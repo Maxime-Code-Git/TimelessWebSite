@@ -1,0 +1,217 @@
+.container {
+  background: var(--bg);
+  color: var(--forest);
+  line-height: 1.6;
+}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+.hero {
+  text-align: center;
+  padding: 96px 28px 100px;
+}
+
+.heroDivider {
+  height: 1px;
+  width: 44px;
+  background: var(--gold);
+  margin: 0 auto 28px;
+}
+
+.heroTitle {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(34px, 6vw, 60px);
+  line-height: 1.1;
+  color: var(--forest-dark);
+  margin: 0 auto 26px;
+  max-width: 760px;
+}
+
+.heroText {
+  font-size: 14.5px;
+  color: var(--forest);
+  letter-spacing: 0.02em;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+/* ── Duo Section ──────────────────────────────────────────── */
+.duoSection {
+  padding: 0 0 110px;
+}
+
+.duoWrapper {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+.duoTitle {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+  text-align: center;
+  margin: 0 0 44px;
+}
+
+.duoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 44px;
+}
+
+.person {
+  text-align: center;
+}
+
+.personImageWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4/5;
+  margin-bottom: 22px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(186,153,107,0.1);
+}
+
+.personImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.personPlaceholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--forest-light);
+  font-size: 14px;
+  font-style: italic;
+}
+
+.personName {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 22px;
+  color: var(--forest-dark);
+  margin-bottom: 4px;
+}
+
+.personRole {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+  margin-bottom: 14px;
+}
+
+.personBio {
+  font-size: 13.5px;
+  color: var(--forest);
+  line-height: 1.7;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+/* ── Approach Section ─────────────────────────────────────── */
+.approachSection {
+  padding: 96px 28px;
+  background-color: var(--forest-light);
+}
+
+.approachWrapper {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.approachTitle {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  text-align: center;
+  margin: 0 0 50px;
+}
+
+.principles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 44px;
+}
+
+.principle {
+  text-align: center;
+}
+
+.principleDivider {
+  height: 1px;
+  width: 28px;
+  background: var(--gold);
+  margin: 0 auto 20px;
+}
+
+.principleTitle {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 22px;
+  color: var(--bg);
+  margin: 0 0 12px;
+}
+
+.principleText {
+  font-size: 13px;
+  color: var(--grey);
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* ── Difference Section ───────────────────────────────────── */
+.differenceSection {
+  padding: 100px 28px;
+}
+
+.differenceWrapper {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.differenceSubtitle {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+  margin: 0 0 26px;
+}
+
+.differenceText {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(20px, 3vw, 26px);
+  line-height: 1.5;
+  color: var(--forest-dark);
+  margin: 0;
+}
+
+/* Responsive Overrides */
+@media (max-width: 720px) {
+  .duoGrid {
+    grid-template-columns: 1fr;
+    gap: 44px;
+  }
+  .principles {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+}

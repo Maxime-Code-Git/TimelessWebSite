@@ -66,7 +66,7 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Une erreur inattendue s'est produite.";
+  const message = "Une erreur inattendue s'est produite.";
   let details = "";
 
   if (error instanceof Error) {

@@ -5,6 +5,9 @@
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc"
   },

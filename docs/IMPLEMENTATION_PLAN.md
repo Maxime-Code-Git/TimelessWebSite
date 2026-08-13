@@ -199,13 +199,13 @@ CREATE INDEX idx_jobs_status_priority ON processing_jobs(status, priority, run_a
 
 ## [CORR. 5] Versions Node et dépendances — verrouillage au moment de l'installation
 
-Node actuel installé : **v26.5.1** (LTS actif — utilisé tel quel).
+Node actuel installé : **v24.1.0** (LTS actif — utilisé tel quel).
 npm actuel : **11.17.0**.
 
 Versions stables à verrouiller au moment du `npm install` initial (seront précisées dans `package.json` avec `^` ou épinglées dans `package-lock.json`).
 `.nvmrc` ou `.node-version` commité avec la version exacte de Node installée.
 
-**Règle** : utiliser les versions stables disponibles au moment du `npm install`, puis verrouiller via `package-lock.json`. Aucune version codée en dur dans les docs au-delà de Node 26.5.1 actuel.
+**Règle** : utiliser les versions stables disponibles au moment du `npm install`, puis verrouiller via `package-lock.json`. Aucune version codée en dur dans les docs au-delà de Node 24.1.0 actuel.
 
 ---
 

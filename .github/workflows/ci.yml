@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 24.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Block Secrets and Private Data
+        run: |
+          echo "Checking for secrets in tracked files..."
+          # Block any .env files except .env.example
+          if git ls-files | grep -E '\.env(\..+)?$' | grep -v '\.env\.example$'; then
+            echo "ERROR: Real .env file found in repository!"
+            exit 1
+          fi
+          # Block SQLite DBs
+          if git ls-files | grep -E '\.(sqlite|db)(-wal|-shm)?$'; then
+            echo "ERROR: SQLite database found in repository!"
+            exit 1
+          fi
+          # Block client media in data/media (except .gitkeep)
+          if git ls-files 'data/media/' | grep -v '\.gitkeep$'; then
+            echo "ERROR: Media files found in data/media!"
+            exit 1
+          fi
+
+      - name: Type Check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit Tests
+        run: npm run test
+
+      - name: Playwright End-to-End Tests
+        run: |
+          npx playwright install --with-deps chromium
+          # E2E tests run on the dev server, which needs to be started
+          npm run test:e2e
+        env:
+          CI: true
+
+      - name: Upload Playwright Traces
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: apps/web/playwright-report/
+          retention-days: 14
+
+      - name: Build
+        run: npm run build

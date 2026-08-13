@@ -1,0 +1,50 @@
+.container {
+  background: var(--bg);
+  color: var(--forest);
+  line-height: 1.6;
+}
+
+.mainSection {
+  padding: 100px 28px;
+}
+
+.wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(26px, 4vw, 40px);
+  color: var(--forest-dark);
+  margin: 0 0 40px;
+  text-align: center;
+}
+
+.content {
+  font-size: 14px;
+  color: var(--forest);
+  line-height: 1.8;
+}
+
+.content h2 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 20px;
+  color: var(--forest-dark);
+  margin: 40px 0 16px;
+}
+
+.content p {
+  margin: 0 0 16px;
+}
+
+.content ul {
+  margin: 0 0 16px;
+  padding-left: 20px;
+}
+
+.content li {
+  margin-bottom: 8px;
+}

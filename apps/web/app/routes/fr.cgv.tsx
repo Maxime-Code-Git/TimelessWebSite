@@ -1,9 +1,37 @@
-// TODO: Full implementation in Phase 2
-import { redirect } from "react-router";
-export async function loader() { return {}; }
-export default function Stub() {
-  return <div style={{padding:'80px 28px',textAlign:'center',fontFamily:'var(--font-sans)',color:'var(--forest)'}}>
-    <p style={{color:'var(--gold-dark)',fontSize:'12px',letterSpacing:'0.2em',textTransform:'uppercase',marginBottom:'16px'}}>Coming soon</p>
-    <h1 style={{fontFamily:'var(--font-serif)',fontSize:'36px',fontWeight:500,color:'var(--forest-deep)'}}>CGV</h1>
-  </div>;
+import type { Route } from "./+types/fr.cgv";
+import { Header } from "~/components/layout/Header";
+import { Footer } from "~/components/layout/Footer";
+import { ScrollTop } from "~/components/ui/ScrollTop";
+import styles from "./legal.module.css";
+
+export function meta(_args: Route.MetaArgs) {
+  return [
+    { title: "Conditions Générales de Vente — Timeless" },
+    { name: "description", content: "Conditions Générales de Vente de Timeless." }
+  ];
+}
+
+export default function CgvFr() {
+  return (
+    <div className={styles.container}>
+      <Header lang="fr" alternateLangHref="/en/terms" />
+      <main className={styles.mainSection}>
+        <div className={styles.wrapper}>
+          <h1 className={styles.title}>Conditions Générales de Vente</h1>
+          <div className={styles.content}>
+            <h2>Objet</h2>
+            <p>Les présentes conditions générales de vente régissent les prestations de photographie et vidéographie de mariage réalisées par Timeless.</p>
+            
+            <h2>Réservation</h2>
+            <p>La réservation d'une prestation n'est définitive qu'à réception d'un acompte de 30% du montant total et de la signature du devis/contrat.</p>
+            
+            <h2>Livraison</h2>
+            <p>Les fichiers numériques sont livrés via une galerie en ligne sécurisée dans les délais indiqués sur le devis, selon la formule choisie.</p>
+          </div>
+        </div>
+      </main>
+      <Footer lang="fr" />
+      <ScrollTop />
+    </div>
+  );
 }

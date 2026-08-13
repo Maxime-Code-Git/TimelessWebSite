@@ -1,0 +1,513 @@
+.container {
+  background: var(--bg);
+  color: var(--forest);
+  line-height: 1.6;
+}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+.hero {
+  text-align: center;
+  padding: 88px 28px 20px;
+}
+
+.heroDivider {
+  height: 1px;
+  width: 44px;
+  background: var(--gold);
+  margin: 0 auto 24px;
+}
+
+.heroTitle {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(34px, 5.5vw, 56px);
+  color: var(--forest-dark);
+  margin: 0 0 16px;
+}
+
+.heroText {
+  font-size: 14px;
+  color: var(--forest);
+  letter-spacing: 0.02em;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* ── Discovery Call Promo ─────────────────────────────────── */
+.callPromo {
+  background: var(--forest-dark);
+  text-align: center;
+  padding: 80px 28px;
+}
+
+.callPromoTitle {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(26px, 4.5vw, 40px);
+  color: var(--bg);
+  margin: 0 0 18px;
+}
+
+.callPromoText {
+  color: var(--grey);
+  font-size: 14px;
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.callPromoTags {
+  display: flex;
+  justify-content: center;
+  gap: 34px;
+  flex-wrap: wrap;
+  margin-top: 34px;
+}
+
+.callPromoTag {
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+}
+
+/* ── Booking Section ──────────────────────────────────────── */
+.bookingSection {
+  padding: 80px 28px 90px;
+}
+
+.bookingWrapper {
+  max-width: 860px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.bookingSubtitle {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+  margin: 0 0 18px;
+}
+
+.bookingTitle {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(26px, 4vw, 38px);
+  color: var(--forest-dark);
+  margin: 0 0 14px;
+}
+
+.bookingText {
+  font-size: 13.5px;
+  color: var(--forest);
+  max-width: 460px;
+  margin: 0 auto 44px;
+}
+
+.bookingGrid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 40px;
+  text-align: left;
+  border: 0.5px solid var(--gold-light);
+  border-radius: 16px;
+  padding: 34px;
+}
+
+/* Calendar Month Header */
+.calHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.calNavBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 0.5px solid var(--gold-light);
+  background: none;
+  color: var(--gold-dark);
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calNavBtn:hover {
+  transform: scale(1.1);
+}
+
+.calMonthLabel {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  color: var(--forest-dark);
+}
+
+/* Calendar Grid */
+.calWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.calWeekday {
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.calDays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.calDay {
+  padding: 9px 0;
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  text-align: center;
+  transition: transform 0.15s;
+  background: none;
+  border: none;
+}
+
+.calDayAvailable {
+  background: rgba(39, 97, 82, 0.06);
+  color: var(--forest-dark);
+  border: 0.5px solid var(--gold);
+  cursor: pointer;
+}
+
+.calDayAvailable:hover {
+  transform: scale(1.05);
+}
+
+.calDaySelected {
+  background: var(--forest-dark);
+  color: var(--bg);
+  border: 0.5px solid var(--gold);
+  cursor: pointer;
+}
+
+.calDayDisabled {
+  background: none;
+  color: #C9CFC6;
+  border: 0.5px solid transparent;
+  cursor: default;
+}
+
+.calDayHidden {
+  visibility: hidden;
+  padding: 9px 0;
+  border: none;
+  background: none;
+}
+
+.calNote {
+  font-size: 11px;
+  color: var(--gold-dark);
+  margin: 20px 0 0;
+  letter-spacing: 0.04em;
+}
+
+/* Time Slots */
+.slotsPanel {
+  border-left: 0.5px solid var(--gold-light);
+  padding-left: 34px;
+}
+
+.slotsTitle {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+  margin: 0 0 18px;
+}
+
+.slotsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.slotBtn {
+  padding: 10px 6px;
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: transform 0.15s;
+  background: none;
+  color: var(--forest);
+  border: 0.5px solid var(--gold-light);
+}
+
+.slotBtn:hover {
+  transform: scale(1.05);
+}
+
+.slotBtnSelected {
+  background: var(--forest-dark);
+  color: var(--gold-light);
+  border: 1px solid var(--gold);
+}
+
+.slotsEmpty {
+  font-size: 13px;
+  color: var(--grey);
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* Booking Confirm */
+.bookingConfirmArea {
+  margin-top: 32px;
+}
+
+.bookingRecap {
+  font-size: 13px;
+  color: var(--forest);
+  margin: 0 0 18px;
+}
+
+.bookingRecap b {
+  color: var(--forest-dark);
+  font-weight: 500;
+}
+
+.bookingConfirmBtn {
+  padding: 14px 34px;
+  border-radius: 26px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transition: transform 0.2s;
+  border: 0.5px solid var(--gold);
+}
+
+.bookingConfirmBtnReady {
+  background: var(--forest-dark);
+  color: var(--gold-light);
+  cursor: pointer;
+}
+
+.bookingConfirmBtnReady:hover {
+  transform: scale(1.04);
+}
+
+.bookingConfirmBtnDisabled {
+  background: none;
+  color: var(--grey);
+  border: 0.5px solid var(--gold-light);
+  cursor: not-allowed;
+}
+
+/* ── Contact Form Section ─────────────────────────────────── */
+.contactSection {
+  padding: 0 0 100px;
+}
+
+.contactWrapper {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+.contactIntro {
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--forest);
+  margin: 0 0 44px;
+}
+
+.contactLayout {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 70px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.formLabel {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+}
+
+.formInput, .formTextarea, .formSelect {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 0.5px solid var(--gold-light);
+  border-radius: 8px;
+  background: var(--bg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--forest-dark);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.formTextarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.formInput:focus, .formTextarea:focus, .formSelect:focus {
+  border-color: var(--gold);
+}
+
+.formSubmitBtn {
+  align-self: flex-start;
+  margin-top: 8px;
+  background: var(--forest-dark);
+  color: var(--gold-light);
+  border: 0.5px solid var(--gold);
+  padding: 14px 34px;
+  border-radius: 26px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.formSubmitBtn:hover {
+  transform: scale(1.04);
+}
+
+/* Contact Details */
+.detailsBox {
+  border: 0.5px solid var(--gold-light);
+  border-radius: 14px;
+  padding: 36px 30px;
+}
+
+.detailsTitle {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+  margin: 0 0 26px;
+}
+
+.detailsList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font-size: 13.5px;
+  color: var(--forest);
+}
+
+.detailLabel {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--grey);
+  margin-bottom: 4px;
+}
+
+.detailsLink {
+  color: var(--forest);
+}
+
+.detailsDivider {
+  height: 1px;
+  background: var(--gold-light);
+  margin: 26px 0 20px;
+}
+
+.detailsNote {
+  font-size: 12.5px;
+  color: var(--gold-dark);
+  margin: 0;
+  font-style: italic;
+}
+
+.formMessage {
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--gold-light);
+  color: var(--forest-dark);
+  font-size: 14px;
+  border-left: 4px solid var(--gold);
+}
+
+/* ── Formules Promo Section ───────────────────────────────── */
+.promoSection {
+  background: var(--forest-light);
+  text-align: center;
+  padding: 44px 28px;
+}
+
+.promoText {
+  color: var(--bg);
+  font-size: 13.5px;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.promoLink {
+  color: var(--gold-light);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-bottom: 0.5px solid var(--gold);
+  padding-bottom: 2px;
+}
+
+/* Responsive Overrides */
+@media (max-width: 760px) {
+  .contactLayout {
+    grid-template-columns: 1fr;
+    gap: 52px;
+  }
+  .bookingGrid {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    padding: 24px;
+  }
+  .slotsPanel {
+    border-left: none;
+    padding-left: 0;
+    border-top: 0.5px solid var(--gold-light);
+    padding-top: 26px;
+  }
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+}
