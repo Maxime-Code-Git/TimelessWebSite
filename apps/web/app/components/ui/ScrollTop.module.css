@@ -1,0 +1,36 @@
+/* ScrollTop button */
+.scrollTop {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 0.5px solid var(--gold);
+  background: rgba(7, 36, 33, 0.75);
+  color: var(--gold-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity var(--transition-base), transform var(--transition-base);
+  z-index: 100;
+  backdrop-filter: blur(4px);
+}
+
+.scrollTop.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.scrollTop:hover {
+  border-color: var(--gold-light);
+  transform: translateY(-2px);
+}
+
+.scrollTop svg {
+  width: 16px;
+  height: 16px;
+}

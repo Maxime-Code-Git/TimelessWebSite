@@ -1,0 +1,37 @@
+import { type RouteConfig, index, route, prefix } from "@react-router/dev/routes";
+
+export default [
+  // ── Root redirect ─────────────────────────────────────────
+  index("routes/root-redirect.tsx"),
+
+  // ── French routes ─────────────────────────────────────────
+  ...prefix("fr", [
+    index("routes/fr._index.tsx"),
+    route("portfolio", "routes/fr.portfolio.tsx"),
+    route("formules", "routes/fr.formules.tsx"),
+    route("a-propos", "routes/fr.about.tsx"),
+    route("contact", "routes/fr.contact.tsx"),
+    route("espace-clients", "routes/fr.clients.tsx"),
+    route("galerie/:id", "routes/fr.gallery.tsx"),
+    route("mentions-legales", "routes/fr.legal.tsx"),
+    route("confidentialite", "routes/fr.privacy.tsx"),
+    route("cgv", "routes/fr.cgv.tsx"),
+  ]),
+
+  // ── English routes ────────────────────────────────────────
+  ...prefix("en", [
+    index("routes/en._index.tsx"),
+    route("portfolio", "routes/en.portfolio.tsx"),
+    route("pricing", "routes/en.pricing.tsx"),
+    route("about", "routes/en.about.tsx"),
+    route("contact", "routes/en.contact.tsx"),
+    route("client-area", "routes/en.clients.tsx"),
+    route("gallery/:id", "routes/en.gallery.tsx"),
+    route("legal", "routes/en.legal.tsx"),
+    route("privacy", "routes/en.privacy.tsx"),
+    route("terms", "routes/en.cgv.tsx"),
+  ]),
+
+  // ── System routes ─────────────────────────────────────────
+  route("*", "routes/404.tsx"),
+] satisfies RouteConfig;

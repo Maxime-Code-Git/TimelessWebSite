@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&amp;family=Hanken+Grotesk:wght@400;500&amp;display=swap" rel="stylesheet">
+<script src="./image-slot.js"></script>
+<style>
+body{margin:0}
+a{color:#276152;text-decoration:none}
+a:hover{color:#BA996B}
+@media (max-width:980px){
+  .tm-gallery{grid-template-columns:repeat(2,1fr) !important;gap:44px 26px !important}
+}
+@media (max-width:720px){
+  .tm-menu{gap:14px !important}
+  .tm-footer-social{gap:18px !important;flex-direction:column !important}
+  .tm-access{grid-template-columns:1fr !important;gap:18px !important}
+  .tm-downloads{flex-direction:column !important;align-items:stretch !important}
+  .tm-gallery{grid-template-columns:1fr !important;gap:40px !important}
+  .tm-gallery > div{grid-column:1 !important}
+}
+</style>
+<script src="./scroll-top.js"></script>
+</helmet>
+
+<div style="background:#FBF6F0;color:#0D3A35;font-family:'Hanken Grotesk',sans-serif;line-height:1.6" data-screen-label="Ma galerie">
+
+  <header style="text-align:center;padding:26px 20px 0">
+    <img src="assets/logo-header.png" alt="Timeless Memory" style="height:96px;width:auto;margin:0 auto;display:block">
+    <nav class="tm-menu" style="display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:22px;padding:18px 20px;margin-top:18px;border-top:0.5px solid #E4C99A;font-size:12px;letter-spacing:0.06em;color:#276152;text-transform:uppercase">
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Portfolio</a>
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Formules</a>
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">À propos</a>
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Contact</a>
+      <a href="#" style="border:0.5px solid #BA996B;color:#9B7846;padding:6px 13px;border-radius:20px;font-size:11px;text-transform:uppercase;display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Espace clients</a>
+      <span style="color:#9B7846;letter-spacing:0.12em">FR · <b style="color:#B1B7AB;font-weight:400">EN</b></span>
+    </nav>
+  </header>
+
+  <section style="position:relative;min-height:56vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:70px 24px;overflow:hidden">
+    <div style="position:absolute;inset:0;z-index:0">
+      <image-slot id="galerie-cover" shape="rect" placeholder="Photo de couverture du mariage" style="width:100%;height:100%"></image-slot>
+    </div>
+    <div style="position:absolute;inset:0;background:rgba(7,36,33,0.85);z-index:1"></div>
+    <div style="position:relative;z-index:2">
+      <p style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#E4C99A;margin:0 0 20px">Votre journée</p>
+      <h1 style="font-family:'Cormorant Garamond',serif;font-weight:500;font-size:clamp(30px,5.5vw,50px);color:#FBF6F0;margin:0 0 14px">Julie &amp; Marc — 14 juin 2025</h1>
+      <p style="font-size:14px;color:#B1B7AB;max-width:440px;margin:0 auto">Bienvenue dans votre galerie privée. Merci de nous avoir confié ce si beau jour.</p>
+    </div>
+  </section>
+
+  <section style="padding:70px 0 0">
+    <div style="max-width:820px;margin:0 auto;padding:0 28px">
+      <div class="tm-access" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <a href="#galerie-photo" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:40px 24px;border:0.5px solid #E4C99A;border-radius:14px;transition:transform .2s" style-hover="transform:translateY(-4px)">
+          <span style="width:48px;height:48px;border-radius:50%;border:1px solid #BA996B;display:flex;align-items:center;justify-content:center;font-size:17px;color:#9B7846">▢</span>
+          <span style="font-family:'Cormorant Garamond',serif;font-weight:500;font-size:20px;color:#072421">Voir les photos</span>
+        </a>
+        <a href="#galerie-video" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:40px 24px;border:0.5px solid #E4C99A;border-radius:14px;transition:transform .2s" style-hover="transform:translateY(-4px)">
+          <span style="width:48px;height:48px;border-radius:50%;border:1px solid #BA996B;display:flex;align-items:center;justify-content:center;font-size:15px;color:#9B7846">▶</span>
+          <span style="font-family:'Cormorant Garamond',serif;font-weight:500;font-size:20px;color:#072421">Voir le film</span>
+        </a>
+      </div>
+
+      <div style="text-align:center;margin-top:40px">
+        <div class="tm-downloads" style="display:flex;justify-content:center;flex-wrap:wrap;gap:14px">
+          <button onClick="{{ noop }}" style="background:#072421;color:#E4C99A;border:0.5px solid #BA996B;padding:15px 36px;border-radius:26px;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;cursor:pointer;transition:transform .2s" style-hover="transform:scale(1.03)">Tout télécharger</button>
+          <button onClick="{{ noop }}" style="background:none;color:#276152;border:0.5px solid #E4C99A;padding:15px 30px;border-radius:26px;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;cursor:pointer;transition:transform .2s" style-hover="transform:scale(1.03)">Télécharger les photos</button>
+          <button onClick="{{ noop }}" style="background:none;color:#276152;border:0.5px solid #E4C99A;padding:15px 30px;border-radius:26px;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;cursor:pointer;transition:transform .2s" style-hover="transform:scale(1.03)">Télécharger les vidéos</button>
+        </div>
+        <p style="font-size:11.5px;color:#9B7846;margin:16px 0 0">Archive .zip — pensez à une connexion stable.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="galerie-photo" style="padding:90px 0 100px">
+    <div style="max-width:1080px;margin:0 auto;padding:0 28px">
+      <p style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:16px;letter-spacing:0.24em;text-transform:uppercase;color:#9B7846;text-align:center;margin:0 0 44px">Vos photos</p>
+      <div class="tm-gallery" style="display:grid;grid-template-columns:repeat(4,1fr);gap:36px 24px">
+        <sc-for list="{{ photos }}" as="photo" hint-placeholder-count="12">
+          <div style="{{ photo.wrapStyle }}">
+            <image-slot id="{{ photo.id }}" shape="rounded" radius="10" placeholder="{{ photo.placeholder }}" style="width:100%;height:100%"></image-slot>
+            <button onClick="{{ noop }}" aria-label="Télécharger cette photo" style="position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;border:0.5px solid #E4C99A;background:rgba(7,36,33,0.55);color:#FBF6F0;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.6;transition:opacity .2s,transform .2s" style-hover="opacity:1;transform:scale(1.1)">↓</button>
+          </div>
+        </sc-for>
+      </div>
+      <div style="text-align:center;margin-top:52px">
+        <button onClick="{{ toggleAll }}" style="background:none;border:none;border-bottom:0.5px solid #BA996B;color:#9B7846;padding:0 2px 3px;font-family:'Hanken Grotesk',sans-serif;font-size:11.5px;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;transition:transform .2s" style-hover="transform:scale(1.06)">{{ toggleLabel }}</button>
+        <p style="font-size:11.5px;color:#B1B7AB;margin:12px 0 0">{{ countLabel }}</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="galerie-video" style="background:#0D3A35;padding:90px 0 100px">
+    <div style="max-width:900px;margin:0 auto;padding:0 28px;text-align:center">
+      <p style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:16px;letter-spacing:0.24em;text-transform:uppercase;color:#E4C99A;margin:0 0 44px">Votre film</p>
+      <div style="position:relative;aspect-ratio:21/9;border-radius:12px;overflow:hidden;border:0.5px solid #E4C99A;background:#000">
+        <button onClick="{{ noop }}" aria-label="Télécharger le film" style="position:absolute;top:14px;right:14px;z-index:3;width:34px;height:34px;border-radius:50%;border:0.5px solid #E4C99A;background:rgba(7,36,33,0.55);color:#FBF6F0;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.6;transition:opacity .2s,transform .2s" style-hover="opacity:1;transform:scale(1.1)">↓</button>
+        <sc-if value="{{ playing }}" hint-placeholder-val="{{ false }}">
+          <video autoPlay="{{ true }}" controls="{{ true }}" muted="{{ true }}" playsInline="{{ true }}" style="width:100%;height:100%;object-fit:cover;display:block"></video>
+        </sc-if>
+        <sc-if value="{{ notPlaying }}" hint-placeholder-val="{{ true }}">
+          <image-slot id="galerie-video-poster" shape="rect" placeholder="Film du mariage (format cinéma)" style="width:100%;height:100%"></image-slot>
+          <button onClick="{{ togglePlay }}" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:68px;height:68px;border-radius:50%;border:1px solid #BA996B;background:rgba(7,36,33,0.55);color:#FBF6F0;font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer">►</button>
+        </sc-if>
+      </div>
+    </div>
+  </section>
+
+  <section style="text-align:center;padding:64px 28px 90px">
+    <p style="font-size:13px;color:#276152;margin:0 0 10px">Votre galerie reste disponible 24 mois.</p>
+    <a href="Timeless Memory - Contact.dc.html" style="font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;color:#9B7846;border-bottom:0.5px solid #BA996B;padding-bottom:2px">Un souci ? Contactez-nous</a>
+  </section>
+
+  <footer style="background:#04211d;text-align:center;padding:56px 28px 40px">
+    <img src="assets/logo-1.png" alt="Timeless Memory" style="height:66px;width:auto;margin:0 auto 30px;opacity:.95;display:block">
+
+    <div class="tm-footer-social" style="display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:30px;margin-bottom:32px">
+      <a href="#" style="display:inline-flex;align-items:center;gap:9px;color:#B1B7AB;font-size:12px;letter-spacing:0.06em;transition:transform .2s" style-hover="transform:scale(1.06)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#BA996B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.5" cy="6.5" r="1"></circle></svg>
+        Instagram
+      </a>
+      <a href="#" style="display:inline-flex;align-items:center;gap:9px;color:#B1B7AB;font-size:12px;letter-spacing:0.06em;transition:transform .2s" style-hover="transform:scale(1.06)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#BA996B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="3"></rect><line x1="7" y1="10" x2="7" y2="17"></line><circle cx="7" cy="6.8" r="0.9"></circle><path d="M11 17v-4a2.5 2.5 0 0 1 5 0v4"></path><line x1="11" y1="10" x2="11" y2="17"></line></svg>
+        LinkedIn
+      </a>
+      <a href="tel:+32400000000" style="display:inline-flex;align-items:center;gap:9px;color:#B1B7AB;font-size:12px;letter-spacing:0.06em;transition:transform .2s" style-hover="transform:scale(1.06)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#BA996B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"></path></svg>
+        +32 4XX XX XX XX
+      </a>
+    </div>
+
+    <a href="Timeless Memory - Contact.dc.html" style="display:inline-block;border:1px solid #BA996B;color:#E4C99A;padding:13px 32px;border-radius:26px;font-size:11.5px;letter-spacing:0.18em;text-transform:uppercase;transition:transform .2s" style-hover="transform:scale(1.04)">Nous contacter</a>
+
+    <div style="height:1px;background:rgba(186,153,107,0.28);max-width:520px;margin:36px auto 22px"></div>
+
+    <div class="tm-menu" style="display:flex;justify-content:center;flex-wrap:wrap;gap:18px;font-size:10.5px;letter-spacing:0.08em;color:#5f8177">
+      <a href="Timeless Memory - Espace Clients.dc.html" style="color:#5f8177">Espace clients</a>
+      <a href="#" style="color:#5f8177">Mentions légales</a>
+      <a href="#" style="color:#5f8177">CGV</a>
+      <a href="#" style="color:#5f8177">Confidentialité</a>
+    </div>
+  </footer>
+
+  <x-import component-from-global-scope="scroll-top-button" from="./scroll-top.js" hint-size="46px,46px"></x-import>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const ALL_PHOTOS = [
+  { id: 'mg-01', ar: '3/4' }, { id: 'mg-02', ar: '3/4' }, { id: 'mg-03', ar: '3/4' }, { id: 'mg-04', ar: '3/4' },
+  { id: 'mg-05', ar: '4/3' }, { id: 'mg-06', ar: '4/3' },
+  { id: 'mg-07', ar: '3/4' }, { id: 'mg-08', ar: '3/4' }, { id: 'mg-09', ar: '3/4' }, { id: 'mg-10', ar: '3/4' },
+  { id: 'mg-11', ar: '4/3' }, { id: 'mg-12', ar: '4/3' },
+  { id: 'mg-13', ar: '3/4' }, { id: 'mg-14', ar: '3/4' }, { id: 'mg-15', ar: '3/4' }, { id: 'mg-16', ar: '3/4' },
+  { id: 'mg-17', ar: '4/3' }, { id: 'mg-18', ar: '4/3' },
+  { id: 'mg-19', ar: '3/4' }, { id: 'mg-20', ar: '3/4' }, { id: 'mg-21', ar: '3/4' }, { id: 'mg-22', ar: '3/4' },
+  { id: 'mg-23', ar: '4/3' }, { id: 'mg-24', ar: '4/3' }
+];
+const INITIAL_COUNT = 12;
+
+class Component extends DCLogic {
+  state = { playing: false, expanded: false };
+
+  renderVals() {
+    const visible = this.state.expanded ? ALL_PHOTOS : ALL_PHOTOS.slice(0, INITIAL_COUNT);
+    const photos = visible.map((p, i) => ({
+      id: p.id,
+      placeholder: `Photo ${i + 1}`,
+      wrapStyle: `position:relative;aspect-ratio:${p.ar};overflow:hidden;width:100%;min-width:0;` + (p.ar === '4/3' ? 'grid-column:span 2' : 'grid-column:span 1')
+    }));
+
+    return {
+      photos,
+      countLabel: `${visible.length} sur ${ALL_PHOTOS.length} photos`,
+      toggleLabel: this.state.expanded ? 'Afficher moins' : 'Voir plus',
+      toggleAll: () => this.setState(s => ({ expanded: !s.expanded })),
+      playing: this.state.playing,
+      notPlaying: !this.state.playing,
+      togglePlay: () => this.setState({ playing: true }),
+      noop: (e) => e.preventDefault()
+    };
+  }
+}
+
+</script>
+</body>
+</html>

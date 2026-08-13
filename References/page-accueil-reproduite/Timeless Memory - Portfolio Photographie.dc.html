@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Hanken+Grotesk:wght@400;500&display=swap" rel="stylesheet">
+<script src="./image-slot.js"></script>
+<style>
+body{margin:0}
+a{color:#276152;text-decoration:none}
+a:hover{color:#BA996B}
+@media (max-width:720px){
+  .tm-gallery{grid-template-columns:1fr !important;gap:40px !important}
+  .tm-gallery > div{grid-column:1 !important}
+  .tm-menu{gap:14px !important}
+  .tm-filters{gap:10px !important}
+  .tm-footer-social{gap:18px !important;flex-direction:column !important}
+}
+</style>
+<script src="./scroll-top.js"></script>
+</helmet>
+
+<div style="background:#FBF6F0;color:#0D3A35;font-family:'Hanken Grotesk',sans-serif;line-height:1.6" data-screen-label="Portfolio - Photographie">
+
+  <header style="text-align:center;padding:26px 20px 0">
+    <img src="assets/logo-header.png" alt="Timeless Memory" style="height:96px;width:auto;margin:0 auto;display:block">
+    <nav class="tm-menu" style="display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:22px;padding:18px 20px;margin-top:18px;border-top:0.5px solid #E4C99A;font-size:12px;letter-spacing:0.06em;color:#276152;text-transform:uppercase">
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Portfolio</a>
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Formules</a>
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">À propos</a>
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Contact</a>
+      <a href="#" style="border:0.5px solid #BA996B;color:#9B7846;padding:6px 13px;border-radius:20px;font-size:11px;text-transform:uppercase;display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Espace clients</a>
+      <span style="color:#9B7846;letter-spacing:0.12em">FR · <b style="color:#B1B7AB;font-weight:400">EN</b></span>
+    </nav>
+  </header>
+
+  <section style="text-align:center;padding:80px 28px 20px">
+    <div style="height:1px;width:44px;background:#BA996B;margin:0 auto 24px"></div>
+    <h1 style="font-family:'Cormorant Garamond',serif;font-weight:500;font-size:clamp(34px,5.5vw,56px);color:#072421;margin:0 0 16px">Photographie</h1>
+    <p style="font-size:14px;color:#276152;letter-spacing:0.02em;max-width:480px;margin:0 auto">Un regard sincère sur vos instants, saisis tels qu'ils se vivent.</p>
+    <div style="display:flex;justify-content:center;gap:12px;margin-top:30px">
+      <a href="#galerie-photo" style="display:inline-block;background:#072421;color:#FBF6F0;padding:10px 26px;border-radius:22px;font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;border:0.5px solid #072421;transition:transform .2s" style-hover="transform:scale(1.08)">Photo</a>
+      <a href="#galerie-video" style="display:inline-block;background:transparent;color:#276152;padding:10px 26px;border-radius:22px;font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;border:0.5px solid #E4C99A;transition:transform .2s" style-hover="transform:scale(1.08)">Vidéo</a>
+    </div>
+  </section>
+
+  <section style="text-align:center;padding:8px 28px 56px">
+    <div class="tm-filters" style="display:flex;justify-content:center;flex-wrap:wrap;gap:14px">
+      <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+        <button onClick="{{ selectFilter }}" data-key="{{ f.key }}" style="{{ f.style }}" style-hover="{{ f.styleHover }}">{{ f.label }}</button>
+      </sc-for>
+    </div>
+  </section>
+
+  <section id="galerie-photo" style="padding:0 0 100px">
+    <div style="max-width:1080px;margin:0 auto;padding:0 28px">
+      <div class="tm-gallery" style="display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:dense;gap:56px 28px">
+        <sc-for list="{{ photos }}" as="photo" hint-placeholder-count="9">
+          <div style="{{ photo.wrapStyle }}">
+            <image-slot id="{{ photo.id }}" shape="rounded" radius="10" placeholder="{{ photo.placeholder }}" style="{{ photo.slotStyle }}" style-hover="{{ photo.slotHoverStyle }}"></image-slot>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section id="galerie-video" style="background:#072421;text-align:center;padding:80px 28px">
+    <p style="font-size:11px;letter-spacing:0.28em;text-transform:uppercase;color:#E4C99A;margin:0 0 18px">Et en mouvement</p>
+    <h2 style="font-family:'Cormorant Garamond',serif;font-weight:500;font-size:clamp(26px,4vw,38px);color:#FBF6F0;margin:0 0 34px">Découvrez le film de votre journée.</h2>
+    <div style="max-width:760px;margin:0 auto;position:relative;aspect-ratio:16/9;border-radius:14px;overflow:hidden;border:0.5px solid #E4C99A;background:#000">
+      <sc-if value="{{ playing }}" hint-placeholder-val="{{ false }}">
+        <video autoPlay="{{ true }}" controls="{{ true }}" muted="{{ true }}" playsInline="{{ true }}" style="width:100%;height:100%;object-fit:cover;display:block"></video>
+      </sc-if>
+      <sc-if value="{{ notPlaying }}" hint-placeholder-val="{{ true }}">
+        <image-slot id="video-poster" shape="rect" placeholder="Extrait du film (horizontal)" style="width:100%;height:100%"></image-slot>
+        <button onClick="{{ togglePlay }}" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;border:1px solid #BA996B;background:rgba(7,36,33,0.55);color:#FBF6F0;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer">►</button>
+      </sc-if>
+    </div>
+    <a href="#" style="display:inline-block;margin-top:28px;color:#E4C99A;font-size:11.5px;letter-spacing:0.14em;text-transform:uppercase;border-bottom:0.5px solid #BA996B;padding-bottom:2px">Voir tous les films</a>
+  </section>
+
+  <footer style="background:#04211d;text-align:center;padding:56px 28px 40px">
+    <img src="assets/logo-1.png" alt="Timeless Memory" style="height:66px;width:auto;margin:0 auto 30px;opacity:.95;display:block">
+
+    <div class="tm-footer-social" style="display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:30px;margin-bottom:32px">
+      <a href="#" style="display:inline-flex;align-items:center;gap:9px;color:#B1B7AB;font-size:12px;letter-spacing:0.06em;transition:transform .2s" style-hover="transform:scale(1.06)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#BA996B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.5" cy="6.5" r="1"></circle></svg>
+        Instagram
+      </a>
+      <a href="#" style="display:inline-flex;align-items:center;gap:9px;color:#B1B7AB;font-size:12px;letter-spacing:0.06em;transition:transform .2s" style-hover="transform:scale(1.06)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#BA996B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="3"></rect><line x1="7" y1="10" x2="7" y2="17"></line><circle cx="7" cy="6.8" r="0.9"></circle><path d="M11 17v-4a2.5 2.5 0 0 1 5 0v4"></path><line x1="11" y1="10" x2="11" y2="17"></line></svg>
+        LinkedIn
+      </a>
+      <a href="tel:+32400000000" style="display:inline-flex;align-items:center;gap:9px;color:#B1B7AB;font-size:12px;letter-spacing:0.06em;transition:transform .2s" style-hover="transform:scale(1.06)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#BA996B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"></path></svg>
+        +32 4XX XX XX XX
+      </a>
+    </div>
+
+    <a href="Timeless Memory - Contact.dc.html" style="display:inline-block;border:1px solid #BA996B;color:#E4C99A;padding:13px 32px;border-radius:26px;font-size:11.5px;letter-spacing:0.18em;text-transform:uppercase;transition:transform .2s" style-hover="transform:scale(1.04)">Nous contacter</a>
+
+    <div style="height:1px;background:rgba(186,153,107,0.28);max-width:520px;margin:36px auto 22px"></div>
+
+    <div class="tm-menu" style="display:flex;justify-content:center;flex-wrap:wrap;gap:18px;font-size:10.5px;letter-spacing:0.08em;color:#5f8177">
+      <a href="Timeless Memory - Espace Clients.dc.html" style="color:#5f8177">Espace clients</a>
+      <a href="#" style="color:#5f8177">Mentions légales</a>
+      <a href="#" style="color:#5f8177">CGV</a>
+      <a href="#" style="color:#5f8177">Confidentialité</a>
+    </div>
+  </footer>
+
+  <x-import component-from-global-scope="scroll-top-button" from="./scroll-top.js" hint-size="46px,46px"></x-import>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const ALL_PHOTOS = [
+  { id: 'ph-01', ar: '3/4', cat: 'ceremonie', label: 'Cérémonie' },
+  { id: 'ph-02', ar: '3/4', cat: 'portraits', label: 'Portraits' },
+  { id: 'ph-03', ar: '4/3', cat: 'reception', label: 'Réception' },
+  { id: 'ph-04', ar: '3/4', cat: 'ceremonie', label: 'Cérémonie' },
+  { id: 'ph-05', ar: '3/4', cat: 'portraits', label: 'Portraits' },
+  { id: 'ph-06', ar: '4/3', cat: 'reception', label: 'Réception' },
+  { id: 'ph-07', ar: '3/4', cat: 'ceremonie', label: 'Cérémonie' },
+  { id: 'ph-08', ar: '3/4', cat: 'reception', label: 'Réception' },
+  { id: 'ph-09', ar: '4/3', cat: 'portraits', label: 'Portraits' }
+];
+const FILTERS = [
+  { key: 'tout', label: 'Tout' },
+  { key: 'ceremonie', label: 'Cérémonie' },
+  { key: 'portraits', label: 'Portraits' },
+  { key: 'reception', label: 'Réception' }
+];
+
+class Component extends DCLogic {
+  state = { filter: 'tout', playing: false };
+
+  renderVals() {
+    const active = this.state.filter;
+    const filters = FILTERS.map(f => ({
+      key: f.key,
+      label: f.label,
+      style: 'padding:9px 18px;border-radius:20px;font-family:\'Hanken Grotesk\',sans-serif;font-size:11.5px;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:transform .2s,background .2s;' +
+        (f.key === active
+          ? 'background:#072421;color:#FBF6F0;border:0.5px solid #072421'
+          : 'background:transparent;color:#276152;border:0.5px solid #E4C99A'),
+      styleHover: 'transform:scale(1.08)'
+    }));
+
+    const photos = ALL_PHOTOS
+      .filter(p => active === 'tout' || p.cat === active)
+      .map(p => ({
+        id: p.id,
+        placeholder: p.label,
+        wrapStyle: `aspect-ratio:${p.ar};overflow:hidden;width:100%;min-width:0;` + (p.ar === '4/3' ? 'grid-column:span 2' : 'grid-column:span 1'),
+        slotStyle: 'width:100%;height:100%;transition:box-shadow .25s,filter .25s',
+        slotHoverStyle: 'box-shadow:0 0 0 1px #BA996B;filter:brightness(0.96)'
+      }));
+
+    return {
+      filters,
+      photos,
+      selectFilter: (e) => this.setState({ filter: e.currentTarget.getAttribute('data-key') }),
+      playing: this.state.playing,
+      notPlaying: !this.state.playing,
+      togglePlay: () => this.setState({ playing: true })
+    };
+  }
+}
+
+</script>
+</body>
+</html>

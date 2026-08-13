@@ -1,0 +1,389 @@
+/* ============================================================
+   TIMELESS PHOTO & VIDEO — Global CSS
+   Design system: tokens, reset, typography, utilities
+   NO Tailwind. Pure CSS with Custom Properties.
+   ============================================================ */
+
+/* ── 1. Design Tokens ─────────────────────────────────────── */
+:root {
+  /* Brand colors — exact palette from maquettes */
+  --ivory:        #FBF6F0;
+  --forest-deep:  #072421;
+  --forest:       #0D3A35;
+  --green:        #276152;
+  --gold:         #BA996B;
+  --gold-light:   #E4C99A;
+  --gold-dark:    #9B7846;
+  --sage:         #B1B7AB;
+  --footer-bg:    #04211D;
+  --footer-link:  #5F8177;
+
+  /* Typography — loaded from local WOFF2, no Google Fonts */
+  --font-serif:   'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-sans:    'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+
+  /* Spacing scale */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  28px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-22: 88px;
+  --space-24: 96px;
+
+  /* Border radius */
+  --radius-sm:  8px;
+  --radius-md:  14px;
+  --radius-lg:  16px;
+  --radius-pill: 26px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.25s ease;
+
+  /* Max widths */
+  --max-w-content: 1120px;
+  --max-w-narrow:  720px;
+  --max-w-wide:    1280px;
+
+  /* Gold border used throughout */
+  --border-gold:      0.5px solid var(--gold);
+  --border-gold-thin: 0.5px solid var(--gold-light);
+}
+
+/* ── 2. Font-face declarations — self-hosted WOFF2 only ───── */
+/* Cormorant Garamond */
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/CormorantGaramond-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/CormorantGaramond-Italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/CormorantGaramond-Medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/CormorantGaramond-MediumItalic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/CormorantGaramond-SemiBold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/CormorantGaramond-SemiBoldItalic.woff2') format('woff2');
+}
+
+/* Hanken Grotesk */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/HankenGrotesk-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/HankenGrotesk-Italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/HankenGrotesk-Medium.woff2') format('woff2');
+}
+
+/* ── 3. Prevent synthetic font variants ───────────────────── */
+* {
+  font-synthesis: none;
+}
+
+/* ── 4. Box model reset ───────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── 5. Base HTML & body ──────────────────────────────────── */
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  background-color: var(--ivory);
+  color: var(--forest);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── 6. Typography ────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+  line-height: 1.1;
+}
+
+a {
+  color: var(--green);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--gold);
+}
+
+a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+img, video {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ── 7. Layout utilities ──────────────────────────────────── */
+.container {
+  max-width: var(--max-w-content);
+  margin-inline: auto;
+  padding-inline: var(--space-7);
+}
+
+.container--narrow {
+  max-width: var(--max-w-narrow);
+  margin-inline: auto;
+  padding-inline: var(--space-7);
+}
+
+/* ── 8. Common section patterns ───────────────────────────── */
+.section {
+  padding-block: var(--space-22);
+}
+
+.section--dark {
+  background-color: var(--forest);
+  color: var(--ivory);
+}
+
+.section--deep {
+  background-color: var(--forest-deep);
+  color: var(--ivory);
+}
+
+.section--footer {
+  background-color: var(--footer-bg);
+  color: var(--sage);
+}
+
+/* ── 9. Gold divider (used across pages) ─────────────────── */
+.gold-divider {
+  height: 1px;
+  width: 44px;
+  background-color: var(--gold);
+  margin-inline: auto;
+  margin-bottom: var(--space-7);
+}
+
+.gold-divider--short {
+  width: 28px;
+  margin-bottom: var(--space-5);
+}
+
+/* ── 10. Eyebrow label (small uppercase with letter-spacing) ─ */
+.eyebrow {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+}
+
+.eyebrow--light {
+  color: var(--gold-light);
+}
+
+.eyebrow--tiny {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+}
+
+/* ── 11. Buttons ─────────────────────────────────────────── */
+.btn {
+  display: inline-block;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 13px 32px;
+  transition: transform var(--transition-base);
+  border: 1px solid var(--gold);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:hover {
+  transform: scale(1.04);
+}
+
+.btn--primary {
+  background-color: var(--forest-deep);
+  color: var(--gold-light);
+  border-color: var(--gold);
+}
+
+.btn--outline {
+  background-color: transparent;
+  color: var(--gold-light);
+  border-color: var(--gold);
+}
+
+.btn--outline-green {
+  background-color: transparent;
+  color: var(--green);
+  border-color: var(--gold-light);
+}
+
+.btn--small {
+  font-size: 11px;
+  padding: 6px 13px;
+  border-width: 0.5px;
+}
+
+/* ── 12. Form elements ────────────────────────────────────── */
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 0.5px solid var(--gold-light);
+  border-radius: var(--radius-sm);
+  background-color: var(--ivory);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--forest-deep);
+  outline: none;
+  transition: border-color var(--transition-base);
+}
+
+.input:focus {
+  border-color: var(--gold);
+}
+
+/* ── 13. Skip link (accessibility) ───────────────────────── */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: var(--space-4);
+  background: var(--forest-deep);
+  color: var(--gold-light);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  z-index: 9999;
+  transition: top var(--transition-base);
+}
+
+.skip-link:focus {
+  top: var(--space-4);
+}
+
+/* ── 14. Visually hidden (screen reader only) ─────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── 15. Responsive breakpoints ───────────────────────────── */
+/* Mobile first — breakpoints mirror the maquettes */
+/* sm: 390px (mobile), md: 768px (tablet), lg: 1024px, xl: 1440px */
+
+@media (max-width: 720px) {
+  .container,
+  .container--narrow {
+    padding-inline: var(--space-5);
+  }
+
+  .section {
+    padding-block: 60px;
+  }
+}

@@ -1,0 +1,101 @@
+/* Header component styles */
+.header {
+  text-align: center;
+  padding: 26px 20px 0;
+}
+
+.logo {
+  display: block;
+  margin-inline: auto;
+}
+
+/* Homepage: large logo */
+.logo--large {
+  height: 173px;
+  width: 173px;
+  object-fit: contain;
+}
+
+/* Other pages: compact logo */
+.logo--compact {
+  height: 96px;
+  width: auto;
+}
+
+.nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 22px;
+  padding: 18px 20px;
+  margin-top: 18px;
+  border-top: 0.5px solid var(--gold-light);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--green);
+  text-transform: uppercase;
+}
+
+.navLink {
+  display: inline-block;
+  color: var(--green);
+  text-decoration: none;
+  transition: transform var(--transition-base), color var(--transition-base);
+}
+
+.navLink:hover {
+  transform: scale(1.08);
+  color: var(--gold);
+}
+
+.navLink[aria-current="page"] {
+  color: var(--forest-deep);
+  font-weight: 500;
+}
+
+.clientBtn {
+  border: 0.5px solid var(--gold);
+  color: var(--gold-dark);
+  padding: 6px 13px;
+  border-radius: 20px;
+  font-size: 11px;
+  text-transform: uppercase;
+  display: inline-block;
+  transition: transform var(--transition-base), background-color var(--transition-base);
+  text-decoration: none;
+  font-family: var(--font-sans);
+  letter-spacing: 0.06em;
+}
+
+.clientBtn:hover {
+  transform: scale(1.08);
+  background-color: var(--gold);
+  color: var(--ivory);
+}
+
+.langSwitcher {
+  color: var(--gold-dark);
+  letter-spacing: 0.12em;
+  font-size: 12px;
+}
+
+.langActive {
+  color: var(--gold-dark);
+  font-weight: 500;
+}
+
+.langInactive {
+  color: var(--sage);
+  font-weight: 400;
+}
+
+.langDot {
+  margin-inline: 4px;
+}
+
+@media (max-width: 720px) {
+  .nav {
+    gap: 14px;
+  }
+}

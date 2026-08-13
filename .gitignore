@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.vite/
+.cache/
+
+# Environment variables (NEVER commit secrets)
+.env
+.env.local
+.env.production
+.env.*.local
+!.env.example
+
+# Data (never commit)
+data/
+!data/.gitkeep
+
+# Media (mounted SSD, never commit)
+/Volumes/TimelessMedia
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Font extraction temp (sources in references/fonts/ are committed)
+references/fonts-extracted/
+
+# Test artifacts
+test-results/
+playwright-report/
+coverage/
+
+# Docker
+.docker/
+
+# Editors
+.idea/
+*.swp
+*.swo
+
+# Admin path (NEVER commit)
+ADMIN_PATH.txt

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Hanken+Grotesk:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#276152;text-decoration:none}
+a:hover{color:#BA996B}
+@media (max-width:760px){
+  .tm-menu{gap:14px !important}
+  .tm-contact-grid{grid-template-columns:1fr !important;gap:52px !important}
+  .tm-booking{grid-template-columns:1fr !important;gap:30px !important;padding:24px !important}
+  .tm-booking > div:last-child{border-left:none !important;padding-left:0 !important;border-top:0.5px solid #E4C99A;padding-top:26px}
+  .tm-footer-social{gap:18px !important;flex-direction:column !important}
+}
+</style>
+<script src="./scroll-top.js"></script>
+</helmet>
+
+<div style="background:#FBF6F0;color:#0D3A35;font-family:'Hanken Grotesk',sans-serif;line-height:1.6" data-screen-label="Contact">
+
+  <header style="text-align:center;padding:26px 20px 0">
+    <img src="assets/logo-header.png" alt="Timeless Memory" style="height:96px;width:auto;margin:0 auto;display:block">
+    <nav class="tm-menu" style="display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:22px;padding:18px 20px;margin-top:18px;border-top:0.5px solid #E4C99A;font-size:12px;letter-spacing:0.06em;color:#276152;text-transform:uppercase">
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Portfolio</a>
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Formules</a>
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">À propos</a>
+      <a href="#" style="display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Contact</a>
+      <a href="#" style="border:0.5px solid #BA996B;color:#9B7846;padding:6px 13px;border-radius:20px;font-size:11px;text-transform:uppercase;display:inline-block;transition:transform .2s" style-hover="transform:scale(1.08)">Espace clients</a>
+      <span style="color:#9B7846;letter-spacing:0.12em">FR · <b style="color:#B1B7AB;font-weight:400">EN</b></span>
+    </nav>
+  </header>
+
+  <section style="text-align:center;padding:88px 28px 20px">
+    <div style="height:1px;width:44px;background:#BA996B;margin:0 auto 24px"></div>
+    <h1 style="font-family:'Cormorant Garamond',serif;font-weight:500;font-size:clamp(34px,5.5vw,56px);color:#072421;margin:0 0 16px">Racontons votre jour.</h1>
+    <p style="font-size:14px;color:#276152;letter-spacing:0.02em;max-width:480px;margin:0 auto">Écrivez-nous, sans engagement — nous prendrons le temps de vous répondre.</p>
+  </section>
+
+  <section style="background:#072421;text-align:center;padding:80px 28px">
+    <h2 style="font-family:'Cormorant Garamond',serif;font-weight:500;font-size:clamp(26px,4.5vw,40px);color:#FBF6F0;margin:0 0 18px">Envie de nous parler de vive voix ?</h2>
+    <p style="color:#B1B7AB;font-size:14px;max-width:460px;margin:0 auto">Un appel découverte gratuit, sans engagement, pour faire connaissance et parler de votre mariage.</p>
+    <div style="display:flex;justify-content:center;gap:34px;flex-wrap:wrap;margin-top:34px">
+      <span style="font-size:11.5px;letter-spacing:0.08em;text-transform:uppercase;color:#9B7846">30 minutes</span>
+      <span style="font-size:11.5px;letter-spacing:0.08em;text-transform:uppercase;color:#9B7846">Sans engagement</span>
+      <span style="font-size:11.5px;letter-spacing:0.08em;text-transform:uppercase;color:#9B7846">En visio ou par téléphone</span>
+    </div>
+  </section>
+
+  <section id="reservation" style="padding:80px 28px 90px">
+    <div style="max-width:860px;margin:0 auto;text-align:center">
+      <p style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:15px;letter-spacing:0.22em;text-transform:uppercase;color:#9B7846;margin:0 0 18px">Rendez-vous</p>
+      <h2 style="font-family:'Cormorant Garamond',serif;font-weight:500;font-size:clamp(26px,4vw,38px);color:#072421;margin:0 0 14px">Choisissez votre créneau</h2>
+      <p style="font-size:13.5px;color:#276152;max-width:460px;margin:0 auto 44px">Sélectionnez le jour et l'heure qui vous conviennent pour un appel de 30 minutes.</p>
+
+      <div class="tm-booking" style="display:grid;grid-template-columns:1.15fr 1fr;gap:40px;text-align:left;border:0.5px solid #E4C99A;border-radius:16px;padding:34px">
+
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+            <button onClick="{{ prevMonth }}" aria-label="Mois précédent" style="width:32px;height:32px;border-radius:50%;border:0.5px solid #E4C99A;background:none;color:#9B7846;font-size:14px;cursor:pointer;transition:transform .2s" style-hover="transform:scale(1.1)">‹</button>
+            <span style="font-family:'Cormorant Garamond',serif;font-size:20px;color:#072421">{{ monthLabel }}</span>
+            <button onClick="{{ nextMonth }}" aria-label="Mois suivant" style="width:32px;height:32px;border-radius:50%;border:0.5px solid #E4C99A;background:none;color:#9B7846;font-size:14px;cursor:pointer;transition:transform .2s" style-hover="transform:scale(1.1)">›</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:10px">
+            <sc-for list="{{ weekdays }}" as="wd" hint-placeholder-count="7">
+              <div style="text-align:center;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#B1B7AB">{{ wd }}</div>
+            </sc-for>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+            <sc-for list="{{ days }}" as="day" hint-placeholder-count="35">
+              <button onClick="{{ day.onClick }}" disabled="{{ day.disabled }}" style="{{ day.style }}">{{ day.label }}</button>
+            </sc-for>
+          </div>
+          <p style="font-size:11px;color:#9B7846;margin:20px 0 0;letter-spacing:0.04em">Appels disponibles les mardis et jeudis.</p>
+        </div>
+
+        <div style="border-left:0.5px solid #E4C99A;padding-left:34px">
+          <p style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#9B7846;margin:0 0 18px">Créneaux disponibles</p>
+          <sc-if value="{{ hasDay }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+              <sc-for list="{{ slots }}" as="slot" hint-placeholder-count="8">
+                <button onClick="{{ slot.onClick }}" style="{{ slot.style }}">{{ slot.label }}</button>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ noDay }}" hint-placeholder-val="{{ true }}">
+            <p style="font-size:13px;color:#B1B7AB;line-height:1.7;margin:0">Sélectionnez d'abord un mardi ou un jeudi dans le calendrier.</p>
+          </sc-if>
+        </div>
+
+      </div>
+
+      <div style="margin-top:32px">
+        <p style="font-size:13px;color:#276152;margin:0 0 18px">Votre appel : <b style="color:#072421;font-weight:500">{{ recap }}</b></p>
+        <button onClick="{{ confirm }}" disabled="{{ confirmDisabled }}" style="{{ confirmStyle }}">Confirmer le rendez-vous</button>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding:0 0 100px">
+    <div style="max-width:1080px;margin:0 auto;padding:0 28px">
+      <p style="text-align:center;font-size:13.5px;color:#276152;margin:0 0 44px">Vous préférez écrire ? Remplissez le formulaire ci-dessous.</p>
+      <div class="tm-contact-grid" style="display:grid;grid-template-columns:1.3fr 1fr;gap:70px">
+
+        <form style="display:flex;flex-direction:column;gap:22px" onSubmit="{{ preventSubmit }}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <label for="tm-names" style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#9B7846">Prénom(s) des futurs mariés</label>
+              <input id="tm-names" type="text" placeholder="Camille &amp; Antoine" style="{{ inputStyle }}" style-focus="{{ inputFocusStyle }}"></input>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <label for="tm-email" style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#9B7846">Adresse e-mail</label>
+              <input id="tm-email" type="email" placeholder="vous@exemple.com" style="{{ inputStyle }}" style-focus="{{ inputFocusStyle }}"></input>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <label for="tm-phone" style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#9B7846">Téléphone (optionnel)</label>
+              <input id="tm-phone" type="tel" placeholder="06 12 34 56 78" style="{{ inputStyle }}" style-focus="{{ inputFocusStyle }}"></input>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <label for="tm-date" style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#9B7846">Date du mariage</label>
+              <input id="tm-date" type="date" style="{{ inputStyle }}" style-focus="{{ inputFocusStyle }}"></input>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label for="tm-lieu" style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#9B7846">Lieu / région du mariage</label>
+            <input id="tm-lieu" type="text" placeholder="Provence, Île-de-France…" style="{{ inputStyle }}" style-focus="{{ inputFocusStyle }}"></input>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label for="tm-formule" style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#9B7846">Formule qui vous intéresse</label>
+            <select id="tm-formule" style="{{ inputStyle }}" style-focus="{{ inputFocusStyle }}">
+              <option value="">Sélectionner…</option>
+              <optgroup label="Photographie">
+                <option value="photo-essentiel">Photo — Essentiel</option>
+                <option value="photo-signature">Photo — Signature</option>
+                <option value="photo-prestige">Photo — Prestige</option>
+              </optgroup>
+              <optgroup label="Film">
+                <option value="film-essentiel">Film — Essentiel</option>
+                <option value="film-signature">Film — Signature</option>
+                <option value="film-prestige">Film — Prestige</option>
+              </optgroup>
+              <optgroup label="Photo &amp; Film">
+                <option value="duo-essentiel">Photo &amp; Film — Essentiel</option>
+                <option value="duo-signature">Photo &amp; Film — Signature</option>
+                <option value="duo-prestige">Photo &amp; Film — Prestige</option>
+              </optgroup>
+              <option value="sur-mesure">Sur-mesure</option>
+              <option value="ne-sais-pas">Je ne sais pas encore</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label for="tm-message" style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#9B7846">Votre message</label>
+            <textarea id="tm-message" rows="5" placeholder="Racontez-nous votre projet, vos envies, votre journée…" style="{{ textareaStyle }}" style-focus="{{ inputFocusStyle }}"></textarea>
+          </div>
+          <button type="submit" style="align-self:flex-start;margin-top:8px;background:#072421;color:#E4C99A;border:0.5px solid #BA996B;padding:14px 34px;border-radius:26px;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;cursor:pointer;transition:transform .2s" style-hover="transform:scale(1.04)">Envoyer</button>
+        </form>
+
+        <div>
+          <div style="border:0.5px solid #E4C99A;border-radius:14px;padding:36px 30px">
+            <p style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:15px;letter-spacing:0.2em;text-transform:uppercase;color:#9B7846;margin:0 0 26px">Coordonnées</p>
+            <div style="display:flex;flex-direction:column;gap:20px;font-size:13.5px;color:#276152">
+              <div>
+                <div style="font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:#B1B7AB;margin-bottom:4px">E-mail</div>
+                <div>bonjour@timelessmemory.fr</div>
+              </div>
+              <div>
+                <div style="font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:#B1B7AB;margin-bottom:4px">Téléphone</div>
+                <div>06 00 00 00 00</div>
+              </div>
+              <div>
+                <div style="font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:#B1B7AB;margin-bottom:4px">Zone d'intervention</div>
+                <div>France entière &amp; mariages à l'étranger</div>
+              </div>
+              <div>
+                <div style="font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:#B1B7AB;margin-bottom:4px">Réseaux</div>
+                <a href="#" style="color:#276152">Instagram</a>
+              </div>
+            </div>
+            <div style="height:1px;background:#E4C99A;margin:26px 0 20px"></div>
+            <p style="font-size:12.5px;color:#9B7846;margin:0;font-style:italic">Nous répondons sous 48h.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section style="background:#0D3A35;text-align:center;padding:44px 28px">
+    <p style="color:#FBF6F0;font-size:13.5px;margin:0;display:inline-flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center">
+      Envie d'en savoir plus sur nos formules ?
+      <a href="Timeless Memory - Formules.dc.html" style="color:#E4C99A;font-size:11.5px;letter-spacing:0.12em;text-transform:uppercase;border-bottom:0.5px solid #BA996B;padding-bottom:2px">Voir nos formules</a>
+    </p>
+  </section>
+
+  <footer style="background:#04211d;text-align:center;padding:56px 28px 40px">
+    <img src="assets/logo-1.png" alt="Timeless Memory" style="height:66px;width:auto;margin:0 auto 30px;opacity:.95;display:block">
+
+    <div class="tm-footer-social" style="display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:30px;margin-bottom:32px">
+      <a href="#" style="display:inline-flex;align-items:center;gap:9px;color:#B1B7AB;font-size:12px;letter-spacing:0.06em;transition:transform .2s" style-hover="transform:scale(1.06)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#BA996B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.5" cy="6.5" r="1"></circle></svg>
+        Instagram
+      </a>
+      <a href="#" style="display:inline-flex;align-items:center;gap:9px;color:#B1B7AB;font-size:12px;letter-spacing:0.06em;transition:transform .2s" style-hover="transform:scale(1.06)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#BA996B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="3"></rect><line x1="7" y1="10" x2="7" y2="17"></line><circle cx="7" cy="6.8" r="0.9"></circle><path d="M11 17v-4a2.5 2.5 0 0 1 5 0v4"></path><line x1="11" y1="10" x2="11" y2="17"></line></svg>
+        LinkedIn
+      </a>
+      <a href="tel:+32400000000" style="display:inline-flex;align-items:center;gap:9px;color:#B1B7AB;font-size:12px;letter-spacing:0.06em;transition:transform .2s" style-hover="transform:scale(1.06)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#BA996B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"></path></svg>
+        +32 4XX XX XX XX
+      </a>
+    </div>
+
+    <a href="Timeless Memory - Contact.dc.html" style="display:inline-block;border:1px solid #BA996B;color:#E4C99A;padding:13px 32px;border-radius:26px;font-size:11.5px;letter-spacing:0.18em;text-transform:uppercase;transition:transform .2s" style-hover="transform:scale(1.04)">Nous contacter</a>
+
+    <div style="height:1px;background:rgba(186,153,107,0.28);max-width:520px;margin:36px auto 22px"></div>
+
+    <div class="tm-menu" style="display:flex;justify-content:center;flex-wrap:wrap;gap:18px;font-size:10.5px;letter-spacing:0.08em;color:#5f8177">
+      <a href="Timeless Memory - Espace Clients.dc.html" style="color:#5f8177">Espace clients</a>
+      <a href="#" style="color:#5f8177">Mentions légales</a>
+      <a href="#" style="color:#5f8177">CGV</a>
+      <a href="#" style="color:#5f8177">Confidentialité</a>
+    </div>
+  </footer>
+
+  <x-import component-from-global-scope="scroll-top-button" from="./scroll-top.js" hint-size="46px,46px"></x-import>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const WEEKDAYS = ['Lu','Ma','Me','Je','Ve','Sa','Di'];
+const SLOTS = ['10:00 – 10:30','10:30 – 11:00','11:00 – 11:30','11:30 – 12:00','14:00 – 14:30','14:30 – 15:00','15:00 – 15:30','15:30 – 16:00'];
+
+class Component extends DCLogic {
+  state = { year: new Date().getFullYear(), month: new Date().getMonth(), selDay: null, selSlot: null };
+
+  shiftMonth(delta) {
+    this.setState(s => {
+      let m = s.month + delta, y = s.year;
+      if (m < 0) { m = 11; y -= 1; }
+      if (m > 11) { m = 0; y += 1; }
+      return { year: y, month: m, selDay: null, selSlot: null };
+    });
+  }
+
+  buildCalendar() {
+    const { year, month, selDay } = this.state;
+    const first = new Date(year, month, 1);
+    const offset = (first.getDay() + 6) % 7;
+    const total = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < offset; i++) {
+      cells.push({ label: '', disabled: true, style: 'visibility:hidden;padding:9px 0;border:none;background:none' });
+    }
+    for (let d = 1; d <= total; d++) {
+      const dow = new Date(year, month, d).getDay();
+      const open = dow === 2 || dow === 4;
+      const selected = selDay === d;
+      let style = "padding:9px 0;border-radius:8px;font-family:'Hanken Grotesk',sans-serif;font-size:12.5px;text-align:center;transition:transform .15s;";
+      if (selected) style += 'background:#072421;color:#FBF6F0;border:0.5px solid #BA996B;cursor:pointer';
+      else if (open) style += 'background:rgba(39,97,82,0.06);color:#072421;border:0.5px solid #BA996B;cursor:pointer';
+      else style += 'background:none;color:#C9CFC6;border:0.5px solid transparent;cursor:default';
+      cells.push({
+        label: String(d),
+        disabled: !open,
+        style,
+        onClick: open ? () => this.setState({ selDay: d, selSlot: null }) : undefined
+      });
+    }
+    return cells;
+  }
+
+  renderVals() {
+    const { year, month, selDay, selSlot } = this.state;
+    const days = this.buildCalendar();
+    const slots = SLOTS.map(label => ({
+      label,
+      style: "padding:10px 6px;border-radius:8px;font-family:'Hanken Grotesk',sans-serif;font-size:11.5px;cursor:pointer;transition:transform .15s;" +
+        (selSlot === label
+          ? 'background:#072421;color:#E4C99A;border:1px solid #BA996B'
+          : 'background:none;color:#276152;border:0.5px solid #E4C99A'),
+      onClick: () => this.setState({ selSlot: label })
+    }));
+
+    let recap = 'aucun créneau sélectionné';
+    if (selDay && selSlot) recap = `${selDay} ${MONTHS[month].toLowerCase()} ${year} à ${selSlot}`;
+    else if (selDay) recap = `${selDay} ${MONTHS[month].toLowerCase()} ${year} — choisissez une heure`;
+
+    const ready = Boolean(selDay && selSlot);
+    const confirmStyle = 'padding:14px 34px;border-radius:26px;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;transition:transform .2s;' +
+      (ready
+        ? 'background:#072421;color:#E4C99A;border:0.5px solid #BA996B;cursor:pointer'
+        : 'background:none;color:#B1B7AB;border:0.5px solid #E4C99A;cursor:not-allowed');
+
+    const bookingVals = {
+      monthLabel: `${MONTHS[month]} ${year}`,
+      weekdays: WEEKDAYS,
+      days,
+      slots,
+      hasDay: Boolean(selDay),
+      noDay: !selDay,
+      recap,
+      confirmDisabled: !ready,
+      confirmStyle,
+      prevMonth: () => this.shiftMonth(-1),
+      nextMonth: () => this.shiftMonth(1),
+      confirm: (e) => e.preventDefault()
+    };
+
+    const inputStyle = "width:100%;box-sizing:border-box;padding:12px 14px;border:0.5px solid #E4C99A;border-radius:8px;background:#FBF6F0;font-family:'Hanken Grotesk',sans-serif;font-size:14px;color:#072421;outline:none;transition:border-color .2s";
+    return {
+      ...bookingVals,
+      inputStyle,
+      textareaStyle: inputStyle + ';resize:vertical;line-height:1.6',
+      inputFocusStyle: 'border-color:#BA996B',
+      preventSubmit: (e) => e.preventDefault()
+    };
+  }
+}
+
+</script>
+</body>
+</html>
