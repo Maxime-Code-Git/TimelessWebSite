@@ -3,20 +3,21 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "description": "Timeless Photo & Video — Studio de photographie et vidéo de mariage",
+  "description": "Timeless — Studio de photographie et vidéo de mariage",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=24.15.0"
   },
   "scripts": {
-    "dev": "npm run dev --workspace=apps/web & npm run dev --workspace=apps/api",
+    "dev": "npm run dev --workspace=apps/web",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspace=apps/web",
     "convert-fonts": "bash scripts/convert-fonts.sh",
     "setup-admin": "bash scripts/set-admin-password.sh"
   },

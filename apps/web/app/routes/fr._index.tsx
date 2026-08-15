@@ -7,7 +7,9 @@ import { ScrollTop } from "~/components/ui/ScrollTop";
 import styles from "./fr._index.module.css";
 
 // SSR meta — content present without JavaScript
-export function meta(_args: Route.MetaArgs) {
+export function meta(args: Route.MetaArgs) {
+  const data = (args as any).data || (args as any).loaderData;
+  const base = data?.siteUrl ?? "";
   return [
     { title: "Timeless — Photographe & Vidéaste de mariage en Belgique" },
     {
@@ -23,15 +25,18 @@ export function meta(_args: Route.MetaArgs) {
     { property: "og:type", content: "website" },
     { property: "og:locale", content: "fr_BE" },
     { property: "og:locale:alternate", content: "en_BE" },
-    { rel: "canonical", href: "https://timeless.be/fr/" },
-    { tagName: "link", rel: "alternate", hrefLang: "fr", href: "https://timeless.be/fr/" },
-    { tagName: "link", rel: "alternate", hrefLang: "en", href: "https://timeless.be/en/" },
-    { tagName: "link", rel: "alternate", hrefLang: "x-default", href: "https://timeless.be/fr/" },
+    ...(base ? [
+      { tagName: "link" as const, rel: "canonical", href: `${base}/fr/` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "fr", href: `${base}/fr/` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "en", href: `${base}/en/` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "x-default", href: `${base}/fr/` },
+    ] : []),
   ];
 }
 
 // SSR loader — will fetch real formules from DB in Phase 3
 export async function loader(_args: Route.LoaderArgs) {
+  const siteUrl = process.env.PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "";
   // Placeholder data — matches maquette content exactly
   // In Phase 3: fetch from SQLite via API
   const FORMULES = {
@@ -51,7 +56,7 @@ export async function loader(_args: Route.LoaderArgs) {
       { name: "Prestige", note: "L'expérience intégrale,<br>sans compromis.", featured: false },
     ],
   };
-  return { formules: FORMULES };
+  return { formules: FORMULES, siteUrl };
 }
 
 type Cat = "photo" | "film" | "duo";

@@ -12,10 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js 24.x
+      - name: Use Node.js 24.15.0
         uses: actions/setup-node@v4
         with:
-          node-version: "24.x"
+          node-version: "24.15.0"
           cache: "npm"
 
       - name: Install dependencies
@@ -49,13 +49,23 @@ jobs:
       - name: Unit Tests
         run: npm run test
 
+      - name: Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+          PUBLIC_SITE_URL: http://localhost:4173
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: ./apps/web
+
       - name: Playwright End-to-End Tests
-        run: |
-          npx playwright install --with-deps chromium
-          # E2E tests run on the dev server, which needs to be started
-          npm run test:e2e
+        run: npm run test:e2e
+        working-directory: ./apps/web
         env:
           CI: true
+          PORT: 4173
+          PUBLIC_SITE_URL: http://localhost:4173
 
       - name: Upload Playwright Traces
         uses: actions/upload-artifact@v4
@@ -64,6 +74,3 @@ jobs:
           name: playwright-traces
           path: apps/web/playwright-report/
           retention-days: 14
-
-      - name: Build
-        run: npm run build

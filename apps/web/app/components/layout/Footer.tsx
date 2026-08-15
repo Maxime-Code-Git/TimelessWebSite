@@ -1,8 +1,11 @@
 import { Link } from "react-router";
 import styles from "./Footer.module.css";
+import { BUSINESS } from "~/lib/business-config";
 
 interface FooterProps {
   lang?: "fr" | "en";
+  /** Hide navigation links (private pages: gallery) */
+  hideNav?: boolean;
 }
 
 // SVG icons matching maquettes exactly (stroke="#BA996B", width="15", height="15")
@@ -87,15 +90,7 @@ const CONTENT = {
   },
 };
 
-// TODO: These will come from CMS/admin settings
-const PLACEHOLDER_SOCIAL = {
-  instagram: "#",       // Replace in admin
-  linkedin: "#",        // Replace in admin
-  phone: "+32 4XX XX XX XX", // Replace in admin
-  phoneHref: "tel:+32400000000",
-};
-
-export function Footer({ lang = "fr" }: FooterProps) {
+export function Footer({ lang = "fr", hideNav = false }: FooterProps) {
   const t = CONTENT[lang];
 
   return (
@@ -103,42 +98,51 @@ export function Footer({ lang = "fr" }: FooterProps) {
       <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Timeless — Accueil">
         <img
           src="/logo-officiel.png"
-          alt="Timeless Photo & Video"
+          alt="Timeless"
           className={styles.footerLogo}
           loading="lazy"
         />
       </Link>
 
-      <div className={styles.social}>
-        <a
-          href={PLACEHOLDER_SOCIAL.instagram}
-          className={styles.socialLink}
-          aria-label="Instagram"
-          rel="noopener noreferrer"
-          target={PLACEHOLDER_SOCIAL.instagram !== "#" ? "_blank" : undefined}
-        >
-          <InstagramIcon />
-          Instagram
-        </a>
-        <a
-          href={PLACEHOLDER_SOCIAL.linkedin}
-          className={styles.socialLink}
-          aria-label="LinkedIn"
-          rel="noopener noreferrer"
-          target={PLACEHOLDER_SOCIAL.linkedin !== "#" ? "_blank" : undefined}
-        >
-          <LinkedInIcon />
-          LinkedIn
-        </a>
-        <a
-          href={PLACEHOLDER_SOCIAL.phoneHref}
-          className={styles.socialLink}
-          aria-label={`Téléphone : ${PLACEHOLDER_SOCIAL.phone}`}
-        >
-          <PhoneIcon />
-          {PLACEHOLDER_SOCIAL.phone}
-        </a>
-      </div>
+      {/* Social links — only rendered when real URLs are configured */}
+      {(BUSINESS.instagramUrl || BUSINESS.linkedinUrl || BUSINESS.phoneHref) && (
+        <div className={styles.social}>
+          {BUSINESS.instagramUrl && (
+            <a
+              href={BUSINESS.instagramUrl}
+              className={styles.socialLink}
+              aria-label="Instagram"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <InstagramIcon />
+              Instagram
+            </a>
+          )}
+          {BUSINESS.linkedinUrl && (
+            <a
+              href={BUSINESS.linkedinUrl}
+              className={styles.socialLink}
+              aria-label="LinkedIn"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <LinkedInIcon />
+              LinkedIn
+            </a>
+          )}
+          {BUSINESS.phoneHref && BUSINESS.phone && (
+            <a
+              href={BUSINESS.phoneHref}
+              className={styles.socialLink}
+              aria-label={`Téléphone : ${BUSINESS.phone}`}
+            >
+              <PhoneIcon />
+              {BUSINESS.phone}
+            </a>
+          )}
+        </div>
+      )}
 
       <Link to={t.contactPath} className={styles.contactBtn}>
         {t.contact}
@@ -146,20 +150,22 @@ export function Footer({ lang = "fr" }: FooterProps) {
 
       <div className={styles.divider} role="separator" />
 
-      <nav className={styles.legalLinks} aria-label="Liens légaux">
-        <Link to={t.clientPath} className={styles.legalLink}>
-          {t.clientArea}
-        </Link>
-        <Link to={t.legalPath} className={styles.legalLink}>
-          {t.legal}
-        </Link>
-        <Link to={t.cgvPath} className={styles.legalLink}>
-          {t.cgv}
-        </Link>
-        <Link to={t.privacyPath} className={styles.legalLink}>
-          {t.privacy}
-        </Link>
-      </nav>
+      {!hideNav && (
+        <nav className={styles.legalLinks} aria-label="Liens légaux">
+          <Link to={t.clientPath} className={styles.legalLink}>
+            {t.clientArea}
+          </Link>
+          <Link to={t.legalPath} className={styles.legalLink}>
+            {t.legal}
+          </Link>
+          <Link to={t.cgvPath} className={styles.legalLink}>
+            {t.cgv}
+          </Link>
+          <Link to={t.privacyPath} className={styles.legalLink}>
+            {t.privacy}
+          </Link>
+        </nav>
+      )}
     </footer>
   );
 }

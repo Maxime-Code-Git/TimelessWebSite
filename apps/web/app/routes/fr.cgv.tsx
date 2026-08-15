@@ -2,12 +2,14 @@ import type { Route } from "./+types/fr.cgv";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
+import { BUSINESS } from "~/lib/business-config";
 import styles from "./legal.module.css";
 
 export function meta(_args: Route.MetaArgs) {
   return [
     { title: "Conditions Générales de Vente — Timeless" },
-    { name: "description", content: "Conditions Générales de Vente de Timeless." }
+    { name: "description", content: "Conditions Générales de Vente de Timeless." },
+    { name: "robots", content: "noindex, nofollow" },
   ];
 }
 
@@ -18,15 +20,21 @@ export default function CgvFr() {
       <main className={styles.mainSection}>
         <div className={styles.wrapper}>
           <h1 className={styles.title}>Conditions Générales de Vente</h1>
+
+          <div className={styles.draftNotice}>
+            Ces conditions générales de vente sont en cours de rédaction et ne constituent pas un document contractuel opposable.
+          </div>
+
           <div className={styles.content}>
             <h2>Objet</h2>
             <p>Les présentes conditions générales de vente régissent les prestations de photographie et vidéographie de mariage réalisées par Timeless.</p>
-            
+
             <h2>Réservation</h2>
-            <p>La réservation d'une prestation n'est définitive qu'à réception d'un acompte de 30% du montant total et de la signature du devis/contrat.</p>
-            
+            {/* La clause d'acompte est retirée tant que le pourcentage exact n'est pas validé juridiquement. */}
+            <p>La réservation d'une prestation est confirmée à la signature du devis ou contrat. Les modalités de paiement, y compris les acomptes, sont précisées dans le devis individuel.</p>
+
             <h2>Livraison</h2>
-            <p>Les fichiers numériques sont livrés via une galerie en ligne sécurisée dans les délais indiqués sur le devis, selon la formule choisie.</p>
+            <p>Les fichiers numériques sont livrés via une galerie en ligne sécurisée dans les délais indiqués sur le devis{BUSINESS.depositPercent !== null ? null : ""}, selon la formule choisie.</p>
           </div>
         </div>
       </main>

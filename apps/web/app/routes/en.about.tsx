@@ -2,15 +2,24 @@ import type { Route } from "./+types/en.about";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
+import { BUSINESS } from "~/lib/business-config";
 import styles from "./about.module.css";
 
-export function meta(_args: Route.MetaArgs) {
+export async function loader() {
+  return { siteUrl: process.env.PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "" };
+}
+
+export function meta(args: Route.MetaArgs) {
+  const data = (args as any).data || (args as any).loaderData;
+  const base = data?.siteUrl ?? "";
   return [
     { title: "About us — Timeless" },
     { name: "description", content: "Two perspectives, one standard: to capture your day authentically, so it returns to you intact in thirty years." },
-    { tagName: "link", rel: "canonical", href: "https://timeless.be/en/about" },
-    { tagName: "link", rel: "alternate", hrefLang: "fr", href: "https://timeless.be/fr/a-propos" },
-    { tagName: "link", rel: "alternate", hrefLang: "en", href: "https://timeless.be/en/about" },
+    ...(base ? [
+      { tagName: "link" as const, rel: "canonical", href: `${base}/en/about` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "fr", href: `${base}/fr/a-propos` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "en", href: `${base}/en/about` },
+    ] : []),
   ];
 }
 
@@ -36,17 +45,21 @@ export default function AboutEn() {
                 <div className={styles.personImageWrap}>
                   <div className={styles.personPlaceholder}>Portrait — Photographer</div>
                 </div>
-                <div className={styles.personName}>Firstname Lastname</div>
+                {BUSINESS.photographer1Name && (
+                  <div className={styles.personName}>{BUSINESS.photographer1Name}</div>
+                )}
                 <div className={styles.personRole}>Photographer</div>
-                <p className={styles.personBio}>A few lines of introduction: their background, their sensibility, what guides their eye on a wedding day.</p>
+                <p className={styles.personBio}>Their background, their sensibility, what guides their eye on a wedding day.</p>
               </div>
               <div className={styles.person}>
                 <div className={styles.personImageWrap}>
                   <div className={styles.personPlaceholder}>Portrait — Videographer</div>
                 </div>
-                <div className={styles.personName}>Firstname Lastname</div>
+                {BUSINESS.photographer2Name && (
+                  <div className={styles.personName}>{BUSINESS.photographer2Name}</div>
+                )}
                 <div className={styles.personRole}>Videographer</div>
-                <p className={styles.personBio}>A few lines of introduction: their background, their sensibility, what guides their eye on a wedding day.</p>
+                <p className={styles.personBio}>Their background, their sensibility, what guides their eye on a wedding day.</p>
               </div>
             </div>
           </div>
@@ -59,7 +72,7 @@ export default function AboutEn() {
             <div className={styles.principles}>
               <div className={styles.principle}>
                 <div className={styles.principleDivider}></div>
-                <h3 className={styles.principleTitle}>Discretion on the D-Day</h3>
+                <h3 className={styles.principleTitle}>Discretion on the Day</h3>
                 <p className={styles.principleText}>Present without ever imposing, so you can experience your day fully.</p>
               </div>
               <div className={styles.principle}>

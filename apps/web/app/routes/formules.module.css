@@ -52,6 +52,7 @@
   gap: 8px;
   max-width: 420px;
   margin: 0 auto 44px;
+  flex-wrap: wrap;
 }
 
 .tabBtn {
@@ -80,6 +81,7 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 22px;
   align-items: start;
+  padding-top: 12px; /* Prevent badge clipping */
 }
 
 .card {
@@ -295,8 +297,16 @@
   .cards {
     grid-template-columns: 1fr;
     gap: 30px;
+    padding-top: 16px;
   }
   .cardFeat {
     transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .categoryTabs {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

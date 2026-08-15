@@ -2,15 +2,24 @@ import type { Route } from "./+types/fr.about";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
+import { BUSINESS } from "~/lib/business-config";
 import styles from "./about.module.css";
 
-export function meta(_args: Route.MetaArgs) {
+export async function loader() {
+  return { siteUrl: process.env.PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "" };
+}
+
+export function meta(args: Route.MetaArgs) {
+  const data = (args as any).data || (args as any).loaderData;
+  const base = data?.siteUrl ?? "";
   return [
     { title: "À propos — Timeless" },
     { name: "description", content: "Deux regards, une même exigence : capter votre journée avec justesse, pour qu'elle vous revienne intacte dans trente ans." },
-    { tagName: "link", rel: "canonical", href: "https://timeless.be/fr/a-propos" },
-    { tagName: "link", rel: "alternate", hrefLang: "fr", href: "https://timeless.be/fr/a-propos" },
-    { tagName: "link", rel: "alternate", hrefLang: "en", href: "https://timeless.be/en/about" },
+    ...(base ? [
+      { tagName: "link" as const, rel: "canonical", href: `${base}/fr/a-propos` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "fr", href: `${base}/fr/a-propos` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "en", href: `${base}/en/about` },
+    ] : []),
   ];
 }
 
@@ -36,17 +45,21 @@ export default function AboutFr() {
                 <div className={styles.personImageWrap}>
                   <div className={styles.personPlaceholder}>Portrait — Photographe</div>
                 </div>
-                <div className={styles.personName}>Prénom Nom</div>
-                <div className={styles.personRole}>Photographe</div>
-                <p className={styles.personBio}>Quelques lignes de présentation : son parcours, sa sensibilité, ce qui guide son regard le jour d'un mariage.</p>
+                {BUSINESS.photographer1Name && (
+                  <div className={styles.personName}>{BUSINESS.photographer1Name}</div>
+                )}
+                <div className={styles.personRole}>{BUSINESS.photographer1Role}</div>
+                <p className={styles.personBio}>Son parcours, sa sensibilité, ce qui guide son regard le jour d'un mariage.</p>
               </div>
               <div className={styles.person}>
                 <div className={styles.personImageWrap}>
                   <div className={styles.personPlaceholder}>Portrait — Vidéaste</div>
                 </div>
-                <div className={styles.personName}>Prénom Nom</div>
-                <div className={styles.personRole}>Vidéaste</div>
-                <p className={styles.personBio}>Quelques lignes de présentation : son parcours, sa sensibilité, ce qui guide son regard le jour d'un mariage.</p>
+                {BUSINESS.photographer2Name && (
+                  <div className={styles.personName}>{BUSINESS.photographer2Name}</div>
+                )}
+                <div className={styles.personRole}>{BUSINESS.photographer2Role}</div>
+                <p className={styles.personBio}>Son parcours, sa sensibilité, ce qui guide son regard le jour d'un mariage.</p>
               </div>
             </div>
           </div>

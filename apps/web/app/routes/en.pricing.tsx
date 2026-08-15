@@ -6,13 +6,21 @@ import { ScrollTop } from "~/components/ui/ScrollTop";
 import styles from "./formules.module.css";
 import type { Category } from "@timeless/shared";
 
-export function meta(_args: Route.MetaArgs) {
+export async function loader() {
+  return { siteUrl: process.env.PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "" };
+}
+
+export function meta(args: Route.MetaArgs) {
+  const data = (args as any).data || (args as any).loaderData;
+  const base = data?.siteUrl ?? "";
   return [
     { title: "Packages & Pricing — Timeless" },
     { name: "description", content: "A single studio for your photo and film: a unified vision, from the first meeting to delivery." },
-    { tagName: "link", rel: "canonical", href: "https://timeless.be/en/pricing" },
-    { tagName: "link", rel: "alternate", hrefLang: "fr", href: "https://timeless.be/fr/formules" },
-    { tagName: "link", rel: "alternate", hrefLang: "en", href: "https://timeless.be/en/pricing" },
+    ...(base ? [
+      { tagName: "link" as const, rel: "canonical", href: `${base}/en/pricing` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "fr", href: `${base}/fr/formules` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "en", href: `${base}/en/pricing` },
+    ] : []),
   ];
 }
 

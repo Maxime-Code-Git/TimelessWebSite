@@ -1,39 +1,38 @@
 import type { Route } from "./+types/fr.clients";
-import { useState } from "react";
+import { useActionData } from "react-router";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
 import styles from "./clients.module.css";
-import { useNavigate } from "react-router";
 
 export function meta(_args: Route.MetaArgs) {
   return [
     { title: "Espace Clients — Timeless" },
     { name: "description", content: "Retrouvez ici vos photos et votre film, avec le code reçu sur votre carte." },
-    { tagName: "link", rel: "canonical", href: "https://timeless.be/fr/espace-clients" },
-    { tagName: "link", rel: "alternate", hrefLang: "fr", href: "https://timeless.be/fr/espace-clients" },
-    { tagName: "link", rel: "alternate", hrefLang: "en", href: "https://timeless.be/en/client-area" },
+    { name: "robots", content: "noindex, nofollow" },
   ];
 }
 
-export default function ClientsFr() {
-  const [code, setCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Pour l'instant, aucun backend n'est connecté.
-    // Conformément aux instructions, on ne simule pas un succès si le backend n'existe pas.
-    // Sauf si c'est un code de démo spécifique en mode dev.
-    if (import.meta.env.DEV && code === 'DEMO-FR') {
-      navigate('/fr/galerie/demo');
-      return;
+/**
+ * Action SSR — s'exécute uniquement côté serveur.
+ *
+ * En Phase 2 : le système d'authentification n'est pas encore disponible.
+ * L'action répond proprement avec un statut 503.
+ * En Phase 3 : vérification du code en base de données + création de session.
+ */
+export async function action(_args: Route.ActionArgs) {
+  return Response.json(
+    { error: "Le service d'authentification n'est pas encore disponible. Veuillez réessayer ultérieurement." },
+    {
+      status: 503,
+      headers: { "Cache-Control": "no-store" },
     }
-    
-    setError("Connexion impossible. Le système d'authentification n'est pas encore disponible.");
-  };
+  );
+}
+
+export default function ClientsFr() {
+  const actionData = useActionData<typeof action>();
+  const error = actionData && "error" in actionData ? (actionData as { error: string }).error : null;
 
   return (
     <div className={styles.container}>
@@ -46,17 +45,16 @@ export default function ClientsFr() {
             <h1 className={styles.cardTitle}>Votre galerie privée</h1>
             <p className={styles.cardText}>Retrouvez ici vos photos et votre film, avec le code reçu sur votre carte.</p>
 
-            <form className={styles.form} onSubmit={handleSubmit}>
+            <form className={styles.form} method="post">
               <div className={styles.formGroup}>
                 <label htmlFor="tm-access-code" className={styles.formLabel}>Votre code d'accès</label>
-                <input 
-                  id="tm-access-code" 
-                  type="text" 
-                  placeholder="Ex. TM-2026-XXXX" 
-                  className={styles.formInput} 
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  required 
+                <input
+                  id="tm-access-code"
+                  name="code"
+                  type="text"
+                  placeholder="Ex. TM-2026-XXXX"
+                  className={styles.formInput}
+                  required
                 />
               </div>
               <button type="submit" className={styles.submitBtn}>Accéder à ma galerie</button>

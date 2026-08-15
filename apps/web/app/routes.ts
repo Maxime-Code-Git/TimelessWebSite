@@ -4,6 +4,12 @@ export default [
   // ── Root redirect ─────────────────────────────────────────
   index("routes/root-redirect.tsx"),
 
+  // ── System resource routes ────────────────────────────────
+  // These MUST be declared here — files in routes/ are NOT auto-discovered
+  route("robots.txt", "routes/robots[.txt].tsx"),
+  route("sitemap.xml", "routes/sitemap[.xml].tsx"),
+  route("maintenance", "routes/maintenance.tsx"),
+
   // ── French routes ─────────────────────────────────────────
   ...prefix("fr", [
     index("routes/fr._index.tsx"),
@@ -32,6 +38,6 @@ export default [
     route("terms", "routes/en.cgv.tsx"),
   ]),
 
-  // ── System routes ─────────────────────────────────────────
+  // ── Catch-all (404) ───────────────────────────────────────
   route("*", "routes/404.tsx"),
 ] satisfies RouteConfig;

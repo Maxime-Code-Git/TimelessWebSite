@@ -8,6 +8,8 @@ interface HeaderProps {
   lang?: "fr" | "en";
   /** Alternate language URL for the switcher */
   alternateLangHref?: string;
+  /** Hide navigation and language switcher (private pages: gallery) */
+  hideNav?: boolean;
 }
 
 const NAV_LINKS = {
@@ -34,6 +36,7 @@ export function Header({
   variant = "page",
   lang = "fr",
   alternateLangHref,
+  hideNav = false,
 }: HeaderProps) {
   const links = NAV_LINKS[lang];
   const clientArea = CLIENT_AREA[lang];
@@ -55,44 +58,46 @@ export function Header({
         />
       </Link>
 
-      <nav
-        className={styles.nav}
-        aria-label={lang === "fr" ? "Navigation principale" : "Main navigation"}
-      >
-        {links.map(({ to, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
-            }
-          >
-            {label}
-          </NavLink>
-        ))}
-
-        <Link to={clientArea.to} className={styles.clientBtn}>
-          {clientArea.label}
-        </Link>
-
-        {/* Language switcher */}
-        <span className={styles.langSwitcher} aria-label="Sélecteur de langue">
-          <span className={styles.langActive}>{curLangLabel}</span>
-          <span className={styles.langDot}>·</span>
-          {alternateLangHref ? (
-            <Link
-              to={alternateLangHref}
-              className={styles.langInactive}
-              hrefLang={altLang}
-              aria-label={`Switch to ${altLangLabel}`}
+      {!hideNav && (
+        <nav
+          className={styles.nav}
+          aria-label={lang === "fr" ? "Navigation principale" : "Main navigation"}
+        >
+          {links.map(({ to, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
+              }
             >
-              {altLangLabel}
-            </Link>
-          ) : (
-            <span className={styles.langInactive}>{altLangLabel}</span>
-          )}
-        </span>
-      </nav>
+              {label}
+            </NavLink>
+          ))}
+
+          <Link to={clientArea.to} className={styles.clientBtn}>
+            {clientArea.label}
+          </Link>
+
+          {/* Language switcher */}
+          <span className={styles.langSwitcher} aria-label="Sélecteur de langue">
+            <span className={styles.langActive}>{curLangLabel}</span>
+            <span className={styles.langDot}>·</span>
+            {alternateLangHref ? (
+              <Link
+                to={alternateLangHref}
+                className={styles.langInactive}
+                hrefLang={altLang}
+                aria-label={`Switch to ${altLangLabel}`}
+              >
+                {altLangLabel}
+              </Link>
+            ) : (
+              <span className={styles.langInactive}>{altLangLabel}</span>
+            )}
+          </span>
+        </nav>
+      )}
     </header>
   );
 }

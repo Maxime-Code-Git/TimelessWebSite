@@ -5,13 +5,21 @@ import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
 import styles from "./portfolio.module.css";
 
-export function meta(_args: Route.MetaArgs) {
+export async function loader() {
+  return { siteUrl: process.env.PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "" };
+}
+
+export function meta(args: Route.MetaArgs) {
+  const data = (args as any).data || (args as any).loaderData;
+  const base = data?.siteUrl ?? "";
   return [
     { title: "Portfolio Photographie — Timeless" },
     { name: "description", content: "Un regard sincère sur vos instants, saisis tels qu'ils se vivent." },
-    { tagName: "link", rel: "canonical", href: "https://timeless.be/fr/portfolio" },
-    { tagName: "link", rel: "alternate", hrefLang: "fr", href: "https://timeless.be/fr/portfolio" },
-    { tagName: "link", rel: "alternate", hrefLang: "en", href: "https://timeless.be/en/portfolio" },
+    ...(base ? [
+      { tagName: "link" as const, rel: "canonical", href: `${base}/fr/portfolio` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "fr", href: `${base}/fr/portfolio` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "en", href: `${base}/en/portfolio` },
+    ] : []),
   ];
 }
 

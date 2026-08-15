@@ -5,13 +5,21 @@ import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
 import styles from "./contact.module.css";
 
-export function meta(_args: Route.MetaArgs) {
+export async function loader() {
+  return { siteUrl: process.env.PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "" };
+}
+
+export function meta(args: Route.MetaArgs) {
+  const data = (args as any).data || (args as any).loaderData;
+  const base = data?.siteUrl ?? "";
   return [
     { title: "Contact — Timeless" },
     { name: "description", content: "Write to us, without obligation — we will take the time to answer you." },
-    { tagName: "link", rel: "canonical", href: "https://timeless.be/en/contact" },
-    { tagName: "link", rel: "alternate", hrefLang: "fr", href: "https://timeless.be/fr/contact" },
-    { tagName: "link", rel: "alternate", hrefLang: "en", href: "https://timeless.be/en/contact" },
+    ...(base ? [
+      { tagName: "link" as const, rel: "canonical", href: `${base}/en/contact` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "fr", href: `${base}/fr/contact` },
+      { tagName: "link" as const, rel: "alternate", hrefLang: "en", href: `${base}/en/contact` },
+    ] : []),
   ];
 }
 
@@ -24,7 +32,7 @@ export default function ContactEn() {
   const [month, setMonth] = useState(new Date().getMonth());
   const [selDay, setSelDay] = useState<number | null>(null);
   const [selSlot, setSelSlot] = useState<string | null>(null);
-  const [formStatus, setFormStatus] = useState<'idle' | 'error' | 'dev_mock'>('idle');
+  const [formStatus, setFormStatus] = useState<'idle' | 'error'>('idle');
 
   const shiftMonth = (delta: number) => {
     let m = month + delta;
@@ -74,11 +82,8 @@ export default function ContactEn() {
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (import.meta.env.DEV) {
-      setFormStatus('dev_mock');
-    } else {
-      setFormStatus('error');
-    }
+    // Phase 3: submit to SSR action. For now, backend is not yet available.
+    setFormStatus('error');
   };
 
   return (
@@ -191,11 +196,6 @@ export default function ContactEn() {
                 Confirm meeting
               </button>
               
-              {formStatus === 'dev_mock' && (
-                <div className={styles.formMessage} style={{marginTop: '16px'}}>
-                  [Dev Mode] Booking mocked. The backend is not connected yet.
-                </div>
-              )}
               {formStatus === 'error' && (
                 <div className={styles.formMessage} style={{marginTop: '16px', borderColor: 'red'}}>
                   Service unavailable. The backend server is not configured yet.
@@ -226,7 +226,7 @@ export default function ContactEn() {
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
                     <label htmlFor="tm-phone" className={styles.formLabel}>Phone (optional)</label>
-                    <input id="tm-phone" type="tel" placeholder="+32 400 00 00 00" className={styles.formInput} />
+                    <input id="tm-phone" type="tel" placeholder="+32 4XX XX XX XX" className={styles.formInput} />
                   </div>
                   <div className={styles.formGroup}>
                     <label htmlFor="tm-date" className={styles.formLabel}>Wedding date</label>
@@ -236,7 +236,7 @@ export default function ContactEn() {
                 
                 <div className={styles.formGroup}>
                   <label htmlFor="tm-lieu" className={styles.formLabel}>Wedding location / region</label>
-                  <input id="tm-lieu" type="text" placeholder="Provence, Paris…" className={styles.formInput} required />
+                  <input id="tm-lieu" type="text" placeholder="Belgium, France, Luxembourg…" className={styles.formInput} required />
                 </div>
                 
                 <div className={styles.formGroup}>
@@ -270,11 +270,6 @@ export default function ContactEn() {
                 
                 <button type="submit" className={styles.formSubmitBtn}>Send</button>
 
-                {formStatus === 'dev_mock' && (
-                  <div className={styles.formMessage}>
-                    [Dev Mode] Submission mocked. The backend is not connected yet to process this request.
-                  </div>
-                )}
                 {formStatus === 'error' && (
                   <div className={styles.formMessage} style={{borderColor: 'red'}}>
                     Sending service unavailable. The backend server is not yet configured in production.
@@ -282,26 +277,14 @@ export default function ContactEn() {
                 )}
               </form>
 
-              {/* Contact Details */}
+              {/* Contact Details - only render fields when real data is configured */}
               <div>
                 <div className={styles.detailsBox}>
                   <p className={styles.detailsTitle}>Contact Details</p>
                   <div className={styles.detailsList}>
                     <div>
-                      <div className={styles.detailLabel}>Email</div>
-                      <div>hello@timeless.be</div>
-                    </div>
-                    <div>
-                      <div className={styles.detailLabel}>Phone</div>
-                      <div>+32 400 00 00 00</div>
-                    </div>
-                    <div>
                       <div className={styles.detailLabel}>Coverage Area</div>
-                      <div>All of Belgium & destination weddings</div>
-                    </div>
-                    <div>
-                      <div className={styles.detailLabel}>Social Media</div>
-                      <a href="#" className={styles.detailsLink}>Instagram</a>
+                      <div>All of Belgium &amp; destination weddings</div>
                     </div>
                   </div>
                   <div className={styles.detailsDivider}></div>

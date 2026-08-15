@@ -7,7 +7,8 @@ import styles from "./legal.module.css";
 export function meta(_args: Route.MetaArgs) {
   return [
     { title: "Privacy Policy — Timeless" },
-    { name: "description", content: "Privacy policy of the Timeless website." }
+    { name: "description", content: "Privacy policy of the Timeless website." },
+    { name: "robots", content: "noindex, nofollow" },
   ];
 }
 
@@ -23,7 +24,7 @@ export default function PrivacyEn() {
             <p>Timeless ensures that the collection and processing of your data, carried out from the site, comply with the General Data Protection Regulation (GDPR).</p>
             
             <h2>Data Usage</h2>
-            <p>Personal data collected as part of the services offered on timeless.be are processed via secure protocols and allow Timeless to manage requests received in its IT applications (contact form, booking).</p>
+            <p>Personal data collected as part of the services offered on this site are processed via secure protocols and allow Timeless to manage requests received in its IT applications (contact form, booking).</p>
             
             <h2>Cookies</h2>
             <p>The site uses technical cookies strictly necessary for its operation. No advertising tracking cookies are used.</p>

@@ -6,6 +6,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useMatches,
 } from "react-router";
 
 // Preload critical fonts (above-the-fold)
@@ -40,9 +41,24 @@ export function meta(_args: Route.MetaArgs) {
   ];
 }
 
+/**
+ * Determine the HTML lang attribute from the current route path.
+ * Routes starting with /en/ use lang="en", all others default to lang="fr".
+ * This is derived from the route id pattern (e.g. "routes/en._index").
+ */
+function useHtmlLang(): "fr" | "en" {
+  const matches = useMatches();
+  const lastMatch = matches[matches.length - 1];
+  if (lastMatch?.id?.startsWith("routes/en")) return "en";
+  if (lastMatch?.pathname?.startsWith("/en")) return "en";
+  return "fr";
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
+  const lang = useHtmlLang();
+
   return (
-    <html lang="fr">
+    <html lang={lang}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -51,7 +67,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <a href="#main-content" className="skip-link">
-          Aller au contenu principal
+          {lang === "en" ? "Skip to main content" : "Aller au contenu principal"}
         </a>
         {children}
         <ScrollRestoration />

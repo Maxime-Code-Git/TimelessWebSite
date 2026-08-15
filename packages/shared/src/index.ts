@@ -1,12 +1,7 @@
 /**
  * @fileoverview Types partagés et utilitaires pour Timeless
+ * Ce module est consommé directement depuis ses sources (pas de build dist/ nécessaire).
  */
-
-export const SITE_CONFIG = {
-  name: "Timeless",
-  tagline: "Photographe & Vidéaste de mariage en Belgique",
-  email: "contact@timeless.be",
-} as const;
 
 export type Category = "photo" | "film" | "duo";
 
@@ -14,7 +9,7 @@ export interface Formule {
   name: string;
   note: string;
   featured: boolean;
-  price?: number; // Optionnel
+  price?: number;
 }
 
 export interface FormulesMap {
@@ -23,7 +18,7 @@ export interface FormulesMap {
   duo: Formule[];
 }
 
-// Validation type helpers for Phase 3 (Forms & API)
+// Validation type helpers pour Phase 3 (Forms & API)
 export interface ContactRequest {
   name: string;
   email: string;
