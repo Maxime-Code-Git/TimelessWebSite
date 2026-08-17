@@ -1,4 +1,5 @@
-/* Footer component styles */
+/* Footer — matches reference HTML exactly */
+/* bg:#04211d; text-align:center; padding:56px 28px 40px */
 .footer {
   background-color: var(--footer-bg);
   text-align: center;
@@ -8,14 +9,13 @@
 .footerLogo {
   height: 66px;
   width: auto;
-  margin-inline: auto;
-  margin-bottom: 30px;
+  margin: 0 auto 30px;
   opacity: 0.95;
   display: block;
-  object-fit: contain;
 }
 
-.social {
+/* Social row: display:flex; gap:30px; margin-bottom:32px */
+.socialRow {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -37,32 +37,28 @@
 
 .socialLink:hover {
   transform: scale(1.06);
-  color: var(--gold-light);
+  color: var(--gold);
 }
 
-.socialLink svg {
-  flex-shrink: 0;
-}
-
+/* CTA button */
 .contactBtn {
   display: inline-block;
   border: 1px solid var(--gold);
   color: var(--gold-light);
   padding: 13px 32px;
-  border-radius: var(--radius-pill);
+  border-radius: 26px;
   font-size: 11.5px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  transition: transform var(--transition-base);
   text-decoration: none;
-  font-family: var(--font-sans);
+  transition: transform var(--transition-base);
 }
 
 .contactBtn:hover {
   transform: scale(1.04);
-  color: var(--gold-light);
 }
 
+/* Divider: height:1px; background:rgba(186,153,107,0.28); max-width:520px; margin:36px auto 22px */
 .divider {
   height: 1px;
   background: rgba(186, 153, 107, 0.28);
@@ -70,6 +66,7 @@
   margin: 36px auto 22px;
 }
 
+/* Legal links row */
 .legalLinks {
   display: flex;
   justify-content: center;
@@ -77,13 +74,11 @@
   gap: 18px;
   font-size: 10.5px;
   letter-spacing: 0.08em;
-  color: var(--footer-link);
 }
 
 .legalLink {
   color: var(--footer-link);
   text-decoration: none;
-  transition: color var(--transition-base);
 }
 
 .legalLink:hover {
@@ -91,7 +86,7 @@
 }
 
 @media (max-width: 720px) {
-  .social {
+  .socialRow {
     gap: 18px;
     flex-direction: column;
   }

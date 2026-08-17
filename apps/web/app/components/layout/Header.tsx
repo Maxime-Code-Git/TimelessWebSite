@@ -1,36 +1,38 @@
 import { NavLink, Link } from "react-router";
+import type { Lang } from "~/lib/i18n";
+import { getStrings } from "~/lib/i18n";
 import styles from "./Header.module.css";
 
 interface HeaderProps {
   /** Show the large logo (homepage) or compact logo (inner pages) */
   variant?: "home" | "page";
   /** Current language */
-  lang?: "fr" | "en";
+  lang?: Lang;
   /** Alternate language URL for the switcher */
   alternateLangHref?: string;
-  /** Hide navigation and language switcher (private pages: gallery) */
+  /** Hide the navigation entirely */
   hideNav?: boolean;
 }
 
 const NAV_LINKS = {
   fr: [
-    { to: "/fr/portfolio", label: "Portfolio" },
-    { to: "/fr/formules", label: "Formules" },
-    { to: "/fr/a-propos", label: "À propos" },
-    { to: "/fr/contact", label: "Contact" },
+    { to: "/fr/portfolio", key: "portfolio" },
+    { to: "/fr/formules", key: "formules" },
+    { to: "/fr/a-propos", key: "about" },
+    { to: "/fr/contact", key: "contact" },
   ],
   en: [
-    { to: "/en/portfolio", label: "Portfolio" },
-    { to: "/en/pricing", label: "Pricing" },
-    { to: "/en/about", label: "About" },
-    { to: "/en/contact", label: "Contact" },
+    { to: "/en/portfolio", key: "portfolio" },
+    { to: "/en/pricing", key: "formules" },
+    { to: "/en/about", key: "about" },
+    { to: "/en/contact", key: "contact" },
   ],
-};
+} as const;
 
 const CLIENT_AREA = {
-  fr: { to: "/fr/espace-clients", label: "Espace clients" },
-  en: { to: "/en/client-area", label: "Client area" },
-};
+  fr: "/fr/espace-clients",
+  en: "/en/client-area",
+} as const;
 
 export function Header({
   variant = "page",
@@ -38,23 +40,29 @@ export function Header({
   alternateLangHref,
   hideNav = false,
 }: HeaderProps) {
+  const t = getStrings(lang).nav;
   const links = NAV_LINKS[lang];
-  const clientArea = CLIENT_AREA[lang];
+  const clientAreaTo = CLIENT_AREA[lang];
   const isHome = variant === "home";
 
   const altLang = lang === "fr" ? "en" : "fr";
   const altLangLabel = lang === "fr" ? "EN" : "FR";
   const curLangLabel = lang === "fr" ? "FR" : "EN";
 
+  const labelMap: Record<string, string> = {
+    portfolio: t.portfolio,
+    formules: t.formules,
+    about: t.about,
+    contact: t.contact,
+  };
+
   return (
     <header className={styles.header}>
       <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Timeless — Accueil">
         <img
           src="/logo-officiel.png"
-          alt="Timeless Photo & Video"
-          className={`${styles.logo} ${isHome ? styles.logoLarge : styles.logoCompact}`}
-          width={isHome ? 173 : undefined}
-          height={isHome ? 173 : 96}
+          alt="Timeless"
+          className={isHome ? styles.logoLarge : styles.logoCompact}
         />
       </Link>
 
@@ -63,20 +71,20 @@ export function Header({
           className={styles.nav}
           aria-label={lang === "fr" ? "Navigation principale" : "Main navigation"}
         >
-          {links.map(({ to, label }) => (
+          {links.map(({ to, key }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
-                isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
+                isActive ? `${styles.navLink} active` : styles.navLink
               }
             >
-              {label}
+              {labelMap[key]}
             </NavLink>
           ))}
 
-          <Link to={clientArea.to} className={styles.clientBtn}>
-            {clientArea.label}
+          <Link to={clientAreaTo} className={styles.clientBtn}>
+            {t.clientArea}
           </Link>
 
           {/* Language switcher */}

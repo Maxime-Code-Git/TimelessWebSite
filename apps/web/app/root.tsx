@@ -8,6 +8,7 @@ import {
   ScrollRestoration,
   useMatches,
 } from "react-router";
+import errorStyles from "./error.module.css";
 
 // Preload critical fonts (above-the-fold)
 const PRELOAD_FONTS = [
@@ -93,51 +94,16 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main
-      id="main-content"
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "column",
-        gap: "24px",
-        background: "var(--ivory)",
-        fontFamily: "var(--font-sans)",
-        textAlign: "center",
-        padding: "40px 28px",
-      }}
-    >
-      <div
-        style={{
-          height: "1px",
-          width: "44px",
-          background: "var(--gold)",
-          marginInline: "auto",
-        }}
-      />
-      <h1
-        style={{
-          fontFamily: "var(--font-serif)",
-          fontSize: "clamp(28px, 4vw, 42px)",
-          color: "var(--forest-deep)",
-          fontWeight: 500,
-        }}
-      >
+    <main id="main-content" className={errorStyles.errorWrap}>
+      <div className={errorStyles.errorDivider} />
+      <h1 className={errorStyles.errorTitle}>
         Une erreur s'est produite
       </h1>
-      <p style={{ color: "var(--green)", fontSize: "14px", maxWidth: "400px" }}>
+      <p className={errorStyles.errorMsg}>
         {message}
       </p>
       {details && (
-        <pre
-          style={{
-            fontSize: "12px",
-            color: "var(--sage)",
-            maxWidth: "600px",
-            overflowX: "auto",
-          }}
-        >
+        <pre className={errorStyles.errorDetails}>
           {details}
         </pre>
       )}

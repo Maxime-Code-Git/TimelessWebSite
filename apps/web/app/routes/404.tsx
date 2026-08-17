@@ -1,5 +1,6 @@
 import type { Route } from "./+types/404";
 import { Link, useLocation } from "react-router";
+import errorStyles from "../error.module.css";
 
 export function meta(_args: Route.MetaArgs) {
   return [
@@ -31,66 +32,18 @@ export default function NotFound() {
   }[lang];
 
   return (
-    <main
-      id="main-content"
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-        background: "var(--ivory)",
-        padding: "80px 28px",
-        fontFamily: "var(--font-sans)",
-      }}
-    >
-      <div
-        style={{
-          height: "1px",
-          width: "44px",
-          background: "var(--gold)",
-          marginInline: "auto",
-          marginBottom: "28px",
-        }}
-        role="presentation"
-      />
-      <p
-        style={{
-          fontSize: "11px",
-          letterSpacing: "0.3em",
-          textTransform: "uppercase",
-          color: "var(--gold-dark)",
-          marginBottom: "16px",
-          fontFamily: "var(--font-sans)",
-        }}
-      >
+    <main id="main-content" className={errorStyles.errorWrap}>
+      <div className={errorStyles.errorDivider} role="presentation" />
+      <p className={errorStyles.errorEyebrow}>
         {content.eyebrow}
       </p>
-      <h1
-        style={{
-          fontFamily: "var(--font-serif)",
-          fontWeight: 500,
-          fontSize: "clamp(28px, 4vw, 48px)",
-          color: "var(--forest-deep)",
-          marginBottom: "16px",
-          lineHeight: 1.1,
-        }}
-      >
+      <h1 className={errorStyles.errorTitle}>
         {content.title}
       </h1>
-      <p
-        style={{
-          fontSize: "14px",
-          color: "var(--green)",
-          maxWidth: "400px",
-          marginBottom: "36px",
-          lineHeight: 1.7,
-        }}
-      >
+      <p className={errorStyles.errorMsg}>
         {content.sub}
       </p>
-      <Link to={content.href} className="btn btn--primary">
+      <Link to={content.href} className={`btn btn--primary ${errorStyles.errorCta}`}>
         {content.cta}
       </Link>
     </main>

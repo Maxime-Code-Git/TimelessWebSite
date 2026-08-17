@@ -43,10 +43,10 @@ async function processImages() {
 
   console.log(`Found ${files.length} images. Processing...`);
 
-  // Create an SVG watermark
+  // Create an SVG watermark with diagonal text
   const watermarkSvg = `
-    <svg width="400" height="150" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
-      <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="rgba(255, 255, 255, 0.5)" text-anchor="middle" dominant-baseline="middle">
+    <svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+      <text x="50%" y="50%" transform="rotate(-45 200 200)" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="rgba(255, 255, 255, 0.4)" text-anchor="middle" dominant-baseline="middle">
         ${WATERMARK_TEXT}
       </text>
     </svg>

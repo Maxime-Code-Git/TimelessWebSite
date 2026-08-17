@@ -25,12 +25,13 @@ test.describe('Homepage', () => {
     await page.goto('/fr/');
     
     // Check that "Photo & Film" is active by default
-    const duoTab = page.getByRole('tab', { name: /Photo & Film/i });
-    await expect(duoTab).toHaveAttribute('aria-selected', 'true');
+    const duoTab = page.getByRole('button', { name: /Photo & Film/i });
+    // check if it has "active" in class
+    await expect(duoTab).toHaveClass(/active/);
     
     // Click "Photo" tab
-    await page.getByRole('tab', { name: 'Photographie' }).click();
-    await expect(page.getByRole('tab', { name: 'Photographie' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('text=Couverture photo')).toBeVisible();
+    await page.getByRole('button', { name: 'Photographie' }).click();
+    await expect(page.getByRole('button', { name: 'Photographie' })).toHaveClass(/active/);
+    await expect(page.getByText(/Couverture photo/i).first()).toBeVisible();
   });
 });

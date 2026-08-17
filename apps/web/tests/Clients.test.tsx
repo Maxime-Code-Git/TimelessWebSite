@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import ClientsFr from "../app/routes/fr.clients";

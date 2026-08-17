@@ -1,100 +1,20 @@
 import { Link } from "react-router";
-import styles from "./Footer.module.css";
+import type { Lang } from "~/lib/i18n";
+import { getStrings } from "~/lib/i18n";
 import { BUSINESS } from "~/lib/business-config";
+import styles from "./Footer.module.css";
 
 interface FooterProps {
-  lang?: "fr" | "en";
-  /** Hide navigation links (private pages: gallery) */
-  hideNav?: boolean;
+  lang: Lang;
 }
 
-// SVG icons matching maquettes exactly (stroke="#BA996B", width="15", height="15")
-const InstagramIcon = () => (
-  <svg
-    width="15"
-    height="15"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#BA996B"
-    strokeWidth="1.3"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <rect x="2" y="2" width="20" height="20" rx="5" />
-    <circle cx="12" cy="12" r="4" />
-    <circle cx="17.5" cy="6.5" r="1" />
-  </svg>
-);
-
-const LinkedInIcon = () => (
-  <svg
-    width="15"
-    height="15"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#BA996B"
-    strokeWidth="1.3"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <rect x="2" y="2" width="20" height="20" rx="3" />
-    <line x1="7" y1="10" x2="7" y2="17" />
-    <circle cx="7" cy="6.8" r="0.9" />
-    <path d="M11 17v-4a2.5 2.5 0 0 1 5 0v4" />
-    <line x1="11" y1="10" x2="11" y2="17" />
-  </svg>
-);
-
-const PhoneIcon = () => (
-  <svg
-    width="15"
-    height="15"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#BA996B"
-    strokeWidth="1.3"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
-  </svg>
-);
-
-const CONTENT = {
-  fr: {
-    contact: "Nous contacter",
-    clientArea: "Espace clients",
-    legal: "Mentions légales",
-    cgv: "CGV",
-    privacy: "Confidentialité",
-    contactPath: "/fr/contact",
-    clientPath: "/fr/espace-clients",
-    legalPath: "/fr/mentions-legales",
-    cgvPath: "/fr/cgv",
-    privacyPath: "/fr/confidentialite",
-  },
-  en: {
-    contact: "Contact us",
-    clientArea: "Client area",
-    legal: "Legal notice",
-    cgv: "Terms",
-    privacy: "Privacy",
-    contactPath: "/en/contact",
-    clientPath: "/en/client-area",
-    legalPath: "/en/legal",
-    cgvPath: "/en/terms",
-    privacyPath: "/en/privacy",
-  },
-};
-
-export function Footer({ lang = "fr", hideNav = false }: FooterProps) {
-  const t = CONTENT[lang];
+export function Footer({ lang }: FooterProps) {
+  const t = getStrings(lang).footer;
+  const contactTo = lang === "fr" ? "/fr/contact" : "/en/contact";
 
   return (
     <footer className={styles.footer}>
+      {/* Logo */}
       <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Timeless — Accueil">
         <img
           src="/logo-officiel.png"
@@ -104,68 +24,69 @@ export function Footer({ lang = "fr", hideNav = false }: FooterProps) {
         />
       </Link>
 
-      {/* Social links — only rendered when real URLs are configured */}
-      {(BUSINESS.instagramUrl || BUSINESS.linkedinUrl || BUSINESS.phoneHref) && (
-        <div className={styles.social}>
-          {BUSINESS.instagramUrl && (
-            <a
-              href={BUSINESS.instagramUrl}
-              className={styles.socialLink}
-              aria-label="Instagram"
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              <InstagramIcon />
-              Instagram
-            </a>
-          )}
-          {BUSINESS.linkedinUrl && (
-            <a
-              href={BUSINESS.linkedinUrl}
-              className={styles.socialLink}
-              aria-label="LinkedIn"
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              <LinkedInIcon />
-              LinkedIn
-            </a>
-          )}
-          {BUSINESS.phoneHref && BUSINESS.phone && (
-            <a
-              href={BUSINESS.phoneHref}
-              className={styles.socialLink}
-              aria-label={`Téléphone : ${BUSINESS.phone}`}
-            >
-              <PhoneIcon />
-              {BUSINESS.phone}
-            </a>
-          )}
-        </div>
-      )}
+      {/* Social links — only render if URLs are configured */}
+      <div className={styles.socialRow}>
+        {BUSINESS.instagramUrl && (
+          <a
+            href={BUSINESS.instagramUrl}
+            className={styles.socialLink}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="2" y="2" width="20" height="20" rx="5" />
+              <circle cx="12" cy="12" r="4" />
+              <circle cx="17.5" cy="6.5" r="1" />
+            </svg>
+            {t.instagram}
+          </a>
+        )}
+        {BUSINESS.linkedinUrl && (
+          <a
+            href={BUSINESS.linkedinUrl}
+            className={styles.socialLink}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="2" y="2" width="20" height="20" rx="3" />
+              <line x1="7" y1="10" x2="7" y2="17" />
+              <circle cx="7" cy="6.8" r="0.9" />
+              <path d="M11 17v-4a2.5 2.5 0 0 1 5 0v4" />
+              <line x1="11" y1="10" x2="11" y2="17" />
+            </svg>
+            {t.linkedin}
+          </a>
+        )}
+        {BUSINESS.phone && (
+          <a
+            href={BUSINESS.phoneHref}
+            className={styles.socialLink}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
+            </svg>
+            {BUSINESS.phone}
+          </a>
+        )}
+      </div>
 
-      <Link to={t.contactPath} className={styles.contactBtn}>
-        {t.contact}
+      {/* Contact CTA */}
+      <Link to={contactTo} className={styles.contactBtn}>
+        {t.contactBtn}
       </Link>
 
+      {/* Divider */}
       <div className={styles.divider} role="separator" />
 
-      {!hideNav && (
-        <nav className={styles.legalLinks} aria-label="Liens légaux">
-          <Link to={t.clientPath} className={styles.legalLink}>
-            {t.clientArea}
+      {/* Legal links */}
+      <nav aria-label={lang === "fr" ? "Liens légaux" : "Legal links"} className={styles.legalLinks}>
+        {t.legalLinks.map(({ label, to }) => (
+          <Link key={to} to={to} className={styles.legalLink}>
+            {label}
           </Link>
-          <Link to={t.legalPath} className={styles.legalLink}>
-            {t.legal}
-          </Link>
-          <Link to={t.cgvPath} className={styles.legalLink}>
-            {t.cgv}
-          </Link>
-          <Link to={t.privacyPath} className={styles.legalLink}>
-            {t.privacy}
-          </Link>
-        </nav>
-      )}
+        ))}
+      </nav>
     </footer>
   );
 }

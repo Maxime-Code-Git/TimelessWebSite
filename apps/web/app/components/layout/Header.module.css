@@ -1,25 +1,25 @@
-/* Header component styles */
+/* Header — matches reference HTML exactly */
 .header {
   text-align: center;
   padding: 26px 20px 0;
 }
 
-.logo {
+/* Homepage: large logo 173×173 */
+.logoLarge {
   display: block;
   margin-inline: auto;
-}
-
-/* Homepage: large logo */
-.logo--large {
   height: 173px;
   width: 173px;
   object-fit: contain;
 }
 
-/* Other pages: compact logo */
-.logo--compact {
+/* Inner pages: compact logo h=96px */
+.logoCompact {
+  display: block;
+  margin-inline: auto;
   height: 96px;
   width: auto;
+  object-fit: contain;
 }
 
 .nav {
@@ -49,6 +49,7 @@
   color: var(--gold);
 }
 
+/* Active page styling via aria-current (set by NavLink) */
 .navLink[aria-current="page"] {
   color: var(--forest-deep);
   font-weight: 500;
@@ -62,7 +63,7 @@
   font-size: 11px;
   text-transform: uppercase;
   display: inline-block;
-  transition: transform var(--transition-base), background-color var(--transition-base);
+  transition: transform var(--transition-base);
   text-decoration: none;
   font-family: var(--font-sans);
   letter-spacing: 0.06em;
@@ -70,8 +71,6 @@
 
 .clientBtn:hover {
   transform: scale(1.08);
-  background-color: var(--gold);
-  color: var(--ivory);
 }
 
 .langSwitcher {
@@ -88,6 +87,7 @@
 .langInactive {
   color: var(--sage);
   font-weight: 400;
+  text-decoration: none;
 }
 
 .langDot {

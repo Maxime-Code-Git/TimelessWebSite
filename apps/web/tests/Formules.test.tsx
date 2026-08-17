@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router";
 import FormulesFr from "../app/routes/fr.formules";
 
 describe("Formules Component", () => {
-  it("renders Photo & Film category by default", () => {
+  it("renders Photo & Film category by default (Duo)", () => {
     render(
       <MemoryRouter>
         <FormulesFr />
@@ -12,11 +12,11 @@ describe("Formules Component", () => {
     );
 
     // Vérifie que le tab "Photo & Film" est sélectionné
-    const activeTab = screen.getByRole("tab", { selected: true });
-    expect(activeTab).toHaveTextContent("Photo & Film");
+    const activeTab = screen.getByRole("button", { name: "Photo & Film" });
+    expect(activeTab).toHaveClass(/active/);
 
-    // "L'expérience intégrale" est une feature du Duo Prestige
-    expect(screen.getByText("L'expérience intégrale, sans compromis.")).toBeInTheDocument();
+    // "200 photos + film court" is a feature of the Duo package
+    expect(screen.getByText("200 photos + film court")).toBeInTheDocument();
   });
 
   it("switches categories when clicking tabs", () => {
@@ -26,13 +26,14 @@ describe("Formules Component", () => {
       </MemoryRouter>
     );
 
-    const photoTab = screen.getByRole("tab", { name: "Photographie" });
+    const photoTab = screen.getByRole("button", { name: "Photographie" });
     fireEvent.click(photoTab);
 
     // Vérifie le changement de catégorie
-    expect(photoTab).toHaveAttribute("aria-selected", "true");
-    // "Couverture photo complète du jour." est dans Photo Signature
-    expect(screen.getByText("Couverture photo complète du jour.")).toBeInTheDocument();
+    expect(photoTab).toHaveClass(/active/);
+
+    // "200 photos livrées" is in Photo packages
+    expect(screen.getByText("200 photos livrées")).toBeInTheDocument();
   });
 
   it("toggles FAQ accordion", () => {
@@ -42,20 +43,21 @@ describe("Formules Component", () => {
       </MemoryRouter>
     );
 
-    const questionBtn = screen.getByRole("button", { name: /Les déplacements sont-ils inclus \?/i });
-    
+    // Clic on second FAQ question (closed by default)
+    const questionBtn = screen.getByRole("button", { name: /Quel acompte pour réserver la date/i });
+
     // Fermé au début
     expect(questionBtn).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText(/Les déplacements sont inclus dans un rayon/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Un acompte de réservation est demandé à la signature/i)).not.toBeInTheDocument();
 
     // Clic pour ouvrir
     fireEvent.click(questionBtn);
     expect(questionBtn).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText(/Les déplacements sont inclus dans un rayon/i)).toBeInTheDocument();
+    expect(screen.getByText(/Un acompte de réservation est demandé à la signature/i)).toBeInTheDocument();
 
     // Clic pour fermer
     fireEvent.click(questionBtn);
     expect(questionBtn).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText(/Les déplacements sont inclus dans un rayon/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Un acompte de réservation est demandé à la signature/i)).not.toBeInTheDocument();
   });
 });

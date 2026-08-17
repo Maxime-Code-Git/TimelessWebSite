@@ -1,18 +1,37 @@
 import { describe, it, expect } from "vitest";
-import GalleryFr, { loader } from "../app/routes/fr.gallery";
+import { render } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+import { GalleryPage } from "../app/components/pages/GalleryPage";
 
-describe("Gallery Component", () => {
-  it("renders null", () => {
-    expect(GalleryFr()).toBeNull();
+describe("GalleryPage Presentation Component", () => {
+  it("renders correctly with mock fixtures (FR)", () => {
+    const { container, getByText } = render(
+      <MemoryRouter>
+        <GalleryPage lang="fr" />
+      </MemoryRouter>
+    );
+
+    // Check that dummy fixture name is rendered
+    expect(getByText("Camille & Antoine")).toBeInTheDocument();
+
+    // Check that chapters are rendered
+    expect(getByText("Préparatifs")).toBeInTheDocument();
+    expect(getByText("Cérémonie")).toBeInTheDocument();
+
+    // No undefined classes
+    expect(container.innerHTML).not.toContain('class="undefined"');
   });
 
-  it("loader throws a redirect to espace-clients", async () => {
-    try {
-      await loader({ request: new Request("http://localhost/fr/galerie/123"), params: {}, context: {} });
-      expect.fail("Loader should have thrown a redirect");
-    } catch (response: any) {
-      expect(response.status).toBe(302);
-      expect(response.headers.get("Location")).toBe("/fr/espace-clients?status=unavailable");
-    }
+  it("renders correctly with mock fixtures (EN)", () => {
+    const { container, getByText } = render(
+      <MemoryRouter>
+        <GalleryPage lang="en" />
+      </MemoryRouter>
+    );
+
+    // Check English translations for chapters
+    expect(getByText("Preparations")).toBeInTheDocument();
+
+    expect(container.innerHTML).not.toContain('class="undefined"');
   });
 });

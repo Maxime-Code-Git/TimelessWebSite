@@ -1,0 +1,268 @@
+/* ============================================================
+   Gallery Page Component — exact match to Ma Galerie.dc.html
+   (Presentation component only - not accessible publicly)
+   ============================================================ */
+
+/* ── Global Page Reset/Background ───────────────────────── */
+.galleryWrap {
+  background: var(--ivory);
+  min-height: 100vh;
+}
+
+/* ── Minimal Header ────────────────────────────────────── */
+.galleryHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 28px;
+  background: var(--ivory);
+  border-bottom: 0.5px solid var(--gold-light);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.logo {
+  height: 44px;
+  width: auto;
+}
+
+.headerActions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.langSwitcher {
+  color: var(--gold-dark);
+  letter-spacing: 0.12em;
+  font-size: 11px;
+}
+
+.langActive {
+  font-weight: 500;
+}
+
+.langInactive {
+  color: var(--sage);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.langDot {
+  margin-inline: 4px;
+}
+
+.downloadBtn {
+  background: transparent;
+  border: 0.5px solid var(--gold);
+  color: var(--gold-dark);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  transition: transform var(--transition-base), background-color var(--transition-base);
+}
+
+.downloadBtn:hover {
+  transform: scale(1.05);
+  background: var(--gold);
+  color: var(--ivory);
+}
+
+/* ── Cover Section ─────────────────────────────────────── */
+.coverSection {
+  position: relative;
+  height: 60vh;
+  min-height: 400px;
+  background: var(--forest-deep);
+  display: flex;
+  align-items: flex-end;
+  padding: 40px 28px;
+  overflow: hidden;
+}
+
+.coverImagePlaceholder {
+  position: absolute;
+  inset: 0;
+  background: var(--sage);
+  z-index: 1;
+}
+
+.coverOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(7, 36, 33, 0.8) 0%, rgba(7, 36, 33, 0) 60%);
+  z-index: 2;
+}
+
+.coverContent {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.date {
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  margin: 0 0 12px;
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(32px, 5vw, 56px);
+  color: var(--ivory);
+  margin: 0 0 6px;
+}
+
+.location {
+  font-size: 14px;
+  color: var(--sage);
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+/* ── Content Area ──────────────────────────────────────── */
+.contentArea {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 56px 28px 100px;
+}
+
+/* ── Intro Message ─────────────────────────────────────── */
+.introMsg {
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto 64px;
+}
+
+.introDivider {
+  height: 1px;
+  width: 44px;
+  background: var(--gold);
+  margin: 0 auto 24px;
+}
+
+.introText {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--forest-deep);
+  margin: 0 0 24px;
+  white-space: pre-line;
+}
+
+.introSignature {
+  font-size: 14px;
+  color: var(--gold-dark);
+  font-style: italic;
+  margin: 0;
+}
+
+/* ── Chapters/Grid ─────────────────────────────────────── */
+.chapter {
+  margin-bottom: 80px;
+}
+
+.chapterTitle {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 28px;
+  color: var(--forest-deep);
+  margin: 0 0 8px;
+}
+
+.chapterCount {
+  font-size: 12px;
+  color: var(--green);
+  margin: 0 0 24px;
+}
+
+.photoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  grid-auto-flow: dense;
+}
+
+.photoWrap {
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--sage);
+  position: relative;
+  cursor: pointer;
+}
+
+.photoWrap::after {
+  content: "";
+  display: block;
+}
+
+.photoWrap.aspect-4-3::after {
+  padding-bottom: 75%;
+}
+
+.photoWrap.aspect-3-4::after {
+  padding-bottom: 133.33%;
+}
+
+.photoWrap.aspect-16-9::after {
+  padding-bottom: 56.25%;
+}
+
+.photoWrap.span2 {
+  grid-column: span 2;
+}
+
+.photoSlot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  transition: opacity 0.2s;
+}
+
+.photoWrap:hover .photoSlot {
+  background: rgba(7, 36, 33, 0.2);
+}
+
+/* ── Minimal Footer ────────────────────────────────────── */
+.galleryFooter {
+  text-align: center;
+  padding: 40px 28px;
+  background: var(--forest-deep);
+  color: var(--sage);
+  font-size: 11.5px;
+  letter-spacing: 0.05em;
+}
+
+.footerLogo {
+  height: 40px;
+  opacity: 0.6;
+  margin-bottom: 16px;
+}
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .photoGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .photoWrap.span2 {
+    grid-column: 1;
+  }
+}

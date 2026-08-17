@@ -1,12 +1,11 @@
 /**
  * Business configuration for Timeless studio.
  *
- * All values default to null — fill in before going live.
+ * Values default to null when not yet confirmed.
  * When a value is null, its corresponding UI element MUST be hidden entirely.
  * Never display placeholder text like "[À configurer]" to end users.
  *
- * This file is committed with all nulls. Real values are NOT committed.
- * In Phase 3, sensitive values (email, phone) will be moved to server-side env vars.
+ * In Phase 3, these values will be managed from the administration panel.
  */
 export const BUSINESS = {
   /** Official studio name */
@@ -18,14 +17,17 @@ export const BUSINESS = {
   /** Belgian enterprise number (BE XXXX.XXX.XXX) — null until confirmed */
   enterpriseNumber: null as string | null,
 
-  /** Public contact email — null until confirmed */
-  email: null as string | null,
+  /** Public contact email */
+  email: "timelessstudiolm@gmail.com",
 
-  /** Display phone number — null until confirmed */
-  phone: null as string | null,
+  /** mailto: href for email */
+  emailHref: "mailto:timelessstudiolm@gmail.com",
 
-  /** tel: href for phone — null until confirmed */
-  phoneHref: null as string | null,
+  /** Display phone number */
+  phone: "+32 477 86 37 42",
+
+  /** tel: href for phone */
+  phoneHref: "tel:+32477863742",
 
   /** Hosting provider name — null until confirmed */
   hostingProvider: null as string | null,
@@ -53,4 +55,10 @@ export const BUSINESS = {
 
   /** LinkedIn profile URL — null until confirmed */
   linkedinUrl: null as string | null,
+
+  /** Zone d'intervention */
+  serviceArea: {
+    fr: "Belgique & mariages à l'étranger",
+    en: "Belgium & destination weddings",
+  },
 } as const;
