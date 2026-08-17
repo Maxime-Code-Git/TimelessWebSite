@@ -31,7 +31,7 @@ export function ClientsPage({ lang }: ClientsPageProps) {
       {/* Header hidden nav as per maquette */}
       <Header lang={lang} alternateLangHref={alternateLangHref} hideNav />
 
-      <main className={styles.pageWrap}>
+      <main id="main-content" className={styles.pageWrap}>
         <div className={styles.loginCard}>
           <div className={styles.divider} />
           <h1 className={styles.title}>{t.title}</h1>

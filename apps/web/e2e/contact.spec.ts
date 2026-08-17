@@ -15,8 +15,7 @@ test.describe('Contact Form', () => {
     // Submit
     await page.click('button[type="submit"]');
     
-    // Verify that the submit button did nothing or the page didn't reload with success message
-    // Since we do e.preventDefault() and nothing else, the form should just stay on the page with inputs filled
-    await expect(page.locator('#names')).toHaveValue('Test Names');
+    // Verify that the submit button shows the unavailability message
+    await expect(page.getByRole('alert').last()).toContainText('indisponible');
   });
 });

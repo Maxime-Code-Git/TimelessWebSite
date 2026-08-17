@@ -2,48 +2,34 @@ import { Link } from "react-router";
 import type { Lang } from "~/lib/i18n";
 import styles from "./gallery.module.css";
 
-interface GalleryPageProps {
-  lang: Lang;
+export interface GalleryChapter {
+  id: string;
+  titleFR?: string;
+  titleEN?: string;
+  title?: string;
+  count: number;
+  photos: Array<{ id: string; aspect: string; span: string }>;
 }
 
-// ── Dummy Fixtures ───────────────────────────────────────
-const FIXTURES = {
-  galleryName: "Camille & Antoine",
-  dateFR: "12 Septembre 2026",
-  dateEN: "September 12, 2026",
-  location: "Château de la Hulpe, Belgique",
-  introFR:
-    "Chère Camille, cher Antoine,\n\nVoici le récit de votre journée. Nous espérons que ces images vous feront revivre chaque émotion avec la même intensité.",
-  introEN:
-    "Dear Camille, dear Antoine,\n\nHere is the story of your day. We hope these images will make you relive every emotion with the same intensity.",
-  signature: "— L'équipe Timeless",
-  chapters: [
-    {
-      id: "prep",
-      titleFR: "Préparatifs",
-      titleEN: "Preparations",
-      count: 42,
-      photos: [
-        { id: "p1", aspect: "aspect-4-3", span: "span2" },
-        { id: "p2", aspect: "aspect-3-4", span: "" },
-        { id: "p3", aspect: "aspect-3-4", span: "" },
-      ],
-    },
-    {
-      id: "ceremony",
-      titleFR: "Cérémonie",
-      titleEN: "Ceremony",
-      count: 156,
-      photos: [
-        { id: "c1", aspect: "aspect-16-9", span: "span2" },
-        { id: "c2", aspect: "aspect-3-4", span: "" },
-        { id: "c3", aspect: "aspect-4-3", span: "span2" },
-      ],
-    },
-  ],
-};
+export interface GalleryPageProps {
+  lang: Lang;
+  galleryName: string;
+  date: string;
+  location: string;
+  intro: string;
+  signature: string;
+  chapters: GalleryChapter[];
+}
 
-export function GalleryPage({ lang }: GalleryPageProps) {
+export function GalleryPage({
+  lang,
+  galleryName,
+  date,
+  location,
+  intro,
+  signature,
+  chapters,
+}: GalleryPageProps) {
   const altLangLabel = lang === "fr" ? "EN" : "FR";
   const curLangLabel = lang === "fr" ? "FR" : "EN";
 
@@ -79,9 +65,9 @@ export function GalleryPage({ lang }: GalleryPageProps) {
         <div className={styles.coverImagePlaceholder} />
         <div className={styles.coverOverlay} />
         <div className={styles.coverContent}>
-          <p className={styles.date}>{lang === "fr" ? FIXTURES.dateFR : FIXTURES.dateEN}</p>
-          <h1 className={styles.title}>{FIXTURES.galleryName}</h1>
-          <p className={styles.location}>{FIXTURES.location}</p>
+          <p className={styles.date}>{date}</p>
+          <h1 className={styles.title}>{galleryName}</h1>
+          <p className={styles.location}>{location}</p>
         </div>
       </section>
 
@@ -89,16 +75,14 @@ export function GalleryPage({ lang }: GalleryPageProps) {
       <main className={styles.contentArea}>
         <div className={styles.introMsg}>
           <div className={styles.introDivider} />
-          <p className={styles.introText}>
-            {lang === "fr" ? FIXTURES.introFR : FIXTURES.introEN}
-          </p>
-          <p className={styles.introSignature}>{FIXTURES.signature}</p>
+          <p className={styles.introText}>{intro}</p>
+          <p className={styles.introSignature}>{signature}</p>
         </div>
 
-        {FIXTURES.chapters.map((chapter) => (
+        {chapters.map((chapter) => (
           <div key={chapter.id} className={styles.chapter}>
             <h2 className={styles.chapterTitle}>
-              {lang === "fr" ? chapter.titleFR : chapter.titleEN}
+              {chapter.title || (lang === "fr" ? chapter.titleFR : chapter.titleEN)}
             </h2>
             <p className={styles.chapterCount}>
               {chapter.count} {lang === "fr" ? "photos" : "photos"}

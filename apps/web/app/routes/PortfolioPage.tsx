@@ -25,7 +25,6 @@ const ALL_PHOTOS = [
 export function PortfolioPage({ lang }: PortfolioPageProps) {
   const t = getStrings(lang).portfolio;
   const [activeFilter, setActiveFilter] = useState("all");
-  const [videoPlaying, setVideoPlaying] = useState(false);
 
   const alternateLangHref = lang === "fr" ? "/en/portfolio" : "/fr/portfolio";
 
@@ -44,6 +43,7 @@ export function PortfolioPage({ lang }: PortfolioPageProps) {
     <>
       <Header lang={lang} alternateLangHref={alternateLangHref} />
 
+      <main id="main-content">
       {/* Title Section */}
       <section className={styles.titleSection}>
         <div className={styles.titleDivider} />
@@ -64,6 +64,7 @@ export function PortfolioPage({ lang }: PortfolioPageProps) {
         <div className={styles.filters}>
           {filters.map((f) => (
             <button
+              type="button"
               key={f.key}
               onClick={() => setActiveFilter(f.key)}
               className={`${styles.filterBtn} ${
@@ -97,36 +98,13 @@ export function PortfolioPage({ lang }: PortfolioPageProps) {
       <section id="galerie-video" className={styles.videoSection}>
         <p className={styles.videoEyebrow}>{t.videoEyebrow}</p>
         <h2 className={styles.videoTitle}>{t.videoTitle}</h2>
-        
         <div className={styles.videoPlayerWrap}>
-          {videoPlaying ? (
-            <video
-              autoPlay
-              controls
-              muted
-              playsInline
-              className={styles.videoElement}
-            />
-          ) : (
-            <>
-              <div className={styles.videoPoster}>
-                {lang === "fr" ? "Extrait du film (horizontal)" : "Film excerpt (horizontal)"}
-              </div>
-              <button
-                className={styles.videoPlayBtn}
-                onClick={() => setVideoPlaying(true)}
-                aria-label="Play video"
-              >
-                ►
-              </button>
-            </>
-          )}
+          <div className={styles.videoPoster}>
+            {lang === "fr" ? "Le film n'est pas encore disponible." : "Film is not yet available."}
+          </div>
         </div>
-        
-        <a href="#galerie-video" className={styles.videoSeeAll}>
-          {t.videoSeeAll}
-        </a>
       </section>
+      </main>
 
       <Footer lang={lang} />
     </>

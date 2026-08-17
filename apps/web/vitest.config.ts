@@ -14,8 +14,8 @@ export default defineConfig({
         __dirname,
         "../../packages/shared/src/index.ts"
       ),
+      "~": path.resolve(__dirname, "app"),
     },
-    tsconfigPaths: true,
   },
   test: {
     environment: "jsdom",

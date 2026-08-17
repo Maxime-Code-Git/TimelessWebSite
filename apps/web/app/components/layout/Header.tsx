@@ -75,9 +75,7 @@ export function Header({
             <NavLink
               key={to}
               to={to}
-              className={({ isActive }) =>
-                isActive ? `${styles.navLink} active` : styles.navLink
-              }
+              className={styles.navLink}
             >
               {labelMap[key]}
             </NavLink>

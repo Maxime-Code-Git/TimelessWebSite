@@ -15,20 +15,18 @@ export function ContactPage({ lang }: ContactPageProps) {
   const t = getStrings(lang).contact;
   const alternateLangHref = lang === "fr" ? "/en/contact" : "/fr/contact";
 
-  // Dummy calendar state for UI only
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Generate a dummy month calendar (e.g. 1st is Tuesday)
-  const emptyDays = 1; // 1 empty slot before day 1 (if Monday is first day)
-  const daysInMonth = Array.from({ length: 30 }, (_, i) => i + 1);
-
-  // Fake slots
-  const availableSlots = ["10:00", "11:30", "14:00", "15:30", "17:00"];
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitError(t.submitUnavailable || "Le service d'envoi est temporairement indisponible.");
+  };
 
   return (
     <>
       <Header lang={lang} alternateLangHref={alternateLangHref} />
+
+      <main id="main-content">
 
       {/* Hero Section */}
       <section className={styles.heroSection}>
@@ -61,81 +59,20 @@ export function ContactPage({ lang }: ContactPageProps) {
             
             <div className={styles.calendarCard}>
               <div className={styles.calendarHeader}>
-                <span className={styles.calendarMonth}>{t.months[8]} 2026</span>
-                <div className={styles.calendarNav}>
-                  <button className={styles.calendarNavBtn} disabled>←</button>
-                  <button className={styles.calendarNavBtn}>→</button>
-                </div>
+                <span className={styles.calendarMonth}>
+                  {lang === "fr" ? "Réservation en ligne" : "Online booking"}
+                </span>
               </div>
-              
-              <div className={styles.calendarGrid}>
-                {t.weekdays.map((wd, i) => (
-                  <div key={i} className={styles.calendarWeekday}>{wd}</div>
-                ))}
-                
-                {Array.from({ length: emptyDays }).map((_, i) => (
-                  <div key={`empty-${i}`} />
-                ))}
-                
-                {daysInMonth.map((day) => {
-                  const dayOfWeek = (emptyDays + day - 1) % 7;
-                  const isAvailable = dayOfWeek === 1 || dayOfWeek === 3; // Tue or Thu
-                  
-                  return (
-                    <button
-                      key={day}
-                      onClick={() => isAvailable && setSelectedDay(day)}
-                      disabled={!isAvailable}
-                      className={`${styles.calendarDay} ${
-                        !isAvailable ? styles.disabled : ""
-                      } ${selectedDay === day ? styles.selected : ""}`}
-                    >
-                      {day}
-                    </button>
-                  );
-                })}
+              <div className={styles.slotsEmpty}>
+                {lang === "fr"
+                  ? "La réservation en ligne est temporairement indisponible. Veuillez nous écrire directement via le formulaire ou par e-mail."
+                  : "Online booking is temporarily unavailable. Please contact us directly via the form or by email."}
               </div>
             </div>
           </div>
           
-          <div className={styles.slotsColumn}>
-            <h4 className={styles.slotsTitle}>{t.slotsTitle}</h4>
-            
-            {!selectedDay ? (
-              <div className={styles.slotsEmpty}>{t.slotsEmpty}</div>
-            ) : (
-              <>
-                <div className={styles.slotsList}>
-                  {availableSlots.map((time) => (
-                    <button
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      className={`${styles.slotBtn} ${
-                        selectedTime === time ? styles.selected : ""
-                      }`}
-                    >
-                      {time}
-                    </button>
-                  ))}
-                </div>
-                
-                <div className={styles.recapBox}>
-                  {t.recapPrefix}
-                  {selectedTime ? (
-                    <b>{selectedDay} {t.months[8]} à {selectedTime}</b>
-                  ) : (
-                    <span className={styles.recapPlaceholder}>{t.recapChooseTime}</span>
-                  )}
-                </div>
-                
-                <button 
-                  className={`btn btn--primary ${styles.confirmBtn}`}
-                  disabled={!selectedTime}
-                >
-                  {t.confirmBtn}
-                </button>
-              </>
-            )}
+          <div role="alert" className={styles.unavailableAlert}>
+            {t.submitUnavailable}
           </div>
         </div>
       </section>
@@ -145,39 +82,44 @@ export function ContactPage({ lang }: ContactPageProps) {
         <h3 className={styles.formPrompt}>{t.formPrompt}</h3>
         
         <div className={styles.formGrid}>
-          <form onSubmit={(e) => e.preventDefault()}>
+          <form onSubmit={handleSubmit}>
+            {submitError && (
+              <div className={styles.formError} role="alert">
+                {submitError}
+              </div>
+            )}
             <div className={styles.formGroup}>
               <label htmlFor="names" className={styles.label}>{t.formLabels.names}</label>
-              <input type="text" id="names" className={styles.input} placeholder={t.formPlaceholders.names} />
+              <input type="text" id="names" name="names" required className={styles.input} placeholder={t.formPlaceholders.names} />
             </div>
             
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
                 <label htmlFor="email" className={styles.label}>{t.formLabels.email}</label>
-                <input type="email" id="email" className={styles.input} placeholder={t.formPlaceholders.email} />
+                <input type="email" id="email" name="email" required className={styles.input} placeholder={t.formPlaceholders.email} />
               </div>
               <div className={styles.formGroup}>
                 <label htmlFor="phone" className={styles.label}>{t.formLabels.phone}</label>
-                <input type="tel" id="phone" className={styles.input} placeholder={t.formPlaceholders.phone} />
+                <input type="tel" id="phone" name="phone" className={styles.input} placeholder={t.formPlaceholders.phone} />
               </div>
             </div>
             
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
                 <label htmlFor="date" className={styles.label}>{t.formLabels.date}</label>
-                <input type="date" id="date" className={styles.input} />
+                <input type="date" id="date" name="date" required className={styles.input} />
               </div>
               <div className={styles.formGroup}>
                 <label htmlFor="location" className={styles.label}>{t.formLabels.location}</label>
-                <input type="text" id="location" className={styles.input} placeholder={t.formPlaceholders.location} />
+                <input type="text" id="location" name="location" required className={styles.input} placeholder={t.formPlaceholders.location} />
               </div>
             </div>
             
             <div className={styles.formGroup}>
               <label htmlFor="formula" className={styles.label}>{t.formLabels.formula}</label>
-              <select id="formula" className={styles.select} defaultValue="">
+              <select id="formula" name="formula" required className={styles.select} defaultValue="">
                 <option value="" disabled>{t.formPlaceholders.formulaDefault}</option>
-                <option value="photo">Photographie</option>
+                <option value="photo">{lang === "fr" ? "Photographie" : "Photography"}</option>
                 <option value="film">Film</option>
                 <option value="duo">Duo (Photo + Film)</option>
                 <option value="custom">{t.formPlaceholders.formulaSurMesure}</option>
@@ -187,7 +129,7 @@ export function ContactPage({ lang }: ContactPageProps) {
             
             <div className={styles.formGroup}>
               <label htmlFor="message" className={styles.label}>{t.formLabels.message}</label>
-              <textarea id="message" className={styles.textarea} placeholder={t.formPlaceholders.message} />
+              <textarea id="message" name="message" required className={styles.textarea} placeholder={t.formPlaceholders.message} />
             </div>
             
             <button type="submit" className={`btn btn--primary ${styles.submitBtn}`}>
@@ -251,6 +193,7 @@ export function ContactPage({ lang }: ContactPageProps) {
       </section>
 
       <Footer lang={lang} />
+      </main>
     </>
   );
 }

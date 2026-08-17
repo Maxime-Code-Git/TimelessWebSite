@@ -30,6 +30,7 @@ export function FormulesPage({ lang }: FormulesPageProps) {
     <>
       <Header lang={lang} alternateLangHref={alternateLangHref} />
 
+      <main id="main-content">
       {/* Title Section */}
       <section className={styles.titleSection}>
         <div className={styles.titleDivider} />
@@ -43,6 +44,7 @@ export function FormulesPage({ lang }: FormulesPageProps) {
           <div className={styles.tabs}>
             {categories.map((cat) => (
               <button
+                type="button"
                 key={cat}
                 onClick={() => setSelectedCat(cat)}
                 className={`${styles.tabBtn} ${
@@ -59,7 +61,7 @@ export function FormulesPage({ lang }: FormulesPageProps) {
               const features = currentFeatures[index] || [];
               return (
                 <div
-                  key={tier.name}
+                  key={tier.id}
                   className={`${styles.card} ${
                     tier.featured ? styles.featured : ""
                   }`}
@@ -68,7 +70,7 @@ export function FormulesPage({ lang }: FormulesPageProps) {
                     <span className={styles.featuredBadge}>{t.featuredBadge}</span>
                   )}
                   <div className={styles.cardHeader}>
-                    <div className={styles.cardName}>{tier.name}</div>
+                    <div className={styles.cardName}>{getStrings(lang).tierNames[tier.id]}</div>
                     <div className={styles.cardPrice}>
                       {formatPrice(tier.priceCents, lang)}
                     </div>
@@ -131,6 +133,7 @@ export function FormulesPage({ lang }: FormulesPageProps) {
           </div>
         </div>
       </section>
+      </main>
 
       <Footer lang={lang} />
     </>

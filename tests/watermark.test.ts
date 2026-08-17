@@ -6,15 +6,22 @@ import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rawDir = path.join(__dirname, '../data/media/raw');
-const outDir = path.join(__dirname, '../apps/web/public/media/portfolio');
-const testImgPath = path.join(rawDir, 'test-image.jpg');
+
+let tempRawDir: string;
+let tempOutDir: string;
+let testImgPath: string;
 
 describe('Watermark Script', () => {
   beforeAll(async () => {
-    // Ensure directories exist
-    if (!fs.existsSync(rawDir)) fs.mkdirSync(rawDir, { recursive: true });
-    
+    // Create temporary directories
+    const tmpBase = fs.mkdtempSync(path.join(fs.realpathSync(require('os').tmpdir()), 'timeless-'));
+    tempRawDir = path.join(tmpBase, 'raw');
+    tempOutDir = path.join(tmpBase, 'out');
+    fs.mkdirSync(tempRawDir, { recursive: true });
+    fs.mkdirSync(tempOutDir, { recursive: true });
+
+    testImgPath = path.join(tempRawDir, 'test-image.jpg');
+
     // Create a dummy solid color image for testing
     await sharp({
       create: {
@@ -26,34 +33,47 @@ describe('Watermark Script', () => {
     })
     .jpeg()
     .toFile(testImgPath);
-    
+
     // Run the script
-    execSync('node scripts/watermark-portfolio.js', { 
+    execSync('node scripts/watermark-portfolio.js', {
       cwd: path.join(__dirname, '..'),
-      stdio: 'ignore'
+      env: { ...process.env, INPUT_DIR: tempRawDir, OUTPUT_DIR: tempOutDir },
+      stdio: 'inherit'
     });
   });
 
   afterAll(() => {
-    // Cleanup
-    if (fs.existsSync(testImgPath)) fs.unlinkSync(testImgPath);
-    const webpPath = path.join(outDir, 'test-image.webp');
-    const avifPath = path.join(outDir, 'test-image.avif');
-    if (fs.existsSync(webpPath)) fs.unlinkSync(webpPath);
-    if (fs.existsSync(avifPath)) fs.unlinkSync(avifPath);
+    // Cleanup temp directory
+    fs.rmSync(path.dirname(tempRawDir), { recursive: true, force: true });
   });
 
   it('should generate WebP and AVIF files', () => {
-    expect(fs.existsSync(path.join(outDir, 'test-image.webp'))).toBe(true);
-    expect(fs.existsSync(path.join(outDir, 'test-image.avif'))).toBe(true);
+    expect(fs.existsSync(path.join(tempOutDir, 'test-image.webp'))).toBe(true);
+    expect(fs.existsSync(path.join(tempOutDir, 'test-image.avif'))).toBe(true);
   });
 
   it('should strip metadata', async () => {
-    const webpPath = path.join(outDir, 'test-image.webp');
+    const webpPath = path.join(tempOutDir, 'test-image.webp');
     const metadata = await sharp(webpPath).metadata();
-    
+
     // sharp automatically strips metadata unless withMetadata is called.
-    // Exif data should be undefined
     expect(metadata.exif).toBeUndefined();
+  });
+
+  it('should exit with non-zero code on invalid image', () => {
+    const invalidImgPath = path.join(tempRawDir, 'invalid-image.jpg');
+    fs.writeFileSync(invalidImgPath, 'not a real image');
+
+    let exitCode = 0;
+    try {
+      execSync('node scripts/watermark-portfolio.js', {
+        cwd: path.join(__dirname, '..'),
+        env: { ...process.env, INPUT_DIR: tempRawDir, OUTPUT_DIR: tempOutDir },
+        stdio: 'ignore'
+      });
+    } catch (error: any) {
+      exitCode = error.status;
+    }
+    expect(exitCode).toBe(1);
   });
 });

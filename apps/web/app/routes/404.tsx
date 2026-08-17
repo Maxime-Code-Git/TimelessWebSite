@@ -9,6 +9,10 @@ export function meta(_args: Route.MetaArgs) {
   ];
 }
 
+export function loader() {
+  return Response.json(null, { status: 404 });
+}
+
 export default function NotFound() {
   const location = useLocation();
   // Detect lang from URL prefix

@@ -38,6 +38,11 @@ export default [
     route("terms", "routes/en.cgv.tsx"),
   ]),
 
+  // ── Test routes (not in production) ───────────────────────
+  ...(process.env.NODE_ENV !== "production" ? [
+    route("__test/gallery", "routes/__test.gallery.tsx")
+  ] : []),
+
   // ── Catch-all (404) ───────────────────────────────────────
   route("*", "routes/404.tsx"),
 ] satisfies RouteConfig;

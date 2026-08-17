@@ -31,6 +31,7 @@ export function HomePage({ lang }: HomePageProps) {
       {/* 1. Header */}
       <Header variant="home" lang={lang} alternateLangHref={alternateLangHref} />
 
+      <main id="main-content">
       {/* 2. Hero */}
       <section className={styles.hero}>
         <div className={styles.heroOverlay} />
@@ -115,7 +116,7 @@ export function HomePage({ lang }: HomePageProps) {
           <div className={styles.formuleCards}>
             {currentPricing.map((tier) => (
               <div
-                key={tier.name}
+                key={tier.id}
                 className={`${styles.formuleCard} ${
                   tier.featured ? styles.featured : ""
                 }`}
@@ -123,14 +124,14 @@ export function HomePage({ lang }: HomePageProps) {
                 {tier.featured && (
                   <span className={styles.featuredBadge}>{t.featuredBadge}</span>
                 )}
-                <div className={styles.formuleName}>{tier.name}</div>
+                <div className={styles.formuleName}>{getStrings(lang).tierNames[tier.id]}</div>
                 <div className={styles.formulePrice}>
                   {formatPrice(tier.priceCents, lang)}
                 </div>
                 <div
                   className={styles.formuleNote}
                   dangerouslySetInnerHTML={{
-                    __html: getFormulaNote(selectedCat, tier.name, lang),
+                    __html: getFormulaNote(selectedCat, tier.id, lang),
                   }}
                 />
               </div>
@@ -171,6 +172,7 @@ export function HomePage({ lang }: HomePageProps) {
           </div>
         </div>
       </section>
+      </main>
 
       {/* 7. Footer */}
       <Footer lang={lang} />
@@ -179,39 +181,39 @@ export function HomePage({ lang }: HomePageProps) {
 }
 
 // Helper pour les notes (taglines) des cartes sur l'accueil
-function getFormulaNote(cat: string, tier: string, lang: Lang): string {
+function getFormulaNote(cat: string, tierId: string, lang: Lang): string {
   if (lang === "fr") {
     if (cat === "photo") {
-      if (tier === "Essentiel") return "Les moments clés,<br>en images.";
-      if (tier === "Signature") return "Couverture photo<br>complète du jour.";
-      if (tier === "Prestige") return "Reportage intégral<br>+ album d'art.";
+      if (tierId === "essential") return "Les moments clés,<br>en images.";
+      if (tierId === "signature") return "Couverture photo<br>complète du jour.";
+      if (tierId === "prestige") return "Reportage intégral<br>+ album d'art.";
     }
     if (cat === "film") {
-      if (tier === "Essentiel") return "Un film court,<br>l'émotion condensée.";
-      if (tier === "Signature") return "Le film complet<br>de votre journée.";
-      if (tier === "Prestige") return "Long métrage<br>+ teaser + rushes.";
+      if (tierId === "essential") return "Un film court,<br>l'émotion condensée.";
+      if (tierId === "signature") return "Le film complet<br>de votre journée.";
+      if (tierId === "prestige") return "Long métrage<br>+ teaser + rushes.";
     }
     if (cat === "duo") {
-      if (tier === "Essentiel") return "Photo et film,<br>l'essentiel réuni.";
-      if (tier === "Signature") return "Photo + film,<br>couverture complète.";
-      if (tier === "Prestige") return "L'expérience intégrale,<br>sans compromis.";
+      if (tierId === "essential") return "Photo et film,<br>l'essentiel réuni.";
+      if (tierId === "signature") return "Photo + film,<br>couverture complète.";
+      if (tierId === "prestige") return "L'expérience intégrale,<br>sans compromis.";
     }
   } else {
     // English
     if (cat === "photo") {
-      if (tier === "Essentiel") return "Key moments,<br>in images.";
-      if (tier === "Signature") return "Complete photo coverage<br>of the day.";
-      if (tier === "Prestige") return "Full reportage<br>+ fine-art album.";
+      if (tierId === "essential") return "Key moments,<br>in images.";
+      if (tierId === "signature") return "Complete photo coverage<br>of the day.";
+      if (tierId === "prestige") return "Full reportage<br>+ fine-art album.";
     }
     if (cat === "film") {
-      if (tier === "Essentiel") return "A short film,<br>condensed emotion.";
-      if (tier === "Signature") return "The complete film<br>of your day.";
-      if (tier === "Prestige") return "Feature film<br>+ teaser + raw footage.";
+      if (tierId === "essential") return "A short film,<br>condensed emotion.";
+      if (tierId === "signature") return "The complete film<br>of your day.";
+      if (tierId === "prestige") return "Feature film<br>+ teaser + raw footage.";
     }
     if (cat === "duo") {
-      if (tier === "Essentiel") return "Photo & film,<br>the essentials combined.";
-      if (tier === "Signature") return "Photo + film,<br>complete coverage.";
-      if (tier === "Prestige") return "The ultimate experience,<br>without compromise.";
+      if (tierId === "essential") return "Photo & film,<br>the essentials combined.";
+      if (tierId === "signature") return "Photo + film,<br>complete coverage.";
+      if (tierId === "prestige") return "The ultimate experience,<br>without compromise.";
     }
   }
   return "";

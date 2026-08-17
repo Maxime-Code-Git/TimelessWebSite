@@ -13,7 +13,7 @@ export interface TierPricing {
 }
 
 export interface FormulaTier {
-  readonly name: string;
+  readonly id: "essential" | "signature" | "prestige";
   readonly priceCents: number;
   readonly featured: boolean;
 }
@@ -21,19 +21,19 @@ export interface FormulaTier {
 /** Pricing per category, each with 3 tiers in order: Essentiel, Signature, Prestige */
 export const PRICING = {
   photo: [
-    { name: "Essentiel", priceCents: 129_000, featured: false },
-    { name: "Signature", priceCents: 179_000, featured: true },
-    { name: "Prestige", priceCents: 239_000, featured: false },
+    { id: "essential", priceCents: 129_000, featured: false },
+    { id: "signature", priceCents: 179_000, featured: true },
+    { id: "prestige", priceCents: 239_000, featured: false },
   ],
   film: [
-    { name: "Essentiel", priceCents: 149_000, featured: false },
-    { name: "Signature", priceCents: 219_000, featured: true },
-    { name: "Prestige", priceCents: 299_000, featured: false },
+    { id: "essential", priceCents: 149_000, featured: false },
+    { id: "signature", priceCents: 219_000, featured: true },
+    { id: "prestige", priceCents: 299_000, featured: false },
   ],
   duo: [
-    { name: "Essentiel", priceCents: 249_000, featured: false },
-    { name: "Signature", priceCents: 349_000, featured: true },
-    { name: "Prestige", priceCents: 469_000, featured: false },
+    { id: "essential", priceCents: 249_000, featured: false },
+    { id: "signature", priceCents: 349_000, featured: true },
+    { id: "prestige", priceCents: 469_000, featured: false },
   ],
 } as const;
 

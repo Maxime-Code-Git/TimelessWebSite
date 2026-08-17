@@ -1,40 +1,25 @@
-import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import ContactFr from "../app/routes/fr.contact";
+import { ContactPage } from "../app/routes/ContactPage";
 
-describe("Contact Component", () => {
-  it("allows selecting a day in the booking calendar", () => {
-    render(
+describe("ContactPage Component", () => {
+  it("renders correctly and shows unavailability message", () => {
+    const { container } = render(
       <MemoryRouter>
-        <ContactFr />
+        <ContactPage lang="fr" />
       </MemoryRouter>
     );
 
-    // Initial state: no slot selected
-    expect(screen.getByText("Sélectionnez d'abord un mardi ou un jeudi dans le calendrier.")).toBeInTheDocument();
+    // Unavailability message is shown (it appears twice on the page)
+    const msgs = screen.getAllByText(/La réservation en ligne est temporairement/i);
+    expect(msgs.length).toBeGreaterThan(0);
 
-    // The calendar should have some buttons for days.
-    // Tuesdays and Thursdays are open. We find an enabled button.
-    const buttons = screen.getAllByRole("button");
-    const openDay = buttons.find(b => !b.hasAttribute("disabled") && !isNaN(Number(b.textContent)));
+    // Check form is rendered
+    expect(screen.getByLabelText("Prénom(s) des futurs mariés")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Envoyer" })).toBeInTheDocument();
 
-    if (openDay) {
-      fireEvent.click(openDay);
-      
-      // Now slots should appear
-      expect(screen.queryByText("Sélectionnez d'abord un mardi ou un jeudi dans le calendrier.")).not.toBeInTheDocument();
-      expect(screen.getByText("Créneaux disponibles")).toBeInTheDocument();
-      
-      // Click a slot
-      const slots = screen.getAllByRole("button").filter(b => b.className.includes("slotBtn"));
-      if (slots.length > 0) {
-        fireEvent.click(slots[0]);
-      }
-      
-      // The confirmation button should be enabled
-      const confirmBtn = screen.getByRole("button", { name: "Confirmer le rendez-vous" });
-      expect(confirmBtn).not.toBeDisabled();
-    }
+    // No undefined classes
+    expect(container.innerHTML).not.toContain('class="undefined"');
   });
 });

@@ -5,13 +5,21 @@ import { ScrollTop } from "~/components/ui/ScrollTop";
 import { BUSINESS } from "~/lib/business-config";
 import styles from "./legal.module.css";
 
-export function meta(_args: Route.MetaArgs) {
-  return [
-    { title: "Mentions légales — Timeless" },
-    { name: "description", content: "Mentions légales du site Timeless." },
-    // noindex tant que les informations légales ne sont pas finalisées
-    { name: "robots", content: "noindex, nofollow" },
-  ];
+import { getSeoMeta } from "~/lib/seo";
+
+export function meta({ matches }: Route.MetaArgs) {
+  const rootData = matches[0]?.loaderData as { PUBLIC_SITE_URL?: string } | undefined;
+  const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
+
+  return getSeoMeta({
+    title: "Mentions légales — Timeless",
+    description: "Mentions légales du site Timeless.",
+    path: "/fr/mentions-legales",
+    alternatePath: "/en/legal",
+    lang: "fr",
+    noindex: true,
+    siteUrl,
+  });
 }
 
 const isComplete = Boolean(

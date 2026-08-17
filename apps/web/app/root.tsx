@@ -1,4 +1,5 @@
 import type { Route } from "./+types/root";
+import { data } from "react-router";
 import stylesheet from "./app.css?url";
 import {
   Links,
@@ -16,6 +17,12 @@ const PRELOAD_FONTS = [
   "/fonts/CormorantGaramond-Medium.woff2",
   "/fonts/HankenGrotesk-Regular.woff2",
 ];
+
+export function loader() {
+  const url = process.env.PUBLIC_SITE_URL || "http://localhost:5173";
+  // Remove trailing slash if any
+  return data({ PUBLIC_SITE_URL: url.replace(/\/$/, "") });
+}
 
 export const links: Route.LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },

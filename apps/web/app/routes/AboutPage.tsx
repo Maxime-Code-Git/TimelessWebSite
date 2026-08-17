@@ -2,7 +2,6 @@ import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
 import { getStrings } from "~/lib/i18n";
-import { BUSINESS } from "~/lib/business-config";
 import styles from "./about.module.css";
 
 interface AboutPageProps {
@@ -17,6 +16,7 @@ export function AboutPage({ lang }: AboutPageProps) {
     <>
       <Header lang={lang} alternateLangHref={alternateLangHref} />
 
+      <main id="main-content">
       {/* Hero Section */}
       <section className={styles.heroSection}>
         <h1 className={styles.heroTitle}>{t.heroTitle}</h1>
@@ -27,24 +27,17 @@ export function AboutPage({ lang }: AboutPageProps) {
       <section className={styles.duoSection}>
         <div className={styles.duoInner}>
           <div className={styles.duoGrid}>
-            {/* Person 1 */}
             <div className={styles.personCard}>
               <div className={styles.personPhoto} />
               <h2 className={styles.personName}>
-                {BUSINESS.photographer1Name || t.personNamePlaceholder}
+                {lang === "fr" ? "L'équipe Timeless" : "The Timeless Team"}
               </h2>
-              <p className={styles.personRole}>{t.personRole1}</p>
-              <p className={styles.personBio}>{t.personBio}</p>
-            </div>
-            
-            {/* Person 2 */}
-            <div className={styles.personCard}>
-              <div className={styles.personPhoto} />
-              <h2 className={styles.personName}>
-                {BUSINESS.photographer2Name || t.personNamePlaceholder}
-              </h2>
-              <p className={styles.personRole}>{t.personRole2}</p>
-              <p className={styles.personBio}>{t.personBio}</p>
+              <p className={styles.personRole}>{t.personRole1} & {t.personRole2}</p>
+              <p className={styles.personBio}>
+                {lang === "fr"
+                  ? "Nous sommes un studio spécialisé dans la photographie et la vidéo de mariage. Notre objectif est de capturer votre journée de manière authentique, avec deux regards complémentaires."
+                  : "We are a studio specialized in wedding photography and videography. Our goal is to capture your day authentically, with two complementary perspectives."}
+              </p>
             </div>
           </div>
         </div>
@@ -73,6 +66,7 @@ export function AboutPage({ lang }: AboutPageProps) {
           <p className={styles.differenceText}>{t.differenceText}</p>
         </div>
       </section>
+      </main>
 
       <Footer lang={lang} />
     </>

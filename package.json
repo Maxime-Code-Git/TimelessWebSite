@@ -16,7 +16,7 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "vitest run tests/watermark.test.ts && npm run test --workspaces --if-present",
     "test:e2e": "npm run test:e2e --workspace=apps/web",
     "convert-fonts": "bash scripts/convert-fonts.sh",
     "setup-admin": "bash scripts/set-admin-password.sh"
@@ -31,6 +31,7 @@
     "eslint": "^10.8.1",
     "globals": "^17.11.0",
     "jsdom": "^30.0.1",
+    "sharp": "0.35.3",
     "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.10"
   }
