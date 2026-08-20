@@ -18,10 +18,10 @@ export const BUSINESS = {
   enterpriseNumber: null as string | null,
 
   /** Public contact email */
-  email: "timelessstudiolm@gmail.com",
+  email: "timeless.studiolm@gmail.com",
 
   /** mailto: href for email */
-  emailHref: "mailto:timelessstudiolm@gmail.com",
+  emailHref: "mailto:timeless.studiolm@gmail.com",
 
   /** Display phone number */
   phone: "+32 477 86 37 42",

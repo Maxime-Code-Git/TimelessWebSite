@@ -228,7 +228,7 @@
   border: 0.5px solid var(--green);
 }
 
-.formuleTab.active {
+.active {
   background: var(--ivory);
   color: var(--forest-deep);
   border: 0.5px solid var(--gold);

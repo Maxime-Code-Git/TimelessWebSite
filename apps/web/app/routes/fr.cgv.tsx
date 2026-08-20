@@ -1,16 +1,24 @@
 import type { Route } from "./+types/fr.cgv";
+import { getSeoMeta } from "~/lib/seo";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
 import { BUSINESS } from "~/lib/business-config";
 import styles from "./legal.module.css";
 
-export function meta(_args: Route.MetaArgs) {
-  return [
-    { title: "Conditions Générales de Vente — Timeless" },
-    { name: "description", content: "Conditions Générales de Vente de Timeless." },
-    { name: "robots", content: "noindex, nofollow" },
-  ];
+export function meta({ matches }: Route.MetaArgs) {
+  const rootData = matches.find((m) => m?.id === "root")?.loaderData as { PUBLIC_SITE_URL?: string } | undefined;
+  const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
+
+  return getSeoMeta({
+    title: "Conditions Générales de Vente — Timeless",
+    description: "Conditions Générales de Vente de Timeless.",
+    path: "/fr/cgv",
+    alternatePath: "/en/terms",
+    lang: "fr",
+    noindex: true,
+    siteUrl,
+  });
 }
 
 export default function CgvFr() {

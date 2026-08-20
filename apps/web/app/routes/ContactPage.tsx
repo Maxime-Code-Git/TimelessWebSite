@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useRef } from "react";
+import { Link, useFetcher } from "react-router";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
@@ -15,12 +15,20 @@ export function ContactPage({ lang }: ContactPageProps) {
   const t = getStrings(lang).contact;
   const alternateLangHref = lang === "fr" ? "/en/contact" : "/fr/contact";
 
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const fetcher = useFetcher();
+  const isSubmitting = fetcher.state === "submitting";
+  const success = fetcher.data?.success;
+  const errorMsg = fetcher.data?.error;
+  
+  const formRef = useRef<HTMLFormElement>(null);
+  const messageRef = useRef<HTMLDivElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitError(t.submitUnavailable || "Le service d'envoi est temporairement indisponible.");
-  };
+  useEffect(() => {
+    if (success && formRef.current) {
+      formRef.current.reset();
+      messageRef.current?.focus();
+    }
+  }, [success]);
 
   return (
     <>
@@ -82,10 +90,29 @@ export function ContactPage({ lang }: ContactPageProps) {
         <h3 className={styles.formPrompt}>{t.formPrompt}</h3>
         
         <div className={styles.formGrid}>
-          <form onSubmit={handleSubmit}>
-            {submitError && (
-              <div className={styles.formError} role="alert">
-                {submitError}
+          <fetcher.Form method="post" ref={formRef} action={lang === "fr" ? "/fr/contact" : "/en/contact"}>
+            {/* Honeypot field - must be hidden to humans */}
+            <div className={styles.honeypot} aria-hidden="true">
+              <label htmlFor="website">Website</label>
+              <input type="text" id="website" name="website" tabIndex={-1} autoComplete="off" />
+            </div>
+
+            {errorMsg && (
+              <div className={styles.formError} role="alert" tabIndex={-1}>
+                {errorMsg}
+              </div>
+            )}
+            
+            {success && (
+              <div 
+                className={styles.formSuccess} 
+                role="status" 
+                tabIndex={-1} 
+                ref={messageRef}
+              >
+                {lang === "fr" 
+                  ? "Votre message a bien été envoyé. Nous vous répondrons sous 48 h." 
+                  : "Your message has been sent successfully. We will reply within 48 hours."}
               </div>
             )}
             <div className={styles.formGroup}>
@@ -132,10 +159,10 @@ export function ContactPage({ lang }: ContactPageProps) {
               <textarea id="message" name="message" required className={styles.textarea} placeholder={t.formPlaceholders.message} />
             </div>
             
-            <button type="submit" className={`btn btn--primary ${styles.submitBtn}`}>
-              {t.formLabels.submit}
+            <button type="submit" className={`btn btn--primary ${styles.submitBtn}`} disabled={isSubmitting}>
+              {isSubmitting ? (lang === "fr" ? "Envoi..." : "Sending...") : t.formLabels.submit}
             </button>
-          </form>
+          </fetcher.Form>
           
           {/* Info Card with Real Config */}
           <div className={styles.infoCard}>
@@ -191,9 +218,9 @@ export function ContactPage({ lang }: ContactPageProps) {
           {t.bannerLink}
         </Link>
       </section>
+      </main>
 
       <Footer lang={lang} />
-      </main>
     </>
   );
 }

@@ -15,7 +15,7 @@
     "dev": "npm run dev --workspace=apps/web",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
+    "lint": "eslint .",
     "test": "vitest run tests/watermark.test.ts && npm run test --workspaces --if-present",
     "test:e2e": "npm run test:e2e --workspace=apps/web",
     "convert-fonts": "bash scripts/convert-fonts.sh",
@@ -27,12 +27,18 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
+    "@types/nodemailer": "^8.0.1",
+    "@types/smtp-server": "^3.5.13",
     "@vitejs/plugin-react": "^6.0.5",
     "eslint": "^10.8.1",
     "globals": "^17.11.0",
     "jsdom": "^30.0.1",
     "sharp": "0.35.3",
+    "smtp-server": "^3.19.3",
     "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "nodemailer": "^9.0.5"
   }
 }

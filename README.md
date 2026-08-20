@@ -55,12 +55,13 @@ This compiles both the `@timeless/shared` package and the `apps/web` React Route
 - **Security**: 
   - Nonce-based CSP for all scripts.
   - Client areas and gallery pages redirect via SSR loader.
-- **SEO**: Canonical, `hreflang` and `robots.txt` generated securely.
+- **SEO**: Canonical, `hrefLang` and `robots.txt` generated securely.
 
 ## Configuration
 
-Duplicate `.env.example` to `.env` in `apps/web/`:
+Duplicate `.env.example` to `.env.local` (for development) or `.env.production` (for production) at the root of the repository:
 
 ```
-PUBLIC_SITE_URL=http://localhost:4173
+PUBLIC_SITE_URL=http://localhost:5173
+TRUST_PROXY=false
 ```

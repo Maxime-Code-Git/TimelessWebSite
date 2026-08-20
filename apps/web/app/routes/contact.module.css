@@ -439,3 +439,15 @@
     gap: 44px;
   }
 }
+
+.honeypot {
+  display: none;
+}
+
+.formSuccess {
+  padding: 1rem;
+  background-color: #e6f4ea;
+  color: #137333;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+}

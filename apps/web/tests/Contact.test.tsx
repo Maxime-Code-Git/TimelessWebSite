@@ -1,15 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { ContactPage } from "../app/routes/ContactPage";
 
 describe("ContactPage Component", () => {
   it("renders correctly and shows unavailability message", () => {
-    const { container } = render(
-      <MemoryRouter>
-        <ContactPage lang="fr" />
-      </MemoryRouter>
-    );
+    const router = createMemoryRouter([
+      {
+        path: "/",
+        element: <ContactPage lang="fr" />
+      }
+    ]);
+    const { container } = render(<RouterProvider router={router} />);
 
     // Unavailability message is shown (it appears twice on the page)
     const msgs = screen.getAllByText(/La réservation en ligne est temporairement/i);

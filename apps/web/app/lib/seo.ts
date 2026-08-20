@@ -59,16 +59,16 @@ export function getSeoMeta({
   // Tags <link> via la fonction meta (supporté dans React Router v7)
   const links: Record<string, string>[] = [
     { tagName: "link", rel: "canonical", href: absoluteUrl },
-    { tagName: "link", rel: "alternate", hreflang: lang, href: absoluteUrl },
+    { tagName: "link", rel: "alternate", hrefLang: lang, href: absoluteUrl },
   ];
 
   if (absoluteAltUrl) {
     const altLang = isFr ? "en" : "fr";
-    links.push({ tagName: "link", rel: "alternate", hreflang: altLang, href: absoluteAltUrl });
+    links.push({ tagName: "link", rel: "alternate", hrefLang: altLang, href: absoluteAltUrl });
   }
   
   // x-default pointera vers le français
-  links.push({ tagName: "link", rel: "alternate", hreflang: "x-default", href: xDefaultUrl });
+  links.push({ tagName: "link", rel: "alternate", hrefLang: "x-default", href: xDefaultUrl });
 
   return [...meta, ...links];
 }

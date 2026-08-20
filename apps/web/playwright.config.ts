@@ -56,6 +56,15 @@ export default defineConfig({
     env: {
       PORT: '4173',
       PUBLIC_SITE_URL: 'http://localhost:4173',
+      SMTP_HOST: '127.0.0.1',
+      SMTP_PORT: '2525',
+      SMTP_USER: 'test@example.com',
+      SMTP_PASS: 'test',
+      SMTP_FROM: 'test@example.com',
+      SMTP_TO: 'test@example.com',
+      CONTACT_RATE_LIMIT_SECRET: 'testsecret',
+      RATE_LIMIT_DB_PATH: './data/db/rate-limit-test.sqlite',
+      TRUST_PROXY: 'true',
     },
   },
 });

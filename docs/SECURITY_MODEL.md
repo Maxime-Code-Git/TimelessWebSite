@@ -135,7 +135,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 - **Honeypot** : champ caché `website` — si rempli, requête silencieusement ignorée
 - **Rate limiting** : 3 soumissions / heure / IP
 - **Validation serveur** : chaque champ validé indépendamment du client
-- **Stockage** : en base de données, jamais dans les logs
+- **Stockage provisoire** : le contenu du formulaire n'est pas conservé durablement en base SQLite tant que sa durée de conservation RGPD n'a pas été décidée. Le message est conservé dans la boîte Gmail du studio. La base SQLite ne conserve actuellement que le hash des IP pour le rate limiting.
 - **E-mails** : via relais SMTP configuré, pas d'envoi direct depuis IP résidentielle
 
 ---
@@ -153,7 +153,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 ## 8. Données personnelles (RGPD)
 
 - **Logs** : aucun e-mail, nom, code galerie, mot de passe ou token signé
-- **IPs** : hashées avant stockage dans les tables de rate limiting et audit
+- **IPs** : L'application écoute uniquement sur `127.0.0.1`. En production, elle fait confiance exclusivement à l'en-tête `X-Forwarded-For` fourni par le reverse proxy (activé via `TRUST_PROXY=true`). Les IPs sont hashées avec un secret HMAC avant stockage dans les tables de rate limiting et audit. L'IP brute n'est jamais conservée.
 - **Cookies** : session opaque uniquement — pas de tracking, pas d'analytics tiers par défaut
 - **Galeries** : accès limité dans le temps (24 mois), expiration documentée
 - **Sauvegardes** : chiffrées, accès restreint

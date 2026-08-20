@@ -36,19 +36,23 @@ function generateNonce(): string {
 }
 
 function buildCsp(nonce: string): string {
+  const isDev = process.env.NODE_ENV === "development";
+  
+  const styleSrc = isDev ? "'self' 'unsafe-inline'" : "'self'";
+  const connectSrc = isDev ? "'self' ws: wss:" : "'self'";
+
   const directives = [
     "default-src 'self'",
     // React Router hydration scripts require nonce
     `script-src 'self' 'nonce-${nonce}'`,
     // CSS Modules compile to separate .css files — no inline styles needed in production
-    // 'unsafe-inline' NOT used — we keep this strict
-    "style-src 'self'",
+    `style-src ${styleSrc}`,
     // Local fonts only (woff2 served from /public/fonts/)
     "font-src 'self'",
     // Images from same origin + data: URIs (for base64 inline images if any)
     "img-src 'self' data:",
     // API calls will only go to same origin in Phase 3
-    "connect-src 'self'",
+    `connect-src ${connectSrc}`,
     // No iframes allowed
     "frame-ancestors 'none'",
     // Prevent base tag injection

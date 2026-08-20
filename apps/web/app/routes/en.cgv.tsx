@@ -1,15 +1,23 @@
 import type { Route } from "./+types/en.cgv";
+import { getSeoMeta } from "~/lib/seo";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
 import styles from "./legal.module.css";
 
-export function meta(_args: Route.MetaArgs) {
-  return [
-    { title: "Terms & Conditions — Timeless" },
-    { name: "description", content: "Terms and conditions of Timeless." },
-    { name: "robots", content: "noindex, nofollow" },
-  ];
+export function meta({ matches }: Route.MetaArgs) {
+  const rootData = matches.find((m) => m?.id === "root")?.loaderData as { PUBLIC_SITE_URL?: string } | undefined;
+  const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
+
+  return getSeoMeta({
+    title: "Terms & Conditions — Timeless",
+    description: "Terms and conditions of Timeless.",
+    path: "/en/terms",
+    alternatePath: "/fr/cgv",
+    lang: "en",
+    noindex: true,
+    siteUrl,
+  });
 }
 
 export default function CgvEn() {

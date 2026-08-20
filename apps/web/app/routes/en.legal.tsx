@@ -1,17 +1,24 @@
 import type { Route } from "./+types/en.legal";
+import { getSeoMeta } from "~/lib/seo";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
 import { BUSINESS } from "~/lib/business-config";
 import styles from "./legal.module.css";
 
-export function meta(_args: Route.MetaArgs) {
-  return [
-    { title: "Legal Notice — Timeless" },
-    { name: "description", content: "Legal notice of the Timeless website." },
-    // noindex until legal information is finalised
-    { name: "robots", content: "noindex, nofollow" },
-  ];
+export function meta({ matches }: Route.MetaArgs) {
+  const rootData = matches.find((m) => m?.id === "root")?.loaderData as { PUBLIC_SITE_URL?: string } | undefined;
+  const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
+
+  return getSeoMeta({
+    title: "Legal Notice — Timeless",
+    description: "Legal notice of the Timeless website.",
+    path: "/en/legal",
+    alternatePath: "/fr/mentions-legales",
+    lang: "en",
+    noindex: true,
+    siteUrl,
+  });
 }
 
 const isComplete = Boolean(

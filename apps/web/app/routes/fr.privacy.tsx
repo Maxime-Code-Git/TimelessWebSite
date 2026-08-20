@@ -1,15 +1,23 @@
 import type { Route } from "./+types/fr.privacy";
+import { getSeoMeta } from "~/lib/seo";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
 import styles from "./legal.module.css";
 
-export function meta(_args: Route.MetaArgs) {
-  return [
-    { title: "Politique de confidentialité — Timeless" },
-    { name: "description", content: "Politique de confidentialité du site Timeless." },
-    { name: "robots", content: "noindex, nofollow" },
-  ];
+export function meta({ matches }: Route.MetaArgs) {
+  const rootData = matches.find((m) => m?.id === "root")?.loaderData as { PUBLIC_SITE_URL?: string } | undefined;
+  const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
+
+  return getSeoMeta({
+    title: "Politique de confidentialité — Timeless",
+    description: "Politique de confidentialité du site Timeless.",
+    path: "/fr/confidentialite",
+    alternatePath: "/en/privacy",
+    lang: "fr",
+    noindex: true,
+    siteUrl,
+  });
 }
 
 export default function PrivacyFr() {

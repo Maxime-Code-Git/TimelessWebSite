@@ -106,4 +106,7 @@ async function processImages() {
   }
 }
 
-processImages().catch(console.error);
+processImages().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

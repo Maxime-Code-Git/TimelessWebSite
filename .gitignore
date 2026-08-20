@@ -57,3 +57,8 @@ coverage/
 
 # Admin path (NEVER commit)
 ADMIN_PATH.txt
+
+# Artifacts
+apps/web/screenshots/
+visual-review.zip
+apps/web/generate-screenshots.cjs

@@ -4,6 +4,7 @@ import path from 'path';
 import sharp from 'sharp';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import os from 'node:os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,7 +15,7 @@ let testImgPath: string;
 describe('Watermark Script', () => {
   beforeAll(async () => {
     // Create temporary directories
-    const tmpBase = fs.mkdtempSync(path.join(fs.realpathSync(require('os').tmpdir()), 'timeless-'));
+    const tmpBase = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'timeless-'));
     tempRawDir = path.join(tmpBase, 'raw');
     tempOutDir = path.join(tmpBase, 'out');
     fs.mkdirSync(tempRawDir, { recursive: true });
@@ -71,8 +72,12 @@ describe('Watermark Script', () => {
         env: { ...process.env, INPUT_DIR: tempRawDir, OUTPUT_DIR: tempOutDir },
         stdio: 'ignore'
       });
-    } catch (error: any) {
-      exitCode = error.status;
+    } catch (error) {
+      if (error && typeof error === 'object' && 'status' in error) {
+        exitCode = (error as { status: number }).status;
+      } else {
+        exitCode = 1;
+      }
     }
     expect(exitCode).toBe(1);
   });
