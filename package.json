@@ -18,6 +18,7 @@
     "lint": "eslint .",
     "test": "vitest run tests/watermark.test.ts && npm run test --workspaces --if-present",
     "test:e2e": "npm run test:e2e --workspace=apps/web",
+    "smtp:verify": "node apps/web/scripts/smtp-verify.js",
     "convert-fonts": "bash scripts/convert-fonts.sh",
     "setup-admin": "bash scripts/set-admin-password.sh"
   },

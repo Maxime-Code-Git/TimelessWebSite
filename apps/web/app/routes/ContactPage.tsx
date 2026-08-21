@@ -21,14 +21,18 @@ export function ContactPage({ lang }: ContactPageProps) {
   const errorMsg = fetcher.data?.error;
   
   const formRef = useRef<HTMLFormElement>(null);
-  const messageRef = useRef<HTMLDivElement>(null);
+  const successRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (success && formRef.current) {
+    if (fetcher.data?.success && formRef.current) {
       formRef.current.reset();
-      messageRef.current?.focus();
+      successRef.current?.focus();
     }
-  }, [success]);
+    if (fetcher.data?.error && errorRef.current) {
+      errorRef.current.focus();
+    }
+  }, [fetcher.data]);
 
   return (
     <>
@@ -98,7 +102,7 @@ export function ContactPage({ lang }: ContactPageProps) {
             </div>
 
             {errorMsg && (
-              <div className={styles.formError} role="alert" tabIndex={-1}>
+              <div className={styles.formError} role="alert" tabIndex={-1} ref={errorRef}>
                 {errorMsg}
               </div>
             )}
@@ -108,7 +112,7 @@ export function ContactPage({ lang }: ContactPageProps) {
                 className={styles.formSuccess} 
                 role="status" 
                 tabIndex={-1} 
-                ref={messageRef}
+                ref={successRef}
               >
                 {lang === "fr" 
                   ? "Votre message a bien été envoyé. Nous vous répondrons sous 48 h." 

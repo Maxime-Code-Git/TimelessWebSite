@@ -10,7 +10,8 @@
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "smtp:verify": "node scripts/smtp-verify.js"
   },
   "dependencies": {
     "@react-router/node": "^8",

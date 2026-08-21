@@ -16,6 +16,9 @@ build/
 .env.*.local
 !.env.example
 
+# TLS test certs
+apps/web/e2e/certs/
+
 # Data (never commit)
 data/
 !data/.gitkeep

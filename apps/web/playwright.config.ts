@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as fs from 'node:fs';
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -24,6 +25,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
+  globalSetup: './e2e/global.setup.ts',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
@@ -56,12 +58,14 @@ export default defineConfig({
     env: {
       PORT: '4173',
       PUBLIC_SITE_URL: 'http://localhost:4173',
-      SMTP_HOST: '127.0.0.1',
+      NODE_TLS_REJECT_UNAUTHORIZED: '0',
+      SMTP_HOST: 'localhost',
       SMTP_PORT: '2525',
       SMTP_USER: 'test@example.com',
       SMTP_PASS: 'test',
       SMTP_FROM: 'test@example.com',
       SMTP_TO: 'test@example.com',
+      SMTP_CA_CERT: fs.existsSync('./e2e/certs/test-cert.pem') ? fs.readFileSync('./e2e/certs/test-cert.pem', 'utf-8') : '',
       CONTACT_RATE_LIMIT_SECRET: 'testsecret',
       RATE_LIMIT_DB_PATH: './data/db/rate-limit-test.sqlite',
       TRUST_PROXY: 'true',

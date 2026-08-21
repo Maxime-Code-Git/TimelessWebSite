@@ -3,6 +3,7 @@
  * Throws an error at startup if required variables are missing or invalid,
  * without exposing secrets in logs.
  */
+import "../../../../scripts/env-loader.js";
 
 export function requireEnvVar(name: string): string {
   const value = process.env[name];
@@ -27,6 +28,9 @@ export const ENV = {
   },
   get SMTP_PASS() {
     return requireEnvVar("SMTP_PASS");
+  },
+  get SMTP_CA_CERT() {
+    return process.env.SMTP_CA_CERT || "";
   },
   get SMTP_FROM() {
     return requireEnvVar("SMTP_FROM");

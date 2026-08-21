@@ -8,25 +8,28 @@ export interface ContactFormData {
   location: string;
   formula: string;
   message: string;
+  phone: string;
 }
 
 let transporter: nodemailer.Transporter | null = null;
 
 function getTransporter() {
+  console.log("[DEBUG] SMTP_CA_CERT length:", ENV.SMTP_CA_CERT?.length || 0);
   if (!transporter) {
     transporter = nodemailer.createTransport({
       host: ENV.SMTP_HOST,
       port: ENV.SMTP_PORT,
-      secure: false, // Use STARTTLS on port 587
+      secure: false, // Port 587 must use secure: false
+      requireTLS: true, // Force STARTTLS
       tls: {
-        rejectUnauthorized: process.env.NODE_ENV === "production"
+        ...(ENV.SMTP_CA_CERT ? { ca: [ENV.SMTP_CA_CERT] } : {})
       },
       auth: {
         user: ENV.SMTP_USER,
         pass: ENV.SMTP_PASS,
       },
       connectionTimeout: 10000,
-      socketTimeout: 10000,
+      socketTimeout: 15000,
     });
   }
   return transporter;
@@ -40,7 +43,8 @@ Nouvelle demande de contact:
 
 Noms : ${data.names}
 Email : ${data.email}
-Date du mariage : ${data.date || "Non précisée"}
+Téléphone : ${data.phone || "Non précisé"}
+Date : ${data.date || "Non précisée"}
 Lieu : ${data.location || "Non précisé"}
 Formule : ${data.formula}
 
@@ -48,21 +52,27 @@ Message :
 ${data.message}
   `.trim();
 
-  // Ensure To address is exactly the configured destination
+  // The 'from' address MUST be the authorized sender for Brevo
+  const fromAddress = ENV.SMTP_FROM;
   const toAddress = ENV.SMTP_TO;
 
-  const info = await mailer.sendMail({
-    from: ENV.SMTP_FROM,
-    to: toAddress,
-    replyTo: data.email,
-    subject: "[Timeless] Nouvelle demande de contact",
-    text: textBody,
-  });
+  try {
+    const info = await mailer.sendMail({
+      from: fromAddress,
+      to: toAddress,
+      replyTo: data.email, // Visitor's email is set as Reply-To
+      subject: "[Timeless] Nouvelle demande de contact",
+      text: textBody,
+    });
 
-  // Verify that the destination was actually accepted
-  if (!info.accepted.includes(toAddress)) {
-    throw new Error("SMTP Error: Recipient was not accepted by the mail server.");
+    // Verify that the destination was actually accepted
+    if (!info.accepted.includes(toAddress)) {
+      throw new Error("SMTP Error: Recipient was not accepted by the mail server.");
+    }
+
+    return info;
+  } catch (error: unknown) {
+    console.error("SMTP Delivery Error:", error);
+    throw error;
   }
-
-  return info;
 }
