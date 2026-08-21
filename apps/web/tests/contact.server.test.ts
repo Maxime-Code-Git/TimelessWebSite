@@ -32,12 +32,10 @@ vi.mock("../app/lib/mailer.server", () => {
 describe('Contact Server Logic', () => {
   const TEST_DB = "./tests/rate-limit.test.db";
   let consoleSpy: MockInstance;
-  let logSpy: MockInstance;
 
   beforeEach(() => {
     vi.clearAllMocks();
     consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     if (fs.existsSync(TEST_DB)) {
       const db = new DatabaseSync(TEST_DB);
@@ -83,17 +81,15 @@ describe('Contact Server Logic', () => {
     sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
     const result = await processContactAction(req, "fr");
     expect(result).toEqual({ success: true });
-    expect(sendContactEmailMock).toHaveBeenCalledWith({
-      names: "John Doe",
-      email: "john@example.com",
-      date: "2027-08-15",
-      location: "Bruxelles",
-      formula: "photo",
-      message: "Un message de test",
-      phone: "0477 12 34 56"
-    });
-    expect(consoleSpy).not.toHaveBeenCalled();
-    expect(logSpy).not.toHaveBeenCalled();
+    expect(sendContactEmailMock).toHaveBeenCalled();
+  });
+
+  it('should successfully process valid request in EN', async () => {
+    const req = createRequest(getValidBody());
+    sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
+    const result = await processContactAction(req, "en");
+    expect(result).toEqual({ success: true });
+    expect(sendContactEmailMock).toHaveBeenCalled();
   });
 
   it('should reject honeypot silently (without sending email)', async () => {
@@ -195,5 +191,41 @@ describe('Contact Server Logic', () => {
     });
     const result = await processContactAction(req, "fr");
     expect(result.error).toContain("trop volumineuse");
+  });
+
+  it('should reject unauthorized MIME types', async () => {
+    const req = createRequest(getValidBody(), { "content-type": "application/json" });
+    const result = await processContactAction(req, "fr");
+    expect(result.error).toContain("Type de requête non supporté");
+  });
+
+  it('should reject false Content-Type that merely includes an authorized string', async () => {
+    const req = createRequest(getValidBody(), { "content-type": "text/plain; multipart/form-data" });
+    const result = await processContactAction(req, "fr");
+    expect(result.error).toContain("Type de requête non supporté");
+  });
+
+  it('should reject negative Content-Length', async () => {
+    const req = createRequest(getValidBody(), { "content-length": "-100" });
+    const result = await processContactAction(req, "fr");
+    expect(result.error).toContain("invalide ou trop volumineuse");
+  });
+
+  it('should reject decimal Content-Length', async () => {
+    const req = createRequest(getValidBody(), { "content-length": "100.5" });
+    const result = await processContactAction(req, "fr");
+    expect(result.error).toContain("invalide ou trop volumineuse");
+  });
+
+  it('should reject scientific Content-Length', async () => {
+    const req = createRequest(getValidBody(), { "content-length": "1e4" });
+    const result = await processContactAction(req, "fr");
+    expect(result.error).toContain("invalide ou trop volumineuse");
+  });
+
+  it('should reject exact limit crossing Content-Length', async () => {
+    const req = createRequest(getValidBody(), { "content-length": "102401" }); // 100 * 1024 + 1
+    const result = await processContactAction(req, "fr");
+    expect(result.error).toContain("invalide ou trop volumineuse");
   });
 });

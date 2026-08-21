@@ -4,21 +4,32 @@ import { execSync } from "node:child_process";
 
 describe("TLS Security Constraints", () => {
   it("should not contain disabled TLS checks in the codebase", () => {
-    const forbidden1 = "NODE_TLS_" + "REJECT_UNAUTHORIZED";
-    const forbidden2 = "rejectUnauthorized:" + " false";
-    
-    // We only scan the `apps/web` directory for these forbidden strings.
-    // We exclude tests directory because this file itself and other tests might contain it for asserting.
-    const projectRoot = path.resolve(__dirname, "../");
-    const cmd = `grep -rI --exclude-dir=tests --exclude-dir=node_modules "${forbidden1}\\|${forbidden2}" "${projectRoot}" || true`;
-    
-    const output = execSync(cmd).toString().trim();
-    
-    // If output is not empty, we found something forbidden!
+    // Construct forbidden strings dynamically so this file doesn't flag itself
+    const forbidden1 = "NODE_TLS" + "_REJECT_UNAUTHORIZED";
+    const forbidden2 = "reject" + "Unauthorized:" + " false";
+
+    const projectRoot = path.resolve(__dirname, "../../..");
+
+    // Scan the entire repository excluding common ignored directories
+    // We also exclude this test file explicitly in the grep command if necessary,
+    // but constructing the strings dynamically should be enough.
+    const excludes = [
+      "--exclude-dir=node_modules",
+      "--exclude-dir=build",
+      "--exclude-dir=test-results",
+      "--exclude-dir=playwright-report",
+      "--exclude-dir=.git"
+    ].join(" ");
+
+    // We use `|| true` to prevent execSync from throwing an error if grep finds nothing (exit code 1)
+    const cmd = `grep -rI ${excludes} "${forbidden1}\\|${forbidden2}" "${projectRoot}" || true`;
+
+    const output = execSync(cmd, { encoding: "utf-8" }).trim();
+
     if (output) {
       console.error("Found forbidden strings:", output);
     }
-    
+
     expect(output).toBe("");
   });
 });

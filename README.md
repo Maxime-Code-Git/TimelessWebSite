@@ -45,12 +45,12 @@ This compiles both the `@timeless/shared` package and the `apps/web` React Route
 
 Pour déployer l'application en production :
 
-1. Préparez vos secrets dans `.env.local` à la racine (variables injectées en production).
+1. Fournissez vos secrets via l'environnement de votre orchestrateur ou gestionnaire de services (ex: Systemd, Docker).
 2. Lancez le serveur Node.js (écoute restreinte à localhost) :
    ```bash
    npm run start
    ```
-   > **Note :** La commande force l'écoute sur `127.0.0.1:4173`. Vous DEVEZ déployer un reverse proxy de confiance (Nginx, Caddy, Apache) devant le serveur Node.
+   > **Note :** La commande `start` force l'écoute sur `127.0.0.1`. Vous DEVEZ déployer un reverse proxy de confiance (Nginx, Caddy, Apache) devant le serveur Node.
 
 ### Configuration du Reverse Proxy & Politique IP
 La variable `TRUST_PROXY=true` est **strictement requise** en production.
@@ -58,6 +58,10 @@ Votre reverse proxy DOIT écraser l'entête HTTP entrant `X-Forwarded-For` et le
 
 ### Relais SMTP
 Le formulaire de contact utilise **Brevo** comme relais SMTP transactionnel sécurisé (port 587 + TLS forcé) pour transférer les messages vers l'adresse finale. Aucune donnée personnelle n'est journalisée en interne lors des envois.
+
+### Formulaire de contact
+- **Honeypot** : Si le champ caché `website` est rempli, la requête est silencieusement ignorée (simulation de succès pour tromper les bots) sans déclencher l'envoi d'e-mail.
+- **Rate limiting** : Limité par défaut à 5 envois par heure et par IP (modifiable via `CONTACT_RATE_LIMIT_MAX`).
 
 ## Testing & Quality
 
@@ -78,9 +82,4 @@ Le formulaire de contact utilise **Brevo** comme relais SMTP transactionnel séc
 ## Configuration
 
 Duplicate `.env.example` to `.env.local` for development at the root of the repository.
-Do NOT use `.env.production`. Production variables are injected directly into the environment by your orchestrator.
-
-```
-PUBLIC_SITE_URL=http://localhost:5173
-TRUST_PROXY=false
-```
+In production, do not use `.env.local`; variables must be injected directly into the environment by your service manager.

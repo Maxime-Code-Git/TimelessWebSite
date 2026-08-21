@@ -65,6 +65,7 @@ export default defineConfig({
       SMTP_TO: 'test@example.com',
       SMTP_CA_CERT: fs.readFileSync('./e2e/certs/test-cert.pem', 'utf-8'),
       CONTACT_RATE_LIMIT_SECRET: 'testsecret',
+      CONTACT_RATE_LIMIT_MAX: '100',
       RATE_LIMIT_DB_PATH: './data/db/rate-limit-test.sqlite',
       TRUST_PROXY: 'true',
     },

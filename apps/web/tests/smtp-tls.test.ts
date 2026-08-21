@@ -81,7 +81,6 @@ IP.1 = 127.0.0.1
       requireTLS: true,
       tls: {
         ca: [fs.readFileSync(certPath, "utf-8")],
-        // No rejectUnauthorized: false! It defaults to true.
       },
     });
 

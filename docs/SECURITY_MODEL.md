@@ -132,8 +132,8 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 ## 6. Formulaire de contact
 
-- **Honeypot** : champ caché `website` — si rempli, requête silencieusement ignorée
-- **Rate limiting** : 3 soumissions / heure / IP
+- **Honeypot** : champ caché `website` — si rempli, la requête est silencieusement ignorée (simulation de succès pour tromper les bots) sans déclencher l'envoi d'e-mail.
+- **Rate limiting** : Limité par défaut à 5 envois par heure et par IP (modifiable via la variable d'environnement `CONTACT_RATE_LIMIT_MAX`).
 - **Validation serveur** : chaque champ validé indépendamment du client
 - **Stockage provisoire** : le contenu du formulaire n'est pas conservé durablement en base SQLite tant que sa durée de conservation RGPD n'a pas été décidée. Le message est conservé dans la boîte Gmail du studio. La base SQLite ne conserve actuellement que le hash des IP pour le rate limiting.
 - **E-mails** : Les messages sont transmis au relais SMTP sécurisé **Brevo** (sur le port 587 avec TLS forcé) pour être livrés. Aucune donnée personnelle, trace SMTP brute ou IP n'est journalisée en cas d'erreur.

@@ -12,15 +12,20 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
   }
 
   // 1. Content-Type and Body limit (Enforce strict size limit BEFORE and DURING parsing)
-  const contentType = request.headers.get("content-type") || "";
-  if (!contentType.includes("multipart/form-data") && !contentType.includes("application/x-www-form-urlencoded")) {
+  const rawContentType = request.headers.get("content-type") || "";
+  const mimeType = rawContentType.split(";")[0]?.trim().toLowerCase();
+
+  if (mimeType !== "multipart/form-data" && mimeType !== "application/x-www-form-urlencoded") {
     return { error: lang === "fr" ? "Type de requête non supporté." : "Unsupported request type." };
   }
 
   const contentLengthStr = request.headers.get("content-length");
   if (contentLengthStr) {
+    if (!/^\d+$/.test(contentLengthStr)) {
+      return { error: lang === "fr" ? "La requête est invalide ou trop volumineuse." : "Request payload is invalid or too large." };
+    }
     const contentLength = Number(contentLengthStr);
-    if (isNaN(contentLength) || contentLength < 0 || contentLength > MAX_BODY_SIZE) {
+    if (!Number.isSafeInteger(contentLength) || contentLength > MAX_BODY_SIZE) {
       return { error: lang === "fr" ? "La requête est invalide ou trop volumineuse." : "Request payload is invalid or too large." };
     }
   }

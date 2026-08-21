@@ -1,8 +1,3 @@
-/**
- * Validates and exposes server environment variables safely.
- * Throws an error at startup if required variables are missing or invalid,
- * without exposing secrets in logs.
- */
 import "../../../../scripts/env-loader.js";
 
 export function requireEnvVar(name: string): string {
@@ -17,9 +12,12 @@ export const ENV = {
   get PUBLIC_SITE_URL() {
     const url = requireEnvVar("PUBLIC_SITE_URL");
     try {
-      new URL(url);
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error();
+      }
     } catch {
-      throw new Error("CRITICAL: PUBLIC_SITE_URL is not a valid URL.");
+      throw new Error("CRITICAL: PUBLIC_SITE_URL is not a valid URL or does not use http:/https: protocol.");
     }
     return url;
   },
@@ -27,8 +25,12 @@ export const ENV = {
     return requireEnvVar("SMTP_HOST");
   },
   get SMTP_PORT() {
-    const port = parseInt(requireEnvVar("SMTP_PORT"), 10);
-    if (isNaN(port) || port < 1 || port > 65535) {
+    const portStr = requireEnvVar("SMTP_PORT");
+    if (!/^\d+$/.test(portStr)) {
+      throw new Error("CRITICAL: SMTP_PORT must contain only digits.");
+    }
+    const port = Number(portStr);
+    if (!Number.isSafeInteger(port) || port < 1 || port > 65535) {
       throw new Error("CRITICAL: SMTP_PORT must be an integer between 1 and 65535.");
     }
     return port;
@@ -59,10 +61,12 @@ export const ENV = {
     return requireEnvVar("RATE_LIMIT_DB_PATH");
   },
   get CONTACT_RATE_LIMIT_MAX() {
-    // Will read from CONTACT_RATE_LIMIT_MAX or default to 5
     const val = process.env.CONTACT_RATE_LIMIT_MAX || "5";
-    const max = parseInt(val, 10);
-    if (isNaN(max) || max < 1 || max > 100) {
+    if (!/^\d+$/.test(val)) {
+      throw new Error("CRITICAL: CONTACT_RATE_LIMIT_MAX must contain only digits.");
+    }
+    const max = Number(val);
+    if (!Number.isSafeInteger(max) || max < 1 || max > 100) {
       throw new Error("CRITICAL: CONTACT_RATE_LIMIT_MAX must be an integer between 1 and 100.");
     }
     return max;
@@ -77,9 +81,14 @@ export const ENV = {
 };
 
 // Fail fast on startup by forcing evaluation
-void ENV.PUBLIC_SITE_URL;
-void ENV.SMTP_PORT;
+void ENV.SMTP_HOST;
+void ENV.SMTP_USER;
+void ENV.SMTP_PASS;
 void ENV.SMTP_FROM;
 void ENV.SMTP_TO;
+void ENV.CONTACT_RATE_LIMIT_SECRET;
+void ENV.RATE_LIMIT_DB_PATH;
+void ENV.SMTP_PORT;
+void ENV.PUBLIC_SITE_URL;
 void ENV.CONTACT_RATE_LIMIT_MAX;
 void ENV.TRUST_PROXY;
