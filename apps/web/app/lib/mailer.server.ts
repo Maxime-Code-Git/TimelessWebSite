@@ -14,7 +14,6 @@ export interface ContactFormData {
 let transporter: nodemailer.Transporter | null = null;
 
 function getTransporter() {
-  console.log("[DEBUG] SMTP_CA_CERT length:", ENV.SMTP_CA_CERT?.length || 0);
   if (!transporter) {
     transporter = nodemailer.createTransport({
       host: ENV.SMTP_HOST,
@@ -72,7 +71,7 @@ ${data.message}
 
     return info;
   } catch (error: unknown) {
-    console.error("SMTP Delivery Error:", error);
+    console.error("CONTACT_SMTP_FAILURE");
     throw error;
   }
 }

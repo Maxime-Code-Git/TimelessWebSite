@@ -3,55 +3,103 @@ import { sendContactEmail } from "./mailer.server";
 import { ENV } from "./env.server";
 import * as net from "node:net";
 
+const MAX_BODY_SIZE = 100 * 1024; // 100 KB
+
 export async function processContactAction(request: Request, lang: "fr" | "en") {
   // Prevent MOCK_SMTP=true backdoor in production entirely
   if (process.env.NODE_ENV === "production" && process.env.MOCK_SMTP) {
     throw new Error("CRITICAL: MOCK_SMTP is strictly forbidden in production.");
   }
 
-  // 1. Body limit (Enforce strict size limit BEFORE parsing)
-  // 100KB should be more than enough for a simple text form.
-  const MAX_BODY_SIZE = 100 * 1024;
+  // 1. Content-Type and Body limit (Enforce strict size limit BEFORE and DURING parsing)
+  const contentType = request.headers.get("content-type") || "";
+  if (!contentType.includes("multipart/form-data") && !contentType.includes("application/x-www-form-urlencoded")) {
+    return { error: lang === "fr" ? "Type de requête non supporté." : "Unsupported request type." };
+  }
+
   const contentLengthStr = request.headers.get("content-length");
   if (contentLengthStr) {
-    const contentLength = parseInt(contentLengthStr, 10);
-    if (contentLength > MAX_BODY_SIZE) {
-      return { error: lang === "fr" ? "La requête est trop volumineuse." : "Request payload is too large." };
+    const contentLength = Number(contentLengthStr);
+    if (isNaN(contentLength) || contentLength < 0 || contentLength > MAX_BODY_SIZE) {
+      return { error: lang === "fr" ? "La requête est invalide ou trop volumineuse." : "Request payload is invalid or too large." };
     }
   }
 
-  // Strictly check Origin/Same-Origin (CSRF defense-in-depth)
-  const origin = request.headers.get("Origin");
-  if (origin && new URL(origin).origin !== new URL(ENV.PUBLIC_SITE_URL).origin) {
-    return { error: lang === "fr" ? "Origine non autorisée." : "Unauthorized origin." };
+  // Strictly check Origin/Same-Origin
+  const originHeader = request.headers.get("Origin");
+  if (originHeader) {
+    try {
+      if (new URL(originHeader).origin !== new URL(ENV.PUBLIC_SITE_URL).origin) {
+        return { error: lang === "fr" ? "Origine non autorisée." : "Unauthorized origin." };
+      }
+    } catch {
+      return { error: lang === "fr" ? "Origine malformée." : "Malformed origin." };
+    }
   }
 
-  // 2. Secure parsing
+  // 2. Stream Bounded Reader
+  if (!request.body) {
+    return { error: lang === "fr" ? "Requête invalide." : "Invalid request." };
+  }
+
+  let totalBytes = 0;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        totalBytes += value.byteLength;
+        if (totalBytes > MAX_BODY_SIZE) {
+          await reader.cancel("Payload too large");
+          return { error: lang === "fr" ? "La requête est trop volumineuse." : "Request payload is too large." };
+        }
+        chunks.push(value);
+      }
+    }
+  } catch {
+    return { error: lang === "fr" ? "Erreur de lecture de la requête." : "Error reading request." };
+  }
+
+  // Reconstruct body safely
+  const completeBody = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    completeBody.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  const safeRequest = new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: completeBody,
+  });
+
+  // 3. Secure parsing
   let formData: FormData;
   try {
-    formData = await request.formData();
+    formData = await safeRequest.formData();
   } catch {
     return { error: lang === "fr" ? "Requête invalide." : "Invalid request." };
   }
 
-  // 3. Honeypot check
+  // 4. Honeypot check
   if (formData.get("website")) {
-    // Fail silently to the bot by returning a validation error?
-    // The user requested: "Le honeypot ne doit jamais envoyer d'e-mail. Il ne doit pas non plus produire un succès visible affirmant que le message a été envoyé...".
     return { error: lang === "fr" ? "Requête invalide." : "Invalid request." };
   }
 
-  // 4. Validation and Normalization
+  // 5. Validation and Normalization
   const names = formData.get("names")?.toString().trim();
   const email = formData.get("email")?.toString().trim();
-  const date = formData.get("date")?.toString().trim(); // Make sure this is checked! User said 'date ou lieu absent (champs obligatoires)'
+  const date = formData.get("date")?.toString().trim();
   const location = formData.get("location")?.toString().trim();
   const formula = formData.get("formula")?.toString().trim();
   const message = formData.get("message")?.toString().trim();
   const phone = formData.get("phone")?.toString().trim() || "";
 
   if (!names || !email || !formula || !message || !date || !location) {
-    console.error("[DEBUG] Missing fields:", { names, email, formula, message, date, location });
     return { error: lang === "fr" ? "Veuillez remplir tous les champs obligatoires." : "Please fill in all required fields." };
   }
 
@@ -76,40 +124,43 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
     return { error: lang === "fr" ? "Formule invalide." : "Invalid formula." };
   }
 
-  // 5. Rate Limiting (done AFTER validation so invalid requests don't waste DB space, but attackers could spam invalid ones. However, we extract IP reliably)
-  // Extract IP safely
+  // Validate Date
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { error: lang === "fr" ? "Format de date invalide." : "Invalid date format." };
+  }
+  const parsedDate = new Date(date);
+  if (isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
+    return { error: lang === "fr" ? "Date impossible ou invalide." : "Impossible or invalid date." };
+  }
+
+  // Validate Phone
+  if (phone && !/^[\d\s\-+()]{4,30}$/.test(phone)) {
+    return { error: lang === "fr" ? "Format de téléphone invalide." : "Invalid phone format." };
+  }
+
+  // 6. Rate Limiting and IP Policy
   let clientIp = "127.0.0.1";
   if (ENV.TRUST_PROXY) {
-    const forwardedFor = request.headers.get("x-forwarded-for");
-    if (!forwardedFor) {
-      // If we trust proxy but no header is found, drop the request
+    const forwardedFor = request.headers.get("x-forwarded-for") || "";
+    // Reject if multiple IPs (comma) indicating spoofing or multiple uncontrolled proxies
+    if (forwardedFor.includes(",") || !forwardedFor.trim()) {
       return { error: lang === "fr" ? "Configuration réseau invalide." : "Invalid network configuration." };
     }
-    // Safely take the first IP in the chain (set by the trusted proxy)
-    clientIp = forwardedFor.split(",")[0].trim();
+    clientIp = forwardedFor.trim();
 
     // Strict IP validation using net.isIP
     if (!net.isIP(clientIp)) {
-      console.error(`[DEBUG] Invalid IP detected: ${clientIp}`);
       return { error: lang === "fr" ? "Adresse IP invalide." : "Invalid IP address." };
     }
-  } else {
-    // If we don't trust proxy, we shouldn't read x-forwarded-for.
-    // We would read the actual socket IP, but in Remix/React Router standard Request, socket IP isn't available directly on Request.
-    // Usually it's passed via loadContext from the server adapter.
-    // For now, if TRUST_PROXY is false, we rely on a fallback or loadContext if provided.
   }
 
   try {
     checkRateLimit(clientIp);
-  } catch (err: unknown) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    console.error(`[DEBUG] Rate limit block hit for IP ${clientIp}. Error:`, errMsg);
-    // Rate limit hit
+  } catch {
     return { error: lang === "fr" ? "Trop de tentatives. Veuillez réessayer plus tard." : "Too many attempts. Please try again later." };
   }
 
-  // 6. SMTP Sending
+  // 7. SMTP Sending
   try {
     await sendContactEmail({
       names,

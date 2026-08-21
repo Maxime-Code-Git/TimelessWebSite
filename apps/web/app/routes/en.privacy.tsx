@@ -32,7 +32,7 @@ export default function PrivacyEn() {
             <p>Timeless ensures that the collection and processing of your data, carried out from the site, comply with the General Data Protection Regulation (GDPR).</p>
             
             <h2>Data Usage</h2>
-            <p>Personal data collected as part of the services offered on this site are processed via secure protocols and allow Timeless to manage requests received in its IT applications (contact form, booking).</p>
+            <p>Personal data collected as part of the services offered on this site (contact form) allows Timeless to manage the requests received. This data is transmitted via the third-party transactional email relay service (SMTP) named <strong>Brevo</strong> to be delivered to the Timeless studio mailbox. No information from the contact form is retained or logged on our own servers after the message is transmitted.</p>
             
             <h2>Cookies</h2>
             <p>The site uses technical cookies strictly necessary for its operation. No advertising tracking cookies are used.</p>

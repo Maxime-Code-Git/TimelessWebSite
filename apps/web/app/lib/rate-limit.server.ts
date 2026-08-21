@@ -55,7 +55,7 @@ export function checkRateLimit(ip: string) {
     const countStmt = db.prepare("SELECT COUNT(*) as count FROM requests WHERE hash = ? AND timestamp >= ?");
     const result = countStmt.get(hash, oneHourAgo) as { count: number };
     
-    const maxAttempts = parseInt(process.env.CONTACT_RATE_LIMIT_MAX || "5", 10);
+    const maxAttempts = ENV.CONTACT_RATE_LIMIT_MAX;
     if (result.count >= maxAttempts) {
       throw new Error("Rate limit exceeded");
     }

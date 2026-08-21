@@ -17,6 +17,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "test": "vitest run tests/watermark.test.ts && npm run test --workspaces --if-present",
+    "start": "HOST=127.0.0.1 npm run start --workspace=apps/web",
     "test:e2e": "npm run test:e2e --workspace=apps/web",
     "smtp:verify": "node apps/web/scripts/smtp-verify.js",
     "convert-fonts": "bash scripts/convert-fonts.sh",

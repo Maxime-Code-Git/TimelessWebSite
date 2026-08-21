@@ -32,7 +32,7 @@ export default function PrivacyFr() {
             <p>Timeless s'engage à ce que la collecte et le traitement de vos données, effectués à partir du site, soient conformes au règlement général sur la protection des données (RGPD).</p>
             
             <h2>Utilisation des données</h2>
-            <p>Les données personnelles recueillies dans le cadre des services proposés sur ce site sont traitées selon des protocoles sécurisés et permettent à Timeless de gérer les demandes reçues dans ses applications informatiques (formulaire de contact, réservation).</p>
+            <p>Les données personnelles recueillies dans le cadre des services proposés sur ce site (formulaire de contact) permettent à Timeless de gérer les demandes reçues. Ces données transitent via le service d'envoi transactionnel de courriels (SMTP) tiers nommé <strong>Brevo</strong> pour être délivrées dans la boîte de messagerie du studio Timeless. Aucune information issue du formulaire de contact n'est conservée ou journalisée sur nos propres serveurs après la transmission du message.</p>
             
             <h2>Cookies</h2>
             <p>Le site utilise des cookies techniques strictement nécessaires à son fonctionnement. Aucun cookie de pistage publicitaire n'est utilisé.</p>

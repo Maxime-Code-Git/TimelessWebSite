@@ -136,7 +136,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 - **Rate limiting** : 3 soumissions / heure / IP
 - **Validation serveur** : chaque champ validé indépendamment du client
 - **Stockage provisoire** : le contenu du formulaire n'est pas conservé durablement en base SQLite tant que sa durée de conservation RGPD n'a pas été décidée. Le message est conservé dans la boîte Gmail du studio. La base SQLite ne conserve actuellement que le hash des IP pour le rate limiting.
-- **E-mails** : via relais SMTP configuré, pas d'envoi direct depuis IP résidentielle
+- **E-mails** : Les messages sont transmis au relais SMTP sécurisé **Brevo** (sur le port 587 avec TLS forcé) pour être livrés. Aucune donnée personnelle, trace SMTP brute ou IP n'est journalisée en cas d'erreur.
 
 ---
 

@@ -41,6 +41,24 @@ npm run build
 
 This compiles both the `@timeless/shared` package and the `apps/web` React Router application.
 
+## Déploiement en Production
+
+Pour déployer l'application en production :
+
+1. Préparez vos secrets dans `.env.local` à la racine (variables injectées en production).
+2. Lancez le serveur Node.js (écoute restreinte à localhost) :
+   ```bash
+   npm run start
+   ```
+   > **Note :** La commande force l'écoute sur `127.0.0.1:4173`. Vous DEVEZ déployer un reverse proxy de confiance (Nginx, Caddy, Apache) devant le serveur Node.
+
+### Configuration du Reverse Proxy & Politique IP
+La variable `TRUST_PROXY=true` est **strictement requise** en production.
+Votre reverse proxy DOIT écraser l'entête HTTP entrant `X-Forwarded-For` et le remplacer par la véritable adresse IP distante du client. S'il y a plusieurs IP, l'application rejettera la requête pour prévenir toute falsification (spoofing).
+
+### Relais SMTP
+Le formulaire de contact utilise **Brevo** comme relais SMTP transactionnel sécurisé (port 587 + TLS forcé) pour transférer les messages vers l'adresse finale. Aucune donnée personnelle n'est journalisée en interne lors des envois.
+
 ## Testing & Quality
 
 - **Typecheck**: `npm run typecheck`
@@ -59,7 +77,8 @@ This compiles both the `@timeless/shared` package and the `apps/web` React Route
 
 ## Configuration
 
-Duplicate `.env.example` to `.env.local` (for development) or `.env.production` (for production) at the root of the repository:
+Duplicate `.env.example` to `.env.local` for development at the root of the repository.
+Do NOT use `.env.production`. Production variables are injected directly into the environment by your orchestrator.
 
 ```
 PUBLIC_SITE_URL=http://localhost:5173
