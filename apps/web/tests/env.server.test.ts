@@ -181,8 +181,8 @@ describe("Environment Validation — fail-fast on import", () => {
     const err = await captureImportError();
     // Import should succeed with all valid vars
     if (err !== null) {
-      // If it fails, the error must not contain the sentinel
-      expect(err.message).not.toContain("DUMMY_SMTP_SECRET_MUST_NOT_APPEAR");
+      // If it fails unexpectedly, fail the test explicitly with a generic message
+      throw new Error("Expected env.server import to succeed");
     }
     // Either way, the sentinel must not appear — captureImportError
     // never retains the resolved module, so no serialization leak.
