@@ -17,7 +17,7 @@ export const ENV = {
         throw new Error();
       }
     } catch {
-      throw new Error("CRITICAL: PUBLIC_SITE_URL is not a valid URL or does not use http:/https: protocol.");
+      throw new Error("CRITICAL: PUBLIC_SITE_URL is not a valid URL or does not use HTTP or HTTPS protocol.");
     }
     return url;
   },

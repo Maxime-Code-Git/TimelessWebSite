@@ -60,7 +60,7 @@ Votre reverse proxy DOIT écraser l'entête HTTP entrant `X-Forwarded-For` et le
 Le formulaire de contact utilise **Brevo** comme relais SMTP transactionnel sécurisé (port 587 + TLS forcé) pour transférer les messages vers l'adresse finale. Aucune donnée personnelle n'est journalisée en interne lors des envois.
 
 ### Formulaire de contact
-- **Honeypot** : Si le champ caché `website` est rempli, la requête est silencieusement ignorée (simulation de succès pour tromper les bots) sans déclencher l'envoi d'e-mail.
+- **Honeypot** : Si le champ caché `website` est rempli, la requête est rejetée avec une réponse d'erreur générique. Aucun e-mail n'est envoyé et aucune donnée du formulaire n'est conservée.
 - **Rate limiting** : Limité par défaut à 5 envois par heure et par IP (modifiable via `CONTACT_RATE_LIMIT_MAX`).
 
 ## Testing & Quality

@@ -92,7 +92,7 @@ describe('Contact Server Logic', () => {
     expect(sendContactEmailMock).toHaveBeenCalled();
   });
 
-  it('should reject honeypot silently (without sending email)', async () => {
+  it('should reject honeypot without sending email', async () => {
     const req = createRequest({ ...getValidBody(), website: "http://spam.com" });
     const result = await processContactAction(req, "fr");
     expect(result).toEqual({ error: "Requête invalide." });
@@ -227,5 +227,53 @@ describe('Contact Server Logic', () => {
     const req = createRequest(getValidBody(), { "content-length": "102401" }); // 100 * 1024 + 1
     const result = await processContactAction(req, "fr");
     expect(result.error).toContain("invalide ou trop volumineuse");
+  });
+
+  it('should accept a body of exactly 102400 bytes (stream reader allows exactly 100 KB)', async () => {
+    // Build a body of exactly 100 * 1024 = 102400 bytes
+    const payload = new Uint8Array(102400);
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(payload);
+        controller.close();
+      }
+    });
+    const req = new Request("http://localhost:4173/fr/contact", {
+      method: "POST",
+      body: stream,
+      headers: {
+        "content-type": "multipart/form-data; boundary=----WebKitFormBoundary",
+        "x-forwarded-for": "192.168.1.1",
+      },
+      // @ts-expect-error Node 18+ streaming request bodies in tests
+      duplex: 'half'
+    });
+    const result = await processContactAction(req, "fr");
+    // The stream reader should NOT reject as "too large".
+    // It may fail later (e.g. invalid form data), but the size check must pass.
+    expect(result.error).not.toContain("trop volumineuse");
+  });
+
+  it('should reject a body of exactly 102401 bytes via stream reader', async () => {
+    // Build a body of exactly 100 * 1024 + 1 = 102401 bytes
+    const payload = new Uint8Array(102401);
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(payload);
+        controller.close();
+      }
+    });
+    const req = new Request("http://localhost:4173/fr/contact", {
+      method: "POST",
+      body: stream,
+      headers: {
+        "content-type": "multipart/form-data; boundary=----WebKitFormBoundary",
+        "x-forwarded-for": "192.168.1.1",
+      },
+      // @ts-expect-error Node 18+ streaming request bodies in tests
+      duplex: 'half'
+    });
+    const result = await processContactAction(req, "fr");
+    expect(result.error).toContain("trop volumineuse");
   });
 });
