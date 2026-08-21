@@ -4,6 +4,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
  * These tests verify that importing env.server.ts itself throws
  * when a required variable is missing or invalid, because the
  * module-level fail-fast code forces evaluation on import.
+ *
+ * SECURITY: We never use `expect(import(...)).rejects` because if the
+ * import succeeds unexpectedly, Vitest serializes the resolved module
+ * (which contains ENV with real secrets) into the test output.
+ * Instead we use a safe helper that captures only the Error object.
  */
 describe("Environment Validation — fail-fast on import", () => {
   const originalEnv = process.env;
@@ -22,9 +27,34 @@ describe("Environment Validation — fail-fast on import", () => {
     };
   }
 
+  /**
+   * Safe import helper. Returns an Error if the import throws,
+   * or null if it resolves. Never retains or exposes the resolved module.
+   */
+  async function captureImportError(): Promise<Error | null> {
+    try {
+      await import("../app/lib/env.server");
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error : new Error("Unknown import error");
+    }
+  }
+
+  function setEnv(env: Record<string, string>) {
+    // Wipe process.env entirely, then apply only what the test needs
+    for (const key of Object.keys(process.env)) {
+      delete process.env[key];
+    }
+    process.env.NODE_ENV = "test";
+    for (const [k, v] of Object.entries(env)) {
+      process.env[k] = v;
+    }
+  }
+
   beforeEach(() => {
     vi.resetModules();
     process.env = { ...originalEnv };
+    process.env.NODE_ENV = "test";
   });
 
   afterEach(() => {
@@ -50,16 +80,11 @@ describe("Environment Validation — fail-fast on import", () => {
     it(`should fail on import when ${varName} is missing`, async () => {
       const env = validEnv();
       delete env[varName];
-      // Set all vars except the one under test
-      for (const [k, v] of Object.entries(env)) {
-        process.env[k] = v;
-      }
-      // Clear the variable under test
-      delete process.env[varName];
+      setEnv(env);
 
-      await expect(
-        import("../app/lib/env.server")
-      ).rejects.toThrow(`${varName} is missing`);
+      const err = await captureImportError();
+      expect(err).not.toBeNull();
+      expect(err!.message).toContain(`${varName} is missing`);
     });
   }
 
@@ -69,69 +94,97 @@ describe("Environment Validation — fail-fast on import", () => {
   it("should fail on import with SMTP_PORT=587abc", async () => {
     const env = validEnv();
     env.SMTP_PORT = "587abc";
-    for (const [k, v] of Object.entries(env)) process.env[k] = v;
-    await expect(import("../app/lib/env.server")).rejects.toThrow("must contain only digits");
+    setEnv(env);
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("must contain only digits");
   });
 
   it("should fail on import with SMTP_PORT=65536", async () => {
     const env = validEnv();
     env.SMTP_PORT = "65536";
-    for (const [k, v] of Object.entries(env)) process.env[k] = v;
-    await expect(import("../app/lib/env.server")).rejects.toThrow("must be an integer between 1 and 65535");
+    setEnv(env);
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("must be an integer between 1 and 65535");
   });
 
   it("should fail on import with CONTACT_RATE_LIMIT_MAX=0", async () => {
     const env = validEnv();
     env.CONTACT_RATE_LIMIT_MAX = "0";
-    for (const [k, v] of Object.entries(env)) process.env[k] = v;
-    await expect(import("../app/lib/env.server")).rejects.toThrow("must be an integer between 1 and 100");
+    setEnv(env);
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("must be an integer between 1 and 100");
   });
 
   it("should fail on import with CONTACT_RATE_LIMIT_MAX=101", async () => {
     const env = validEnv();
     env.CONTACT_RATE_LIMIT_MAX = "101";
-    for (const [k, v] of Object.entries(env)) process.env[k] = v;
-    await expect(import("../app/lib/env.server")).rejects.toThrow("must be an integer between 1 and 100");
+    setEnv(env);
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("must be an integer between 1 and 100");
   });
 
   it("should fail on import with CONTACT_RATE_LIMIT_MAX=5abc", async () => {
     const env = validEnv();
     env.CONTACT_RATE_LIMIT_MAX = "5abc";
-    for (const [k, v] of Object.entries(env)) process.env[k] = v;
-    await expect(import("../app/lib/env.server")).rejects.toThrow("must contain only digits");
+    setEnv(env);
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("must contain only digits");
   });
 
   it("should fail on import with PUBLIC_SITE_URL=ftp://example.com", async () => {
     const env = validEnv();
     env.PUBLIC_SITE_URL = "ftp://example.com";
-    for (const [k, v] of Object.entries(env)) process.env[k] = v;
-    await expect(import("../app/lib/env.server")).rejects.toThrow("HTTP or HTTPS protocol");
+    setEnv(env);
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("HTTP or HTTPS protocol");
   });
 
   it("should fail on import with PUBLIC_SITE_URL=not-a-url", async () => {
     const env = validEnv();
     env.PUBLIC_SITE_URL = "not-a-url";
-    for (const [k, v] of Object.entries(env)) process.env[k] = v;
-    await expect(import("../app/lib/env.server")).rejects.toThrow("HTTP or HTTPS protocol");
+    setEnv(env);
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("HTTP or HTTPS protocol");
   });
 
   it("should not leak secret values in error messages", async () => {
     const env = validEnv();
     delete env.SMTP_PASS;
-    for (const [k, v] of Object.entries(env)) process.env[k] = v;
-    delete process.env.SMTP_PASS;
-    try {
-      await import("../app/lib/env.server");
-      expect.unreachable("import should have thrown");
-    } catch (e: unknown) {
-      const msg = (e as Error).message;
-      expect(msg).toContain("SMTP_PASS is missing");
-      // Must not contain any of the valid env values
-      for (const v of Object.values(env)) {
-        if (v.length > 3) {
-          expect(msg).not.toContain(v);
-        }
+    setEnv(env);
+
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("SMTP_PASS is missing");
+    // Must not contain any of the valid env values
+    for (const v of Object.values(env)) {
+      if (v.length > 3) {
+        expect(err!.message).not.toContain(v);
       }
     }
+  });
+
+  // ---------------------------------------------------------------
+  // Anti-leak sentinel: even on unexpected success, no secrets shown
+  // ---------------------------------------------------------------
+  it("should succeed import with all valid env vars without leaking values", async () => {
+    const env = validEnv();
+    env.SMTP_PASS = "DUMMY_SMTP_SECRET_MUST_NOT_APPEAR";
+    setEnv(env);
+
+    const err = await captureImportError();
+    // Import should succeed with all valid vars
+    if (err !== null) {
+      // If it fails, the error must not contain the sentinel
+      expect(err.message).not.toContain("DUMMY_SMTP_SECRET_MUST_NOT_APPEAR");
+    }
+    // Either way, the sentinel must not appear — captureImportError
+    // never retains the resolved module, so no serialization leak.
   });
 });

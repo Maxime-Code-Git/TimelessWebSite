@@ -57,5 +57,9 @@ export function loadEnvLocal() {
   }
 }
 
-// Automatically load when imported
-loadEnvLocal();
+// Automatically load when imported, except during tests.
+// In test mode, process.env must be fully controlled by the test harness
+// to prevent real secrets from .env.local leaking into test output.
+if (process.env.NODE_ENV !== "test") {
+  loadEnvLocal();
+}
