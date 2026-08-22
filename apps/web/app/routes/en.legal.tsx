@@ -45,26 +45,32 @@ export default function LegalEn() {
           )}
 
           <div className={styles.content}>
-            <h2>Publisher</h2>
+            <h2>Site Publisher</h2>
             {business?.address && business?.enterpriseNumber ? (
-              <p>
-                {STUDIO_NAME}<br />
-                <span style={{ whiteSpace: "pre-line" }}>{business.address}</span><br />
-                {business.email && <>Email: {business.email}<br /></>}
+              <address>
+                <strong>{STUDIO_NAME}</strong><br />
+                {business.address && (
+                  <>
+                    <span className={styles.preLine}>{business.address}</span><br />
+                  </>
+                )}
+                {business.email && <><a href={`mailto:${business.email}`}>{business.email}</a><br /></>}
+                {business.phoneDisplay && <a href={`tel:${business.phoneE164}`}>{business.phoneDisplay}</a>}
+                <br />
                 Enterprise Number: {business.enterpriseNumber}
-              </p>
+              </address>
             ) : (
-              <p><em>Information currently being finalized.</em></p>
+              <p><em>Information pending finalization.</em></p>
             )}
 
             <h2>Hosting</h2>
             {business?.hostingProvider ? (
               <p>
-                The site is hosted by {business.hostingProvider}.
-                {business.hostingAddress && <><br /><span style={{ whiteSpace: "pre-line" }}>{business.hostingAddress}</span></>}
+                This site is hosted by {business.hostingProvider}.
+                {business.hostingAddress && <><br /><span className={styles.preLine}>{business.hostingAddress}</span></>}
               </p>
             ) : (
-              <p><em>Information currently being finalized.</em></p>
+              <p><em>Information pending finalization.</em></p>
             )}
 
             <h2>Intellectual Property</h2>

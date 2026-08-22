@@ -1,5 +1,6 @@
 import { execSync, spawnSync } from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -46,8 +47,15 @@ function cleanupCerts() {
   }
 }
 
+let e2eTempDir = '';
+
 try {
   generateCerts();
+  e2eTempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'timeless-e2e-'));
+
+  process.env.SITE_CONTENT_PATH = path.join(e2eTempDir, 'site-content.json');
+  process.env.RATE_LIMIT_DB_PATH = path.join(e2eTempDir, 'rate-limit.sqlite');
+  process.env.NODE_ENV = 'test';
 
   const args = process.argv.slice(2);
   const result = spawnSync('npx', ['playwright', 'test', ...args], {
@@ -58,4 +66,7 @@ try {
   process.exitCode = result.status !== null ? result.status : 1;
 } finally {
   cleanupCerts();
+  if (e2eTempDir && fs.existsSync(e2eTempDir)) {
+    fs.rmSync(e2eTempDir, { recursive: true, force: true });
+  }
 }

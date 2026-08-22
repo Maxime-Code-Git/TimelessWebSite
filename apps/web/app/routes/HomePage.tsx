@@ -134,10 +134,7 @@ export function HomePage({ lang }: HomePageProps) {
                 <div className={styles.formulePrice}>
                   {formatPrice(tier.priceCents, lang)}
                 </div>
-                <div
-                  className={styles.formuleNote}
-                  style={{ whiteSpace: "pre-line" }}
-                >
+                <div className={styles.formuleNote}>
                   {getFormulaNote(selectedCat, tier.id, lang)}
                 </div>
               </div>

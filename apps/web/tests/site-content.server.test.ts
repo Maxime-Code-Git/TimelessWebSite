@@ -6,11 +6,9 @@ import {
   getRawSiteContent,
   savePricing,
   saveSettings,
-  validateSiteContent,
   RevisionConflictError,
   ValidationError
 } from "../app/lib/site-content.server";
-import type { SiteContent } from "../app/lib/site-content.server";
 import defaultContent from "../app/content/default-site-content.json";
 
 describe("site-content.server.ts", () => {

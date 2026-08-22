@@ -48,12 +48,18 @@ export default function LegalFr() {
           <div className={styles.content}>
             <h2>Éditeur du site</h2>
             {business?.address && business?.enterpriseNumber ? (
-              <p>
-                {STUDIO_NAME}<br />
-                <span style={{ whiteSpace: "pre-line" }}>{business.address}</span><br />
-                {business.email && <>Email : {business.email}<br /></>}
+              <address>
+                <strong>{STUDIO_NAME}</strong><br />
+                {business.address && (
+                  <>
+                    <span className={styles.preLine}>{business.address}</span><br />
+                  </>
+                )}
+                {business.email && <><a href={`mailto:${business.email}`}>{business.email}</a><br /></>}
+                {business.phoneDisplay && <a href={`tel:${business.phoneE164}`}>{business.phoneDisplay}</a>}
+                <br />
                 Numéro d'entreprise : {business.enterpriseNumber}
-              </p>
+              </address>
             ) : (
               <p><em>Informations en cours de finalisation.</em></p>
             )}
@@ -62,7 +68,7 @@ export default function LegalFr() {
             {business?.hostingProvider ? (
               <p>
                 Le site est hébergé par {business.hostingProvider}.
-                {business.hostingAddress && <><br /><span style={{ whiteSpace: "pre-line" }}>{business.hostingAddress}</span></>}
+                {business.hostingAddress && <><br /><span className={styles.preLine}>{business.hostingAddress}</span></>}
               </p>
             ) : (
               <p><em>Informations en cours de finalisation.</em></p>

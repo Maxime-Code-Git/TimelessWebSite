@@ -58,24 +58,32 @@ export class ValidationError extends Error {
 
 function getFilePath(): string {
   if (!process.env.SITE_CONTENT_PATH) {
-    // Should never happen in a properly configured environment
     return path.join(process.cwd(), "data", "site-content.json");
   }
   return path.resolve(process.env.SITE_CONTENT_PATH);
 }
 
-// Strict manual TypeScript validation
-function validateFormula(data: any, expectedId: string, context: string): Formula {
-  if (typeof data !== "object" || data === null) {
-    throw new ValidationError(`Invalid formula object in ${context}`);
+function assertExactKeys(obj: any, allowedKeys: string[], context: string) {
+  if (typeof obj !== "object" || obj === null) {
+    throw new ValidationError(`${context} must be an object`);
   }
+  const objKeys = Object.keys(obj);
+  for (const k of objKeys) {
+    if (!allowedKeys.includes(k)) {
+      throw new ValidationError(`Unknown property '${k}' in ${context}`);
+    }
+  }
+}
+
+function validateFormula(data: any, expectedId: string, context: string): Formula {
+  assertExactKeys(data, ["id", "priceCents", "featured"], context);
 
   if (data.id !== expectedId) {
     throw new ValidationError(`Invalid id in ${context}, expected ${expectedId}`);
   }
 
   const priceCents = data.priceCents;
-  if (typeof priceCents !== "number" || !Number.isInteger(priceCents) || priceCents <= 0 || priceCents > 10000000) { // 100 000€ max
+  if (typeof priceCents !== "number" || !Number.isInteger(priceCents) || priceCents <= 0 || priceCents > 10000000) {
     throw new ValidationError(`Invalid priceCents in ${context}`);
   }
 
@@ -96,9 +104,9 @@ function validateCategory(data: any, categoryName: string): Formula[] {
   }
 
   const formulas = [
-    validateFormula(data.find((f: any) => f.id === "essential"), "essential", `${categoryName} > essential`),
-    validateFormula(data.find((f: any) => f.id === "signature"), "signature", `${categoryName} > signature`),
-    validateFormula(data.find((f: any) => f.id === "prestige"), "prestige", `${categoryName} > prestige`),
+    validateFormula(data.find((f: any) => f?.id === "essential"), "essential", `${categoryName} > essential`),
+    validateFormula(data.find((f: any) => f?.id === "signature"), "signature", `${categoryName} > signature`),
+    validateFormula(data.find((f: any) => f?.id === "prestige"), "prestige", `${categoryName} > prestige`),
   ];
 
   const featuredCount = formulas.filter(f => f.featured).length;
@@ -110,9 +118,7 @@ function validateCategory(data: any, categoryName: string): Formula[] {
 }
 
 function validatePricing(data: any): PricingCategory {
-  if (typeof data !== "object" || data === null) {
-    throw new ValidationError("Pricing must be an object");
-  }
+  assertExactKeys(data, ["photo", "film", "duo"], "pricing");
 
   return {
     photo: validateCategory(data.photo, "photo"),
@@ -127,8 +133,7 @@ function validateStringOrNull(value: any, name: string, maxLength = 255): string
   const trimmed = value.trim();
   if (trimmed === "") return null;
   if (trimmed.length > maxLength) throw new ValidationError(`${name} is too long (max ${maxLength})`);
-  // Refuse HTML tags
-  if (/<[a-z][\s\S]*>/i.test(trimmed)) throw new ValidationError(`${name} contains forbidden HTML characters`);
+  if (trimmed.includes("<") || trimmed.includes(">")) throw new ValidationError(`${name} contains forbidden HTML characters`);
   return trimmed;
 }
 
@@ -149,11 +154,25 @@ function validatePhoneE164(value: any): string | null {
 }
 
 function validateHttpsUrl(value: any, name: string): string | null {
-  const url = validateStringOrNull(value, name, 255);
-  if (url && !/^https:\/\/[^\s]+$/.test(url)) {
-    throw new ValidationError(`${name} must be a valid HTTPS URL`);
+  const urlStr = validateStringOrNull(value, name, 255);
+  if (!urlStr) return null;
+
+  try {
+    const url = new URL(urlStr);
+    if (url.protocol !== "https:") {
+      throw new ValidationError(`${name} must use https: protocol`);
+    }
+    if (!url.hostname) {
+      throw new ValidationError(`${name} must have a hostname`);
+    }
+    if (url.username || url.password) {
+      throw new ValidationError(`${name} must not contain credentials`);
+    }
+  } catch (err: any) {
+    if (err instanceof ValidationError) throw err;
+    throw new ValidationError(`${name} is a malformed URL`);
   }
-  return url;
+  return urlStr;
 }
 
 function validateDepositPercent(value: any): number | null {
@@ -165,17 +184,16 @@ function validateDepositPercent(value: any): number | null {
 }
 
 function validateBusiness(data: any): BusinessContent {
-  if (typeof data !== "object" || data === null) {
-    throw new ValidationError("Business must be an object");
-  }
+  assertExactKeys(data, [
+    "email", "phoneDisplay", "phoneE164", "address", "enterpriseNumber",
+    "legalForm", "legalRepresentative", "hostingProvider", "hostingAddress",
+    "depositPercent", "instagramUrl", "linkedinUrl", "serviceArea"
+  ], "business");
 
-  const serviceArea = data.serviceArea;
-  if (typeof serviceArea !== "object" || serviceArea === null) {
-    throw new ValidationError("serviceArea must be an object");
-  }
+  assertExactKeys(data.serviceArea, ["fr", "en"], "serviceArea");
 
-  const frArea = validateStringOrNull(serviceArea.fr, "serviceArea.fr", 100);
-  const enArea = validateStringOrNull(serviceArea.en, "serviceArea.en", 100);
+  const frArea = validateStringOrNull(data.serviceArea.fr, "serviceArea.fr", 100);
+  const enArea = validateStringOrNull(data.serviceArea.en, "serviceArea.en", 100);
 
   if (!frArea || !enArea) {
     throw new ValidationError("serviceArea fr and en are required");
@@ -202,22 +220,26 @@ function validateBusiness(data: any): BusinessContent {
 }
 
 export function validateSiteContent(data: any): SiteContent {
-  if (typeof data !== "object" || data === null) {
-    throw new ValidationError("SiteContent must be an object");
-  }
+  assertExactKeys(data, ["schemaVersion", "revision", "updatedAt", "business", "pricing"], "root");
 
   if (data.schemaVersion !== 1) {
     throw new ValidationError("Unsupported schemaVersion");
   }
 
-  if (typeof data.revision !== "string") {
-    throw new ValidationError("Invalid revision");
+  if (typeof data.revision !== "string" || !/^[a-f0-9]{32}$/.test(data.revision)) {
+    throw new ValidationError("Invalid revision format");
+  }
+
+  const updatedAtStr = typeof data.updatedAt === "string" ? data.updatedAt : new Date().toISOString();
+  const d = new Date(updatedAtStr);
+  if (isNaN(d.getTime()) || d.toISOString() !== updatedAtStr) {
+    throw new ValidationError("updatedAt must be a valid ISO Date string");
   }
 
   return {
     schemaVersion: 1,
     revision: data.revision,
-    updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : new Date().toISOString(),
+    updatedAt: updatedAtStr,
     business: validateBusiness(data.business),
     pricing: validatePricing(data.pricing),
   };
@@ -229,13 +251,10 @@ export function getSiteContent(): SiteContent {
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, "utf-8");
       const parsed = JSON.parse(content);
-      // We validate on read to avoid serving corrupted content
       return validateSiteContent(parsed);
     }
-  } catch (err) {
-    // If corrupted or missing, fallback to defaults
-    // Admin interface will know it's corrupted if it tries to read raw or save.
-    // For the purpose of getSiteContent, just serve defaults if parsing/validation fails.
+  } catch {
+    // Ignore
   }
   return defaultContent as SiteContent;
 }
@@ -248,7 +267,7 @@ export function getRawSiteContent(): { content: SiteContent, isCorrupted: boolea
       const parsed = JSON.parse(content);
       return { content: validateSiteContent(parsed), isCorrupted: false };
     }
-  } catch (err) {
+  } catch {
     return { content: defaultContent as SiteContent, isCorrupted: true };
   }
   return { content: defaultContent as SiteContent, isCorrupted: false };
@@ -260,12 +279,11 @@ function manageBackups(filePath: string) {
   const dir = path.dirname(filePath);
   const baseName = path.basename(filePath);
 
-  // Create a new backup
   const timestamp = Date.now();
   const backupPath = path.join(dir, `${baseName}.${timestamp}.bak`);
   fs.copyFileSync(filePath, backupPath);
+  fs.chmodSync(backupPath, 0o600);
 
-  // Limit to 5 backups
   const files = fs.readdirSync(dir);
   const backups = files
     .filter(f => f.startsWith(baseName) && f.endsWith(".bak"))
@@ -274,7 +292,9 @@ function manageBackups(filePath: string) {
 
   if (backups.length > 5) {
     for (let i = 5; i < backups.length; i++) {
-      fs.unlinkSync(path.join(dir, backups[i]));
+      try {
+        fs.unlinkSync(path.join(dir, backups[i]));
+      } catch { /* ignore */ }
     }
   }
 }
@@ -286,32 +306,49 @@ function atomicSave(newContent: SiteContent, filePath: string) {
   }
 
   const tempFilePath = `${filePath}.tmp.${crypto.randomBytes(4).toString("hex")}`;
-
+  let fd: number | null = null;
   try {
     const jsonStr = JSON.stringify(newContent, null, 2);
-    // Write to temp file
-    const fd = fs.openSync(tempFilePath, "w", 0o600);
-    fs.writeSync(fd, jsonStr);
+    const buffer = Buffer.from(jsonStr, "utf-8");
+    fd = fs.openSync(tempFilePath, "w", 0o600);
 
-    // fsync to ensure it's written to disk
+    let bytesWritten = 0;
+    while (bytesWritten < buffer.length) {
+      const written = fs.writeSync(fd, buffer, bytesWritten, buffer.length - bytesWritten, bytesWritten);
+      bytesWritten += written;
+    }
+
     fs.fsyncSync(fd);
     fs.closeSync(fd);
+    fd = null;
 
-    // Create backup of current file before overwriting
     manageBackups(filePath);
 
-    // Atomic rename
     fs.renameSync(tempFilePath, filePath);
+    fs.chmodSync(filePath, 0o600);
+
+    try {
+      const dirFd = fs.openSync(dir, "r");
+      fs.fsyncSync(dirFd);
+      fs.closeSync(dirFd);
+    } catch (err: unknown) {
+      console.error(err);
+    }
   } catch (err) {
-    // Cleanup temp file on error
     if (fs.existsSync(tempFilePath)) {
       try {
         fs.unlinkSync(tempFilePath);
-      } catch (e) {
-        // Ignore unlink errors
+      } catch (e: unknown) {
+        console.error(e);
       }
     }
     throw err;
+  } finally {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd);
+      } catch { /* ignore */ }
+    }
   }
 }
 

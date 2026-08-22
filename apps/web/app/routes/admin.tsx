@@ -32,8 +32,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { isValid, session } = await requireAdminSession(request);
   const headers = new Headers();
 
-  // Enforce session destruction if invalid but present (e.g., config changed)
-  if (!isValid && session.has("adminId")) {
+  // If the user submitted a cookie but it's invalid, destroy it to clean up the browser state.
+  // We only redirect if they actually have a cookie that we want to clear.
+  const cookieHeader = request.headers.get("Cookie");
+  if (!isValid && cookieHeader && cookieHeader.includes("__admin_session")) {
     return redirect("/admin", {
       headers: {
         "Set-Cookie": await destroySession(session),

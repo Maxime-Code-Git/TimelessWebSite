@@ -9,24 +9,37 @@ import {
 } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { getRawSiteContent, saveSettings, RevisionConflictError, ValidationError } from "../lib/site-content.server";
-import { requireAdminSession } from "../lib/auth.server";
-import { validateAdminFormData, createAdminHeaders, ActionSecurityError } from "../lib/admin-auth.server";
+import { requireValidAdminSession, validateAdminFormData, createAdminHeaders, ActionSecurityError } from "../lib/admin-auth.server";
+import { commitSession } from "../lib/session.server";
+import * as crypto from "node:crypto";
 import styles from "./admin.module.css";
 import type { BusinessContent } from "../lib/site-content.server";
 import { useState } from "react";
-import { useRouteLoaderData } from "react-router";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  await requireAdminSession(request);
-  const { content } = getRawSiteContent();
+  const session = await requireValidAdminSession(request);
+  const { content, isCorrupted } = getRawSiteContent();
+
+  const headers = createAdminHeaders();
+  let csrfToken = session.get("csrfToken");
+  if (!csrfToken) {
+    csrfToken = crypto.randomUUID();
+    session.set("csrfToken", csrfToken);
+    headers.set("Set-Cookie", await commitSession(session));
+  }
 
   return Response.json(
-    { business: content.business, revision: content.revision },
-    { headers: createAdminHeaders() }
+    { business: content.business, revision: content.revision, csrfToken, storageWarning: isCorrupted },
+    { headers }
   );
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const { isCorrupted } = getRawSiteContent();
+  if (isCorrupted) {
+    return Response.json({ error: "Le stockage du contenu doit être vérifié avant toute modification." }, { status: 409 });
+  }
+
   try {
     const formData = await validateAdminFormData(request);
     const revision = String(formData.get("revision"));
@@ -64,13 +77,10 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function AdminSettingsPage() {
-  const { business, revision } = useLoaderData<typeof loader>();
+  const { business, revision, csrfToken, storageWarning } = useLoaderData<typeof loader>();
   const actionData = useActionData<{ error?: string; success?: boolean; revision?: string }>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
-
-  const adminData = useRouteLoaderData("routes/admin") as { csrfToken: string } | undefined;
-  const csrfToken = adminData?.csrfToken;
 
   const [data, setData] = useState<BusinessContent>(business);
 
@@ -104,23 +114,26 @@ export default function AdminSettingsPage() {
             <input type="hidden" name="revision" value={actionData?.revision || revision} />
             <input type="hidden" name="business" value={JSON.stringify(data)} />
 
+            {storageWarning && (
+              <div className={styles.error} role="alert">Le stockage du contenu doit être vérifié avant toute modification.</div>
+            )}
             {actionData?.error && <div className={styles.error} role="alert">{actionData.error}</div>}
-            {actionData?.success && <div className={styles.success} role="status">Informations mises à jour avec succès.</div>}
+            {actionData?.success && !actionData?.error && <div className={styles.success} role="status">Informations mises à jour avec succès.</div>}
 
             <div className={styles.settingsGrid}>
               <div className={styles.settingsSection}>
                 <h3>Contact</h3>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Email public</label>
-                  <input type="email" name="email" value={data.email || ""} onChange={handleChange} className={styles.input} />
+                  <label htmlFor="email" className={styles.label}>Email public</label>
+                  <input id="email" type="email" name="email" value={data.email || ""} onChange={handleChange} className={styles.input} />
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Téléphone (affichage)</label>
-                  <input type="text" name="phoneDisplay" value={data.phoneDisplay || ""} onChange={handleChange} className={styles.input} placeholder="+32 477 86 37 42" />
+                  <label htmlFor="phoneDisplay" className={styles.label}>Téléphone (affichage)</label>
+                  <input id="phoneDisplay" type="text" name="phoneDisplay" value={data.phoneDisplay || ""} onChange={handleChange} className={styles.input} placeholder="+32 477 86 37 42" />
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Téléphone (E164)</label>
-                  <input type="text" name="phoneE164" value={data.phoneE164 || ""} onChange={handleChange} className={styles.input} placeholder="+32477863742" />
+                  <label htmlFor="phoneE164" className={styles.label}>Téléphone (E164)</label>
+                  <input id="phoneE164" type="text" name="phoneE164" value={data.phoneE164 || ""} onChange={handleChange} className={styles.input} placeholder="+32477863742" />
                   <small className={styles.helperText}>Ex: +32477863742 (sans espaces)</small>
                 </div>
               </div>
@@ -128,57 +141,61 @@ export default function AdminSettingsPage() {
               <div className={styles.settingsSection}>
                 <h3>Réseaux Sociaux</h3>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Instagram (URL HTTPS)</label>
-                  <input type="url" name="instagramUrl" value={data.instagramUrl || ""} onChange={handleChange} className={styles.input} />
+                  <label htmlFor="instagramUrl" className={styles.label}>Instagram (URL HTTPS)</label>
+                  <input id="instagramUrl" type="url" name="instagramUrl" value={data.instagramUrl || ""} onChange={handleChange} className={styles.input} />
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>LinkedIn (URL HTTPS)</label>
-                  <input type="url" name="linkedinUrl" value={data.linkedinUrl || ""} onChange={handleChange} className={styles.input} />
+                  <label htmlFor="linkedinUrl" className={styles.label}>LinkedIn (URL HTTPS)</label>
+                  <input id="linkedinUrl" type="url" name="linkedinUrl" value={data.linkedinUrl || ""} onChange={handleChange} className={styles.input} />
                 </div>
               </div>
 
               <div className={styles.settingsSection}>
                 <h3>Studio & Mentions Légales</h3>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Adresse du studio</label>
-                  <textarea name="address" value={data.address || ""} onChange={handleChange} className={styles.textarea} />
+                  <label htmlFor="address" className={styles.label}>Adresse du studio</label>
+                  <textarea id="address" name="address" value={data.address || ""} onChange={handleChange} className={styles.textarea} />
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Numéro d'entreprise</label>
-                  <input type="text" name="enterpriseNumber" value={data.enterpriseNumber || ""} onChange={handleChange} className={styles.input} />
+                  <label htmlFor="enterpriseNumber" className={styles.label}>Numéro d'entreprise</label>
+                  <input id="enterpriseNumber" type="text" name="enterpriseNumber" value={data.enterpriseNumber || ""} onChange={handleChange} className={styles.input} />
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Forme légale</label>
-                  <input type="text" name="legalForm" value={data.legalForm || ""} onChange={handleChange} className={styles.input} />
+                  <label htmlFor="legalForm" className={styles.label}>Forme légale</label>
+                  <input id="legalForm" type="text" name="legalForm" value={data.legalForm || ""} onChange={handleChange} className={styles.input} />
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Hébergeur (Nom)</label>
-                  <input type="text" name="hostingProvider" value={data.hostingProvider || ""} onChange={handleChange} className={styles.input} />
+                  <label htmlFor="legalRepresentative" className={styles.label}>Représentant légal</label>
+                  <input id="legalRepresentative" type="text" name="legalRepresentative" value={data.legalRepresentative || ""} onChange={handleChange} className={styles.input} />
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Hébergeur (Adresse)</label>
-                  <textarea name="hostingAddress" value={data.hostingAddress || ""} onChange={handleChange} className={styles.textarea} />
+                  <label htmlFor="hostingProvider" className={styles.label}>Hébergeur (Nom)</label>
+                  <input id="hostingProvider" type="text" name="hostingProvider" value={data.hostingProvider || ""} onChange={handleChange} className={styles.input} />
+                </div>
+                <div className={styles.formGroup}>
+                  <label htmlFor="hostingAddress" className={styles.label}>Hébergeur (Adresse)</label>
+                  <textarea id="hostingAddress" name="hostingAddress" value={data.hostingAddress || ""} onChange={handleChange} className={styles.textarea} />
                 </div>
               </div>
 
               <div className={styles.settingsSection}>
                 <h3>Paramètres commerciaux</h3>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Acompte (%)</label>
-                  <input type="number" name="depositPercent" value={data.depositPercent || ""} onChange={handleChange} min="0" max="100" className={styles.input} />
+                  <label htmlFor="depositPercent" className={styles.label}>Acompte (%)</label>
+                  <input id="depositPercent" type="number" name="depositPercent" value={data.depositPercent || ""} onChange={handleChange} min="0" max="100" className={styles.input} />
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Zone d'intervention (FR)</label>
-                  <input type="text" name="serviceArea.fr" value={data.serviceArea.fr || ""} onChange={handleChange} required className={styles.input} />
+                  <label htmlFor="serviceAreaFr" className={styles.label}>Zone d'intervention (FR)</label>
+                  <input id="serviceAreaFr" type="text" name="serviceArea.fr" value={data.serviceArea.fr || ""} onChange={handleChange} required className={styles.input} />
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Zone d'intervention (EN)</label>
-                  <input type="text" name="serviceArea.en" value={data.serviceArea.en || ""} onChange={handleChange} required className={styles.input} />
+                  <label htmlFor="serviceAreaEn" className={styles.label}>Zone d'intervention (EN)</label>
+                  <input id="serviceAreaEn" type="text" name="serviceArea.en" value={data.serviceArea.en || ""} onChange={handleChange} required className={styles.input} />
                 </div>
               </div>
             </div>
 
-            <button type="submit" disabled={isSubmitting} className={styles.submitButton}>
+            <button type="submit" disabled={isSubmitting || storageWarning} className={styles.submitButton}>
               {isSubmitting ? "Enregistrement..." : "Enregistrer les modifications"}
             </button>
           </Form>

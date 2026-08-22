@@ -9,22 +9,36 @@ import {
 } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { getRawSiteContent, savePricing, RevisionConflictError, ValidationError } from "../lib/site-content.server";
-import { requireAdminSession } from "../lib/auth.server";
-import { validateAdminFormData, createAdminHeaders, ActionSecurityError } from "../lib/admin-auth.server";
+import { requireValidAdminSession, validateAdminFormData, createAdminHeaders, ActionSecurityError } from "../lib/admin-auth.server";
+import { commitSession } from "../lib/session.server";
+import * as crypto from "node:crypto";
 import styles from "./admin.module.css";
 import type { PricingCategory } from "../lib/site-content.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  await requireAdminSession(request);
-  const { content } = getRawSiteContent();
+  const session = await requireValidAdminSession(request);
+  const { content, isCorrupted } = getRawSiteContent();
+
+  const headers = createAdminHeaders();
+  let csrfToken = session.get("csrfToken");
+  if (!csrfToken) {
+    csrfToken = crypto.randomUUID();
+    session.set("csrfToken", csrfToken);
+    headers.set("Set-Cookie", await commitSession(session));
+  }
 
   return Response.json(
-    { pricing: content.pricing, revision: content.revision },
-    { headers: createAdminHeaders() }
+    { pricing: content.pricing, revision: content.revision, csrfToken, storageWarning: isCorrupted },
+    { headers }
   );
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const { isCorrupted } = getRawSiteContent();
+  if (isCorrupted) {
+    return Response.json({ error: "Le stockage du contenu doit être vérifié avant toute modification." }, { status: 409 });
+  }
+
   try {
     const formData = await validateAdminFormData(request);
     const revision = String(formData.get("revision"));
@@ -64,7 +78,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function AdminPricingPage() {
-  const { pricing, revision } = useLoaderData<typeof loader>();
+  const { pricing, revision, csrfToken, storageWarning } = useLoaderData<typeof loader>();
   const actionData = useActionData<{ error?: string; success?: boolean; revision?: string }>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -92,6 +106,8 @@ export default function AdminPricingPage() {
             error={actionData?.error}
             success={actionData?.success}
             isSubmitting={isSubmitting}
+            csrfToken={csrfToken}
+            storageWarning={storageWarning}
           />
         </div>
       </main>
@@ -101,34 +117,37 @@ export default function AdminPricingPage() {
 
 // Client-side React logic to edit pricing
 import { useState } from "react";
-import { useRouteLoaderData } from "react-router";
 
-function PricingEditor({ initialPricing, revision, error, success, isSubmitting }: {
+function PricingEditor({ initialPricing, revision, error, success, isSubmitting, csrfToken, storageWarning }: {
   initialPricing: PricingCategory,
   revision: string,
   error?: string,
   success?: boolean,
-  isSubmitting: boolean
+  isSubmitting: boolean,
+  csrfToken: string,
+  storageWarning: boolean
 }) {
-  const adminData = useRouteLoaderData("routes/admin") as { csrfToken: string } | undefined;
-  const csrfToken = adminData?.csrfToken;
 
   const [pricing, setPricing] = useState<PricingCategory>(initialPricing);
 
-  // Convert cents to euros for display
   const handleChange = (cat: keyof PricingCategory, index: number, field: "priceEuros" | "featured", value: number | boolean) => {
-    const newPricing = { ...pricing };
-    const formula = newPricing[cat][index];
-
-    if (field === "featured") {
-      // only one featured per cat
-      newPricing[cat].forEach(f => f.featured = false);
-      formula.featured = Boolean(value);
-    } else if (field === "priceEuros") {
-      formula.priceCents = Math.round(Number(value) * 100);
-    }
-
-    setPricing(newPricing);
+    setPricing((prev) => {
+      // Immutable update
+      const newPricing = {
+        ...prev,
+        [cat]: prev[cat].map((f, i) => {
+          if (field === "featured") {
+            // Uncheck all other featured items in this category if checking this one
+            return { ...f, featured: value ? (i === index) : f.featured };
+          }
+          if (i === index && field === "priceEuros") {
+            return { ...f, priceCents: Math.round(Number(value) * 100) };
+          }
+          return f;
+        })
+      };
+      return newPricing;
+    });
   };
 
   return (
@@ -137,8 +156,11 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting 
       <input type="hidden" name="revision" value={revision} />
       <input type="hidden" name="pricing" value={JSON.stringify(pricing)} />
 
+      {storageWarning && (
+        <div className={styles.error} role="alert">Le stockage du contenu doit être vérifié avant toute modification.</div>
+      )}
       {error && <div className={styles.error} role="alert">{error}</div>}
-      {success && <div className={styles.success} role="status">Tarifs mis à jour avec succès.</div>}
+      {success && !error && <div className={styles.success} role="status">Tarifs mis à jour avec succès.</div>}
 
       <div className={styles.grid}>
         {(Object.keys(pricing) as Array<keyof PricingCategory>).map(cat => (
@@ -157,7 +179,9 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting 
                   <tr key={formula.id}>
                     <td>{formula.id}</td>
                     <td>
+                      <label htmlFor={`price_${cat}_${idx}`} className="sr-only">Prix pour {formula.id}</label>
                       <input
+                        id={`price_${cat}_${idx}`}
                         type="number"
                         min="1"
                         max="100000"
@@ -167,7 +191,9 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting 
                       />
                     </td>
                     <td>
+                      <label htmlFor={`feat_${cat}_${idx}`} className="sr-only">Mettre en avant {formula.id}</label>
                       <input
+                        id={`feat_${cat}_${idx}`}
                         type="radio"
                         name={`featured_${cat}`}
                         checked={formula.featured}
@@ -182,7 +208,7 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting 
         ))}
       </div>
 
-      <button type="submit" disabled={isSubmitting} className={styles.submitButton}>
+      <button type="submit" disabled={isSubmitting || storageWarning} className={styles.submitButton}>
         {isSubmitting ? "Enregistrement..." : "Enregistrer les modifications"}
       </button>
     </Form>

@@ -1,22 +1,20 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'url';
 
-const testDbPath = './data/db/rate-limit-test.sqlite';
-const dataPath = './data/site-content.json';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Cleanup the temp site-content before tests
-test.beforeAll(() => {
-  try {
-    fs.unlinkSync(dataPath);
-  } catch (e) {
-    // Ignore
-  }
-});
+const defaultContentPath = path.resolve(__dirname, '../app/content/default-site-content.json');
+const defaultContent = JSON.parse(fs.readFileSync(defaultContentPath, 'utf8'));
 
 test.describe('Admin Content Management (Phase 3B)', () => {
 
   test.beforeEach(async ({ page }) => {
+    if (process.env.SITE_CONTENT_PATH) {
+      fs.writeFileSync(process.env.SITE_CONTENT_PATH, JSON.stringify(defaultContent, null, 2));
+    }
     // Login before each test
     await page.goto('/admin');
     await page.fill('input[name="password"]', 'e2e_password');
@@ -45,6 +43,9 @@ test.describe('Admin Content Management (Phase 3B)', () => {
     // Verify on public page (FR)
     await page.goto('/fr/formules');
 
+    // Click on the 'Photographie' tab to make sure it's visible
+    await page.click('button:has-text("Photographie")');
+
     // Find the photo category
     const photoSection = page.locator('section').filter({ hasText: 'Photographie' }).first();
     // Verify the price is 1 300 €
@@ -54,7 +55,7 @@ test.describe('Admin Content Management (Phase 3B)', () => {
     // Just ensuring we don't get 500s is also part of it.
   });
 
-  test('should edit settings and see changes on contact page', async ({ page, context }) => {
+  test('should edit settings and see changes on contact page', async ({ page }) => {
     await page.click('text=Textes et informations');
     await expect(page.locator('h1')).toContainText('Textes et informations');
 
@@ -71,8 +72,8 @@ test.describe('Admin Content Management (Phase 3B)', () => {
 
     // Verify on contact page
     await page.goto('/fr/contact');
-    await expect(page.locator('a[href="mailto:new-contact@example.com"]')).toBeVisible();
-    await expect(page.locator('a[href="tel:+33612345678"]')).toContainText('+33 6 12 34 56 78');
+    await expect(page.locator('a[href="mailto:new-contact@example.com"]').first()).toBeVisible();
+    await expect(page.locator('a[href="tel:+33612345678"]').first()).toContainText('+33 6 12 34 56 78');
   });
 
   test('should handle revision conflicts (409)', async ({ page, request }) => {
@@ -111,7 +112,7 @@ test.describe('Admin Content Management (Phase 3B)', () => {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Cookie': cookieString,
-        'Origin': 'http://localhost:4173'
+        'Origin': 'http://localhost:4174'
       },
       data: new URLSearchParams({
         csrfToken,

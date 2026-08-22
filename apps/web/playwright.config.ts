@@ -16,13 +16,13 @@ export default defineConfig({
     timeout: 5000
   },
   /* Run tests in files in parallel */
-  fullyParallel: true,
+  fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -30,7 +30,7 @@ export default defineConfig({
     /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
     actionTimeout: 0,
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:4173',
+    baseURL: 'http://localhost:4174',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -60,14 +60,14 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: {
     command: 'npm run start',
-    url: 'http://localhost:4173',
-    reuseExistingServer: !process.env.CI,
+    url: 'http://localhost:4174',
+    reuseExistingServer: false,
     timeout: 120 * 1000,
     env: {
-      PORT: '4173',
+      PORT: '4174',
       NODE_ENV: 'test',
       TRUST_PROXY: 'true',
-      PUBLIC_SITE_URL: 'http://localhost:4173',
+      PUBLIC_SITE_URL: 'http://localhost:4174',
       SMTP_PORT: '2525',
       SMTP_USER: 'test@example.com',
       SMTP_PASS: 'test',
@@ -77,7 +77,8 @@ export default defineConfig({
       SMTP_CA_CERT: fs.readFileSync('./e2e/certs/test-cert.pem', 'utf-8'),
       CONTACT_RATE_LIMIT_SECRET: 'testsecret',
       CONTACT_RATE_LIMIT_MAX: '100',
-      RATE_LIMIT_DB_PATH: './data/db/rate-limit-test.sqlite',
+      RATE_LIMIT_DB_PATH: process.env.RATE_LIMIT_DB_PATH || './data/db/rate-limit-test.sqlite',
+      SITE_CONTENT_PATH: process.env.SITE_CONTENT_PATH || './data/site-content.json',
       ADMIN_PASSWORD_HASH: '$argon2id$v=19$m=19456,t=2,p=1$mA6OzU+rMEkQeBBnZfesFQ$1rIHIz/8BAyH0+GNXhYq8KDDu99lqaOTBtwGg1Lzczs',
       ADMIN_SESSION_SECRET: 'e2e_test_session_secret_for_admin_only',
     },

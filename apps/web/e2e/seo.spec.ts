@@ -28,16 +28,16 @@ test.describe('SEO & Meta Tags for all routes', () => {
       expect(response?.status()).not.toBe(404);
       
       const canonical = await page.locator('link[rel="canonical"]').getAttribute('href');
-      expect(canonical).toBe(`http://localhost:4173${route.path}`);
+      expect(canonical).toBe(`http://localhost:4174${route.path}`);
       
       const lang = route.path.startsWith('/fr') ? 'fr' : 'en';
       const altLang = lang === 'fr' ? 'en' : 'fr';
 
       const altSelf = await page.locator(`link[rel="alternate"][hreflang="${lang}"]`).getAttribute('href');
-      expect(altSelf).toBe(`http://localhost:4173${route.path}`);
+      expect(altSelf).toBe(`http://localhost:4174${route.path}`);
 
       const altOther = await page.locator(`link[rel="alternate"][hreflang="${altLang}"]`).getAttribute('href');
-      expect(altOther).toBe(`http://localhost:4173${route.alt}`);
+      expect(altOther).toBe(`http://localhost:4174${route.alt}`);
 
       // Check robots
       if (route.noindex) {
@@ -53,7 +53,7 @@ test.describe('SEO & Meta Tags for all routes', () => {
 
       // Check OG tags
       const ogUrl = await page.locator('meta[property="og:url"]').getAttribute('content');
-      expect(ogUrl).toBe(`http://localhost:4173${route.path}`);
+      expect(ogUrl).toBe(`http://localhost:4174${route.path}`);
     });
   }
 
@@ -62,8 +62,8 @@ test.describe('SEO & Meta Tags for all routes', () => {
     expect(response.ok()).toBeTruthy();
     
     const xml = await response.text();
-    expect(xml).toContain('<loc>http://localhost:4173/fr/</loc>');
-    expect(xml).toContain('<loc>http://localhost:4173/fr/portfolio</loc>');
+    expect(xml).toContain('<loc>http://localhost:4174/fr/</loc>');
+    expect(xml).toContain('<loc>http://localhost:4174/fr/portfolio</loc>');
     
     // Check missing things
     expect(xml).not.toContain('espace-clients');

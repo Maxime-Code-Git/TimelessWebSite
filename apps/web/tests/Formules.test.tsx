@@ -1,7 +1,16 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import FormulesFr from "../app/routes/fr.formules";
+import defaultContent from "../app/content/default-site-content.json";
+
+vi.mock("react-router", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("react-router")>();
+  return {
+    ...mod,
+    useRouteLoaderData: () => ({ siteContent: defaultContent })
+  };
+});
 
 describe("Formules Component", () => {
   it("renders Photo & Film category by default (Duo)", () => {
