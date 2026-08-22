@@ -48,7 +48,8 @@ function cleanupCerts() {
 try {
   generateCerts();
 
-  const result = spawnSync('npx', ['playwright', 'test'], {
+  const args = process.argv.slice(2);
+  const result = spawnSync('npx', ['playwright', 'test', ...args], {
     stdio: 'inherit',
     env: process.env
   });

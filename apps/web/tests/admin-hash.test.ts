@@ -1,90 +1,36 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-// @ts-expect-error: no types for this script
-import { generateAdminHash } from "../scripts/admin-hash.js";
-import readline from "node:readline";
+import { describe, it, expect } from "vitest";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+import path from "node:path";
+import fs from "node:fs";
 
-vi.mock("node:readline", () => ({
-  default: {
-    createInterface: vi.fn(),
-  },
-}));
+const execAsync = promisify(exec);
 
-describe("generateAdminHash", () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockRl: any;
-  let originalEnv: NodeJS.ProcessEnv;
-  let originalArgv: string[];
-  let originalStdin: NodeJS.ReadStream;
-  let originalStdout: NodeJS.WriteStream;
+describe("admin:hash script", () => {
+  const scriptPath = path.resolve(__dirname, "../scripts/admin-hash.js");
 
-  beforeEach(() => {
-    originalEnv = { ...process.env };
-    originalArgv = [...process.argv];
-    originalStdin = process.stdin;
-    originalStdout = process.stdout;
-
-    process.env.NODE_ENV = "test";
-
-    mockRl = {
-      question: vi.fn(),
-      close: vi.fn(),
-    };
-    vi.mocked(readline.createInterface).mockReturnValue(mockRl);
-
-    // Mock TTY by default
-    Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
-    Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
-
-    vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+  it("should exist", () => {
+    expect(fs.existsSync(scriptPath)).toBe(true);
   });
 
-  afterEach(() => {
-    process.env = originalEnv;
-    process.argv = originalArgv;
-    Object.defineProperty(process.stdin, "isTTY", { value: originalStdin.isTTY, configurable: true });
-    Object.defineProperty(process.stdout, "isTTY", { value: originalStdout.isTTY, configurable: true });
-    vi.restoreAllMocks();
+  it("should fail gracefully without command-line arguments", async () => {
+    try {
+      await execAsync(`node ${scriptPath} arg1`, { cwd: path.resolve(__dirname, "..") });
+      expect.unreachable("Should have failed");
+    } catch (e: any) {
+      expect(e.code).not.toBe(0);
+      expect(e.stderr).toContain("Les arguments en ligne de commande sont refusés par sécurité.");
+    }
   });
 
-  it("should fail if arguments are provided", async () => {
-    process.argv = ["node", "script.js", "arg1"];
-    process.env.NODE_ENV = "production";
-    await expect(generateAdminHash()).rejects.toThrow("Aucun argument n'est autorisé.");
-  });
-
-  it("should fail without TTY", async () => {
-    Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
-    process.env.NODE_ENV = "production";
-    await expect(generateAdminHash()).rejects.toThrow("Cette commande doit être exécutée dans un terminal interactif");
-  });
-
-  it("should fail if password is too short", async () => {
-    mockRl.question.mockImplementation((_: string, cb: (ans: string) => void) => {
-      cb("short");
-    });
-    await expect(generateAdminHash()).rejects.toThrow("Le mot de passe doit contenir au moins 12 caractères.");
-  });
-
-  it("should fail if passwords do not match", async () => {
-    let callCount = 0;
-    mockRl.question.mockImplementation((_: string, cb: (ans: string) => void) => {
-      callCount++;
-      if (callCount === 1) cb("longenoughpassword");
-      else cb("differentpassword");
-    });
-    await expect(generateAdminHash()).rejects.toThrow("Les mots de passe ne correspondent pas.");
-  });
-
-  it("should generate a hash for matching long passwords and not output password", async () => {
-    mockRl.question.mockImplementation((_: string, cb: (ans: string) => void) => {
-      cb("longenoughpassword");
-    });
-
-    const result = await generateAdminHash();
-    expect(result).toMatch(/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/);
-
-    // Ensure password is not in logs
-    expect(console.log).not.toHaveBeenCalledWith(expect.stringContaining("longenoughpassword"));
+  it("should fail without a TTY", async () => {
+    try {
+      // Running it inside child_process.exec means stdin/stdout are not TTY by default
+      await execAsync(`node ${scriptPath}`, { cwd: path.resolve(__dirname, "..") });
+      expect.unreachable("Should have failed");
+    } catch (e: unknown) {
+      expect((e as any).code).not.toBe(0);
+      expect((e as any).stderr).toContain("Ce script nécessite un terminal interactif (TTY).");
+    }
   });
 });

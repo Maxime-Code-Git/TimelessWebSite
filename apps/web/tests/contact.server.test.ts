@@ -143,7 +143,7 @@ describe('Contact Server Logic', () => {
   it('should reject invalid IPs', async () => {
     const req = createRequest(getValidBody(), { "x-forwarded-for": "not-an-ip" });
     const result = await processContactAction(req, "fr");
-    expect(result.error).toContain("Adresse IP invalide");
+    expect(result.error).toContain("Configuration réseau invalide ou IP non autorisée");
   });
 
   it('should reject impossible dates', async () => {
@@ -161,7 +161,7 @@ describe('Contact Server Logic', () => {
   it('should handle malformed origin gracefully', async () => {
     const req = createRequest(getValidBody(), { "Origin": "not-a-url" });
     const result = await processContactAction(req, "fr");
-    expect(result.error).toContain("Origine malformée");
+    expect(result.error).toContain("Origine non autorisée ou absente");
   });
 
   it('should reject oversized body (Content-Length provided)', async () => {
@@ -185,6 +185,7 @@ describe('Contact Server Logic', () => {
       headers: {
         "content-type": "multipart/form-data; boundary=----WebKitFormBoundary",
         "x-forwarded-for": "192.168.1.1",
+        "Origin": "http://localhost:4173"
       },
       // @ts-expect-error Node 18+ streaming request bodies in tests
       duplex: 'half'
@@ -244,6 +245,7 @@ describe('Contact Server Logic', () => {
       headers: {
         "content-type": "multipart/form-data; boundary=----WebKitFormBoundary",
         "x-forwarded-for": "192.168.1.1",
+        "Origin": "http://localhost:4173"
       },
       // @ts-expect-error Node 18+ streaming request bodies in tests
       duplex: 'half'
@@ -269,6 +271,7 @@ describe('Contact Server Logic', () => {
       headers: {
         "content-type": "multipart/form-data; boundary=----WebKitFormBoundary",
         "x-forwarded-for": "192.168.1.1",
+        "Origin": "http://localhost:4173"
       },
       // @ts-expect-error Node 18+ streaming request bodies in tests
       duplex: 'half'

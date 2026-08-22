@@ -16,6 +16,7 @@ export default defineConfig({
         "../../packages/shared/src/index.ts"
       ),
     },
+    dedupe: ["react", "react-dom", "react-router"],
     tsconfigPaths: true,
   },
   css: {

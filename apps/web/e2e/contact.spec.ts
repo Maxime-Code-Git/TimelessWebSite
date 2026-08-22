@@ -73,7 +73,7 @@ test.beforeEach(() => {
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Contact Form (Phase 3 Backend)', () => {
-  test.skip(({ isMobile }) => isMobile, 'SMTP server can only run in one project to avoid port conflicts');
+  test.skip(({ browserName, isMobile }) => browserName !== 'chromium' || !!isMobile, 'SMTP server can only run in one project to avoid port conflicts');
   test('should successfully submit form, clear it, and allow a second submission (FR)', async ({ page }) => {
     await page.goto('/fr/contact');
 

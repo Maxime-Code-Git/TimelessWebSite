@@ -42,6 +42,10 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
     /* Test against mobile viewports. */
     {
       name: 'Mobile Chrome',
@@ -70,6 +74,7 @@ export default defineConfig({
       TRUST_PROXY: 'true',
       ADMIN_PASSWORD_HASH: '$argon2id$v=19$m=19456,t=2,p=1$mA6OzU+rMEkQeBBnZfesFQ$1rIHIz/8BAyH0+GNXhYq8KDDu99lqaOTBtwGg1Lzczs',
       ADMIN_SESSION_SECRET: 'e2e_test_session_secret_for_admin_only',
+      PLAYWRIGHT_TEST: 'true',
     },
   },
 });

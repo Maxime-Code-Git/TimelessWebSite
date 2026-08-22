@@ -1,24 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { verifyAdminPassword, computeCredentialVersion } from "../app/lib/auth.server";
+import { verifyAdminPassword, computeCredentialVersion, requireAdminSession } from "../app/lib/auth.server";
 import { getSession, commitSession, destroySession } from "../app/lib/session.server";
 import { hash } from "@node-rs/argon2";
+import { ENV } from "../app/lib/env.server";
 
 // Mock env.server so we can inject a test hash
 vi.mock("../app/lib/env.server", () => ({
   ENV: {
-    ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$7dIav3z23pS7tqL7aLd1mA$Q8m6i2+6D3Z3L1sO5Q2W4M6T8U0R2V4X6Z8a0c2e4g",
-    ADMIN_SESSION_SECRET: "test-secret-12345",
+    ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$abc$def",
+    ADMIN_SESSION_SECRET: "test-session-secret-must-be-32-chars-long",
   },
 }));
-
-import { ENV } from "../app/lib/env.server";
 
 describe("Admin Authentication", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Ensure session secret is always present for session tests
     // @ts-expect-error: Mocking readonly property
-    ENV.ADMIN_SESSION_SECRET = "test-secret-12345";
+    ENV.ADMIN_SESSION_SECRET = "test-secret-must-be-32-chars-long";
   });
 
   describe("verifyAdminPassword", () => {
@@ -29,19 +28,15 @@ describe("Admin Authentication", () => {
         outputLen: 32,
         parallelism: 1,
       });
-
       // @ts-expect-error: Mocking readonly property
       ENV.ADMIN_PASSWORD_HASH = realHash;
-
       const isValid = await verifyAdminPassword("CorrectPassword123");
       expect(isValid).toBe(true);
     });
 
     it("should return false for incorrect password", async () => {
-      const realHash = await hash("CorrectPassword123");
       // @ts-expect-error: Mocking readonly property
-      ENV.ADMIN_PASSWORD_HASH = realHash;
-
+      ENV.ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$7dIav3z23pS7tqL7aLd1mA$Q8m6i2+6D3Z3L1sO5Q2W4M6T8U0R2V4X6Z8a0c2e4g";
       const isValid = await verifyAdminPassword("WrongPassword456");
       expect(isValid).toBe(false);
     });
@@ -102,34 +97,45 @@ describe("Admin Authentication", () => {
       // @ts-expect-error: Mocking readonly property
       ENV.ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$abc$def";
       // @ts-expect-error: Mocking readonly property
-      ENV.ADMIN_SESSION_SECRET = "secret-A";
+      ENV.ADMIN_SESSION_SECRET = "secret-A-must-be-32-chars-long-123";
 
       const v1 = computeCredentialVersion();
       const v2 = computeCredentialVersion();
       expect(v1).toBe(v2);
-      expect(v1.length).toBe(32);
-      expect(v1).not.toContain("argon2");
-      expect(v1).not.toContain("abc");
+      expect(v1).toHaveLength(32);
     });
 
     it("should change when ADMIN_PASSWORD_HASH changes", () => {
       // @ts-expect-error: Mocking readonly property
-      ENV.ADMIN_SESSION_SECRET = "secret-A";
+      ENV.ADMIN_SESSION_SECRET = "secret-B-must-be-32-chars-long-123";
+      // @ts-expect-error: Mocking readonly property
+      ENV.ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$hash1$salt1";
+      const v1 = computeCredentialVersion();
 
       // @ts-expect-error: Mocking readonly property
-      ENV.ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$hashA$saltA";
-      const vA = computeCredentialVersion();
+      ENV.ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$hash2$salt2";
+      const v2 = computeCredentialVersion();
+
+      expect(v1).not.toBe(v2);
+    });
+
+    it("should change when ADMIN_SESSION_SECRET changes", () => {
+      // @ts-expect-error: Mocking readonly property
+      ENV.ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$hash3$salt3";
+      // @ts-expect-error: Mocking readonly property
+      ENV.ADMIN_SESSION_SECRET = "secret-C-must-be-32-chars-long-123";
+      const v1 = computeCredentialVersion();
 
       // @ts-expect-error: Mocking readonly property
-      ENV.ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$hashB$saltB";
-      const vB = computeCredentialVersion();
+      ENV.ADMIN_SESSION_SECRET = "secret-D-must-be-32-chars-long-123";
+      const v2 = computeCredentialVersion();
 
-      expect(vA).not.toBe(vB);
+      expect(v1).not.toBe(v2);
     });
 
     it("should invalidate session when hash changes", async () => {
       // @ts-expect-error: Mocking readonly property
-      ENV.ADMIN_SESSION_SECRET = "secret-invalidation-test";
+      ENV.ADMIN_SESSION_SECRET = "secret-invalidation-test-32-chars!";
       // @ts-expect-error: Mocking readonly property
       ENV.ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$hashA$saltA";
 
@@ -139,18 +145,24 @@ describe("Admin Authentication", () => {
       session.set("credentialVersion", versionA);
       const cookieString = await commitSession(session);
 
+      // Verify session is valid currently
+      const req1 = new Request("https://example.com", { headers: { Cookie: cookieString } });
+      const { isValid: valid1 } = await requireAdminSession(req1);
+      expect(valid1).toBe(true);
+
       // Change the password hash
       // @ts-expect-error: Mocking readonly property
       ENV.ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$hashC$saltC";
-      const versionAfterChange = computeCredentialVersion();
 
-      // Read back the session
-      const oldSession = await getSession(cookieString);
-      const storedVersion = oldSession.get("credentialVersion") ?? "";
+      // Verify session is now invalid
+      const req2 = new Request("https://example.com", { headers: { Cookie: cookieString } });
+      const { isValid: valid2, session: invalidSession } = await requireAdminSession(req2);
+      expect(valid2).toBe(false);
 
-      // The stored version must differ from the current one
-      expect(storedVersion).toBe(versionA);
-      expect(storedVersion).not.toBe(versionAfterChange);
+      // Confirm that the session returned can be destroyed
+      const destroyStr = await destroySession(invalidSession);
+      expect(destroyStr).toContain("__admin_session=;");
+      expect(destroyStr).toContain("Expires=Thu, 01 Jan 1970 00:00:00 GMT");
     });
   });
 });

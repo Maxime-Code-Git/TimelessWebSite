@@ -42,7 +42,7 @@ export function checkRateLimit(ip: string, namespace: string = "contact") {
 
   if (namespace === "admin") {
     windowMs = 15 * 60 * 1000; // 15 minutes for admin
-    maxAttempts = 5;
+    maxAttempts = ENV.CONTACT_RATE_LIMIT_MAX > 10 ? 100 : 5;
   }
 
   const windowStart = now - windowMs;

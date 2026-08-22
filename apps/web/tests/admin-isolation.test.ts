@@ -24,9 +24,15 @@ describe("Admin module isolation", () => {
       expect(result).toBe(false);
     });
 
-    it("computeCredentialVersion should throw", async () => {
+    it("computeCredentialVersion should throw a Response", async () => {
       const { computeCredentialVersion } = await import("../app/lib/auth.server");
-      expect(() => computeCredentialVersion()).toThrow("Admin configuration is incomplete");
+      try {
+        computeCredentialVersion();
+        expect.unreachable("Should have thrown");
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(Response);
+        expect(e.status).toBe(503);
+      }
     });
 
     it("session.server getSession should throw when secret is missing", async () => {
@@ -41,7 +47,7 @@ describe("Admin module isolation", () => {
       // @ts-expect-error: Mocking readonly property
       ENV.ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$abc$def";
       // @ts-expect-error: Mocking readonly property
-      ENV.ADMIN_SESSION_SECRET = "test-session-secret";
+      ENV.ADMIN_SESSION_SECRET = "valid-secret-must-be-32-chars-long-1234567";
 
       const { computeCredentialVersion } = await import("../app/lib/auth.server");
       const version = computeCredentialVersion();

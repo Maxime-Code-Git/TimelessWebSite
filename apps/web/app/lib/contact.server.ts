@@ -1,7 +1,7 @@
 import { checkRateLimit } from "./rate-limit.server";
 import { sendContactEmail } from "./mailer.server";
-import { ENV } from "./env.server";
-import * as net from "node:net";
+
+import { validateOrigin, getClientIp } from "./security.server";
 
 const MAX_BODY_SIZE = 100 * 1024; // 100 KB
 
@@ -31,15 +31,8 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
   }
 
   // Strictly check Origin/Same-Origin
-  const originHeader = request.headers.get("Origin");
-  if (originHeader) {
-    try {
-      if (new URL(originHeader).origin !== new URL(ENV.PUBLIC_SITE_URL).origin) {
-        return { error: lang === "fr" ? "Origine non autorisée." : "Unauthorized origin." };
-      }
-    } catch {
-      return { error: lang === "fr" ? "Origine malformée." : "Malformed origin." };
-    }
+  if (!validateOrigin(request)) {
+    return { error: lang === "fr" ? "Origine non autorisée ou absente." : "Unauthorized or missing origin." };
   }
 
   // 2. Stream Bounded Reader
@@ -144,19 +137,9 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
   }
 
   // 6. Rate Limiting and IP Policy
-  let clientIp = "127.0.0.1";
-  if (ENV.TRUST_PROXY) {
-    const forwardedFor = request.headers.get("x-forwarded-for") || "";
-    // Reject if multiple IPs (comma) indicating spoofing or multiple uncontrolled proxies
-    if (forwardedFor.includes(",") || !forwardedFor.trim()) {
-      return { error: lang === "fr" ? "Configuration réseau invalide." : "Invalid network configuration." };
-    }
-    clientIp = forwardedFor.trim();
-
-    // Strict IP validation using net.isIP
-    if (!net.isIP(clientIp)) {
-      return { error: lang === "fr" ? "Adresse IP invalide." : "Invalid IP address." };
-    }
+  const clientIp = getClientIp(request);
+  if (!clientIp) {
+    return { error: lang === "fr" ? "Configuration réseau invalide ou IP non autorisée." : "Invalid network configuration or unauthorized IP." };
   }
 
   try {

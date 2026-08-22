@@ -1,62 +1,91 @@
 import { verify } from "@node-rs/argon2";
-import crypto from "node:crypto";
+import * as crypto from "node:crypto";
 import { ENV } from "./env.server";
 import { getSession } from "./session.server";
-import { redirect } from "react-router";
+/**
+ * Validates and retrieves the admin configuration safely.
+ * Intended to be called ONLY on /admin routes.
+ * Throws a 503 Response if configuration is missing or invalid.
+ */
+export function getAdminConfig() {
+  const hash = ENV.ADMIN_PASSWORD_HASH;
+  const secret = ENV.ADMIN_SESSION_SECRET;
 
+  if (!hash || !hash.startsWith("$argon2id$") || !secret || secret.length < 32) {
+    throw new Response(
+      "Administration temporairement indisponible.\nLa configuration administrateur est incomplète.",
+      { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } }
+    );
+  }
+
+  return { hash, secret };
+}
+
+/**
+ * Computes an opaque deterministic string identifying the current configuration state.
+ * If ADMIN_PASSWORD_HASH or ADMIN_SESSION_SECRET changes, this version changes.
+ */
+export function computeCredentialVersion(): string {
+  const { hash, secret } = getAdminConfig();
+  const hmac = crypto.createHmac("sha256", secret);
+  hmac.update(hash);
+  return hmac.digest("base64url").slice(0, 32);
+}
+
+/**
+ * Verifies if the provided password matches the argon2 hash securely.
+ */
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-  if (!password || !ENV.ADMIN_PASSWORD_HASH) return false;
+  if (!password) return false;
+
   try {
-    return await verify(ENV.ADMIN_PASSWORD_HASH, password);
+    const { hash } = getAdminConfig();
+    return await verify(hash, password);
   } catch {
-    return false;
+    return false; // Fail securely without leaking errors
   }
 }
 
 /**
- * Derives an opaque credential version from the full password hash
- * using HMAC-SHA256 keyed with the session secret.
- *
- * Changing either ADMIN_PASSWORD_HASH or ADMIN_SESSION_SECRET
- * invalidates every existing session.
+ * Validates an existing session.
+ * If the session is invalid, returns an instruction to destroy it.
  */
-export function computeCredentialVersion(): string {
-  const hash = ENV.ADMIN_PASSWORD_HASH;
-  const secret = ENV.ADMIN_SESSION_SECRET;
-  if (!hash || !secret) {
-    throw new Error("Admin configuration is incomplete.");
-  }
-  return crypto
-    .createHmac("sha256", secret)
-    .update(hash)
-    .digest("base64url")
-    .slice(0, 32);
-}
-
 export async function requireAdminSession(request: Request) {
   const cookie = request.headers.get("Cookie");
   const session = await getSession(cookie);
 
-  if (!ENV.ADMIN_PASSWORD_HASH || !ENV.ADMIN_SESSION_SECRET) {
-    throw redirect("/admin");
+  if (!session.has("adminId")) {
+    return { isValid: false, session };
   }
 
-  const expected = computeCredentialVersion();
-  const actual = session.get("credentialVersion") ?? "";
-
-  if (
-    !session.has("adminId") ||
-    !constantTimeEqual(actual, expected)
-  ) {
-    throw redirect("/admin");
+  const currentVersion = session.get("credentialVersion");
+  if (!currentVersion) {
+    return { isValid: false, session };
   }
 
-  return session;
+  try {
+    const expectedVersion = computeCredentialVersion();
+    if (!constantTimeEqual(currentVersion, expectedVersion)) {
+      return { isValid: false, session };
+    }
+  } catch {
+    // If computeCredentialVersion throws (e.g. config went invalid mid-session)
+    return { isValid: false, session };
+  }
+
+  return { isValid: true, session };
 }
 
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  return crypto.timingSafeEqual(bufA, bufB);
+/**
+ * Helper to perform a constant-time string comparison to prevent timing attacks.
+ */
+export function constantTimeEqual(a: string, b: string): boolean {
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(a, "utf-8"),
+      Buffer.from(b, "utf-8"),
+    );
+  } catch {
+    return false;
+  }
 }

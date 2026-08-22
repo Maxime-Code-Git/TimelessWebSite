@@ -1,115 +1,174 @@
-import { type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "react-router";
-import { useRouteError, useActionData, useLoaderData, Form, useNavigation } from "react-router";
-import { verifyAdminPassword, computeCredentialVersion } from "../lib/auth.server";
-import { getSession, commitSession, destroySession } from "../lib/session.server";
+import {
+  redirect,
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+} from "react-router";
+import {
+  Form,
+  useActionData,
+  useLoaderData,
+  useNavigation,
+  isRouteErrorResponse,
+  useRouteError,
+} from "react-router";
+import { verifyAdminPassword, constantTimeEqual, getAdminConfig, requireAdminSession, computeCredentialVersion } from "../lib/auth.server";
 import { checkRateLimit, resetRateLimit } from "../lib/rate-limit.server";
-import { ENV } from "../lib/env.server";
-import crypto from "node:crypto";
+import { commitSession, destroySession } from "../lib/session.server";
+import styles from "./admin.module.css";
+import * as crypto from "node:crypto";
+import { getClientIp, validateOrigin } from "../lib/security.server";
 
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  return crypto.timingSafeEqual(bufA, bufB);
-}
-
-export const meta = () => {
-  return [
-    { title: "Administration - Timeless" },
-    { name: "robots", content: "noindex, nofollow" },
-  ];
-};
+const MAX_BODY_SIZE = 100 * 1024; // 100 KB
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  if (!ENV.ADMIN_PASSWORD_HASH || !ENV.ADMIN_SESSION_SECRET) {
-    return Response.json(
-      { isAuthenticated: false, configMissing: true, csrfToken: "" },
-      { status: 503 },
-    );
+  try {
+    getAdminConfig();
+  } catch (e: unknown) {
+    if (e instanceof Response) throw e;
+    throw new Response("Configuration Error", { status: 503 });
   }
 
-  const cookie = request.headers.get("Cookie");
-  const session = await getSession(cookie);
-
-  if (session.has("adminId")) {
-    // Generate a CSRF token even for the authenticated dashboard (logout form)
-    let csrfToken = session.get("csrfToken");
-    const headers = new Headers();
-    if (!csrfToken) {
-      csrfToken = crypto.randomUUID();
-      session.set("csrfToken", csrfToken);
-      headers.set("Set-Cookie", await commitSession(session));
-    }
-    return Response.json(
-      { isAuthenticated: true, csrfToken, configMissing: false },
-      { headers },
-    );
-  }
-
-  // Generate CSRF token for login form
-  let csrfToken = session.get("csrfToken");
+  const { isValid, session } = await requireAdminSession(request);
   const headers = new Headers();
-  if (!csrfToken) {
+
+  // Enforce session destruction if invalid but present (e.g., config changed)
+  if (!isValid && session.has("adminId")) {
+    headers.set("Set-Cookie", await destroySession(session));
+    // Clear session data manually for the current request cycle just in case
+    session.unset("adminId");
+    session.unset("credentialVersion");
+  }
+
+  // Generate CSRF token for forms
+  let csrfToken = session.get("csrfToken");
+  if (!csrfToken || !isValid) {
     csrfToken = crypto.randomUUID();
     session.set("csrfToken", csrfToken);
+    // Only commit if we haven't already marked it for destruction
+    // Or rather, we always want to set the new CSRF token cookie for the login form
     headers.set("Set-Cookie", await commitSession(session));
   }
 
   return Response.json(
-    { isAuthenticated: false, csrfToken, configMissing: false },
+    { isAuthenticated: isValid, csrfToken },
     { headers },
   );
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  // 1. Check config
+  try {
+    getAdminConfig();
+  } catch (e: unknown) {
+    if (e instanceof Response) throw e;
+    throw new Response("Configuration Error", { status: 503 });
+  }
+
+  // 2. Validate Method
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
-  const contentType = request.headers.get("Content-Type") || "";
-  if (!contentType.includes("application/x-www-form-urlencoded")) {
+  // 3. Strict Origin Validation
+  if (!validateOrigin(request)) {
+    return new Response("Forbidden: Invalid Origin", { status: 403 });
+  }
+
+  // 4. Content Type & Size limits BEFORE unbounded read
+  const rawContentType = request.headers.get("content-type") || "";
+  const mimeType = rawContentType.split(";")[0]?.trim().toLowerCase();
+
+  if (mimeType !== "application/x-www-form-urlencoded" && mimeType !== "multipart/form-data") {
     return new Response("Unsupported Media Type", { status: 415 });
   }
 
-  const origin = request.headers.get("Origin");
-  if (!origin) {
-    return new Response("Forbidden: Missing Origin", { status: 403 });
-  }
-
-  // Enforce body size limit
-  const clonedReq = request.clone();
-  let totalBytes = 0;
-  const reader = clonedReq.body?.getReader();
-  if (reader) {
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        totalBytes += value.length;
-        if (totalBytes > 10 * 1024) {
-          await reader.cancel();
-          return new Response("Payload Too Large", { status: 413 });
-        }
-      }
-    } catch {
-      return new Response("Bad Request", { status: 400 });
+  const contentLengthStr = request.headers.get("content-length");
+  if (contentLengthStr) {
+    if (!/^\d+$/.test(contentLengthStr)) {
+      return new Response("Invalid Content-Length", { status: 400 });
+    }
+    const contentLength = Number(contentLengthStr);
+    if (!Number.isSafeInteger(contentLength) || contentLength > MAX_BODY_SIZE) {
+      return new Response("Payload Too Large", { status: 413 });
     }
   }
 
-  const formData = await request.formData();
+  if (!request.body) {
+    return new Response("Bad Request", { status: 400 });
+  }
+
+  let totalBytes = 0;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        totalBytes += value.byteLength;
+        if (totalBytes > MAX_BODY_SIZE) {
+          await reader.cancel("Payload too large");
+          return new Response("Payload Too Large", { status: 413 });
+        }
+        chunks.push(value);
+      }
+    }
+  } catch {
+    return new Response("Error reading request", { status: 400 });
+  }
+
+  const completeBody = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    completeBody.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  const safeRequest = new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: completeBody,
+  });
+
+  // 5. Parse Body securely
+  let formData: FormData;
+  try {
+    formData = await safeRequest.formData();
+  } catch {
+    return new Response("Bad Request", { status: 400 });
+  }
+
   const intent = formData.get("intent");
   const formCsrf = String(formData.get("csrfToken") ?? "");
 
-  const cookie = request.headers.get("Cookie");
-  const session = await getSession(cookie);
+  // 6. Session parsing and Auth validation
+  const { isValid, session } = await requireAdminSession(request);
   const sessionCsrf = session.get("csrfToken") ?? "";
 
-  // CSRF check for both login and logout
+  // 7. IP and Rate Limit
+  const ip = getClientIp(request);
+  if (!ip) {
+    return new Response("Forbidden: Invalid IP", { status: 403 });
+  }
+
+  try {
+    checkRateLimit(ip, "admin");
+  } catch (e) {
+    return Response.json(
+      { error: "Trop de tentatives. Veuillez réessayer dans 15 minutes." },
+      { status: 429 }
+    );
+  }
+
+  // 8. CSRF Validation
   if (!formCsrf || !sessionCsrf || !constantTimeEqual(formCsrf, sessionCsrf)) {
     return new Response("Invalid CSRF token", { status: 403 });
   }
 
+  // 9. Intent routing
   if (intent === "logout") {
+    // Only authenticated users can logout, technically, but we just destroy anyway.
     return redirect("/admin", {
       headers: {
         "Set-Cookie": await destroySession(session),
@@ -118,29 +177,32 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   if (intent === "login") {
-    const ip = request.headers.get("X-Forwarded-For") || "127.0.0.1";
-    try {
-      checkRateLimit(ip, "admin");
-    } catch {
-      return { error: "Trop de tentatives. Veuillez réessayer plus tard." };
+    // Cannot login if already authenticated
+    if (isValid) {
+      return redirect("/admin");
     }
 
     const password = formData.get("password");
-
     if (typeof password !== "string" || !password) {
-      return { error: "Mot de passe incorrect." };
+      return Response.json(
+        { error: "Le mot de passe est requis." },
+        { status: 400 }
+      );
     }
 
-    const isValid = await verifyAdminPassword(password);
-
-    if (!isValid) {
-      return { error: "Mot de passe incorrect." };
+    const isCorrect = await verifyAdminPassword(password);
+    if (!isCorrect) {
+      return Response.json(
+        { error: "Mot de passe incorrect." },
+        { status: 401 }
+      );
     }
 
     // Success: clear rate limit and create session
     resetRateLimit(ip, "admin");
     session.set("adminId", crypto.randomUUID());
     session.set("credentialVersion", computeCredentialVersion());
+
     // Rotate CSRF token after login
     session.set("csrfToken", crypto.randomUUID());
 
@@ -154,43 +216,19 @@ export async function action({ request }: ActionFunctionArgs) {
   return new Response("Bad Request", { status: 400 });
 }
 
-export function ErrorBoundary() {
-  const error = useRouteError();
-  console.error("Admin Error:", error);
-  return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ textAlign: "center", padding: "2rem" }}>
-        <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>Erreur inattendue</h1>
-        <p>Veuillez réessayer ultérieurement.</p>
-      </div>
-    </div>
-  );
-}
-
 export default function AdminPage() {
-  const { isAuthenticated, csrfToken, configMissing } = useLoaderData<typeof loader>();
+  const { isAuthenticated, csrfToken } = useLoaderData<typeof loader>();
   const actionData = useActionData<{ error?: string }>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
-  if (configMissing) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#f9fafb" }}>
-        <div style={{ textAlign: "center", padding: "2rem" }}>
-          <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem", color: "#111827" }}>Administration temporairement indisponible</h1>
-          <p style={{ color: "#6b7280" }}>La configuration administrateur est incomplète.</p>
-        </div>
-      </div>
-    );
-  }
-
   if (isAuthenticated) {
     return (
-      <div style={{ minHeight: "100vh", backgroundColor: "#f9fafb" }}>
-        <header style={{ backgroundColor: "white", borderBottom: "1px solid #e5e7eb", padding: "1rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className={styles.container}>
+        <header className={styles.header}>
           <div>
-            <h1 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#111827" }}>Administration Timeless</h1>
-            <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>Vous êtes connecté</p>
+            <h1 className={styles.headerTitle}>Administration Timeless</h1>
+            <p className={styles.headerSubtitle}>Vous êtes connecté</p>
           </div>
           <Form method="post">
             <input type="hidden" name="intent" value="logout" />
@@ -198,34 +236,37 @@ export default function AdminPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              style={{
-                padding: "0.5rem 1rem",
-                backgroundColor: "#ef4444",
-                color: "white",
-                borderRadius: "0.375rem",
-                border: "none",
-                cursor: isSubmitting ? "not-allowed" : "pointer",
-                opacity: isSubmitting ? 0.7 : 1
-              }}
+              className={styles.logoutButton}
             >
-              Se déconnecter
+              {isSubmitting ? "Déconnexion..." : "Se déconnecter"}
             </button>
           </Form>
         </header>
 
-        <main style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1.5rem" }}>
-            {[
-              "Galeries clients",
-              "Portfolio public",
-              "Formules et tarifs",
-              "Textes et informations du site"
-            ].map(title => (
-              <div key={title} style={{ backgroundColor: "white", padding: "1.5rem", borderRadius: "0.5rem", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)", border: "1px solid #e5e7eb" }}>
-                <h2 style={{ fontSize: "1.125rem", fontWeight: 500, marginBottom: "1rem", color: "#374151" }}>{title}</h2>
-                <p style={{ fontSize: "0.875rem", color: "#9ca3af" }}>Fonctionnalité disponible prochainement</p>
+        <main className={styles.mainContent}>
+          <div className={styles.dashboardCard}>
+            <h2 className={styles.dashboardTitle}>Bienvenue dans l'espace administration</h2>
+            <p className={styles.dashboardText}>
+              Le tableau de bord complet sera implémenté lors des prochaines phases.
+            </p>
+            <div className={styles.grid}>
+              <div className={styles.card}>
+                <h3>Galeries clients</h3>
+                <p>Fonctionnalité disponible prochainement</p>
               </div>
-            ))}
+              <div className={styles.card}>
+                <h3>Réservations</h3>
+                <p>Fonctionnalité disponible prochainement</p>
+              </div>
+              <div className={styles.card}>
+                <h3>Statistiques</h3>
+                <p>Fonctionnalité disponible prochainement</p>
+              </div>
+              <div className={styles.card}>
+                <h3>Configuration</h3>
+                <p>Fonctionnalité disponible prochainement</p>
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -233,62 +274,71 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#f9fafb" }}>
-      <div style={{ backgroundColor: "white", padding: "2.5rem", borderRadius: "0.75rem", boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)", width: "100%", maxWidth: "24rem" }}>
-        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#111827" }}>Administration</h1>
+    <div className={styles.container}>
+      <main className={styles.mainContent}>
+        <div className={styles.loginCard}>
+          <h1 className={styles.loginTitle}>Administration</h1>
+
+          <Form method="post" className={styles.form}>
+            <input type="hidden" name="intent" value="login" />
+            <input type="hidden" name="csrfToken" value={csrfToken} />
+
+            <div>
+              <label htmlFor="password" className={styles.label}>
+                Mot de passe
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                className={styles.input}
+              />
+            </div>
+
+            {actionData?.error && (
+              <p className={styles.error} role="alert">
+                {actionData.error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={styles.submitButton}
+            >
+              {isSubmitting ? "Connexion..." : "Se connecter"}
+            </button>
+          </Form>
         </div>
+      </main>
+    </div>
+  );
+}
 
-        <Form method="post" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <input type="hidden" name="intent" value="login" />
-          <input type="hidden" name="csrfToken" value={csrfToken} />
+export function ErrorBoundary() {
+  const error = useRouteError();
 
-          <div>
-            <label htmlFor="password" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
-              Mot de passe
-            </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              required
-              style={{
-                width: "100%",
-                padding: "0.75rem",
-                borderRadius: "0.375rem",
-                border: "1px solid #d1d5db",
-                fontSize: "1rem",
-                boxSizing: "border-box"
-              }}
-            />
-          </div>
+  if (isRouteErrorResponse(error) && error.status === 503) {
+    return (
+      <div className={styles.errorContainer}>
+        <div className={styles.errorBox}>
+          <h1 className={styles.errorTitle}>Administration indisponible</h1>
+          <p className={styles.errorText}>
+            {error.data || "La configuration administrateur est incomplète."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-          {actionData?.error && (
-            <p style={{ color: "#ef4444", fontSize: "0.875rem", margin: 0 }} role="alert">
-              {actionData.error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            style={{
-              width: "100%",
-              padding: "0.75rem",
-              backgroundColor: "#111827",
-              color: "white",
-              borderRadius: "0.375rem",
-              border: "none",
-              fontSize: "1rem",
-              fontWeight: 500,
-              cursor: isSubmitting ? "not-allowed" : "pointer",
-              opacity: isSubmitting ? 0.7 : 1,
-              marginTop: "0.5rem"
-            }}
-          >
-            {isSubmitting ? "Connexion..." : "Se connecter"}
-          </button>
-        </Form>
+  return (
+    <div className={styles.errorContainer}>
+      <div className={styles.errorBox}>
+        <h1 className={styles.errorTitle}>Une erreur est survenue</h1>
+        <p className={styles.errorText}>
+          Impossible d'afficher la page d'administration.
+        </p>
       </div>
     </div>
   );

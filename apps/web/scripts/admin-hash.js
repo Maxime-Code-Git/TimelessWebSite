@@ -1,67 +1,72 @@
 import { hash } from "@node-rs/argon2";
 import readline from "node:readline";
-import { Writable } from "node:stream";
 
-export async function generateAdminHash() {
-  if (process.argv.length > 2) {
-    throw new Error("Aucun argument n'est autorisé. Lancez simplement la commande.");
-  }
+async function promptForPassword() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
 
-  if ((!process.stdin.isTTY || !process.stdout.isTTY) && process.env.NODE_ENV !== 'test') {
-    throw new Error("Cette commande doit être exécutée dans un terminal interactif (TTY).");
-  }
+  return new Promise((resolve, reject) => {
+    rl.stdoutMuted = true;
 
-  const askPassword = (promptText) => {
-    return new Promise((resolve) => {
-      let isMuted = false;
-      const mutableStdout = new Writable({
-        write(chunk, encoding, callback) {
-          if (!isMuted) {
-            process.stdout.write(chunk, encoding);
-          }
-          callback();
-        },
-      });
+    const originalWrite = rl.output.write;
+    rl.output.write = function (data, ...args) {
+      if (!rl.stdoutMuted) {
+        return originalWrite.apply(rl.output, [data, ...args]);
+      }
+      if (data === "\r\n" || data === "\n" || data === "\r") {
+        return originalWrite.apply(rl.output, [data, ...args]);
+      }
+      return originalWrite.apply(rl.output, ["*", ...args]);
+    };
 
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: mutableStdout,
-        terminal: true,
-      });
+    rl.question("Entrez le mot de passe administrateur : ", (password) => {
+      rl.stdoutMuted = false;
+      originalWrite.apply(rl.output, ["\n"]);
 
-      process.stdout.write(promptText);
-      isMuted = true;
-
-      rl.question("", (password) => {
+      rl.stdoutMuted = true;
+      rl.question("Confirmez le mot de passe : ", (confirm) => {
+        rl.stdoutMuted = false;
+        originalWrite.apply(rl.output, ["\n"]);
         rl.close();
-        console.log(); // newline after hidden input
-        resolve(password);
+
+        if (password !== confirm) {
+          reject(new Error("Les mots de passe ne correspondent pas."));
+        } else if (password.length < 8) {
+          reject(new Error("Le mot de passe doit faire au moins 8 caractères."));
+        } else {
+          resolve(password);
+        }
       });
     });
-  };
-
-  const password = await askPassword("Entrez le mot de passe administrateur : ");
-  if (!password || password.length < 12) {
-    throw new Error("Le mot de passe doit contenir au moins 12 caractères.");
-  }
-
-  const confirm = await askPassword("Confirmez le mot de passe : ");
-  if (password !== confirm) {
-    throw new Error("Les mots de passe ne correspondent pas.");
-  }
-
-  try {
-    const hashedPassword = await hash(password);
-    console.log(`\nHash généré avec succès :\n\n${hashedPassword}\n`);
-    return hashedPassword;
-  } catch (err) {
-    throw new Error("Erreur lors de la génération du hash : " + err.message, { cause: err });
-  }
+  });
 }
 
-import { fileURLToPath } from "node:url";
+async function generateAdminHash() {
+  if (process.argv.length > 2) {
+    throw new Error("Les arguments en ligne de commande sont refusés par sécurité.");
+  }
 
-const isMainModule = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
-if (process.env.NODE_ENV !== 'test' && isMainModule) {
-  generateAdminHash().catch(console.error);
+  if (!process.stdout.isTTY || !process.stdin.isTTY) {
+    throw new Error("Ce script nécessite un terminal interactif (TTY).");
+  }
+
+  const password = await promptForPassword();
+
+  const passwordHash = await hash(password, {
+    memoryCost: 19456,
+    timeCost: 2,
+    outputLen: 32,
+    parallelism: 1,
+  });
+
+  console.log("\nVoici votre nouveau hash administrateur (à placer dans ADMIN_PASSWORD_HASH) :\n");
+  console.log(passwordHash);
+  console.log("\nAssurez-vous également que ADMIN_SESSION_SECRET comporte au moins 32 caractères aléatoires.");
 }
+
+generateAdminHash().catch((error) => {
+  console.error("Erreur lors de la génération du hash :", error.message);
+  process.exitCode = 1;
+});
