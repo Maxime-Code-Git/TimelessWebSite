@@ -8,7 +8,7 @@ import {
   useRouteError,
 } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { getRawSiteContent, savePricing, RevisionConflictError, ValidationError } from "../lib/site-content.server";
+import { getRawSiteContent, savePricing, RevisionConflictError, ValidationError, CorruptedContentError } from "../lib/site-content.server";
 import { requireValidAdminSession, validateAdminFormData, createAdminHeaders, ActionSecurityError } from "../lib/admin-auth.server";
 import { commitSession } from "../lib/session.server";
 import * as crypto from "node:crypto";
@@ -34,11 +34,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { isCorrupted } = getRawSiteContent();
-  if (isCorrupted) {
-    return Response.json({ error: "Le stockage du contenu doit être vérifié avant toute modification." }, { status: 409 });
-  }
-
   try {
     const formData = await validateAdminFormData(request);
     const revision = String(formData.get("revision"));
@@ -51,13 +46,19 @@ export async function action({ request }: ActionFunctionArgs) {
     try {
       parsedPricing = JSON.parse(pricingJson);
     } catch {
-      return Response.json({ error: "Invalid JSON payload" }, { status: 400 });
+      return Response.json({ error: "Invalid JSON payload" }, { status: 422 });
     }
 
     try {
       const newRev = savePricing(parsedPricing, revision);
       return Response.json({ success: true, revision: newRev });
-    } catch (e: any) {
+    } catch (e: unknown) {
+      if (e instanceof CorruptedContentError) {
+        return Response.json(
+          { error: "Le stockage du contenu doit être vérifié avant toute modification." },
+          { status: 409 }
+        );
+      }
       if (e instanceof RevisionConflictError) {
         return Response.json(
           { error: "Conflit de révision : quelqu'un a modifié les données entre-temps. Veuillez rafraîchir." },
@@ -65,11 +66,11 @@ export async function action({ request }: ActionFunctionArgs) {
         );
       }
       if (e instanceof ValidationError) {
-        return Response.json({ error: e.message }, { status: 400 });
+        return Response.json({ error: e.message }, { status: 422 });
       }
       throw e;
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof ActionSecurityError) {
       return Response.json({ error: e.message }, { status: e.status });
     }

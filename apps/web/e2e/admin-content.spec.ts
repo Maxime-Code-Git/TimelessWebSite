@@ -11,6 +11,12 @@ const defaultContent = JSON.parse(fs.readFileSync(defaultContentPath, 'utf8'));
 
 test.describe('Admin Content Management (Phase 3B)', () => {
 
+  test.beforeAll(() => {
+    expect(process.env.SITE_CONTENT_PATH).toBeDefined();
+    expect(process.env.SITE_CONTENT_PATH).toContain('timeless-e2e-');
+    expect(process.env.SITE_CONTENT_PATH).not.toContain('./data');
+  });
+
   test.beforeEach(async ({ page }) => {
     if (process.env.SITE_CONTENT_PATH) {
       fs.writeFileSync(process.env.SITE_CONTENT_PATH, JSON.stringify(defaultContent, null, 2));
@@ -51,8 +57,11 @@ test.describe('Admin Content Management (Phase 3B)', () => {
     // Verify the price is 1 300 €
     await expect(photoSection).toContainText('1 300 €');
 
-    // The featured badge might be visible for Essential
-    // Just ensuring we don't get 500s is also part of it.
+    // Verify on public page (EN)
+    await page.goto('/en/pricing');
+    await page.click('button:has-text("Photography")');
+    const photoSectionEn = page.locator('section').filter({ hasText: 'Photography' }).first();
+    await expect(photoSectionEn).toContainText(/1[.,\s\xA0]*300/);
   });
 
   test('should edit settings and see changes on contact page', async ({ page }) => {
@@ -60,20 +69,29 @@ test.describe('Admin Content Management (Phase 3B)', () => {
     await expect(page.locator('h1')).toContainText('Textes et informations');
 
     // Change Email
-    await page.fill('input[name="email"]', 'new-contact@example.com');
+    await page.fill('input[name="email"]', 'new-contact@example.com', { strict: false });
 
     // Change Phone
-    await page.fill('input[name="phoneDisplay"]', '+33 6 12 34 56 78');
-    await page.fill('input[name="phoneE164"]', '+33612345678');
+    await page.fill('input[name="phoneDisplay"]', '+33 6 12 34 56 78', { strict: false });
+    await page.fill('input[name="phoneE164"]', '+33612345678', { strict: false });
 
     // Submit
     await page.click('button[type="submit"]');
     await expect(page.locator('div[role="status"]')).toContainText('Informations mises à jour avec succès.');
 
-    // Verify on contact page
+    // Verify on contact page FR
     await page.goto('/fr/contact');
     await expect(page.locator('a[href="mailto:new-contact@example.com"]').first()).toBeVisible();
     await expect(page.locator('a[href="tel:+33612345678"]').first()).toContainText('+33 6 12 34 56 78');
+
+    // Verify on contact page EN
+    await page.goto('/en/contact');
+    await expect(page.locator('a[href="mailto:new-contact@example.com"]').first()).toBeVisible();
+    await expect(page.locator('a[href="tel:+33612345678"]').first()).toContainText('+33 6 12 34 56 78');
+
+    // Verify Footer
+    const footer = page.locator('footer');
+    await expect(footer).toBeVisible();
   });
 
   test('should handle revision conflicts (409)', async ({ page, request }) => {
@@ -129,6 +147,29 @@ test.describe('Admin Content Management (Phase 3B)', () => {
 
     // Should see a 409 error message
     await expect(page.locator('div[role="alert"]')).toContainText('Conflit de révision');
+  });
+
+  test('should display warning and disable submit when JSON is corrupted', async ({ page }) => {
+    // Corrupt the JSON file directly
+    fs.writeFileSync(process.env.SITE_CONTENT_PATH!, '{ corrupted json');
+
+    // Go to admin pricing
+    await page.goto('/admin/pricing');
+
+    // Check for the error message
+    await expect(page.locator('div[role="alert"]')).toContainText('Le stockage du contenu doit être vérifié avant toute modification.');
+
+    // Check submit is disabled
+    const submitBtn = page.locator('button[type="submit"]');
+    await expect(submitBtn).toBeDisabled();
+
+    // Check settings as well
+    await page.goto('/admin/settings');
+    await expect(page.locator('div[role="alert"]')).toContainText('Le stockage du contenu doit être vérifié avant toute modification.');
+    await expect(page.locator('button[type="submit"]')).toBeDisabled();
+
+    // Restore file so parallel tests don't fail
+    fs.writeFileSync(process.env.SITE_CONTENT_PATH!, JSON.stringify(defaultContent, null, 2));
   });
 
 });

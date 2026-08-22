@@ -16,6 +16,7 @@ describe("Real HTTP isolation without admin config", () => {
       try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
       try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
       try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
+    try { fs.unlinkSync(dbPath.replace("rate-limit", "site-content").replace(".db", ".json")); } catch { /* ignore */ }
 
       serverProcess = spawn("npm", ["run", "start"], {
         cwd: path.resolve(__dirname, ".."),
@@ -77,6 +78,7 @@ describe("Real HTTP isolation without admin config", () => {
     try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
     try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
     try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
+    try { fs.unlinkSync(dbPath.replace("rate-limit", "site-content").replace(".db", ".json")); } catch { /* ignore */ }
   });
 
   it("GET /fr/ should return 200 OK", async () => {
@@ -127,6 +129,7 @@ describe("Real HTTP isolation WITH valid admin config", () => {
       try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
       try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
       try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
+    try { fs.unlinkSync(dbPath.replace("rate-limit", "site-content").replace(".db", ".json")); } catch { /* ignore */ }
 
       serverProcess = spawn("npm", ["run", "start"], {
         cwd: path.resolve(__dirname, ".."),
@@ -147,6 +150,7 @@ describe("Real HTTP isolation WITH valid admin config", () => {
           TRUST_PROXY: "true",
           ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$xDSx00u+uSs9AcMqypmthw$ubmjWhg1XWL+Yp496qb5LLlTx0FK4lwqy9pvKa5ills",
           ADMIN_SESSION_SECRET: "12345678901234567890123456789012", // 32 chars
+          SITE_CONTENT_PATH: dbPath.replace("rate-limit", "site-content").replace(".db", ".json"),
         },
       });
 
@@ -187,6 +191,7 @@ describe("Real HTTP isolation WITH valid admin config", () => {
     try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
     try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
     try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
+    try { fs.unlinkSync(dbPath.replace("rate-limit", "site-content").replace(".db", ".json")); } catch { /* ignore */ }
   });
 
   it("GET /fr/ should return 200 OK", async () => {
@@ -263,7 +268,25 @@ describe("Real HTTP isolation WITH valid admin config", () => {
     const signedCookie = execSync(`node ${scriptPath}`).toString().trim();
     fs.unlinkSync(scriptPath);
 
-    const res = await fetch(`${BASE_URL}/admin`, {
+    // Now test session invalidation with anonymous session on protected API
+    const resInvalidPricing = await fetch(`${BASE_URL}/admin/pricing`, {
+      method: "POST",
+      body: new URLSearchParams({ csrfToken: "ignored", pricing: "{}" }),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Origin": BASE_URL,
+        "Cookie": signedCookie,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      redirect: "manual",
+    });
+
+    // Should redirect to /admin since the session is invalid
+    expect(resInvalidPricing.status).toBe(302);
+    expect(resInvalidPricing.headers.get("Location")).toBe("/admin");
+
+    // Now test session invalidation
+    const resInvalid = await fetch(`${BASE_URL}/admin`, {
       headers: {
         "Cookie": signedCookie,
       },
@@ -271,11 +294,11 @@ describe("Real HTTP isolation WITH valid admin config", () => {
     });
 
     // Should redirect to /admin to clear the cookie
-    expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/admin");
+    expect(resInvalid.status).toBe(302);
+    expect(resInvalid.headers.get("Location")).toBe("/admin");
 
     // Should have Set-Cookie with Max-Age=0 or Expires in the past
-    const setCookie = res.headers.get("Set-Cookie") || "";
+    const setCookie = resInvalid.headers.get("Set-Cookie") || "";
     expect(setCookie).toContain("__admin_session=");
     expect(setCookie.toLowerCase()).toMatch(/max-age=0|expires=thu, 01 jan 1970/);
 

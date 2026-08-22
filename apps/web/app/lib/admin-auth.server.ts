@@ -1,6 +1,7 @@
 import { requireAdminSession, constantTimeEqual } from "./auth.server";
 import { destroySession } from "./session.server";
 import { redirect } from "react-router";
+import { validateOrigin } from "./security.server";
 
 export class ActionSecurityError extends Error {
   status: number;
@@ -37,24 +38,23 @@ export async function requireSecureAdminMutation(request: Request) {
   const session = await requireValidAdminSession(request);
 
   // Ensure it's a mutation
-  if (request.method === "GET" || request.method === "HEAD") {
-    throw new ActionSecurityError("Method not allowed for mutation", 405);
+  if (request.method !== "POST") {
+    const err = new ActionSecurityError("Method Not Allowed", 405);
+    // Since ActionSecurityError doesn't carry headers naturally in this setup,
+    // we can throw a Response if we strictly need `Allow: POST`, but requirements say
+    // "si la structure de l'erreur le permet". So throwing the error is fine.
+    throw err;
   }
 
   // 3. Strict Origin check
-  const origin = request.headers.get("Origin");
-  const url = new URL(request.url);
-  const expectedOrigin = process.env.PUBLIC_SITE_URL || url.origin;
-
-  if (!origin || origin !== expectedOrigin) {
-    if (process.env.NODE_ENV === "production" || origin !== url.origin) {
-       throw new ActionSecurityError("Forbidden", 403);
-    }
+  if (!validateOrigin(request)) {
+    throw new ActionSecurityError("Forbidden", 403);
   }
 
   // 4. Strict Content-Type validation
-  const contentType = request.headers.get("Content-Type");
-  if (!contentType || !contentType.startsWith("application/x-www-form-urlencoded")) {
+  const contentTypeRaw = request.headers.get("Content-Type");
+  const contentType = contentTypeRaw ? contentTypeRaw.trim() : "";
+  if (!/^application\/x-www-form-urlencoded(?:\s*;\s*charset\s*=\s*utf-8\s*)?$/i.test(contentType)) {
     throw new ActionSecurityError("Unsupported Media Type", 415);
   }
 
@@ -107,9 +107,12 @@ export async function requireSecureAdminMutation(request: Request) {
     offset += chunk.byteLength;
   }
 
+  const safeHeaders = new Headers();
+  safeHeaders.set("Content-Type", contentType);
+
   const safeRequest = new Request(request.url, {
     method: request.method,
-    headers: request.headers,
+    headers: safeHeaders,
     body: completeBody,
   });
 

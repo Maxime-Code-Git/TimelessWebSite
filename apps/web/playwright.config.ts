@@ -1,6 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as fs from 'node:fs';
 
+if (!process.env.SITE_CONTENT_PATH || !process.env.RATE_LIMIT_DB_PATH) {
+  throw new Error("SITE_CONTENT_PATH and RATE_LIMIT_DB_PATH must be defined in the environment. Run with npm run test:e2e");
+}
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -77,8 +81,8 @@ export default defineConfig({
       SMTP_CA_CERT: fs.readFileSync('./e2e/certs/test-cert.pem', 'utf-8'),
       CONTACT_RATE_LIMIT_SECRET: 'testsecret',
       CONTACT_RATE_LIMIT_MAX: '100',
-      RATE_LIMIT_DB_PATH: process.env.RATE_LIMIT_DB_PATH || './data/db/rate-limit-test.sqlite',
-      SITE_CONTENT_PATH: process.env.SITE_CONTENT_PATH || './data/site-content.json',
+      RATE_LIMIT_DB_PATH: process.env.RATE_LIMIT_DB_PATH,
+      SITE_CONTENT_PATH: process.env.SITE_CONTENT_PATH,
       ADMIN_PASSWORD_HASH: '$argon2id$v=19$m=19456,t=2,p=1$mA6OzU+rMEkQeBBnZfesFQ$1rIHIz/8BAyH0+GNXhYq8KDDu99lqaOTBtwGg1Lzczs',
       ADMIN_SESSION_SECRET: 'e2e_test_session_secret_for_admin_only',
     },

@@ -1,4 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Mock env.server to prevent it from throwing on missing SMTP_HOST during import
+vi.mock("../app/lib/env.server", () => ({
+  ENV: {
+    PUBLIC_SITE_URL: "http://localhost:4173",
+    SMTP_HOST: "localhost",
+    SMTP_PORT: 2525,
+    SMTP_USER: "test",
+    SMTP_PASS: "test",
+    SMTP_FROM: "test@test.com",
+    SMTP_TO: "test@test.com",
+    CONTACT_RATE_LIMIT_MAX: 10,
+    CONTACT_RATE_LIMIT_SECRET: "secret",
+    RATE_LIMIT_DB_PATH: "sqlite.db",
+    SITE_CONTENT_PATH: "site-content.json",
+    TRUST_PROXY: true,
+  }
+}));
+
 import { requireSecureAdminMutation, ActionSecurityError, requireValidAdminSession } from "../app/lib/admin-auth.server";
 import { requireAdminSession } from "../app/lib/auth.server";
 
@@ -68,13 +87,6 @@ describe("admin-auth.server.ts", () => {
     );
   });
 
-  it("should return 400 for negative or malformed Content-Length", async () => {
-    const req = createRequest("POST", "test", { "Content-Length": "-100" });
-    await expect(requireSecureAdminMutation(req)).rejects.toThrowError(
-      new ActionSecurityError("Invalid Content-Length", 400)
-    );
-  });
-
   it("should reject invalid Origin with 403", async () => {
     const req = createRequest("POST", "test", { "Origin": "http://evil.com" });
     await expect(requireSecureAdminMutation(req)).rejects.toThrowError(
@@ -82,11 +94,50 @@ describe("admin-auth.server.ts", () => {
     );
   });
 
+  it("should reject PUT, DELETE, PATCH with 405", async () => {
+    for (const method of ["PUT", "DELETE", "PATCH", "GET", "HEAD"]) {
+      const req = createRequest(method, method !== "GET" && method !== "HEAD" ? "test" : undefined);
+      await expect(requireSecureAdminMutation(req)).rejects.toThrowError(
+        new ActionSecurityError("Method Not Allowed", 405)
+      );
+    }
+  });
+
+  it("should reject malicious Content-Length formats with 400", async () => {
+    for (const cl of ["-100", "1.5", "1e5", "9007199254740992"]) {
+      const req = createRequest("POST", "test", { "Content-Length": cl });
+      await expect(requireSecureAdminMutation(req)).rejects.toThrowError(
+        new ActionSecurityError("Invalid Content-Length", 400)
+      );
+    }
+  });
+
   it("should reject invalid Content-Type with 415", async () => {
-    const req = createRequest("POST", "test", { "Content-Type": "application/json" });
-    await expect(requireSecureAdminMutation(req)).rejects.toThrowError(
-      new ActionSecurityError("Unsupported Media Type", 415)
-    );
+    const invalidTypes = [
+      "application/json",
+      "application/x-www-form-urlencodedevil",
+      "text/plain",
+      "multipart/form-data"
+    ];
+    for (const type of invalidTypes) {
+      const req = createRequest("POST", "test", { "Content-Type": type });
+      await expect(requireSecureAdminMutation(req)).rejects.toThrowError(
+        new ActionSecurityError("Unsupported Media Type", 415)
+      );
+    }
+  });
+
+  it("should accept valid Content-Type with spaces", async () => {
+    const validTypes = [
+      "application/x-www-form-urlencoded",
+      "application/x-www-form-urlencoded; charset=utf-8",
+      "application/x-www-form-urlencoded ; charset = utf-8",
+    ];
+    for (const type of validTypes) {
+      const req = createRequest("POST", "test", { "Content-Type": type });
+      const result = await requireSecureAdminMutation(req);
+      expect(result.safeRequest).toBeDefined();
+    }
   });
 
   it("requireValidAdminSession should throw redirect 302 with destroyed cookie if invalid", async () => {

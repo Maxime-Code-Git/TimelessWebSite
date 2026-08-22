@@ -62,9 +62,11 @@ test.beforeEach(() => {
 
   // Wipe rate-limit db
   try {
-    const db = new DatabaseSync('./data/db/rate-limit-test.sqlite');
-    db.exec('DELETE FROM requests');
-    db.close();
+    if (process.env.RATE_LIMIT_DB_PATH) {
+      const db = new DatabaseSync(process.env.RATE_LIMIT_DB_PATH);
+      db.exec('DELETE FROM requests');
+      db.close();
+    }
   } catch {
     // Ignore if db doesn't exist yet
   }
