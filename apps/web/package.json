@@ -11,9 +11,11 @@
     "lint": "eslint .",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
-    "smtp:verify": "node scripts/smtp-verify.js"
+    "smtp:verify": "node scripts/smtp-verify.js",
+    "admin:hash": "node scripts/admin-hash.js"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.1.0",
     "@react-router/node": "^8",
     "@react-router/serve": "^8",
     "@timeless/shared": "*",

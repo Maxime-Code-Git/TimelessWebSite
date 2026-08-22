@@ -24,6 +24,8 @@ describe("Environment Validation — fail-fast on import", () => {
       SMTP_TO: "to@example.com",
       CONTACT_RATE_LIMIT_SECRET: "secret",
       RATE_LIMIT_DB_PATH: "./db.sqlite",
+      ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$...",
+      ADMIN_SESSION_SECRET: "admin_secret",
     };
   }
 

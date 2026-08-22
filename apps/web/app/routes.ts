@@ -43,6 +43,9 @@ export default [
     route("__test/gallery", "routes/__test.gallery.tsx")
   ] : []),
 
+  // ── Admin routes ──────────────────────────────────────────
+  route("admin", "routes/admin.tsx"),
+
   // ── Catch-all (404) ───────────────────────────────────────
   route("*", "routes/404.tsx"),
 ] satisfies RouteConfig;

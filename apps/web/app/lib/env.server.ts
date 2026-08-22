@@ -77,6 +77,12 @@ export const ENV = {
       throw new Error("CRITICAL: TRUST_PROXY=true is required in production. The application must run behind a reverse proxy that sets X-Forwarded-For securely.");
     }
     return trustProxy;
+  },
+  get ADMIN_PASSWORD_HASH() {
+    return process.env.ADMIN_PASSWORD_HASH;
+  },
+  get ADMIN_SESSION_SECRET() {
+    return process.env.ADMIN_SESSION_SECRET;
   }
 };
 

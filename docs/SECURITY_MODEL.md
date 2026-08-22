@@ -30,8 +30,31 @@
 
 ## 3. Authentification galerie client
 
-- **Codes** : format `TL-AAAA-XXXXXXXX` (8 chars alphanum aléatoires, 40 bits d'entropie)
-- **Stockage** : uniquement le hash Argon2id du code, jamais le code en clair
+## Politique de Mots de Passe Administrateur
+
+### Architecture Serveur et Authentification Simple
+- **Aucun compte administrateur nominatif** et **aucun compte client** n'est stocké ou géré.
+- L'authentification se fait via un accès direct à `/admin` avec un **mot de passe unique**.
+- Les **sessions** sont gérées exclusivement via un cookie signé (`HttpOnly`, `SameSite=Strict`, `Secure`), **sans base de données de sessions**.
+- Les futurs contenus textuels/visuels seront stockés dans `data/site.json` et `data/portfolio.json`.
+- Les futures galeries clients seront structurées sous forme `data/galleries/<id>/gallery.json`.
+- Les **médias** seront hébergés directement sur SSD (aucun média stocké dans les JSON).
+- Le **code client** (galeries) sera choisi manuellement ou généré avec vérification par un **hash du code uniquement**.
+- Il n'y a **aucun serveur API séparé** pour maintenir cette architecture monolithique et simple.
+
+### Invalidation des sessions
+- Chaque session contient un `credentialVersion` opaque calculé via `HMAC-SHA256(ADMIN_SESSION_SECRET, ADMIN_PASSWORD_HASH)`.
+- Aucune partie directe du mot de passe ou du hash Argon2 n'est stockée dans le cookie.
+- Changer `ADMIN_PASSWORD_HASH` invalide automatiquement toutes les sessions existantes.
+- Changer `ADMIN_SESSION_SECRET` invalide automatiquement toutes les sessions existantes.
+- La comparaison est effectuée en temps constant (`crypto.timingSafeEqual`).
+
+### Protection CSRF
+- Un token CSRF cryptographique (`crypto.randomUUID()`) est généré dans la session et inclus dans les formulaires de connexion et de déconnexion.
+- La vérification est effectuée en temps constant côté serveur pour les deux opérations.
+- Le token est renouvelé après une connexion réussie.
+
+### Hachage des Mots de Passe
 - **Session galerie** : cookie `HttpOnly; Secure; SameSite=Strict`, durée 7 jours
 - **Rate limiting** : 5 essais / 15 min / IP, message d'erreur uniforme (ne révèle pas si galerie existe)
 - **Rotation** : nouveau code → hash remplacé → toutes sessions galerie précédentes invalidées
