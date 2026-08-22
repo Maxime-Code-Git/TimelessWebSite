@@ -34,6 +34,10 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+
+    extraHTTPHeaders: {
+      "x-forwarded-for": "127.0.0.1"
+    }
   },
 
   /* Configure projects for major browsers */
@@ -56,25 +60,26 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: {
     command: 'npm run start',
-    port: 4173,
+    url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000,
     env: {
       PORT: '4173',
+      NODE_ENV: 'test',
+      TRUST_PROXY: 'true',
       PUBLIC_SITE_URL: 'http://localhost:4173',
-      SMTP_HOST: 'localhost',
       SMTP_PORT: '2525',
       SMTP_USER: 'test@example.com',
       SMTP_PASS: 'test',
       SMTP_FROM: 'test@example.com',
       SMTP_TO: 'test@example.com',
+      SMTP_HOST: 'localhost',
       SMTP_CA_CERT: fs.readFileSync('./e2e/certs/test-cert.pem', 'utf-8'),
       CONTACT_RATE_LIMIT_SECRET: 'testsecret',
       CONTACT_RATE_LIMIT_MAX: '100',
       RATE_LIMIT_DB_PATH: './data/db/rate-limit-test.sqlite',
-      TRUST_PROXY: 'true',
       ADMIN_PASSWORD_HASH: '$argon2id$v=19$m=19456,t=2,p=1$mA6OzU+rMEkQeBBnZfesFQ$1rIHIz/8BAyH0+GNXhYq8KDDu99lqaOTBtwGg1Lzczs',
       ADMIN_SESSION_SECRET: 'e2e_test_session_secret_for_admin_only',
-      PLAYWRIGHT_TEST: 'true',
     },
   },
 });

@@ -33,19 +33,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // Enforce session destruction if invalid but present (e.g., config changed)
   if (!isValid && session.has("adminId")) {
-    headers.set("Set-Cookie", await destroySession(session));
-    // Clear session data manually for the current request cycle just in case
-    session.unset("adminId");
-    session.unset("credentialVersion");
+    return redirect("/admin", {
+      headers: {
+        "Set-Cookie": await destroySession(session),
+      },
+    });
   }
 
   // Generate CSRF token for forms
   let csrfToken = session.get("csrfToken");
-  if (!csrfToken || !isValid) {
+  if (!csrfToken) {
     csrfToken = crypto.randomUUID();
     session.set("csrfToken", csrfToken);
-    // Only commit if we haven't already marked it for destruction
-    // Or rather, we always want to set the new CSRF token cookie for the login form
     headers.set("Set-Cookie", await commitSession(session));
   }
 
@@ -154,7 +153,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     checkRateLimit(ip, "admin");
-  } catch (e) {
+  } catch {
     return Response.json(
       { error: "Trop de tentatives. Veuillez réessayer dans 15 minutes." },
       { status: 429 }
@@ -255,15 +254,15 @@ export default function AdminPage() {
                 <p>Fonctionnalité disponible prochainement</p>
               </div>
               <div className={styles.card}>
-                <h3>Réservations</h3>
+                <h3>Portfolio public</h3>
                 <p>Fonctionnalité disponible prochainement</p>
               </div>
               <div className={styles.card}>
-                <h3>Statistiques</h3>
+                <h3>Formules et tarifs</h3>
                 <p>Fonctionnalité disponible prochainement</p>
               </div>
               <div className={styles.card}>
-                <h3>Configuration</h3>
+                <h3>Textes et informations</h3>
                 <p>Fonctionnalité disponible prochainement</p>
               </div>
             </div>

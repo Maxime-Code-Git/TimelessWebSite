@@ -1,72 +1,55 @@
-import { hash } from "@node-rs/argon2";
-import readline from "node:readline";
+import { createInterface } from "node:readline";
+import * as argon2 from "@node-rs/argon2";
 
-async function promptForPassword() {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+const rl = createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
 
-  return new Promise((resolve, reject) => {
-    rl.stdoutMuted = true;
+if (process.argv.length > 2) {
+  console.error("Les arguments en ligne de commande sont refusés par sécurité.");
+  process.exit(1);
+}
 
-    const originalWrite = rl.output.write;
-    rl.output.write = function (data, ...args) {
-      if (!rl.stdoutMuted) {
-        return originalWrite.apply(rl.output, [data, ...args]);
-      }
-      if (data === "\r\n" || data === "\n" || data === "\r") {
-        return originalWrite.apply(rl.output, [data, ...args]);
-      }
-      return originalWrite.apply(rl.output, ["*", ...args]);
-    };
+if (!process.stdout.isTTY || !process.stdin.isTTY) {
+  console.error("Ce script nécessite un terminal interactif (TTY).");
+  process.exit(1);
+}
 
-    rl.question("Entrez le mot de passe administrateur : ", (password) => {
-      rl.stdoutMuted = false;
-      originalWrite.apply(rl.output, ["\n"]);
+// Hack to mask password input since readline doesn't natively support it
+rl.stdoutMuted = true;
+rl._writeToOutput = function _writeToOutput(stringToWrite) {
+  if (rl.stdoutMuted) {
+    if (stringToWrite === "\r" || stringToWrite === "\n" || stringToWrite === "\r\n") {
+      process.stdout.write(stringToWrite);
+    } else {
+      process.stdout.write("*");
+    }
+  } else {
+    process.stdout.write(stringToWrite);
+  }
+};
 
-      rl.stdoutMuted = true;
-      rl.question("Confirmez le mot de passe : ", (confirm) => {
-        rl.stdoutMuted = false;
-        originalWrite.apply(rl.output, ["\n"]);
-        rl.close();
+rl.question("Veuillez saisir le mot de passe administrateur : ", async (password) => {
+  rl.close();
 
-        if (password !== confirm) {
-          reject(new Error("Les mots de passe ne correspondent pas."));
-        } else if (password.length < 8) {
-          reject(new Error("Le mot de passe doit faire au moins 8 caractères."));
-        } else {
-          resolve(password);
-        }
-      });
+  if (!password) {
+    console.error("\nErreur : le mot de passe est requis.");
+    process.exit(1);
+  }
+
+  try {
+    const hash = await argon2.hash(password, {
+      type: argon2.argon2id,
+      memoryCost: 19456,
+      timeCost: 2,
+      parallelism: 1,
     });
-  });
-}
-
-async function generateAdminHash() {
-  if (process.argv.length > 2) {
-    throw new Error("Les arguments en ligne de commande sont refusés par sécurité.");
+    console.log("\nADMIN_PASSWORD_HASH généré avec succès :\n");
+    console.log(hash);
+    console.log("\nCopiez cette valeur dans votre fichier .env.local.");
+  } catch {
+    console.error("\nUne erreur inattendue est survenue.");
+    process.exit(1);
   }
-
-  if (!process.stdout.isTTY || !process.stdin.isTTY) {
-    throw new Error("Ce script nécessite un terminal interactif (TTY).");
-  }
-
-  const password = await promptForPassword();
-
-  const passwordHash = await hash(password, {
-    memoryCost: 19456,
-    timeCost: 2,
-    outputLen: 32,
-    parallelism: 1,
-  });
-
-  console.log("\nVoici votre nouveau hash administrateur (à placer dans ADMIN_PASSWORD_HASH) :\n");
-  console.log(passwordHash);
-  console.log("\nAssurez-vous également que ADMIN_SESSION_SECRET comporte au moins 32 caractères aléatoires.");
-}
-
-generateAdminHash().catch((error) => {
-  console.error("Erreur lors de la génération du hash :", error.message);
-  process.exitCode = 1;
 });

@@ -34,7 +34,7 @@ function getSessionStorage() {
       path: "/",
       sameSite: "strict",
       secrets: [secret],
-      secure: process.env.NODE_ENV === "production" && !process.env.PLAYWRIGHT_TEST,
+      secure: process.env.NODE_ENV === "production",
     },
   });
   return _sessionStorage;

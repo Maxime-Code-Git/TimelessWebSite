@@ -36,6 +36,7 @@ IP.1 = 127.0.0.1
     { cwd: certsDir, stdio: 'inherit' }
   );
 
+  process.env.ADMIN_SESSION_SECRET = 'e2e_test_session_secret_for_admin_only';
   process.env.SMTP_CA_CERT = fs.readFileSync(certPath, 'utf-8');
 }
 

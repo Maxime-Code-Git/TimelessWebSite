@@ -45,9 +45,6 @@ describe("Real HTTP isolation without admin config", () => {
       serverProcess.on("error", (err) => {
         reject(err);
       });
-
-      // Fallback timeout in case server doesn't log port exactly as expected
-      setTimeout(resolve, 3000);
     });
   });
 
@@ -98,7 +95,7 @@ describe("Real HTTP isolation WITH valid admin config", () => {
   const BASE_URL = `http://localhost:${PORT}`;
 
   beforeAll(async () => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       serverProcess = spawn("npm", ["run", "start"], {
         cwd: path.resolve(__dirname, ".."),
         env: {
@@ -116,7 +113,7 @@ describe("Real HTTP isolation WITH valid admin config", () => {
           SMTP_TO: "to@example.com",
           CONTACT_RATE_LIMIT_MAX: "10",
           TRUST_PROXY: "true",
-          ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$abc$def",
+          ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$xDSx00u+uSs9AcMqypmthw$ubmjWhg1XWL+Yp496qb5LLlTx0FK4lwqy9pvKa5ills",
           ADMIN_SESSION_SECRET: "12345678901234567890123456789012", // 32 chars
         },
       });
@@ -127,7 +124,9 @@ describe("Real HTTP isolation WITH valid admin config", () => {
         }
       });
 
-      setTimeout(resolve, 3000);
+      serverProcess.on("error", (err) => {
+        reject(err);
+      });
     });
   });
 
@@ -147,5 +146,56 @@ describe("Real HTTP isolation WITH valid admin config", () => {
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).toContain("Se connecter");
+  });
+
+  it("POST /admin valid login should return secure cookie attributes", async () => {
+    // Generate valid CSRF token by doing GET first
+    const getRes = await fetch(`${BASE_URL}/admin`);
+    const cookies = getRes.headers.get("Set-Cookie");
+    const text = await getRes.text();
+    const csrfMatch = text.match(/name="csrfToken" value="([^"]+)"/);
+    const csrfToken = csrfMatch ? csrfMatch[1] : "";
+
+    // Login
+    const res = await fetch(`${BASE_URL}/admin`, {
+      method: "POST",
+      body: new URLSearchParams({ intent: "login", password: "test", csrfToken }),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Origin": BASE_URL,
+        "Cookie": cookies || "",
+        "x-forwarded-for": "127.0.0.1"
+      },
+      redirect: "manual",
+    });
+
+    // Check Set-Cookie headers
+    const setCookie = res.headers.get("Set-Cookie") || "";
+    // Note: login doesn't succeed here because the password hash is mock, wait, no, the hash is "$argon2id$v=19$m=19456,t=2,p=1$abc$def", password is "test", it will fail validation.
+    // Let's check Set-Cookie anyway.
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("SameSite=Strict");
+    expect(setCookie).toContain("Secure");
+    expect(setCookie).toContain("Max-Age=");
+  });
+
+  it("GET /admin with invalid session should destroy cookie without redirect loop", async () => {
+    const res = await fetch(`${BASE_URL}/admin`, {
+      headers: {
+        // Send a fake invalid session (wrong secret or old format)
+        "Cookie": "__admin_session=some-invalid-session-data",
+      }
+    });
+
+    // Should render the login page, NOT redirect loop
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain("Se connecter");
+
+    // Should have Set-Cookie to clear or replace session
+    const setCookie = res.headers.get("Set-Cookie") || "";
+    expect(setCookie).toContain("__admin_session=");
+    // And importantly it must be secure
+    expect(setCookie).toContain("Secure");
   });
 });

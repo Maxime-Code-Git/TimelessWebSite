@@ -9,17 +9,14 @@ export function validateOrigin(request: Request): boolean {
   try {
     const isValid = new URL(originHeader).origin === new URL(ENV.PUBLIC_SITE_URL).origin;
     return isValid;
-  } catch (e) {
+  } catch {
     return false;
   }
 }
 
 export function getClientIp(request: Request): string | null {
   if (ENV.TRUST_PROXY) {
-    let forwardedFor = request.headers.get("x-forwarded-for") || "";
-    if (process.env.PLAYWRIGHT_TEST && !forwardedFor) {
-      forwardedFor = "127.0.0.1";
-    }
+    const forwardedFor = request.headers.get("x-forwarded-for") || "";
     // Reject if multiple IPs (comma) indicating spoofing or multiple uncontrolled proxies
     if (forwardedFor.includes(",") || !forwardedFor.trim()) {
       return null;
