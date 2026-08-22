@@ -30,13 +30,37 @@ rl._writeToOutput = function _writeToOutput(stringToWrite) {
   }
 };
 
-rl.question("Veuillez saisir le mot de passe administrateur : ", async (password) => {
-  rl.close();
+function askQuestion(query) {
+  return new Promise((resolve) => {
+    rl.question(query, (answer) => {
+      resolve(answer);
+    });
+  });
+}
+
+async function run() {
+  const password = await askQuestion("Veuillez saisir le mot de passe administrateur : ");
+  console.log(""); // New line after hidden input
 
   if (!password) {
     console.error("\nErreur : le mot de passe est requis.");
     process.exit(1);
   }
+
+  if (password.length < 12) {
+    console.error("\nErreur : le mot de passe doit contenir au moins 12 caractères.");
+    process.exit(1);
+  }
+
+  const confirmation = await askQuestion("Veuillez confirmer le mot de passe : ");
+  console.log(""); // New line after hidden input
+
+  if (password !== confirmation) {
+    console.error("\nErreur : les mots de passe ne correspondent pas.");
+    process.exit(1);
+  }
+
+  rl.close();
 
   try {
     const hash = await argon2.hash(password, {
@@ -52,4 +76,6 @@ rl.question("Veuillez saisir le mot de passe administrateur : ", async (password
     console.error("\nUne erreur inattendue est survenue.");
     process.exit(1);
   }
-});
+}
+
+run();

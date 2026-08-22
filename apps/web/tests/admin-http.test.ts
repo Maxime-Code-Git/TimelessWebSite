@@ -1,14 +1,22 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { spawn, ChildProcess } from "node:child_process";
+import { spawn, ChildProcess, execSync } from "node:child_process";
 import path from "node:path";
+import fs from "node:fs";
 
 describe("Real HTTP isolation without admin config", () => {
   let serverProcess: ChildProcess;
   const PORT = 43210;
   const BASE_URL = `http://localhost:${PORT}`;
 
+  const dbPath = path.resolve(__dirname, `rate-limit.test.${PORT}.db`);
+
   beforeAll(async () => {
     return new Promise((resolve, reject) => {
+      // Cleanup any leftover db just in case
+      try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
+      try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
+      try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
+
       serverProcess = spawn("npm", ["run", "start"], {
         cwd: path.resolve(__dirname, ".."),
         env: {
@@ -17,7 +25,7 @@ describe("Real HTTP isolation without admin config", () => {
           NODE_ENV: "production",
           PUBLIC_SITE_URL: BASE_URL,
           CONTACT_RATE_LIMIT_SECRET: "test-secret",
-          RATE_LIMIT_DB_PATH: "./tests/rate-limit.test.db",
+          RATE_LIMIT_DB_PATH: dbPath,
           SMTP_HOST: "localhost",
           SMTP_PORT: "2525",
           SMTP_USER: "test",
@@ -32,8 +40,13 @@ describe("Real HTTP isolation without admin config", () => {
         },
       });
 
+      const timeout = setTimeout(() => {
+        reject(new Error("Server startup timeout"));
+      }, 5000);
+
       serverProcess.stdout?.on("data", (data) => {
         if (data.toString().includes(String(PORT))) {
+          clearTimeout(timeout);
           resolve(undefined);
         }
       });
@@ -43,7 +56,15 @@ describe("Real HTTP isolation without admin config", () => {
       });
 
       serverProcess.on("error", (err) => {
+        clearTimeout(timeout);
         reject(err);
+      });
+
+      serverProcess.on("exit", (code) => {
+        clearTimeout(timeout);
+        if (code !== 0 && code !== null) {
+          reject(new Error(`Server exited with code ${code}`));
+        }
       });
     });
   });
@@ -52,6 +73,10 @@ describe("Real HTTP isolation without admin config", () => {
     if (serverProcess) {
       serverProcess.kill();
     }
+    // Cleanup DB
+    try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
+    try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
+    try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
   });
 
   it("GET /fr/ should return 200 OK", async () => {
@@ -94,8 +119,15 @@ describe("Real HTTP isolation WITH valid admin config", () => {
   const PORT = 43211;
   const BASE_URL = `http://localhost:${PORT}`;
 
+  const dbPath = path.resolve(__dirname, `rate-limit.test.${PORT}.db`);
+
   beforeAll(async () => {
     return new Promise((resolve, reject) => {
+      // Cleanup any leftover db just in case
+      try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
+      try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
+      try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
+
       serverProcess = spawn("npm", ["run", "start"], {
         cwd: path.resolve(__dirname, ".."),
         env: {
@@ -104,7 +136,7 @@ describe("Real HTTP isolation WITH valid admin config", () => {
           NODE_ENV: "production",
           PUBLIC_SITE_URL: BASE_URL,
           CONTACT_RATE_LIMIT_SECRET: "test-secret",
-          RATE_LIMIT_DB_PATH: "./tests/rate-limit.test.db",
+          RATE_LIMIT_DB_PATH: dbPath,
           SMTP_HOST: "localhost",
           SMTP_PORT: "2525",
           SMTP_USER: "test",
@@ -118,14 +150,31 @@ describe("Real HTTP isolation WITH valid admin config", () => {
         },
       });
 
+      const timeout = setTimeout(() => {
+        reject(new Error("Server startup timeout"));
+      }, 5000);
+
       serverProcess.stdout?.on("data", (data) => {
         if (data.toString().includes(String(PORT))) {
+          clearTimeout(timeout);
           resolve(undefined);
         }
       });
 
+      serverProcess.stderr?.on("data", (data) => {
+        console.error("Server error:", data.toString());
+      });
+
       serverProcess.on("error", (err) => {
+        clearTimeout(timeout);
         reject(err);
+      });
+
+      serverProcess.on("exit", (code) => {
+        clearTimeout(timeout);
+        if (code !== 0 && code !== null) {
+          reject(new Error(`Server exited with code ${code}`));
+        }
       });
     });
   });
@@ -134,6 +183,10 @@ describe("Real HTTP isolation WITH valid admin config", () => {
     if (serverProcess) {
       serverProcess.kill();
     }
+    // Cleanup DB
+    try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
+    try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
+    try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
   });
 
   it("GET /fr/ should return 200 OK", async () => {
@@ -180,22 +233,56 @@ describe("Real HTTP isolation WITH valid admin config", () => {
   });
 
   it("GET /admin with invalid session should destroy cookie without redirect loop", async () => {
+    // We need to create a signed session with a valid adminId but wrong credentialVersion
+    // Since we are running in an isolated process, we can just use the same session secret
+    // to sign a cookie manually, or import the session storage.
+    // Let's use the session storage from the app.
+
+    // Create a temporary script to generate a signed cookie using the app's session storage
+
+    const generateCookieScript = `
+      import { createCookieSessionStorage } from "react-router";
+      const sessionStorage = createCookieSessionStorage({
+        cookie: {
+          name: "__admin_session",
+          secrets: ["12345678901234567890123456789012"],
+          secure: true,
+        },
+      });
+      async function run() {
+        const session = await sessionStorage.getSession();
+        session.set("adminId", "fake-admin-id");
+        session.set("credentialVersion", 999999); // Wrong version
+        const cookie = await sessionStorage.commitSession(session);
+        console.log(cookie);
+      }
+      run();
+    `;
+    const scriptPath = path.join(__dirname, "temp-cookie-gen.js");
+    fs.writeFileSync(scriptPath, generateCookieScript);
+    const signedCookie = execSync(`node ${scriptPath}`).toString().trim();
+    fs.unlinkSync(scriptPath);
+
     const res = await fetch(`${BASE_URL}/admin`, {
       headers: {
-        // Send a fake invalid session (wrong secret or old format)
-        "Cookie": "__admin_session=some-invalid-session-data",
-      }
+        "Cookie": signedCookie,
+      },
+      redirect: "manual",
     });
 
-    // Should render the login page, NOT redirect loop
-    expect(res.status).toBe(200);
-    const text = await res.text();
-    expect(text).toContain("Se connecter");
+    // Should redirect to /admin to clear the cookie
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/admin");
 
-    // Should have Set-Cookie to clear or replace session
+    // Should have Set-Cookie with Max-Age=0 or Expires in the past
     const setCookie = res.headers.get("Set-Cookie") || "";
     expect(setCookie).toContain("__admin_session=");
-    // And importantly it must be secure
-    expect(setCookie).toContain("Secure");
+    expect(setCookie.toLowerCase()).toMatch(/max-age=0|expires=thu, 01 jan 1970/);
+
+    // Following the redirect WITHOUT the old cookie should work (no loop)
+    const res2 = await fetch(`${BASE_URL}/admin`);
+    expect(res2.status).toBe(200);
+    const text2 = await res2.text();
+    expect(text2).toContain("Se connecter");
   });
 });

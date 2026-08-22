@@ -5,8 +5,10 @@
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
+    "pretest": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
+    "pretest:e2e": "npm run build",
     "test:e2e": "node scripts/run-e2e.js",
     "lint": "eslint .",
     "start": "react-router-serve ./build/server/index.js",
