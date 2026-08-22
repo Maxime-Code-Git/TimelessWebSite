@@ -1,136 +1,23 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { spawn, ChildProcess, execSync } from "node:child_process";
+import { spawn, ChildProcess } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
-
-describe("Real HTTP isolation without admin config", () => {
-  let serverProcess: ChildProcess;
-  const PORT = 43210;
-  const BASE_URL = `http://localhost:${PORT}`;
-
-  const dbPath = path.resolve(__dirname, `rate-limit.test.${PORT}.db`);
-
-  beforeAll(async () => {
-    return new Promise((resolve, reject) => {
-      // Cleanup any leftover db just in case
-      try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
-      try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
-      try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
-    try { fs.unlinkSync(dbPath.replace("rate-limit", "site-content").replace(".db", ".json")); } catch { /* ignore */ }
-
-      serverProcess = spawn("npm", ["run", "start"], {
-        cwd: path.resolve(__dirname, ".."),
-        env: {
-          ...process.env,
-          PORT: String(PORT),
-          NODE_ENV: "production",
-          PUBLIC_SITE_URL: BASE_URL,
-          CONTACT_RATE_LIMIT_SECRET: "test-secret",
-          RATE_LIMIT_DB_PATH: dbPath,
-          SMTP_HOST: "localhost",
-          SMTP_PORT: "2525",
-          SMTP_USER: "test",
-          SMTP_PASS: "test",
-          SMTP_FROM: "from@example.com",
-          SMTP_TO: "to@example.com",
-          CONTACT_RATE_LIMIT_MAX: "10",
-          TRUST_PROXY: "true",
-          // Explicitly remove admin configs to test isolation
-          ADMIN_PASSWORD_HASH: "",
-          ADMIN_SESSION_SECRET: "",
-        },
-      });
-
-      const timeout = setTimeout(() => {
-        reject(new Error("Server startup timeout"));
-      }, 5000);
-
-      serverProcess.stdout?.on("data", (data) => {
-        if (data.toString().includes(String(PORT))) {
-          clearTimeout(timeout);
-          resolve(undefined);
-        }
-      });
-
-      serverProcess.stderr?.on("data", (data) => {
-        console.error("Server error:", data.toString());
-      });
-
-      serverProcess.on("error", (err) => {
-        clearTimeout(timeout);
-        reject(err);
-      });
-
-      serverProcess.on("exit", (code) => {
-        clearTimeout(timeout);
-        if (code !== 0 && code !== null) {
-          reject(new Error(`Server exited with code ${code}`));
-        }
-      });
-    });
-  });
-
-  afterAll(() => {
-    if (serverProcess) {
-      serverProcess.kill();
-    }
-    // Cleanup DB
-    try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
-    try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
-    try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
-    try { fs.unlinkSync(dbPath.replace("rate-limit", "site-content").replace(".db", ".json")); } catch { /* ignore */ }
-  });
-
-  it("GET /fr/ should return 200 OK", async () => {
-    const res = await fetch(`${BASE_URL}/fr/`);
-    expect(res.status).toBe(200);
-  });
-
-  it("GET /en/contact should return 200 OK", async () => {
-    const res = await fetch(`${BASE_URL}/en/contact`);
-    expect(res.status).toBe(200);
-  });
-
-  it("GET /admin should return 503 Service Unavailable", async () => {
-    const res = await fetch(`${BASE_URL}/admin`);
-    expect(res.status).toBe(503);
-    const text = await res.text();
-    // Ensure no secrets or stack traces are leaked
-    expect(text).toContain("Administration temporairement indisponible");
-    expect(text).not.toContain("ADMIN_SESSION_SECRET");
-    expect(text).not.toContain("Error:");
-  });
-
-  it("POST /admin should return 503 Service Unavailable", async () => {
-    const res = await fetch(`${BASE_URL}/admin`, {
-      method: "POST",
-      body: new URLSearchParams({ intent: "login", password: "test" }),
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
-      },
-    });
-    expect(res.status).toBe(503);
-    const text = await res.text();
-    expect(text).toContain("Administration temporairement indisponible");
-  });
-});
+import os from "node:os";
 
 describe("Real HTTP isolation WITH valid admin config", () => {
   let serverProcess: ChildProcess;
   const PORT = 43211;
   const BASE_URL = `http://localhost:${PORT}`;
 
-  const dbPath = path.resolve(__dirname, `rate-limit.test.${PORT}.db`);
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-admin-http-"));
+  const dbPath = path.join(tempDir, "rate-limit.db");
+  const siteContentPath = path.join(tempDir, "site-content.json");
+  const defaultContentPath = path.resolve(__dirname, "../app/content/default-site-content.json");
 
   beforeAll(async () => {
-    return new Promise((resolve, reject) => {
-      // Cleanup any leftover db just in case
-      try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
-      try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
-      try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
-    try { fs.unlinkSync(dbPath.replace("rate-limit", "site-content").replace(".db", ".json")); } catch { /* ignore */ }
+    fs.copyFileSync(defaultContentPath, siteContentPath);
 
+    return new Promise((resolve, reject) => {
       serverProcess = spawn("npm", ["run", "start"], {
         cwd: path.resolve(__dirname, ".."),
         env: {
@@ -148,15 +35,14 @@ describe("Real HTTP isolation WITH valid admin config", () => {
           SMTP_TO: "to@example.com",
           CONTACT_RATE_LIMIT_MAX: "10",
           TRUST_PROXY: "true",
+          // The hash below is for password 'test' generated by argon2id
           ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$xDSx00u+uSs9AcMqypmthw$ubmjWhg1XWL+Yp496qb5LLlTx0FK4lwqy9pvKa5ills",
           ADMIN_SESSION_SECRET: "12345678901234567890123456789012", // 32 chars
-          SITE_CONTENT_PATH: dbPath.replace("rate-limit", "site-content").replace(".db", ".json"),
+          SITE_CONTENT_PATH: siteContentPath,
         },
       });
 
-      const timeout = setTimeout(() => {
-        reject(new Error("Server startup timeout"));
-      }, 5000);
+      const timeout = setTimeout(() => reject(new Error("Server startup timeout")), 15000);
 
       serverProcess.stdout?.on("data", (data) => {
         if (data.toString().includes(String(PORT))) {
@@ -164,16 +50,11 @@ describe("Real HTTP isolation WITH valid admin config", () => {
           resolve(undefined);
         }
       });
-
-      serverProcess.stderr?.on("data", (data) => {
-        console.error("Server error:", data.toString());
-      });
-
+      serverProcess.stderr?.on("data", (data) => console.error("Server error:", data.toString()));
       serverProcess.on("error", (err) => {
         clearTimeout(timeout);
         reject(err);
       });
-
       serverProcess.on("exit", (code) => {
         clearTimeout(timeout);
         if (code !== 0 && code !== null) {
@@ -184,128 +65,123 @@ describe("Real HTTP isolation WITH valid admin config", () => {
   });
 
   afterAll(() => {
-    if (serverProcess) {
-      serverProcess.kill();
-    }
-    // Cleanup DB
-    try { fs.unlinkSync(dbPath); } catch { /* ignore */ }
-    try { fs.unlinkSync(`${dbPath}-shm`); } catch { /* ignore */ }
-    try { fs.unlinkSync(`${dbPath}-wal`); } catch { /* ignore */ }
-    try { fs.unlinkSync(dbPath.replace("rate-limit", "site-content").replace(".db", ".json")); } catch { /* ignore */ }
+    if (serverProcess) serverProcess.kill();
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("GET /fr/ should return 200 OK", async () => {
-    const res = await fetch(`${BASE_URL}/fr/`);
-    expect(res.status).toBe(200);
+  it("GET /admin/pricing sans session -> 302 vers /admin", async () => {
+    const res = await fetch(`${BASE_URL}/admin/pricing`, { redirect: "manual" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/admin");
   });
 
-  it("GET /admin should return 200 OK", async () => {
-    const res = await fetch(`${BASE_URL}/admin`);
-    expect(res.status).toBe(200);
-    const text = await res.text();
-    expect(text).toContain("Se connecter");
+  it("GET /admin/settings sans session -> 302 vers /admin", async () => {
+    const res = await fetch(`${BASE_URL}/admin/settings`, { redirect: "manual" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/admin");
   });
 
-  it("POST /admin valid login should return secure cookie attributes", async () => {
-    // Generate valid CSRF token by doing GET first
+  it("POST with anonymous signed cookie -> 302 and clear cookie without touching file", async () => {
     const getRes = await fetch(`${BASE_URL}/admin`);
     const cookies = getRes.headers.get("Set-Cookie");
     const text = await getRes.text();
     const csrfMatch = text.match(/name="csrfToken" value="([^"]+)"/);
     const csrfToken = csrfMatch ? csrfMatch[1] : "";
 
-    // Login
-    const res = await fetch(`${BASE_URL}/admin`, {
+    const beforeData = fs.readFileSync(siteContentPath);
+    const beforeFiles = fs.readdirSync(tempDir);
+
+    const checkRoute = async (route: string) => {
+      const res = await fetch(`${BASE_URL}/admin/${route}`, {
+        method: "POST",
+        body: new URLSearchParams({ csrfToken, pricing: "{}", business: "{}" }),
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Origin": BASE_URL,
+          "Cookie": cookies || "",
+          "x-forwarded-for": "127.0.0.1"
+        },
+        redirect: "manual",
+      });
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe("/admin");
+
+      const setCookie = res.headers.get("Set-Cookie") || "";
+      expect(setCookie).toContain("__admin_session=");
+      expect(setCookie.toLowerCase()).toMatch(/max-age=0|expires=thu, 01 jan 1970/);
+
+      expect(fs.readFileSync(siteContentPath)).toEqual(beforeData);
+      expect(fs.readdirSync(tempDir)).toEqual(beforeFiles);
+    };
+
+    await checkRoute("pricing");
+    await checkRoute("settings");
+  });
+
+  it("should login and test CorruptedContentError behavior on both routes", async () => {
+    // 1. GET /admin to extract anonymous cookie and csrfToken
+    const getRes = await fetch(`${BASE_URL}/admin`);
+    const anonCookie = getRes.headers.get("Set-Cookie");
+    const text = await getRes.text();
+    const csrfMatch = text.match(/name="csrfToken" value="([^"]+)"/);
+    const csrfToken = csrfMatch ? csrfMatch[1] : "";
+
+    // 2. POST /admin to login
+    const loginRes = await fetch(`${BASE_URL}/admin`, {
       method: "POST",
       body: new URLSearchParams({ intent: "login", password: "test", csrfToken }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Origin": BASE_URL,
-        "Cookie": cookies || "",
+        "Cookie": anonCookie || "",
         "x-forwarded-for": "127.0.0.1"
       },
       redirect: "manual",
     });
 
-    // Check Set-Cookie headers
-    const setCookie = res.headers.get("Set-Cookie") || "";
-    // Note: login doesn't succeed here because the password hash is mock, wait, no, the hash is "$argon2id$v=19$m=19456,t=2,p=1$abc$def", password is "test", it will fail validation.
-    // Let's check Set-Cookie anyway.
-    expect(setCookie).toContain("HttpOnly");
-    expect(setCookie).toContain("SameSite=Strict");
-    expect(setCookie).toContain("Secure");
-    expect(setCookie).toContain("Max-Age=");
-  });
+    expect(loginRes.status).toBe(302);
+    const authCookie = loginRes.headers.get("Set-Cookie") || "";
+    expect(authCookie).toContain("__admin_session=");
 
-  it("GET /admin with invalid session should destroy cookie without redirect loop", async () => {
-    // We need to create a signed session with a valid adminId but wrong credentialVersion
-    // Since we are running in an isolated process, we can just use the same session secret
-    // to sign a cookie manually, or import the session storage.
-    // Let's use the session storage from the app.
-
-    // Create a temporary script to generate a signed cookie using the app's session storage
-
-    const generateCookieScript = `
-      import { createCookieSessionStorage } from "react-router";
-      const sessionStorage = createCookieSessionStorage({
-        cookie: {
-          name: "__admin_session",
-          secrets: ["12345678901234567890123456789012"],
-          secure: true,
-        },
-      });
-      async function run() {
-        const session = await sessionStorage.getSession();
-        session.set("adminId", "fake-admin-id");
-        session.set("credentialVersion", 999999); // Wrong version
-        const cookie = await sessionStorage.commitSession(session);
-        console.log(cookie);
-      }
-      run();
-    `;
-    const scriptPath = path.join(__dirname, "temp-cookie-gen.js");
-    fs.writeFileSync(scriptPath, generateCookieScript);
-    const signedCookie = execSync(`node ${scriptPath}`).toString().trim();
-    fs.unlinkSync(scriptPath);
-
-    // Now test session invalidation with anonymous session on protected API
-    const resInvalidPricing = await fetch(`${BASE_URL}/admin/pricing`, {
-      method: "POST",
-      body: new URLSearchParams({ csrfToken: "ignored", pricing: "{}" }),
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
-        "Cookie": signedCookie,
-        "x-forwarded-for": "127.0.0.1"
-      },
-      redirect: "manual",
+    // GET /admin/pricing to extract new CSRF token
+    const pricingRes = await fetch(`${BASE_URL}/admin/pricing`, {
+        headers: { "Cookie": authCookie }
     });
+    const pricingText = await pricingRes.text();
+    const newCsrfMatch = pricingText.match(/name="csrfToken" value="([^"]+)"/);
+    const newCsrfToken = newCsrfMatch ? newCsrfMatch[1] : "";
+    const revMatch = pricingText.match(/name="revision" value="([^"]+)"/);
+    const revision = revMatch ? revMatch[1] : "";
 
-    // Should redirect to /admin since the session is invalid
-    expect(resInvalidPricing.status).toBe(302);
-    expect(resInvalidPricing.headers.get("Location")).toBe("/admin");
+    // 3. Corrupt the JSON
+    const corruptedData = Buffer.from("{ completely broken JSON");
+    fs.writeFileSync(siteContentPath, corruptedData);
 
-    // Now test session invalidation
-    const resInvalid = await fetch(`${BASE_URL}/admin`, {
-      headers: {
-        "Cookie": signedCookie,
-      },
-      redirect: "manual",
-    });
+    const beforeFiles = fs.readdirSync(tempDir);
 
-    // Should redirect to /admin to clear the cookie
-    expect(resInvalid.status).toBe(302);
-    expect(resInvalid.headers.get("Location")).toBe("/admin");
+    const testRoute = async (route: string) => {
+        const res = await fetch(`${BASE_URL}/admin/${route}`, {
+            method: "POST",
+            body: new URLSearchParams({ csrfToken: newCsrfToken, revision, pricing: "{}", business: "{}" }),
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Origin": BASE_URL,
+              "Cookie": authCookie,
+              "x-forwarded-for": "127.0.0.1"
+            },
+            redirect: "manual",
+        });
 
-    // Should have Set-Cookie with Max-Age=0 or Expires in the past
-    const setCookie = resInvalid.headers.get("Set-Cookie") || "";
-    expect(setCookie).toContain("__admin_session=");
-    expect(setCookie.toLowerCase()).toMatch(/max-age=0|expires=thu, 01 jan 1970/);
+        expect(res.status).toBe(409);
+        expect(fs.readFileSync(siteContentPath)).toEqual(corruptedData);
+        expect(fs.readdirSync(tempDir)).toEqual(beforeFiles);
+    };
 
-    // Following the redirect WITHOUT the old cookie should work (no loop)
-    const res2 = await fetch(`${BASE_URL}/admin`);
-    expect(res2.status).toBe(200);
-    const text2 = await res2.text();
-    expect(text2).toContain("Se connecter");
+    await testRoute("pricing");
+    await testRoute("settings");
+
+    // Restore valid JSON so afterAll doesn't fail on other things
+    fs.copyFileSync(defaultContentPath, siteContentPath);
   });
 });

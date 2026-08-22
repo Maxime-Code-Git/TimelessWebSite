@@ -29,9 +29,9 @@ describe("Admin module isolation", () => {
       try {
         computeCredentialVersion();
         expect.unreachable("Should have thrown");
-      } catch (e: any) {
-        expect(e).toBeInstanceOf(Response);
-        expect(e.status).toBe(503);
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(Response);
+        expect((err as Response).status).toBe(503);
       }
     });
 

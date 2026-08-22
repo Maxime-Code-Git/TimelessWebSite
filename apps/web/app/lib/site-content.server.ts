@@ -113,9 +113,9 @@ function validateCategory(data: unknown, categoryName: string): Formula[] {
   }
 
   const formulas = [
-    validateFormula(data.find(f => typeof f === "object" && f !== null && (f as any).id === "essential"), "essential", `${categoryName} > essential`),
-    validateFormula(data.find(f => typeof f === "object" && f !== null && (f as any).id === "signature"), "signature", `${categoryName} > signature`),
-    validateFormula(data.find(f => typeof f === "object" && f !== null && (f as any).id === "prestige"), "prestige", `${categoryName} > prestige`),
+    validateFormula(data.find(f => typeof f === "object" && f !== null && "id" in f && f.id === "essential"), "essential", `${categoryName} > essential`),
+    validateFormula(data.find(f => typeof f === "object" && f !== null && "id" in f && f.id === "signature"), "signature", `${categoryName} > signature`),
+    validateFormula(data.find(f => typeof f === "object" && f !== null && "id" in f && f.id === "prestige"), "prestige", `${categoryName} > prestige`),
   ];
 
   const featuredCount = formulas.filter(f => f.featured).length;
@@ -178,7 +178,7 @@ function validateHttpsUrl(value: unknown, name: string): string | null {
     if (url.username || url.password) {
       throw new ValidationError(`${name} must not contain credentials`);
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof ValidationError) throw err;
     throw new ValidationError(`${name} is a malformed URL`);
   }
@@ -286,8 +286,8 @@ export function getRawSiteContent(): { content: SiteContent, isCorrupted: boolea
   return { content: defaultContent as SiteContent, isCorrupted: false };
 }
 
-function manageBackups(filePath: string) {
-  if (!fs.existsSync(filePath)) return;
+function manageBackups(filePath: string): string | null {
+  if (!fs.existsSync(filePath)) return null;
 
   const dir = path.dirname(filePath);
   const baseName = path.basename(filePath);
@@ -310,6 +310,7 @@ function manageBackups(filePath: string) {
       } catch { /* ignore */ }
     }
   }
+  return backupPath;
 }
 
 function atomicSave(newContent: SiteContent, filePath: string) {
@@ -321,6 +322,7 @@ function atomicSave(newContent: SiteContent, filePath: string) {
   const tempFilePath = `${filePath}.tmp.${crypto.randomBytes(4).toString("hex")}`;
   let fd: number | null = null;
   let dirFd: number | null = null;
+  let createdBackupPath: string | null = null;
   try {
     const jsonStr = JSON.stringify(newContent, null, 2);
     const buffer = Buffer.from(jsonStr, "utf-8");
@@ -339,17 +341,27 @@ function atomicSave(newContent: SiteContent, filePath: string) {
     fs.closeSync(fd);
     fd = null;
 
-    manageBackups(filePath);
+    createdBackupPath = manageBackups(filePath);
 
     fs.renameSync(tempFilePath, filePath);
-    fs.chmodSync(filePath, 0o600);
 
-    dirFd = fs.openSync(dir, "r");
-    fs.fsyncSync(dirFd);
+    try {
+      dirFd = fs.openSync(dir, "r");
+      fs.fsyncSync(dirFd);
+    } catch {
+      // Best-effort directory fsync
+    }
   } catch (err) {
     if (fs.existsSync(tempFilePath)) {
       try {
         fs.unlinkSync(tempFilePath);
+      } catch {
+        // ignore
+      }
+    }
+    if (createdBackupPath && fs.existsSync(createdBackupPath)) {
+      try {
+        fs.unlinkSync(createdBackupPath);
       } catch {
         // ignore
       }

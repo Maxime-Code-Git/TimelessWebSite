@@ -61,6 +61,18 @@ export function Footer({ lang }: FooterProps) {
             {t.linkedin}
           </a>
         )}
+        {business?.email && (
+          <a
+            href={`mailto:${business.email}`}
+            className={styles.socialLink}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+            {business.email}
+          </a>
+        )}
         {business?.phoneDisplay && business?.phoneE164 && (
           <a
             href={`tel:${business.phoneE164}`}

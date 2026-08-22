@@ -34,8 +34,9 @@ vi.mock("../app/lib/session.server", () => ({
 describe("admin-auth.server.ts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (requireAdminSession as any).mockResolvedValue({
+    vi.mocked(requireAdminSession).mockResolvedValue({
       isValid: true,
+      // @ts-expect-error Mocked session
       session: { get: vi.fn(), set: vi.fn(), has: vi.fn() },
     });
     process.env.PUBLIC_SITE_URL = "http://localhost:4173";
@@ -141,8 +142,9 @@ describe("admin-auth.server.ts", () => {
   });
 
   it("requireValidAdminSession should throw redirect 302 with destroyed cookie if invalid", async () => {
-    (requireAdminSession as any).mockResolvedValue({
+    vi.mocked(requireAdminSession).mockResolvedValue({
       isValid: false,
+      // @ts-expect-error Mocked session
       session: { get: vi.fn(), set: vi.fn(), has: vi.fn() },
     });
 
@@ -151,10 +153,12 @@ describe("admin-auth.server.ts", () => {
     try {
       await requireValidAdminSession(req);
       expect.fail("Should have thrown");
-    } catch (e: any) {
-      expect(e.status).toBe(302);
-      expect(e.headers.get("Location")).toBe("/admin");
-      expect(e.headers.get("Set-Cookie")).toBe("destroyed_cookie");
+    } catch (e: unknown) {
+      expect(e instanceof Response).toBe(true);
+      const res = e as Response;
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe("/admin");
+      expect(res.headers.get("Set-Cookie")).toBe("destroyed_cookie");
     }
   });
 });

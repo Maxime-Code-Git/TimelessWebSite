@@ -55,20 +55,20 @@ describe("Admin CSRF Validation", () => {
   describe("Login CSRF", () => {
     it("should reject login without token", async () => {
       const request = await createRequest("login", "", "valid-csrf-token", false);
-      const response = await action({ request, params: {}, context: {} } as any) as Response;
+      const response = await action({ request, params: {}, context: {} } as unknown as import("react-router").ActionFunctionArgs) as Response;
       expect(response.status).toBe(403);
       expect(await response.text()).toBe("Invalid CSRF token");
     });
 
     it("should reject login with modified token", async () => {
       const request = await createRequest("login", "invalid-token", "valid-csrf-token", false);
-      const response = await action({ request, params: {}, context: {} } as any) as Response;
+      const response = await action({ request, params: {}, context: {} } as unknown as import("react-router").ActionFunctionArgs) as Response;
       expect(response.status).toBe(403);
     });
 
     it("should allow login with valid token (returns 401 because bad password, not 403)", async () => {
       const request = await createRequest("login", "valid-csrf-token", "valid-csrf-token", false);
-      const response = await action({ request, params: {}, context: {} } as any) as Response;
+      const response = await action({ request, params: {}, context: {} } as unknown as import("react-router").ActionFunctionArgs) as Response;
       expect(response.status).toBe(401);
     });
   });
@@ -76,19 +76,19 @@ describe("Admin CSRF Validation", () => {
   describe("Logout CSRF", () => {
     it("should reject logout without token", async () => {
       const request = await createRequest("logout", "", "valid-csrf-token", true);
-      const response = await action({ request, params: {}, context: {} } as any) as Response;
+      const response = await action({ request, params: {}, context: {} } as unknown as import("react-router").ActionFunctionArgs) as Response;
       expect(response.status).toBe(403);
     });
 
     it("should reject logout with modified token", async () => {
       const request = await createRequest("logout", "invalid-token", "valid-csrf-token", true);
-      const response = await action({ request, params: {}, context: {} } as any) as Response;
+      const response = await action({ request, params: {}, context: {} } as unknown as import("react-router").ActionFunctionArgs) as Response;
       expect(response.status).toBe(403);
     });
 
     it("should allow logout with valid token", async () => {
       const request = await createRequest("logout", "valid-csrf-token", "valid-csrf-token", true);
-      const response = await action({ request, params: {}, context: {} } as any) as Response;
+      const response = await action({ request, params: {}, context: {} } as unknown as import("react-router").ActionFunctionArgs) as Response;
       expect(response.status).toBe(302);
       expect(response.headers.get("Location")).toBe("/admin");
     });

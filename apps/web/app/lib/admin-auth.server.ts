@@ -30,7 +30,7 @@ export async function requireValidAdminSession(request: Request) {
 const MAX_MUTATION_SIZE = 131072; // 128 KB exact
 
 /**
- * Common helper for secure admin mutations (POST/PUT/DELETE)
+ * Common helper for secure admin mutations (POST)
  * Implements strict validations as per Phase 3B requirements.
  */
 export async function requireSecureAdminMutation(request: Request) {

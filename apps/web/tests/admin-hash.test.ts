@@ -17,7 +17,7 @@ describe("admin:hash script", () => {
     try {
       await execAsync(`node ${scriptPath} arg1`, { cwd: path.resolve(__dirname, "..") });
       expect.unreachable("Should have failed");
-    } catch (e: any) {
+    } catch (e: unknown) {
       expect(e.code).not.toBe(0);
       expect(e.stderr).toContain("Les arguments en ligne de commande sont refusés par sécurité.");
     }
@@ -29,8 +29,8 @@ describe("admin:hash script", () => {
       await execAsync(`node ${scriptPath}`, { cwd: path.resolve(__dirname, "..") });
       expect.unreachable("Should have failed");
     } catch (e: unknown) {
-      expect((e as any).code).not.toBe(0);
-      expect((e as any).stderr).toContain("Ce script nécessite un terminal interactif (TTY).");
+      expect((e as unknown).code).not.toBe(0);
+      expect((e as unknown).stderr).toContain("Ce script nécessite un terminal interactif (TTY).");
     }
   });
 

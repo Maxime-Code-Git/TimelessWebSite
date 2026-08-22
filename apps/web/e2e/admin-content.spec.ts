@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,9 +13,13 @@ const defaultContent = JSON.parse(fs.readFileSync(defaultContentPath, 'utf8'));
 test.describe('Admin Content Management (Phase 3B)', () => {
 
   test.beforeAll(() => {
-    expect(process.env.SITE_CONTENT_PATH).toBeDefined();
-    expect(process.env.SITE_CONTENT_PATH).toContain('timeless-e2e-');
-    expect(process.env.SITE_CONTENT_PATH).not.toContain('./data');
+    const siteContentPath = process.env.SITE_CONTENT_PATH;
+    expect(siteContentPath).toBeDefined();
+    if (!siteContentPath) throw new Error("SITE_CONTENT_PATH missing");
+    const absolutePath = path.resolve(siteContentPath);
+    expect(absolutePath).toContain('timeless-e2e-');
+    expect(absolutePath.startsWith(fs.realpathSync(os.tmpdir())) || absolutePath.startsWith(os.tmpdir())).toBe(true);
+    expect(absolutePath).not.toContain(path.join(process.cwd(), 'data'));
   });
 
   test.beforeEach(async ({ page }) => {
@@ -68,30 +73,33 @@ test.describe('Admin Content Management (Phase 3B)', () => {
     await page.click('text=Textes et informations');
     await expect(page.locator('h1')).toContainText('Textes et informations');
 
+    const form = page.locator('form');
     // Change Email
-    await page.fill('input[name="email"]', 'new-contact@example.com', { strict: false });
+    await form.locator('input[name="email"]').fill('new-contact@example.com');
 
     // Change Phone
-    await page.fill('input[name="phoneDisplay"]', '+33 6 12 34 56 78', { strict: false });
-    await page.fill('input[name="phoneE164"]', '+33612345678', { strict: false });
+    await form.locator('input[name="phoneDisplay"]').fill('+33 6 12 34 56 78');
+    await form.locator('input[name="phoneE164"]').fill('+33612345678');
 
     // Submit
-    await page.click('button[type="submit"]');
+    await form.locator('button[type="submit"]').click();
     await expect(page.locator('div[role="status"]')).toContainText('Informations mises à jour avec succès.');
 
     // Verify on contact page FR
     await page.goto('/fr/contact');
-    await expect(page.locator('a[href="mailto:new-contact@example.com"]').first()).toBeVisible();
-    await expect(page.locator('a[href="tel:+33612345678"]').first()).toContainText('+33 6 12 34 56 78');
+    await expect(page.locator('main a[href="mailto:new-contact@example.com"]').first()).toBeVisible();
+    await expect(page.locator('main a[href="tel:+33612345678"]').first()).toContainText('+33 6 12 34 56 78');
 
     // Verify on contact page EN
     await page.goto('/en/contact');
-    await expect(page.locator('a[href="mailto:new-contact@example.com"]').first()).toBeVisible();
-    await expect(page.locator('a[href="tel:+33612345678"]').first()).toContainText('+33 6 12 34 56 78');
+    await expect(page.locator('main a[href="mailto:new-contact@example.com"]').first()).toBeVisible();
+    await expect(page.locator('main a[href="tel:+33612345678"]').first()).toContainText('+33 6 12 34 56 78');
 
-    // Verify Footer
+    // Verify Footer realistically
     const footer = page.locator('footer');
     await expect(footer).toBeVisible();
+    await expect(footer.locator('a[href="mailto:new-contact@example.com"]')).toBeVisible();
+    await expect(footer.locator('a[href="tel:+33612345678"]')).toContainText('+33 6 12 34 56 78');
   });
 
   test('should handle revision conflicts (409)', async ({ page, request }) => {
@@ -150,26 +158,28 @@ test.describe('Admin Content Management (Phase 3B)', () => {
   });
 
   test('should display warning and disable submit when JSON is corrupted', async ({ page }) => {
-    // Corrupt the JSON file directly
-    fs.writeFileSync(process.env.SITE_CONTENT_PATH!, '{ corrupted json');
+    try {
+      // Corrupt the JSON file directly
+      fs.writeFileSync(process.env.SITE_CONTENT_PATH!, '{ corrupted json');
 
-    // Go to admin pricing
-    await page.goto('/admin/pricing');
+      // Go to admin pricing
+      await page.goto('/admin/pricing');
 
-    // Check for the error message
-    await expect(page.locator('div[role="alert"]')).toContainText('Le stockage du contenu doit être vérifié avant toute modification.');
+      // Check for the error message
+      await expect(page.locator('div[role="alert"]')).toContainText('Le stockage du contenu doit être vérifié avant toute modification.');
 
-    // Check submit is disabled
-    const submitBtn = page.locator('button[type="submit"]');
-    await expect(submitBtn).toBeDisabled();
+      // Check submit is disabled
+      const submitBtn = page.locator('form button[type="submit"]');
+      await expect(submitBtn).toBeDisabled();
 
-    // Check settings as well
-    await page.goto('/admin/settings');
-    await expect(page.locator('div[role="alert"]')).toContainText('Le stockage du contenu doit être vérifié avant toute modification.');
-    await expect(page.locator('button[type="submit"]')).toBeDisabled();
-
-    // Restore file so parallel tests don't fail
-    fs.writeFileSync(process.env.SITE_CONTENT_PATH!, JSON.stringify(defaultContent, null, 2));
+      // Check settings as well
+      await page.goto('/admin/settings');
+      await expect(page.locator('div[role="alert"]')).toContainText('Le stockage du contenu doit être vérifié avant toute modification.');
+      await expect(page.locator('form button[type="submit"]')).toBeDisabled();
+    } finally {
+      // Restore file so parallel tests don't fail
+      fs.writeFileSync(process.env.SITE_CONTENT_PATH!, JSON.stringify(defaultContent, null, 2));
+    }
   });
 
 });

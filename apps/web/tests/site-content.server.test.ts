@@ -160,11 +160,12 @@ describe("site-content.server.ts", () => {
   });
 
   describe("Corruption and atomicSave Edge Cases", () => {
-    it("should throw CorruptedContentError and keep file strictly identical if json is corrupted", () => {
+    it("should throw CorruptedContentError and keep file strictly identical if json is corrupted (savePricing)", () => {
       const corruptedData = Buffer.from("{ bad json ]");
       fs.writeFileSync(tempFile, corruptedData);
 
       const beforeStat = fs.statSync(tempFile);
+      const beforeBackups = fs.readdirSync(tempDir).filter(f => f.endsWith(".bak")).length;
 
       const newPricing = JSON.parse(JSON.stringify(defaultContent.pricing));
       expect(() => savePricing(newPricing, defaultContent.revision)).toThrow(CorruptedContentError);
@@ -173,9 +174,30 @@ describe("site-content.server.ts", () => {
       expect(afterData).toEqual(corruptedData);
       expect(fs.statSync(tempFile).mtimeMs).toBe(beforeStat.mtimeMs);
 
-      // Verify no temp file left
+      // Verify no temp file and no new backup left
       const files = fs.readdirSync(tempDir);
       expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
+      expect(files.filter(f => f.endsWith(".bak"))).toHaveLength(beforeBackups);
+    });
+
+    it("should throw CorruptedContentError and keep file strictly identical if json is corrupted (saveSettings)", () => {
+      const corruptedData = Buffer.from("{ bad json settings ]");
+      fs.writeFileSync(tempFile, corruptedData);
+
+      const beforeStat = fs.statSync(tempFile);
+      const beforeBackups = fs.readdirSync(tempDir).filter(f => f.endsWith(".bak")).length;
+
+      const newSettings = JSON.parse(JSON.stringify(defaultContent.business));
+      expect(() => saveSettings(newSettings, defaultContent.revision)).toThrow(CorruptedContentError);
+
+      const afterData = fs.readFileSync(tempFile);
+      expect(afterData).toEqual(corruptedData);
+      expect(fs.statSync(tempFile).mtimeMs).toBe(beforeStat.mtimeMs);
+
+      // Verify no temp file and no new backup left
+      const files = fs.readdirSync(tempDir);
+      expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
+      expect(files.filter(f => f.endsWith(".bak"))).toHaveLength(beforeBackups);
     });
 
     it("should loop on partial positive writes and succeed", () => {
@@ -202,11 +224,13 @@ describe("site-content.server.ts", () => {
 
       const loaded = getSiteContent();
       expect(loaded.pricing.photo[0].priceCents).toBe(99999);
+      expect(fs.statSync(tempFile).mode & 0o777).toBe(process.platform === "win32" ? fs.statSync(tempFile).mode & 0o777 : 0o600);
     });
 
     it("should throw and abort on 0 bytes written", () => {
       fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
       const beforeData = fs.readFileSync(tempFile);
+      const beforeBackups = fs.readdirSync(tempDir).filter(f => f.endsWith(".bak")).length;
       const newPricing = JSON.parse(JSON.stringify(defaultContent.pricing));
 
       const writeSpy = vi.spyOn(fs, "writeSync").mockImplementation(() => 0);
@@ -215,20 +239,24 @@ describe("site-content.server.ts", () => {
 
       writeSpy.mockRestore();
 
-      // Original file unchanged
       expect(fs.readFileSync(tempFile)).toEqual(beforeData);
-      // No temp files left
       const files = fs.readdirSync(tempDir);
       expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
+      expect(files.filter(f => f.endsWith(".bak"))).toHaveLength(beforeBackups);
     });
 
-    it("should throw and abort if fsyncSync fails", () => {
+    it("should throw and abort if fsyncSync on temp file fails before rename", () => {
       fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
       const beforeData = fs.readFileSync(tempFile);
+      const beforeBackups = fs.readdirSync(tempDir).filter(f => f.endsWith(".bak")).length;
       const newPricing = JSON.parse(JSON.stringify(defaultContent.pricing));
 
+      let fsyncCalls = 0;
       const fsyncSpy = vi.spyOn(fs, "fsyncSync").mockImplementation(() => {
-        throw new Error("Fake fsync error");
+        fsyncCalls++;
+        if (fsyncCalls === 1) { // First call is the temp file
+          throw new Error("Fake fsync error");
+        }
       });
 
       expect(() => savePricing(newPricing, defaultContent.revision)).toThrow("Fake fsync error");
@@ -238,11 +266,37 @@ describe("site-content.server.ts", () => {
       expect(fs.readFileSync(tempFile)).toEqual(beforeData);
       const files = fs.readdirSync(tempDir);
       expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
+      expect(files.filter(f => f.endsWith(".bak"))).toHaveLength(beforeBackups);
+    });
+
+    it("should ignore error if fsyncSync on directory fails after rename", () => {
+      fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
+      const newPricing = JSON.parse(JSON.stringify(defaultContent.pricing));
+      newPricing.photo[0].priceCents = 77777;
+
+      let fsyncCalls = 0;
+      const fsyncSpy = vi.spyOn(fs, "fsyncSync").mockImplementation((_fd) => {
+        fsyncCalls++;
+        if (fsyncCalls === 2) { // Second call is the directory
+          throw new Error("Fake dir fsync error");
+        }
+      });
+
+      // Should NOT throw
+      const newRev = savePricing(newPricing, defaultContent.revision);
+      expect(newRev).not.toBe(defaultContent.revision);
+
+      fsyncSpy.mockRestore();
+
+      const loaded = getSiteContent();
+      expect(loaded.pricing.photo[0].priceCents).toBe(77777);
+      expect(fs.statSync(tempFile).mode & 0o777).toBe(process.platform === "win32" ? fs.statSync(tempFile).mode & 0o777 : 0o600);
     });
 
     it("should throw and abort if renameSync fails", () => {
       fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
       const beforeData = fs.readFileSync(tempFile);
+      const beforeBackups = fs.readdirSync(tempDir).filter(f => f.endsWith(".bak")).length;
       const newPricing = JSON.parse(JSON.stringify(defaultContent.pricing));
 
       const renameSpy = vi.spyOn(fs, "renameSync").mockImplementation(() => {
@@ -256,6 +310,7 @@ describe("site-content.server.ts", () => {
       expect(fs.readFileSync(tempFile)).toEqual(beforeData);
       const files = fs.readdirSync(tempDir);
       expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
+      expect(files.filter(f => f.endsWith(".bak"))).toHaveLength(beforeBackups);
     });
   });
 });
