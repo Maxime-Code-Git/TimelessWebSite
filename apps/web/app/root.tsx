@@ -18,10 +18,16 @@ const PRELOAD_FONTS = [
   "/fonts/HankenGrotesk-Regular.woff2",
 ];
 
+import { getSiteContent } from "./lib/site-content.server";
+
 export function loader() {
   const url = process.env.PUBLIC_SITE_URL || "http://localhost:5173";
+  const siteContent = getSiteContent();
   // Remove trailing slash if any
-  return data({ PUBLIC_SITE_URL: url.replace(/\/$/, "") });
+  return data({
+    PUBLIC_SITE_URL: url.replace(/\/$/, ""),
+    siteContent,
+  });
 }
 
 export const links: Route.LinksFunction = () => [

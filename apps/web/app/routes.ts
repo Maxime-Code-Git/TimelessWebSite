@@ -45,6 +45,8 @@ export default [
 
   // ── Admin routes ──────────────────────────────────────────
   route("admin", "routes/admin.tsx"),
+  route("admin/pricing", "routes/admin.pricing.tsx"),
+  route("admin/settings", "routes/admin.settings.tsx"),
 
   // ── Catch-all (404) ───────────────────────────────────────
   route("*", "routes/404.tsx"),

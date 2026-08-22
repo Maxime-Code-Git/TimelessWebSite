@@ -2,7 +2,9 @@ import type { Route } from "./+types/fr.legal";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
-import { BUSINESS } from "~/lib/business-config";
+import { useRouteLoaderData } from "react-router";
+import type { loader as rootLoader } from "../root";
+import { STUDIO_NAME } from "~/lib/business-config";
 import styles from "./legal.module.css";
 
 import { getSeoMeta } from "~/lib/seo";
@@ -22,11 +24,14 @@ export function meta({ matches }: Route.MetaArgs) {
   });
 }
 
-const isComplete = Boolean(
-  BUSINESS.address && BUSINESS.enterpriseNumber && BUSINESS.hostingProvider
-);
-
 export default function LegalFr() {
+  const rootData = useRouteLoaderData<typeof rootLoader>("root");
+  const business = rootData?.siteContent?.business;
+
+  const isComplete = Boolean(
+    business?.address && business?.enterpriseNumber && business?.hostingProvider
+  );
+
   return (
     <div className={styles.container}>
       <Header lang="fr" alternateLangHref="/en/legal" />
@@ -42,22 +47,22 @@ export default function LegalFr() {
 
           <div className={styles.content}>
             <h2>Éditeur du site</h2>
-            {BUSINESS.address && BUSINESS.enterpriseNumber ? (
+            {business?.address && business?.enterpriseNumber ? (
               <p>
-                {BUSINESS.studioName}<br />
-                {BUSINESS.address}<br />
-                {BUSINESS.email && <>Email : {BUSINESS.email}<br /></>}
-                Numéro d'entreprise : {BUSINESS.enterpriseNumber}
+                {STUDIO_NAME}<br />
+                <span style={{ whiteSpace: "pre-line" }}>{business.address}</span><br />
+                {business.email && <>Email : {business.email}<br /></>}
+                Numéro d'entreprise : {business.enterpriseNumber}
               </p>
             ) : (
               <p><em>Informations en cours de finalisation.</em></p>
             )}
 
             <h2>Hébergement</h2>
-            {BUSINESS.hostingProvider ? (
+            {business?.hostingProvider ? (
               <p>
-                Le site est hébergé par {BUSINESS.hostingProvider}.
-                {BUSINESS.hostingAddress && <><br />{BUSINESS.hostingAddress}</>}
+                Le site est hébergé par {business.hostingProvider}.
+                {business.hostingAddress && <><br /><span style={{ whiteSpace: "pre-line" }}>{business.hostingAddress}</span></>}
               </p>
             ) : (
               <p><em>Informations en cours de finalisation.</em></p>

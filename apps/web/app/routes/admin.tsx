@@ -5,6 +5,7 @@ import {
 } from "react-router";
 import {
   Form,
+  Link,
   useActionData,
   useLoaderData,
   useNavigation,
@@ -249,22 +250,22 @@ export default function AdminPage() {
               Le tableau de bord complet sera implémenté lors des prochaines phases.
             </p>
             <div className={styles.grid}>
-              <div className={styles.card}>
+              <div className={`${styles.card} ${styles.disabledCard}`}>
                 <h3>Galeries clients</h3>
                 <p>Fonctionnalité disponible prochainement</p>
               </div>
-              <div className={styles.card}>
+              <div className={`${styles.card} ${styles.disabledCard}`}>
                 <h3>Portfolio public</h3>
                 <p>Fonctionnalité disponible prochainement</p>
               </div>
-              <div className={styles.card}>
+              <Link to="/admin/pricing" className={styles.card}>
                 <h3>Formules et tarifs</h3>
-                <p>Fonctionnalité disponible prochainement</p>
-              </div>
-              <div className={styles.card}>
+                <p>Gérer les prix et offres</p>
+              </Link>
+              <Link to="/admin/settings" className={styles.card}>
                 <h3>Textes et informations</h3>
-                <p>Fonctionnalité disponible prochainement</p>
-              </div>
+                <p>Gérer les coordonnées et informations légales</p>
+              </Link>
             </div>
           </div>
         </main>

@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useRouteLoaderData } from "react-router";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
 import { getStrings } from "~/lib/i18n";
-import { PRICING, formatPrice } from "~/lib/pricing";
+import { formatPrice } from "~/lib/pricing";
 import type { FormulaCategory } from "~/lib/pricing";
 import styles from "./formules.module.css";
+import type { loader as rootLoader } from "../root";
 
 interface FormulesPageProps {
   lang: Lang;
@@ -22,8 +23,13 @@ export function FormulesPage({ lang }: FormulesPageProps) {
   const alternateLangHref = lang === "fr" ? "/en/pricing" : "/fr/formules";
   const contactHref = lang === "fr" ? "/fr/contact" : "/en/contact";
 
+  const rootData = useRouteLoaderData<typeof rootLoader>("root");
+  const siteContent = rootData?.siteContent;
+
   const categories: FormulaCategory[] = ["photo", "film", "duo"];
-  const currentPricing = PRICING[selectedCat];
+
+  // Fallback to empty array if not found
+  const currentPricing = siteContent?.pricing[selectedCat] || [];
   const currentFeatures = fFeat[selectedCat];
 
   return (

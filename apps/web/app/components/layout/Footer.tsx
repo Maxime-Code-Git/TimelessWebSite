@@ -1,8 +1,8 @@
-import { Link } from "react-router";
+import { Link, useRouteLoaderData } from "react-router";
 import type { Lang } from "~/lib/i18n";
 import { getStrings } from "~/lib/i18n";
-import { BUSINESS } from "~/lib/business-config";
 import styles from "./Footer.module.css";
+import type { loader as rootLoader } from "../../root";
 
 interface FooterProps {
   lang: Lang;
@@ -11,6 +11,9 @@ interface FooterProps {
 export function Footer({ lang }: FooterProps) {
   const t = getStrings(lang).footer;
   const contactTo = lang === "fr" ? "/fr/contact" : "/en/contact";
+
+  const rootData = useRouteLoaderData<typeof rootLoader>("root");
+  const business = rootData?.siteContent?.business;
 
   return (
     <footer className={styles.footer}>
@@ -26,9 +29,9 @@ export function Footer({ lang }: FooterProps) {
 
       {/* Social links — only render if URLs are configured */}
       <div className={styles.socialRow}>
-        {BUSINESS.instagramUrl && (
+        {business?.instagramUrl && (
           <a
-            href={BUSINESS.instagramUrl}
+            href={business.instagramUrl}
             className={styles.socialLink}
             target="_blank"
             rel="noopener noreferrer"
@@ -41,9 +44,9 @@ export function Footer({ lang }: FooterProps) {
             {t.instagram}
           </a>
         )}
-        {BUSINESS.linkedinUrl && (
+        {business?.linkedinUrl && (
           <a
-            href={BUSINESS.linkedinUrl}
+            href={business.linkedinUrl}
             className={styles.socialLink}
             target="_blank"
             rel="noopener noreferrer"
@@ -58,15 +61,15 @@ export function Footer({ lang }: FooterProps) {
             {t.linkedin}
           </a>
         )}
-        {BUSINESS.phone && (
+        {business?.phoneDisplay && business?.phoneE164 && (
           <a
-            href={BUSINESS.phoneHref}
+            href={`tel:${business.phoneE164}`}
             className={styles.socialLink}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
             </svg>
-            {BUSINESS.phone}
+            {business.phoneDisplay}
           </a>
         )}
       </div>

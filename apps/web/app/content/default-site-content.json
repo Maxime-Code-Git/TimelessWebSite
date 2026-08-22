@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "revision": "default-revision",
+  "updatedAt": "1970-01-01T00:00:00.000Z",
+  "business": {
+    "email": "timeless.studiolm@gmail.com",
+    "phoneDisplay": "+32 477 86 37 42",
+    "phoneE164": "+32477863742",
+    "address": null,
+    "enterpriseNumber": null,
+    "legalForm": null,
+    "legalRepresentative": null,
+    "hostingProvider": null,
+    "hostingAddress": null,
+    "depositPercent": null,
+    "instagramUrl": null,
+    "linkedinUrl": null,
+    "serviceArea": {
+      "fr": "Belgique & mariages à l'étranger",
+      "en": "Belgium & destination weddings"
+    }
+  },
+  "pricing": {
+    "photo": [
+      { "id": "essential", "priceCents": 129000, "featured": false },
+      { "id": "signature", "priceCents": 179000, "featured": true },
+      { "id": "prestige", "priceCents": 239000, "featured": false }
+    ],
+    "film": [
+      { "id": "essential", "priceCents": 149000, "featured": false },
+      { "id": "signature", "priceCents": 219000, "featured": true },
+      { "id": "prestige", "priceCents": 299000, "featured": false }
+    ],
+    "duo": [
+      { "id": "essential", "priceCents": 249000, "featured": false },
+      { "id": "signature", "priceCents": 349000, "featured": true },
+      { "id": "prestige", "priceCents": 469000, "featured": false }
+    ]
+  }
+}

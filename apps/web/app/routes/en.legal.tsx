@@ -3,7 +3,9 @@ import { getSeoMeta } from "~/lib/seo";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
-import { BUSINESS } from "~/lib/business-config";
+import { useRouteLoaderData } from "react-router";
+import type { loader as rootLoader } from "../root";
+import { STUDIO_NAME } from "~/lib/business-config";
 import styles from "./legal.module.css";
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -12,7 +14,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
   return getSeoMeta({
     title: "Legal Notice — Timeless",
-    description: "Legal notice of the Timeless website.",
+    description: "Legal notice for the Timeless website.",
     path: "/en/legal",
     alternatePath: "/fr/mentions-legales",
     lang: "en",
@@ -21,11 +23,14 @@ export function meta({ matches }: Route.MetaArgs) {
   });
 }
 
-const isComplete = Boolean(
-  BUSINESS.address && BUSINESS.enterpriseNumber && BUSINESS.hostingProvider
-);
-
 export default function LegalEn() {
+  const rootData = useRouteLoaderData<typeof rootLoader>("root");
+  const business = rootData?.siteContent?.business;
+
+  const isComplete = Boolean(
+    business?.address && business?.enterpriseNumber && business?.hostingProvider
+  );
+
   return (
     <div className={styles.container}>
       <Header lang="en" alternateLangHref="/fr/mentions-legales" />
@@ -35,31 +40,31 @@ export default function LegalEn() {
 
           {!isComplete && (
             <div className={styles.draftNotice}>
-              This legal notice is being finalised and does not constitute a legally binding document.
+              This legal notice is currently being finalized and does not constitute a binding legal document.
             </div>
           )}
 
           <div className={styles.content}>
             <h2>Publisher</h2>
-            {BUSINESS.address && BUSINESS.enterpriseNumber ? (
+            {business?.address && business?.enterpriseNumber ? (
               <p>
-                {BUSINESS.studioName}<br />
-                {BUSINESS.address}<br />
-                {BUSINESS.email && <>Email: {BUSINESS.email}<br /></>}
-                Company Number: {BUSINESS.enterpriseNumber}
+                {STUDIO_NAME}<br />
+                <span style={{ whiteSpace: "pre-line" }}>{business.address}</span><br />
+                {business.email && <>Email: {business.email}<br /></>}
+                Enterprise Number: {business.enterpriseNumber}
               </p>
             ) : (
-              <p><em>Information being finalised.</em></p>
+              <p><em>Information currently being finalized.</em></p>
             )}
 
             <h2>Hosting</h2>
-            {BUSINESS.hostingProvider ? (
+            {business?.hostingProvider ? (
               <p>
-                The site is hosted by {BUSINESS.hostingProvider}.
-                {BUSINESS.hostingAddress && <><br />{BUSINESS.hostingAddress}</>}
+                The site is hosted by {business.hostingProvider}.
+                {business.hostingAddress && <><br /><span style={{ whiteSpace: "pre-line" }}>{business.hostingAddress}</span></>}
               </p>
             ) : (
-              <p><em>Information being finalised.</em></p>
+              <p><em>Information currently being finalized.</em></p>
             )}
 
             <h2>Intellectual Property</h2>

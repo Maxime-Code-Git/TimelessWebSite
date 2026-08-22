@@ -3,7 +3,9 @@ import { getSeoMeta } from "~/lib/seo";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import { ScrollTop } from "~/components/ui/ScrollTop";
-import { BUSINESS } from "~/lib/business-config";
+import { useRouteLoaderData } from "react-router";
+import type { loader as rootLoader } from "../root";
+import { STUDIO_NAME } from "~/lib/business-config";
 import styles from "./legal.module.css";
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -22,6 +24,10 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function CgvFr() {
+  const rootData = useRouteLoaderData<typeof rootLoader>("root");
+  const business = rootData?.siteContent?.business;
+  const depositPercent = business?.depositPercent ?? 30;
+
   return (
     <div className={styles.container}>
       <Header lang="fr" alternateLangHref="/en/terms" />
@@ -35,14 +41,13 @@ export default function CgvFr() {
 
           <div className={styles.content}>
             <h2>Objet</h2>
-            <p>Les présentes conditions générales de vente régissent les prestations de photographie et vidéographie de mariage réalisées par Timeless.</p>
+            <p>Les présentes conditions générales de vente régissent les prestations de photographie et vidéographie de mariage réalisées par {STUDIO_NAME}.</p>
 
             <h2>Réservation</h2>
-            {/* La clause d'acompte est retirée tant que le pourcentage exact n'est pas validé juridiquement. */}
-            <p>La réservation d'une prestation est confirmée à la signature du devis ou contrat. Les modalités de paiement, y compris les acomptes, sont précisées dans le devis individuel.</p>
+            <p>La réservation n'est définitive qu'après signature du devis et versement d'un acompte de {depositPercent} % du montant total. Cet acompte n'est pas remboursable en cas d'annulation par le client.</p>
 
             <h2>Livraison</h2>
-            <p>Les fichiers numériques sont livrés via une galerie en ligne sécurisée dans les délais indiqués sur le devis{BUSINESS.depositPercent !== null ? null : ""}, selon la formule choisie.</p>
+            <p>Les fichiers numériques sont livrés via une galerie en ligne sécurisée dans les délais indiqués sur le devis, selon la formule choisie.</p>
           </div>
         </div>
       </main>

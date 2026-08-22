@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
-import { Link, useFetcher } from "react-router";
+import { useFetcher, useRouteLoaderData, Link } from "react-router";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
 import { getStrings } from "~/lib/i18n";
-import { BUSINESS } from "~/lib/business-config";
+import type { loader as rootLoader } from "../root";
 import styles from "./contact.module.css";
 
 interface ContactPageProps {
@@ -14,6 +14,8 @@ interface ContactPageProps {
 export function ContactPage({ lang }: ContactPageProps) {
   const t = getStrings(lang).contact;
   const alternateLangHref = lang === "fr" ? "/en/contact" : "/fr/contact";
+  const rootData = useRouteLoaderData<typeof rootLoader>("root");
+  const BUSINESS = rootData?.siteContent?.business;
 
   const fetcher = useFetcher();
   const isSubmitting = fetcher.state === "submitting";
@@ -89,7 +91,7 @@ export function ContactPage({ lang }: ContactPageProps) {
         </div>
       </section>
 
-      {/* Main Form */}
+        {/* Main Form */}
       <section className={styles.formSection}>
         <h3 className={styles.formPrompt}>{t.formPrompt}</h3>
         
@@ -172,30 +174,32 @@ export function ContactPage({ lang }: ContactPageProps) {
           <div className={styles.infoCard}>
             <h4 className={styles.infoTitle}>{t.coordTitle}</h4>
             
-            {BUSINESS.email && (
+            {BUSINESS?.email && (
               <div className={styles.infoBlock}>
                 <p className={styles.infoLabel}>{t.coordLabels.email}</p>
                 <p className={styles.infoValue}>
-                  <a href={BUSINESS.emailHref} className={styles.infoLink}>{BUSINESS.email}</a>
+                  <a href={`mailto:${BUSINESS.email}`} className={styles.infoLink}>{BUSINESS.email}</a>
                 </p>
               </div>
             )}
             
-            {BUSINESS.phone && (
+            {BUSINESS?.phoneDisplay && BUSINESS?.phoneE164 && (
               <div className={styles.infoBlock}>
                 <p className={styles.infoLabel}>{t.coordLabels.phone}</p>
                 <p className={styles.infoValue}>
-                  <a href={BUSINESS.phoneHref} className={styles.infoLink}>{BUSINESS.phone}</a>
+                  <a href={`tel:${BUSINESS.phoneE164}`} className={styles.infoLink}>{BUSINESS.phoneDisplay}</a>
                 </p>
               </div>
             )}
             
-            <div className={styles.infoBlock}>
-              <p className={styles.infoLabel}>{t.coordLabels.area}</p>
-              <p className={styles.infoValue}>{BUSINESS.serviceArea[lang]}</p>
-            </div>
+            {BUSINESS?.serviceArea && (
+              <div className={styles.infoBlock}>
+                <p className={styles.infoLabel}>{t.coordLabels.area}</p>
+                <p className={styles.infoValue}>{BUSINESS.serviceArea[lang]}</p>
+              </div>
+            )}
             
-            {(BUSINESS.instagramUrl || BUSINESS.linkedinUrl) && (
+            {(BUSINESS?.instagramUrl || BUSINESS?.linkedinUrl) && (
               <div className={styles.infoBlock}>
                 <p className={styles.infoLabel}>{t.coordLabels.social}</p>
                 <p className={styles.infoValue}>
