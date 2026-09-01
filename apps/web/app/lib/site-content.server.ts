@@ -294,15 +294,17 @@ export function createBackup(filePath: string): string | null {
   const timestamp = Date.now();
   const backupPath = path.join(dir, `${baseName}.${timestamp}.bak`);
 
-  fs.copyFileSync(filePath, backupPath);
   try {
+    fs.copyFileSync(filePath, backupPath);
     fs.chmodSync(backupPath, 0o600);
-  } catch (chmodErr) {
-    // Cleanup the partial backup before re-throwing
-    try {
-      fs.unlinkSync(backupPath);
-    } catch { /* ignore cleanup error */ }
-    throw chmodErr;
+  } catch (err) {
+    // Cleanup any partially created backup before re-throwing
+    if (fs.existsSync(backupPath)) {
+      try {
+        fs.unlinkSync(backupPath);
+      } catch { /* ignore cleanup error */ }
+    }
+    throw err;
   }
 
   return backupPath;

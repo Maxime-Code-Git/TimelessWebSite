@@ -385,26 +385,64 @@ describe("site-content.server.ts", () => {
       expect(backups.length).toBeLessThanOrEqual(5);
     });
 
-    it("late rotation error does not announce failure after new JSON is installed", async () => {
+    it("late rotation error does not announce failure after new JSON is installed", () => {
       fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
       const newPricing = JSON.parse(JSON.stringify(defaultContent.pricing));
       newPricing.photo[0].priceCents = 55555;
 
-      // Import the module to mock the exported rotateBackups function
-      const siteContentModule = await import("../app/lib/site-content.server");
-      const rotateSpy = vi.spyOn(siteContentModule, "rotateBackups").mockImplementation(() => {
-        throw new Error("Fake rotation error");
+      // rotateBackups calls fs.readdirSync on the directory after rename.
+      // In atomicSave, the only readdirSync call comes from rotateBackups.
+      // Making it throw simulates a rotation failure.
+      let spyCalled = false;
+
+      const readdirSpy = vi.spyOn(fs, "readdirSync").mockImplementation(() => {
+        spyCalled = true;
+        throw new Error("Fake rotation readdirSync error");
       });
 
       // This should NOT throw — rotation is best-effort
       const newRev = savePricing(newPricing, defaultContent.revision);
       expect(newRev).not.toBe(defaultContent.revision);
 
-      rotateSpy.mockRestore();
+      // Verify the spy was actually invoked
+      expect(spyCalled).toBe(true);
+      expect(readdirSpy).toHaveBeenCalled();
 
-      // Verify the new JSON is installed
+      readdirSpy.mockRestore();
+
+      // Verify the new JSON is installed and readable
       const loaded = getSiteContent();
       expect(loaded.pricing.photo[0].priceCents).toBe(55555);
+    });
+
+    it("copyFileSync creates partial file then throws: original unchanged, no temp, no false backup", () => {
+      fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
+      const beforeData = fs.readFileSync(tempFile);
+      const beforeBackups = fs.readdirSync(tempDir).filter(f => f.endsWith(".bak")).length;
+      const newPricing = JSON.parse(JSON.stringify(defaultContent.pricing));
+
+      const originalCopyFileSync = fs.copyFileSync;
+      const copySpy = vi.spyOn(fs, "copyFileSync").mockImplementation((src, dest, ...rest) => {
+        const destStr = String(dest);
+        if (destStr.endsWith(".bak")) {
+          // Simulate partial creation: write a partial file, then throw
+          fs.writeFileSync(destStr, "partial-backup-data");
+          throw new Error("Fake copy error after partial write");
+        }
+        return originalCopyFileSync(src, dest, ...rest);
+      });
+
+      expect(() => savePricing(newPricing, defaultContent.revision)).toThrow("Fake copy error after partial write");
+
+      copySpy.mockRestore();
+
+      // Original file unchanged
+      expect(fs.readFileSync(tempFile)).toEqual(beforeData);
+      // No temp files remain
+      const files = fs.readdirSync(tempDir);
+      expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
+      // No new .bak (even partial) should remain
+      expect(files.filter(f => f.endsWith(".bak"))).toHaveLength(beforeBackups);
     });
   });
 });
