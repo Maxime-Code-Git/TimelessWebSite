@@ -256,10 +256,10 @@ export default function AdminPage() {
                 <h3>Galeries clients</h3>
                 <p>Fonctionnalité disponible prochainement</p>
               </div>
-              <div className={`${styles.card} ${styles.disabledCard}`}>
+              <Link to="/admin/portfolio" className={styles.card}>
                 <h3>Portfolio public</h3>
-                <p>Fonctionnalité disponible prochainement</p>
-              </div>
+                <p>Gérer les projets et photos du portfolio</p>
+              </Link>
               <Link to="/admin/pricing" className={styles.card}>
                 <h3>Formules et tarifs</h3>
                 <p>Gérer les prix et offres</p>

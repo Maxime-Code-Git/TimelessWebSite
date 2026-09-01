@@ -47,6 +47,10 @@ export default [
   route("admin", "routes/admin.tsx"),
   route("admin/pricing", "routes/admin.pricing.tsx"),
   route("admin/settings", "routes/admin.settings.tsx"),
+  route("admin/portfolio", "routes/admin.portfolio.tsx"),
+  route("admin/portfolio/new", "routes/admin.portfolio.new.tsx"),
+  route("admin/portfolio/:projectId", "routes/admin.portfolio.$projectId.tsx"),
+  route("admin/portfolio/:projectId/preview", "routes/admin.portfolio.$projectId.preview.tsx"),
 
   // ── Catch-all (404) ───────────────────────────────────────
   route("*", "routes/404.tsx"),

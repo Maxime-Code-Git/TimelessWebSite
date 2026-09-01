@@ -286,129 +286,7 @@ export function getRawSiteContent(): { content: SiteContent, isCorrupted: boolea
   return { content: defaultContent as SiteContent, isCorrupted: false };
 }
 
-export function createBackup(filePath: string): string | null {
-  if (!fs.existsSync(filePath)) return null;
-
-  const dir = path.dirname(filePath);
-  const baseName = path.basename(filePath);
-  const timestamp = Date.now();
-  const backupPath = path.join(dir, `${baseName}.${timestamp}.bak`);
-
-  try {
-    fs.copyFileSync(filePath, backupPath);
-    fs.chmodSync(backupPath, 0o600);
-  } catch (err) {
-    // Cleanup any partially created backup before re-throwing
-    if (fs.existsSync(backupPath)) {
-      try {
-        fs.unlinkSync(backupPath);
-      } catch { /* ignore cleanup error */ }
-    }
-    throw err;
-  }
-
-  return backupPath;
-}
-
-export function rotateBackups(filePath: string): void {
-  const dir = path.dirname(filePath);
-  const baseName = path.basename(filePath);
-
-  const files = fs.readdirSync(dir);
-  const backups = files
-    .filter(f => f.startsWith(baseName) && f.endsWith(".bak"))
-    .sort()
-    .reverse();
-
-  if (backups.length > 5) {
-    for (let i = 5; i < backups.length; i++) {
-      try {
-        fs.unlinkSync(path.join(dir, backups[i]));
-      } catch { /* ignore */ }
-    }
-  }
-}
-
-function atomicSave(newContent: SiteContent, filePath: string) {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  const tempFilePath = `${filePath}.tmp.${crypto.randomBytes(4).toString("hex")}`;
-  let fd: number | null = null;
-  let dirFd: number | null = null;
-  try {
-    const jsonStr = JSON.stringify(newContent, null, 2);
-    const buffer = Buffer.from(jsonStr, "utf-8");
-    fd = fs.openSync(tempFilePath, "w", 0o600);
-
-    let bytesWritten = 0;
-    while (bytesWritten < buffer.length) {
-      const written = fs.writeSync(fd, buffer, bytesWritten, buffer.length - bytesWritten, bytesWritten);
-      if (written <= 0) {
-        throw new Error("Wrote 0 bytes");
-      }
-      bytesWritten += written;
-    }
-
-    fs.fsyncSync(fd);
-    fs.closeSync(fd);
-    fd = null;
-
-    // Create backup before rename
-    const createdBackupPath = createBackup(filePath);
-
-    try {
-      fs.renameSync(tempFilePath, filePath);
-    } catch (renameErr) {
-      // Rename failed: clean temp file and the backup we just created,
-      // but preserve all older backups strictly intact
-      if (fs.existsSync(tempFilePath)) {
-        try { fs.unlinkSync(tempFilePath); } catch { /* ignore */ }
-      }
-      if (createdBackupPath && fs.existsSync(createdBackupPath)) {
-        try { fs.unlinkSync(createdBackupPath); } catch { /* ignore */ }
-      }
-      throw renameErr;
-    }
-
-    // Rename succeeded — the new JSON is installed.
-    // From this point, no error should turn a successful save into a failure.
-
-    // Best-effort directory fsync
-    try {
-      dirFd = fs.openSync(dir, "r");
-      fs.fsyncSync(dirFd);
-    } catch {
-      // Best-effort directory fsync
-    }
-
-    // Best-effort rotation — only after rename success
-    try {
-      rotateBackups(filePath);
-    } catch {
-      // Rotation errors must not turn a successful save into a failure
-    }
-  } catch (err) {
-    // Cleanup temp file on any error before rename
-    if (fs.existsSync(tempFilePath)) {
-      try { fs.unlinkSync(tempFilePath); } catch { /* ignore */ }
-    }
-    throw err;
-  } finally {
-    if (fd !== null) {
-      try {
-        fs.closeSync(fd);
-      } catch { /* ignore */ }
-    }
-    if (dirFd !== null) {
-      try {
-        fs.closeSync(dirFd);
-      } catch { /* ignore */ }
-    }
-  }
-}
+import { atomicWriteJson } from "./atomic-fs.server";
 
 export function savePricing(pricing: PricingCategory, previousRevision: string) {
   const current = getRawSiteContent();
@@ -426,7 +304,7 @@ export function savePricing(pricing: PricingCategory, previousRevision: string) 
     pricing: validatePricing(pricing),
   };
 
-  atomicSave(newContent, getFilePath());
+  atomicWriteJson(getFilePath(), newContent);
   return newContent.revision;
 }
 
@@ -446,6 +324,6 @@ export function saveSettings(business: BusinessContent, previousRevision: string
     business: validateBusiness(business),
   };
 
-  atomicSave(newContent, getFilePath());
+  atomicWriteJson(getFilePath(), newContent);
   return newContent.revision;
 }

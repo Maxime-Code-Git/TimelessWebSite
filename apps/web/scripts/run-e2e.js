@@ -54,6 +54,8 @@ try {
   e2eTempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'timeless-e2e-'));
 
   process.env.SITE_CONTENT_PATH = path.join(e2eTempDir, 'site-content.json');
+  process.env.PORTFOLIO_CONTENT_PATH = path.join(e2eTempDir, 'portfolio.json');
+  process.env.PORTFOLIO_MEDIA_PATH = path.join(e2eTempDir, 'portfolio-media');
   process.env.RATE_LIMIT_DB_PATH = path.join(e2eTempDir, 'rate-limit.sqlite');
   process.env.NODE_ENV = 'test';
 
