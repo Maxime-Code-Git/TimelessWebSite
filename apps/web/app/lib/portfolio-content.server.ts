@@ -25,13 +25,13 @@ const textSchema = z.string()
   .trim()
   .min(1, "Text is required")
   .max(2000, "Text is too long")
-  .refine(val => !/<[a-z][\s\S]*>/i.test(val), "HTML is not allowed");
+  .refine(val => !/[<>]/.test(val), "HTML is not allowed");
 
 const titleSchema = z.string()
   .trim()
   .min(1, "Title is required")
   .max(100, "Title is too long")
-  .refine(val => !/<[a-z][\s\S]*>/i.test(val), "HTML is not allowed");
+  .refine(val => !/[<>]/.test(val), "HTML is not allowed");
 
 export const projectSchema = z.object({
   id: z.string().uuid(),
@@ -47,7 +47,7 @@ export const projectSchema = z.object({
     fr: textSchema,
     en: textSchema,
   }).strict(),
-  location: z.string().trim().max(255).nullable().refine(val => !val || !/<[a-z][\s\S]*>/i.test(val), "HTML is not allowed"),
+  location: z.string().trim().max(255).nullable().refine(val => !val || !/[<>]/.test(val), "HTML is not allowed"),
   date: z.string().nullable().refine(val => {
     if (!val) return true;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return false;
@@ -59,13 +59,15 @@ export const projectSchema = z.object({
   coverPhotoId: z.null(),
   createdAt: z.string().refine(val => {
     if (!isoDateRegex.test(val)) return false;
-    return !isNaN(new Date(val).getTime());
+    const d = new Date(val);
+    return !isNaN(d.getTime()) && d.toISOString() === val;
   }, "Must be valid ISO with ms"),
   updatedAt: z.string().refine(val => {
     if (!isoDateRegex.test(val)) return false;
-    return !isNaN(new Date(val).getTime());
+    const d = new Date(val);
+    return !isNaN(d.getTime()) && d.toISOString() === val;
   }, "Must be valid ISO with ms"),
-  photos: z.array(z.never()).default([]),
+  photos: z.array(z.never()),
 }).strict();
 
 export const portfolioSchema = z.object({
@@ -73,7 +75,8 @@ export const portfolioSchema = z.object({
   revision: z.string().regex(/^[0-9a-f]{32}$/, "Invalid revision format"),
   updatedAt: z.string().refine(val => {
     if (!isoDateRegex.test(val)) return false;
-    return !isNaN(new Date(val).getTime());
+    const d = new Date(val);
+    return !isNaN(d.getTime()) && d.toISOString() === val;
   }, "Must be valid ISO with ms"),
   projects: z.array(projectSchema),
 }).strict();
@@ -190,8 +193,8 @@ export function createProjectDraft(data: Omit<Project, "id" | "createdAt" | "upd
   const existingFrSlugs = portfolio.projects.map(p => p.slug.fr);
   const existingEnSlugs = portfolio.projects.map(p => p.slug.en);
 
-  const slugFr = data.slug.fr ? data.slug.fr : generateUniqueSlug(generateSlug(data.title.fr), existingFrSlugs);
-  const slugEn = data.slug.en ? data.slug.en : generateUniqueSlug(generateSlug(data.title.en), existingEnSlugs);
+  const slugFr = data.slug.fr && data.slug.fr.trim() ? data.slug.fr.trim() : generateUniqueSlug(generateSlug(data.title.fr), existingFrSlugs);
+  const slugEn = data.slug.en && data.slug.en.trim() ? data.slug.en.trim() : generateUniqueSlug(generateSlug(data.title.en), existingEnSlugs);
 
   const newProject: Project = {
     ...data,
@@ -219,8 +222,8 @@ export function updateProjectMetadata(projectId: string, data: Omit<Project, "id
   const existingFrSlugs = portfolio.projects.filter(p => p.id !== projectId).map(p => p.slug.fr);
   const existingEnSlugs = portfolio.projects.filter(p => p.id !== projectId).map(p => p.slug.en);
 
-  const slugFr = data.slug.fr ? data.slug.fr : generateUniqueSlug(generateSlug(data.title.fr), existingFrSlugs);
-  const slugEn = data.slug.en ? data.slug.en : generateUniqueSlug(generateSlug(data.title.en), existingEnSlugs);
+  const slugFr = data.slug.fr && data.slug.fr.trim() ? data.slug.fr.trim() : generateUniqueSlug(generateSlug(data.title.fr), existingFrSlugs);
+  const slugEn = data.slug.en && data.slug.en.trim() ? data.slug.en.trim() : generateUniqueSlug(generateSlug(data.title.en), existingEnSlugs);
 
   const updatedProject: Project = {
     ...portfolio.projects[index],
@@ -240,7 +243,7 @@ export function reorderProjects(projectIds: string[], previousRevision: string):
   if (projectIds.length !== portfolio.projects.length) {
     throw new Error("Invalid number of project IDs");
   }
-  
+
   const uniqueIds = new Set(projectIds);
   if (uniqueIds.size !== projectIds.length) {
     throw new Error("Duplicate project IDs found");

@@ -82,7 +82,10 @@ export async function action({ request }: ActionFunctionArgs) {
       return Response.json({ error: "Corrupted content" }, { status: 409, headers });
     }
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return Response.json({ error: msg }, { status: 422, headers });
+    if (msg.includes("is already used")) {
+      return Response.json({ error: msg }, { status: 422, headers });
+    }
+    return Response.json({ error: "Validation failed" }, { status: 422, headers });
   }
 }
 

@@ -22,6 +22,7 @@ describe("Real HTTP isolation WITH valid admin config", () => {
         cwd: path.resolve(__dirname, ".."),
         env: {
           ...process.env,
+          HOST: "127.0.0.1",
           PORT: String(PORT),
           NODE_ENV: "production",
           PUBLIC_SITE_URL: BASE_URL,
@@ -206,6 +207,7 @@ describe("Real HTTP isolation WITHOUT admin config", () => {
         cwd: path.resolve(__dirname, ".."),
         env: {
           ...process.env,
+          HOST: "127.0.0.1",
           PORT: String(PORT),
           NODE_ENV: "production",
           PUBLIC_SITE_URL: BASE_URL,

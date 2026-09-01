@@ -14,12 +14,12 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
   const siteContentPath = path.join(tempDir, "site-content.json");
   const portfolioContentPath = path.join(tempDir, "portfolio.json");
   const portfolioMediaPath = path.join(tempDir, "portfolio-media");
-  
+
   const defaultSiteContentPath = path.resolve(__dirname, "../app/content/default-site-content.json");
 
   beforeAll(async () => {
     fs.copyFileSync(defaultSiteContentPath, siteContentPath);
-    
+
     // Create empty portfolio
     fs.writeFileSync(portfolioContentPath, JSON.stringify({
       schemaVersion: 1,
@@ -33,6 +33,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
         cwd: path.resolve(__dirname, ".."),
         env: {
           ...process.env,
+          HOST: "127.0.0.1",
           PORT: String(PORT),
           NODE_ENV: "production",
           PUBLIC_SITE_URL: BASE_URL,
@@ -118,7 +119,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
   it("cookie anonyme signé avec CSRF mais sans admin valide -> redirection et destruction de session", async () => {
     const getRes = await fetch(`${BASE_URL}/admin`);
     const cookies = getRes.headers.get("Set-Cookie");
-    
+
     const res = await fetch(`${BASE_URL}/admin/portfolio`, {
       headers: { "Cookie": cookies || "" },
       redirect: "manual"
@@ -171,7 +172,13 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     // 2. Origin invalide -> 403
     const badOriginRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
       method: "POST",
-      headers: { "Cookie": authCookie, "Origin": "http://evil.com" }
+      headers: { 
+        "Cookie": authCookie, 
+        "Origin": "http://evil.com",
+        "Host": "evil.com",
+        "Content-Type": "application/x-www-form-urlencoded" 
+      },
+      body: new URLSearchParams({ csrfToken: csrfToken2, revision })
     });
     expect(badOriginRes.status).toBe(400);
 
@@ -194,8 +201,8 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     const createRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
       method: "POST",
       headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ 
-        csrfToken: csrfToken2, 
+      body: new URLSearchParams({
+        csrfToken: csrfToken2,
         revision,
         titleFr: "Titre FR",
         titleEn: "Title EN",
@@ -205,7 +212,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
       redirect: "manual"
     });
     expect(createRes.status).toBe(302);
-    
+
     // Check JSON content
     const portfolioContent = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
     expect(portfolioContent.projects.length).toBe(1);
@@ -216,8 +223,8 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     const editRes = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
       method: "POST",
       headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ 
-        csrfToken: csrfToken2, 
+      body: new URLSearchParams({
+        csrfToken: csrfToken2,
         revision,
         titleFr: "Titre Modifié",
         titleEn: "Title Modified",
@@ -232,28 +239,35 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     revision = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8")).revision;
 
     // 7. ancienne révision sur création, édition, ordre et suppression -> 409
-    const conflictRes = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
+    const conflictCreate = await fetch(`${BASE_URL}/admin/portfolio/new`, {
       method: "POST",
       headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ 
-        csrfToken: csrfToken2, 
-        revision: "oldrevision000",
-        titleFr: "T", titleEn: "T", descriptionFr: "D", descriptionEn: "D"
-      }),
+      body: new URLSearchParams({ csrfToken: csrfToken2, revision: "oldrevision000", titleFr: "T", titleEn: "T", descriptionFr: "D", descriptionEn: "D" }),
     });
-    expect(conflictRes.status).toBe(409);
+    expect(conflictCreate.status).toBe(409);
+    
+    const conflictEdit = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
+      method: "POST",
+      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ csrfToken: csrfToken2, revision: "oldrevision000", titleFr: "T", titleEn: "T", descriptionFr: "D", descriptionEn: "D" }),
+    });
+    expect(conflictEdit.status).toBe(409);
+
+    const conflictReorder = await fetch(`${BASE_URL}/admin/portfolio`, {
+      method: "POST",
+      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ intent: "move_up", projectId, csrfToken: csrfToken2, revision: "oldrevision000" }),
+    });
+    expect(conflictReorder.status).toBe(409);
 
     const conflictDelete = await fetch(`${BASE_URL}/admin/portfolio`, {
       method: "POST",
       headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ 
-        intent: "delete",
-        projectId,
-        csrfToken: csrfToken2, 
-        revision: "oldrevision000"
-      }),
+      body: new URLSearchParams({ intent: "delete", projectId, csrfToken: csrfToken2, revision: "oldrevision000" }),
     });
     expect(conflictDelete.status).toBe(409);
+
+
 
     // 8. JSON corrompu -> 409, octets inchangés, aucun temp ni nouveau backup
     const corruptedData = Buffer.from("{ completely broken JSON");
@@ -263,16 +277,21 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     const corruptEdit = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
       method: "POST",
       headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ 
-        csrfToken: csrfToken2, 
-        revision,
-        titleFr: "T", titleEn: "T", descriptionFr: "D", descriptionEn: "D"
-      }),
+      body: new URLSearchParams({ csrfToken: csrfToken2, revision, titleFr: "T", titleEn: "T", descriptionFr: "D", descriptionEn: "D" }),
     });
     expect(corruptEdit.status).toBe(409);
     expect(fs.readFileSync(portfolioContentPath)).toEqual(corruptedData);
     expect(fs.readdirSync(tempDir)).toEqual(beforeFiles);
-    
+
+    const corruptReorder = await fetch(`${BASE_URL}/admin/portfolio`, {
+      method: "POST",
+      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ intent: "move_up", projectId, csrfToken: csrfToken2, revision }),
+    });
+    expect(corruptReorder.status).toBe(409);
+    expect(fs.readFileSync(portfolioContentPath)).toEqual(corruptedData);
+    expect(fs.readdirSync(tempDir)).toEqual(beforeFiles);
+
     // Restore
     fs.writeFileSync(portfolioContentPath, JSON.stringify({
       schemaVersion: 1,
@@ -294,36 +313,75 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
       }]
     }));
 
+    // 8.5. Test successful reordering
+    const createRes2 = await fetch(`${BASE_URL}/admin/portfolio/new`, {
+      method: "POST",
+      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ csrfToken: csrfToken2, revision, titleFr: "Project 2", titleEn: "Project 2 EN", descriptionFr: "D", descriptionEn: "D" }),
+      redirect: "manual"
+    });
+    expect(createRes2.status).toBe(302);
+    
+    let portfolioData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
+    const p1 = portfolioData.projects[0].id;
+    const p2 = portfolioData.projects[1].id;
+    let rev = portfolioData.revision;
+    
+    const moveUp = await fetch(`${BASE_URL}/admin/portfolio`, {
+      method: "POST",
+      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ intent: "move_up", projectId: p2, csrfToken: csrfToken2, revision: rev }),
+      redirect: "manual"
+    });
+    expect(moveUp.status).toBe(302);
+    
+    portfolioData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
+    expect(portfolioData.projects[0].id).toBe(p2);
+    expect(portfolioData.projects[1].id).toBe(p1);
+    rev = portfolioData.revision;
+
     // 9. Suppression vide
     const delRes = await fetch(`${BASE_URL}/admin/portfolio`, {
       method: "POST",
       headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ 
+      body: new URLSearchParams({
         intent: "delete",
-        projectId,
-        csrfToken: csrfToken2, 
-        revision
+        projectId: p2,
+        csrfToken: csrfToken2,
+        revision: rev
       }),
       redirect: "manual"
     });
     expect(delRes.status).toBe(302);
     const afterDel = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
-    expect(afterDel.projects.length).toBe(0);
+    expect(afterDel.projects.length).toBe(1); // Deleted p2, p1 remains
+
+    // Let's delete p1
+    const delRes2 = await fetch(`${BASE_URL}/admin/portfolio`, {
+      method: "POST",
+      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ intent: "delete", projectId: p1, csrfToken: csrfToken2, revision: afterDel.revision }),
+      redirect: "manual"
+    });
+    expect(delRes2.status).toBe(302);
     
+    const finalDel = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
+    expect(finalDel.projects.length).toBe(0);
+
     // données invalides -> 422
     const invalidData = await fetch(`${BASE_URL}/admin/portfolio/new`, {
       method: "POST",
       headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ 
-        csrfToken: csrfToken2, 
-        revision: afterDel.revision
+      body: new URLSearchParams({
+        csrfToken: csrfToken2,
+        revision: finalDel.revision
         // missing fields
       }),
     });
     expect(invalidData.status).toBe(422);
 
     // corps trop grand -> 413
-    const bigBody = new URLSearchParams({ csrfToken: csrfToken2, revision: afterDel.revision, titleFr: "a".repeat(1024 * 1024) });
+    const bigBody = new URLSearchParams({ csrfToken: csrfToken2, revision: finalDel.revision, titleFr: "a".repeat(1024 * 1024) });
     const bigRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
       method: "POST",
       headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },

@@ -45,48 +45,86 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     await expect(portfolioLink).toHaveText(/Portfolio public/);
   });
 
-  test('should create a new draft project, edit it, preview it, and delete it', async ({ page }) => {
-    // Navigate to portfolio
+  test('should completely manage draft projects and respect constraints', async ({ page, context }) => {
+    // 1. Create first project
     await page.click('a[href="/admin/portfolio"]');
-    await expect(page.locator('h1')).toHaveText('Portfolio Public');
-
-    // Create new project
     await page.click('a[href="/admin/portfolio/new"]');
-    await expect(page.locator('h1')).toHaveText('Nouveau Projet');
+    
+    // Check no publish option
+    await expect(page.locator('input[name="published"]')).not.toBeVisible();
 
     await page.fill('input[name="titleFr"]', 'Test Mariage FR');
     await page.fill('input[name="titleEn"]', 'Test Wedding EN');
     await page.fill('textarea[name="descriptionFr"]', 'Desc FR');
     await page.fill('textarea[name="descriptionEn"]', 'Desc EN');
-
     await page.click('button[type="submit"]');
 
-    // Redirected back to list
     await expect(page).toHaveURL('/admin/portfolio');
-    await expect(page.locator('h3', { hasText: 'Test Mariage FR' })).toBeVisible();
+    await expect(page.locator('h3', { hasText: 'Test Mariage FR / Test Wedding EN' })).toBeVisible();
 
-    // Edit project
+    // 2. Slugs automatiques and check headers
     await page.click('a:has-text("Modifier")');
-    await expect(page.locator('h1')).toHaveText('Modifier le Projet');
-    await expect(page.locator('input[name="titleFr"]')).toHaveValue('Test Mariage FR');
+    await expect(page.locator('input[name="slugFr"]')).toHaveValue('test-mariage-fr');
+    await expect(page.locator('input[name="slugEn"]')).toHaveValue('test-wedding-en');
 
-    await page.fill('input[name="titleFr"]', 'Test Mariage Modifié');
+    // 3. Create second project with same title to test slug suffix
+    await page.click('a:has-text("Retour")');
+    await page.click('a[href="/admin/portfolio/new"]');
+    await page.fill('input[name="titleFr"]', 'Test Mariage FR');
+    await page.fill('input[name="titleEn"]', 'Test Wedding EN');
+    await page.fill('textarea[name="descriptionFr"]', 'Desc 2');
+    await page.fill('textarea[name="descriptionEn"]', 'Desc 2');
     await page.click('button[type="submit"]');
 
-    // Redirected back to list
-    await expect(page).toHaveURL('/admin/portfolio');
-    await expect(page.locator('h3', { hasText: 'Test Mariage Modifié' })).toBeVisible();
-
-    // Preview
-    await page.click('a:has-text("Aperçu")');
-    await expect(page.locator('h1')).toHaveText('Aperçu du Projet (Brouillon)');
-    await expect(page.locator('p', { hasText: 'Test Mariage Modifié' }).first()).toBeVisible();
+    const modifyLinks = page.locator('a:has-text("Modifier")');
+    await modifyLinks.last().click();
+    await expect(page.locator('input[name="slugFr"]')).toHaveValue('test-mariage-fr-1');
+    await expect(page.locator('input[name="slugEn"]')).toHaveValue('test-wedding-en-1');
     await page.click('a:has-text("Retour")');
 
-    // Delete
+    // 4. Reorder projects
+    // Wait for buttons
+    const upButtons = page.locator('button:has-text("Monter")');
+    const downButtons = page.locator('button:has-text("Descendre")');
+    
+    // First item cannot go up
+    await expect(upButtons.first()).toBeDisabled();
+    // Second item cannot go down
+    await expect(downButtons.nth(1)).toBeDisabled();
+
+    // Move second item up
+    await upButtons.nth(1).click();
+    // After reload, first item should be the one we just moved
+    await expect(page.locator('h3').first()).toHaveText('Test Mariage FR / Test Wedding EN');
+    
+    // 5. Aperçu authentifié
+    await page.locator('a:has-text("Aperçu")').first().click();
+    await expect(page.locator('h1')).toHaveText('Aperçu du Projet (Brouillon)');
+    const res = await page.request.get(page.url());
+    expect(res.headers()['cache-control']).toContain('no-store');
+    expect(res.headers()['x-robots-tag']).toContain('noindex, nofollow');
+    
+    const previewUrl = page.url();
+
+    // 6. Tentative anonyme d'aperçu -> redirection
+    const anonContext = await context.browser()!.newContext();
+    const anonPage = await anonContext.newPage();
+    await anonPage.goto(previewUrl);
+    await expect(anonPage).toHaveURL(/.*\/admin/);
+    await anonContext.close();
+
+    // 7. Pages publiques ne contiennent pas les brouillons
+    await page.goto('/fr/portfolio');
+    await expect(page.locator('body')).not.toContainText('Test Mariage FR');
+    await page.goto('/en/portfolio');
+    await expect(page.locator('body')).not.toContainText('Test Wedding EN');
+
+    // 8. Delete projects
+    await page.goto('/admin/portfolio');
     page.on('dialog', dialog => dialog.accept());
-    await page.click('button:has-text("Supprimer")');
-    await expect(page.locator('h3', { hasText: 'Test Mariage Modifié' })).not.toBeVisible();
+    await page.locator('button:has-text("Supprimer")').first().click();
+    await page.locator('button:has-text("Supprimer")').first().click();
+    await expect(page.locator('h3')).toHaveCount(0);
   });
 
 });

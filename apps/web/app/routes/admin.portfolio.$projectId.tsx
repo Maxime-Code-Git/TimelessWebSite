@@ -90,8 +90,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return Response.json({ error: "Corrupted content" }, { status: 409, headers });
     }
     const msg = err instanceof Error ? err.message : "Unknown error";
-    if (msg === "Project not found") return Response.json({ error: msg }, { status: 404, headers });
-    return Response.json({ error: msg }, { status: 422, headers });
+    if (msg === "Project not found") {
+      return Response.json({ error: "Project not found" }, { status: 404, headers });
+    }
+    if (msg.includes("is already used")) {
+      return Response.json({ error: msg }, { status: 422, headers });
+    }
+    return Response.json({ error: "Validation failed" }, { status: 422, headers });
   }
 }
 

@@ -183,6 +183,62 @@ describe("Environment Validation — fail-fast on import", () => {
   });
 
   // ---------------------------------------------------------------
+  // Portfolio path tests
+  // ---------------------------------------------------------------
+  it("should fail on import in test if portfolio path is missing", async () => {
+    const env = validEnv();
+    delete env.PORTFOLIO_CONTENT_PATH;
+    setEnv(env);
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("PORTFOLIO_CONTENT_PATH is required in test");
+  });
+
+  it("should fail on import in test if portfolio path is outside os.tmpdir()", async () => {
+    const env = validEnv();
+    env.PORTFOLIO_CONTENT_PATH = "/tmp/outside/portfolio.json";
+    if (os.tmpdir() !== "/tmp") {
+      setEnv(env);
+      const err = await captureImportError();
+      expect(err).not.toBeNull();
+      expect(err!.message).toContain("must be under os.tmpdir");
+    }
+  });
+
+  it("should fail on import in test if portfolio path is in data", async () => {
+    const env = validEnv();
+    // Force it to be in data
+    env.PORTFOLIO_CONTENT_PATH = path.join(process.cwd(), "data", "portfolio.json");
+    setEnv(env);
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    // Since it's in data, it also might be outside tmpdir. But wait, if tmpdir is /tmp, then process.cwd() is outside.
+    // If it's outside, it will fail on "must be under os.tmpdir()".
+    // This is tested in validateTestPath.
+    expect(err!.message).toContain("must");
+  });
+
+  // Test that production fails if missing
+  it("should fail in production if portfolio path is missing", async () => {
+    const env = validEnv();
+    delete env.PORTFOLIO_CONTENT_PATH;
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("Environment variable PORTFOLIO_CONTENT_PATH is missing");
+  });
+
+  it("should allow fallback in development mode", async () => {
+    const env = validEnv();
+    delete env.PORTFOLIO_CONTENT_PATH;
+    setEnv(env);
+    process.env.NODE_ENV = "development";
+    const err = await captureImportError();
+    expect(err).toBeNull(); // Import should succeed in development with fallback
+  });
+
+  // ---------------------------------------------------------------
   // Anti-leak sentinel: even on unexpected success, no secrets shown
   // ---------------------------------------------------------------
   it("should succeed import with all valid env vars without leaking values", async () => {

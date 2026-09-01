@@ -21,6 +21,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return Response.json({ project }, { headers });
 }
 
+export function headers({ loaderHeaders }: { loaderHeaders: Headers }) {
+  return {
+    "Cache-Control": loaderHeaders.get("Cache-Control") ?? "no-store",
+    "X-Robots-Tag": loaderHeaders.get("X-Robots-Tag") ?? "noindex, nofollow",
+  };
+}
+
 export default function AdminPortfolioPreview() {
   const { project } = useLoaderData() as unknown as { project: Project };
 

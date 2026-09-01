@@ -52,7 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const intent = formData.get("intent");
   if (typeof intent !== "string") return Response.json({ error: "Invalid intent" }, { status: 422, headers });
-  
+
   const previousRevision = formData.get("revision");
   if (typeof previousRevision !== "string") return Response.json({ error: "Invalid revision" }, { status: 422, headers });
 
@@ -71,29 +71,29 @@ export async function action({ request }: ActionFunctionArgs) {
         return Response.json({ error: "Corrupted content" }, { status: 409, headers });
       }
       const msg = err instanceof Error ? err.message : "Unknown error";
-      if (msg === "Project not found") return Response.json({ error: msg }, { status: 404, headers });
-      if (msg === "Cannot delete a project that contains photos") return Response.json({ error: msg }, { status: 422, headers });
-      return Response.json({ error: msg }, { status: 500, headers });
+      if (msg === "Project not found") return Response.json({ error: "Project not found" }, { status: 404, headers });
+      if (msg === "Cannot delete a project that contains photos") return Response.json({ error: "Cannot delete a project that contains photos" }, { status: 422, headers });
+      return Response.json({ error: "Internal Server Error" }, { status: 500, headers });
     }
   }
 
   if (intent === "move_up" || intent === "move_down") {
-    const portfolio = getPortfolioContent();
-    const sorted = [...portfolio.projects].sort((a, b) => a.order - b.order);
-    const index = sorted.findIndex(p => p.id === projectId);
-
-    if (index === -1) return Response.json({ error: "Project not found" }, { status: 404, headers });
-    if (intent === "move_up" && index > 0) {
-      const temp = sorted[index];
-      sorted[index] = sorted[index - 1];
-      sorted[index - 1] = temp;
-    } else if (intent === "move_down" && index < sorted.length - 1) {
-      const temp = sorted[index];
-      sorted[index] = sorted[index + 1];
-      sorted[index + 1] = temp;
-    }
-
     try {
+      const portfolio = getPortfolioContent();
+      const sorted = [...portfolio.projects].sort((a, b) => a.order - b.order);
+      const index = sorted.findIndex(p => p.id === projectId);
+
+      if (index === -1) return Response.json({ error: "Project not found" }, { status: 404, headers });
+      if (intent === "move_up" && index > 0) {
+        const temp = sorted[index];
+        sorted[index] = sorted[index - 1];
+        sorted[index - 1] = temp;
+      } else if (intent === "move_down" && index < sorted.length - 1) {
+        const temp = sorted[index];
+        sorted[index] = sorted[index + 1];
+        sorted[index + 1] = temp;
+      }
+
       reorderProjects(sorted.map(p => p.id), previousRevision);
       return redirect("/admin/portfolio", { headers });
     } catch (err: unknown) {
@@ -104,7 +104,8 @@ export async function action({ request }: ActionFunctionArgs) {
         return Response.json({ error: "Corrupted content" }, { status: 409, headers });
       }
       const msg = err instanceof Error ? err.message : "Unknown error";
-      return Response.json({ error: msg }, { status: 422, headers });
+      if (msg === "Project not found") return Response.json({ error: "Project not found" }, { status: 404, headers });
+      return Response.json({ error: "Internal Server Error" }, { status: 500, headers });
     }
   }
 

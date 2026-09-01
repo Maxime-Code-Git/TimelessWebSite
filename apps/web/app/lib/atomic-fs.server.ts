@@ -8,10 +8,11 @@ export function createBackup(filePath: string): string | null {
   const dir = path.dirname(filePath);
   const baseName = path.basename(filePath);
   const timestamp = Date.now();
-  const backupPath = path.join(dir, `${baseName}.${timestamp}.bak`);
+  const randomSuffix = crypto.randomBytes(4).toString("hex");
+  const backupPath = path.join(dir, `${baseName}.${timestamp}-${randomSuffix}.bak`);
 
   try {
-    fs.copyFileSync(filePath, backupPath);
+    fs.copyFileSync(filePath, backupPath, fs.constants.COPYFILE_EXCL);
     fs.chmodSync(backupPath, 0o600);
   } catch (err) {
     if (fs.existsSync(backupPath)) {

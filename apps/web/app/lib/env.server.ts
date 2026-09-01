@@ -25,7 +25,7 @@ function validateTestPath(val: string | undefined, name: string): string {
       throw new Error(`CRITICAL: ${name} must not be under ${fDir} in tests.`);
     }
   }
-  return val;
+  return resolved;
 }
 
 export const ENV = {
@@ -35,7 +35,7 @@ export const ENV = {
     const val = process.env.PORTFOLIO_CONTENT_PATH;
     if (isProd && !val) throw new Error("CRITICAL: Environment variable PORTFOLIO_CONTENT_PATH is missing. Please check your .env files.");
     if (isTest) return validateTestPath(val, "PORTFOLIO_CONTENT_PATH");
-    return val || "./data/portfolio.json";
+    return path.resolve(val || "./data/portfolio.json");
   },
   get PORTFOLIO_MEDIA_PATH() {
     const isProd = process.env.NODE_ENV === "production";
@@ -43,7 +43,7 @@ export const ENV = {
     const val = process.env.PORTFOLIO_MEDIA_PATH;
     if (isProd && !val) throw new Error("CRITICAL: Environment variable PORTFOLIO_MEDIA_PATH is missing. Please check your .env files.");
     if (isTest) return validateTestPath(val, "PORTFOLIO_MEDIA_PATH");
-    return val || "./data/media/portfolio";
+    return path.resolve(val || "./data/media/portfolio");
   },
   get PUBLIC_SITE_URL() {
     const url = requireEnvVar("PUBLIC_SITE_URL");
