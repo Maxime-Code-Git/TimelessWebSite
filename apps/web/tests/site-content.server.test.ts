@@ -312,5 +312,99 @@ describe("site-content.server.ts", () => {
       expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
       expect(files.filter(f => f.endsWith(".bak"))).toHaveLength(beforeBackups);
     });
+
+    it("copyFileSync succeeds then chmodSync of backup fails: original unchanged, no temp, no false backup", () => {
+      fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
+      const beforeData = fs.readFileSync(tempFile);
+      const beforeBackups = fs.readdirSync(tempDir).filter(f => f.endsWith(".bak")).length;
+      const newPricing = JSON.parse(JSON.stringify(defaultContent.pricing));
+
+      const chmodSpy = vi.spyOn(fs, "chmodSync").mockImplementation((p) => {
+        const pathStr = String(p);
+        if (pathStr.endsWith(".bak")) {
+          throw new Error("Fake chmod error");
+        }
+      });
+
+      expect(() => savePricing(newPricing, defaultContent.revision)).toThrow("Fake chmod error");
+
+      chmodSpy.mockRestore();
+
+      // Original file unchanged
+      expect(fs.readFileSync(tempFile)).toEqual(beforeData);
+      // No temp files remain
+      const files = fs.readdirSync(tempDir);
+      expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
+      // No false backup created
+      expect(files.filter(f => f.endsWith(".bak"))).toHaveLength(beforeBackups);
+    });
+
+    it("with five old backups, renameSync fails: all five old backups remain strictly identical", () => {
+      fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
+
+      // Create 5 old backups manually
+      const oldBackupPaths: string[] = [];
+      const oldBackupContents: Buffer[] = [];
+      for (let i = 0; i < 5; i++) {
+        const bkp = path.join(tempDir, `site-content.json.${1000000 + i}.bak`);
+        const content = Buffer.from(`backup-content-${i}`);
+        fs.writeFileSync(bkp, content);
+        oldBackupPaths.push(bkp);
+        oldBackupContents.push(content);
+      }
+
+      const newPricing = JSON.parse(JSON.stringify(defaultContent.pricing));
+      const renameSpy = vi.spyOn(fs, "renameSync").mockImplementation(() => {
+        throw new Error("Fake rename error");
+      });
+
+      expect(() => savePricing(newPricing, defaultContent.revision)).toThrow("Fake rename error");
+
+      renameSpy.mockRestore();
+
+      // All 5 old backups remain strictly identical
+      for (let i = 0; i < 5; i++) {
+        expect(fs.existsSync(oldBackupPaths[i])).toBe(true);
+        expect(fs.readFileSync(oldBackupPaths[i])).toEqual(oldBackupContents[i]);
+      }
+    });
+
+    it("after a rename success: maximum 5 backups", () => {
+      fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
+      let currentRev = defaultContent.revision;
+      const newSettings = JSON.parse(JSON.stringify(defaultContent.business));
+
+      for (let i = 0; i < 8; i++) {
+        newSettings.address = `Addr ${i}`;
+        currentRev = saveSettings(newSettings, currentRev);
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+      }
+
+      const files = fs.readdirSync(tempDir);
+      const backups = files.filter(f => f.endsWith(".bak"));
+      expect(backups.length).toBeLessThanOrEqual(5);
+    });
+
+    it("late rotation error does not announce failure after new JSON is installed", async () => {
+      fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
+      const newPricing = JSON.parse(JSON.stringify(defaultContent.pricing));
+      newPricing.photo[0].priceCents = 55555;
+
+      // Import the module to mock the exported rotateBackups function
+      const siteContentModule = await import("../app/lib/site-content.server");
+      const rotateSpy = vi.spyOn(siteContentModule, "rotateBackups").mockImplementation(() => {
+        throw new Error("Fake rotation error");
+      });
+
+      // This should NOT throw — rotation is best-effort
+      const newRev = savePricing(newPricing, defaultContent.revision);
+      expect(newRev).not.toBe(defaultContent.revision);
+
+      rotateSpy.mockRestore();
+
+      // Verify the new JSON is installed
+      const loaded = getSiteContent();
+      expect(loaded.pricing.photo[0].priceCents).toBe(55555);
+    });
   });
 });

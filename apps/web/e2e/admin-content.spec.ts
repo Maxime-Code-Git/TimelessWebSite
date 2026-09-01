@@ -16,10 +16,31 @@ test.describe('Admin Content Management (Phase 3B)', () => {
     const siteContentPath = process.env.SITE_CONTENT_PATH;
     expect(siteContentPath).toBeDefined();
     if (!siteContentPath) throw new Error("SITE_CONTENT_PATH missing");
+
     const absolutePath = path.resolve(siteContentPath);
-    expect(absolutePath).toContain('timeless-e2e-');
-    expect(absolutePath.startsWith(fs.realpathSync(os.tmpdir())) || absolutePath.startsWith(os.tmpdir())).toBe(true);
-    expect(absolutePath).not.toContain(path.join(process.cwd(), 'data'));
+    const realTmpDir = fs.realpathSync(os.tmpdir());
+    // Resolve the parent directory to handle macOS symlinks (/var -> /private/var)
+    const realParentDir = fs.realpathSync(path.dirname(absolutePath));
+    const realAbsolutePath = path.join(realParentDir, path.basename(absolutePath));
+
+    // Verify the path is truly under the system temp directory using path.relative()
+    const relativeToTmp = path.relative(realTmpDir, realAbsolutePath);
+    if (relativeToTmp.startsWith('..') || path.isAbsolute(relativeToTmp)) {
+      throw new Error(`SITE_CONTENT_PATH is not under tmpdir: ${realAbsolutePath}`);
+    }
+
+    // Verify its parent directory starts with timeless-e2e-
+    const parentDir = path.basename(path.dirname(absolutePath));
+    if (!parentDir.startsWith('timeless-e2e-')) {
+      throw new Error(`SITE_CONTENT_PATH parent dir does not start with timeless-e2e-: ${parentDir}`);
+    }
+
+    // Verify the path is not under the project data directory
+    const dataDir = path.resolve(process.cwd(), 'data');
+    const relativeToData = path.relative(dataDir, absolutePath);
+    if (!relativeToData.startsWith('..') && !path.isAbsolute(relativeToData)) {
+      throw new Error(`SITE_CONTENT_PATH must not be under data/: ${absolutePath}`);
+    }
   });
 
   test.beforeEach(async ({ page }) => {

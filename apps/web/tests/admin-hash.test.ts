@@ -6,6 +6,19 @@ import fs from "node:fs";
 
 const execAsync = promisify(exec);
 
+/**
+ * Narrowing helper for child_process exec errors.
+ * Validates that the caught value is a non-null object with
+ * a numeric `code` and a string `stderr` before accessing them.
+ */
+function getExecError(e: unknown): { code: number; stderr: string } | null {
+  if (typeof e !== "object" || e === null) return null;
+  const obj = e as Record<string, unknown>;
+  if (typeof obj.code !== "number") return null;
+  if (typeof obj.stderr !== "string") return null;
+  return { code: obj.code, stderr: obj.stderr };
+}
+
 describe("admin:hash script", () => {
   const scriptPath = path.resolve(__dirname, "../scripts/admin-hash.js");
 
@@ -18,8 +31,10 @@ describe("admin:hash script", () => {
       await execAsync(`node ${scriptPath} arg1`, { cwd: path.resolve(__dirname, "..") });
       expect.unreachable("Should have failed");
     } catch (e: unknown) {
-      expect(e.code).not.toBe(0);
-      expect(e.stderr).toContain("Les arguments en ligne de commande sont refusés par sécurité.");
+      const err = getExecError(e);
+      expect(err).not.toBeNull();
+      expect(err!.code).not.toBe(0);
+      expect(err!.stderr).toContain("Les arguments en ligne de commande sont refusés par sécurité.");
     }
   });
 
@@ -29,8 +44,10 @@ describe("admin:hash script", () => {
       await execAsync(`node ${scriptPath}`, { cwd: path.resolve(__dirname, "..") });
       expect.unreachable("Should have failed");
     } catch (e: unknown) {
-      expect((e as unknown).code).not.toBe(0);
-      expect((e as unknown).stderr).toContain("Ce script nécessite un terminal interactif (TTY).");
+      const err = getExecError(e);
+      expect(err).not.toBeNull();
+      expect(err!.code).not.toBe(0);
+      expect(err!.stderr).toContain("Ce script nécessite un terminal interactif (TTY).");
     }
   });
 

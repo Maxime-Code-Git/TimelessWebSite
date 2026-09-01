@@ -34,7 +34,9 @@ test.describe('Admin CSP and Styles', () => {
     // 4. Verify Pricing Page
     const pricingRes = await page.goto('/admin/pricing');
     expect(pricingRes?.status()).toBe(200);
-    expect(pricingRes?.headers()['content-security-policy']).not.toContain("'unsafe-inline'");
+    const cspHeaderPricing = pricingRes?.headers()['content-security-policy'];
+    expect(cspHeaderPricing).toBeDefined();
+    expect(cspHeaderPricing).not.toContain("'unsafe-inline'");
     await expect(page.locator('h1')).toContainText('Formules et tarifs');
     const inlineStylesPricing = await page.locator('[style]').count();
     expect(inlineStylesPricing).toBe(0);
@@ -44,7 +46,9 @@ test.describe('Admin CSP and Styles', () => {
     // 5. Verify Settings Page
     const settingsRes = await page.goto('/admin/settings');
     expect(settingsRes?.status()).toBe(200);
-    expect(settingsRes?.headers()['content-security-policy']).not.toContain("'unsafe-inline'");
+    const cspHeaderSettings = settingsRes?.headers()['content-security-policy'];
+    expect(cspHeaderSettings).toBeDefined();
+    expect(cspHeaderSettings).not.toContain("'unsafe-inline'");
     await expect(page.locator('h1')).toContainText('Textes et informations');
     const inlineStylesSettings = await page.locator('[style]').count();
     expect(inlineStylesSettings).toBe(0);

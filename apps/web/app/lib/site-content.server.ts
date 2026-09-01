@@ -286,16 +286,31 @@ export function getRawSiteContent(): { content: SiteContent, isCorrupted: boolea
   return { content: defaultContent as SiteContent, isCorrupted: false };
 }
 
-function manageBackups(filePath: string): string | null {
+export function createBackup(filePath: string): string | null {
   if (!fs.existsSync(filePath)) return null;
 
   const dir = path.dirname(filePath);
   const baseName = path.basename(filePath);
-
   const timestamp = Date.now();
   const backupPath = path.join(dir, `${baseName}.${timestamp}.bak`);
+
   fs.copyFileSync(filePath, backupPath);
-  fs.chmodSync(backupPath, 0o600);
+  try {
+    fs.chmodSync(backupPath, 0o600);
+  } catch (chmodErr) {
+    // Cleanup the partial backup before re-throwing
+    try {
+      fs.unlinkSync(backupPath);
+    } catch { /* ignore cleanup error */ }
+    throw chmodErr;
+  }
+
+  return backupPath;
+}
+
+export function rotateBackups(filePath: string): void {
+  const dir = path.dirname(filePath);
+  const baseName = path.basename(filePath);
 
   const files = fs.readdirSync(dir);
   const backups = files
@@ -310,7 +325,6 @@ function manageBackups(filePath: string): string | null {
       } catch { /* ignore */ }
     }
   }
-  return backupPath;
 }
 
 function atomicSave(newContent: SiteContent, filePath: string) {
@@ -322,7 +336,6 @@ function atomicSave(newContent: SiteContent, filePath: string) {
   const tempFilePath = `${filePath}.tmp.${crypto.randomBytes(4).toString("hex")}`;
   let fd: number | null = null;
   let dirFd: number | null = null;
-  let createdBackupPath: string | null = null;
   try {
     const jsonStr = JSON.stringify(newContent, null, 2);
     const buffer = Buffer.from(jsonStr, "utf-8");
@@ -341,30 +354,44 @@ function atomicSave(newContent: SiteContent, filePath: string) {
     fs.closeSync(fd);
     fd = null;
 
-    createdBackupPath = manageBackups(filePath);
+    // Create backup before rename
+    const createdBackupPath = createBackup(filePath);
 
-    fs.renameSync(tempFilePath, filePath);
+    try {
+      fs.renameSync(tempFilePath, filePath);
+    } catch (renameErr) {
+      // Rename failed: clean temp file and the backup we just created,
+      // but preserve all older backups strictly intact
+      if (fs.existsSync(tempFilePath)) {
+        try { fs.unlinkSync(tempFilePath); } catch { /* ignore */ }
+      }
+      if (createdBackupPath && fs.existsSync(createdBackupPath)) {
+        try { fs.unlinkSync(createdBackupPath); } catch { /* ignore */ }
+      }
+      throw renameErr;
+    }
 
+    // Rename succeeded — the new JSON is installed.
+    // From this point, no error should turn a successful save into a failure.
+
+    // Best-effort directory fsync
     try {
       dirFd = fs.openSync(dir, "r");
       fs.fsyncSync(dirFd);
     } catch {
       // Best-effort directory fsync
     }
-  } catch (err) {
-    if (fs.existsSync(tempFilePath)) {
-      try {
-        fs.unlinkSync(tempFilePath);
-      } catch {
-        // ignore
-      }
+
+    // Best-effort rotation — only after rename success
+    try {
+      rotateBackups(filePath);
+    } catch {
+      // Rotation errors must not turn a successful save into a failure
     }
-    if (createdBackupPath && fs.existsSync(createdBackupPath)) {
-      try {
-        fs.unlinkSync(createdBackupPath);
-      } catch {
-        // ignore
-      }
+  } catch (err) {
+    // Cleanup temp file on any error before rename
+    if (fs.existsSync(tempFilePath)) {
+      try { fs.unlinkSync(tempFilePath); } catch { /* ignore */ }
     }
     throw err;
   } finally {

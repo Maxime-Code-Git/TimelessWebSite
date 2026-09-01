@@ -185,3 +185,108 @@ describe("Real HTTP isolation WITH valid admin config", () => {
     fs.copyFileSync(defaultContentPath, siteContentPath);
   });
 });
+
+describe("Real HTTP isolation WITHOUT admin config", () => {
+  let serverProcess: ChildProcess;
+  const PORT = 43210;
+  const BASE_URL = `http://localhost:${PORT}`;
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-noadmin-http-"));
+  const dbPath = path.join(tempDir, "rate-limit.db");
+  const siteContentPath = path.join(tempDir, "site-content.json");
+  const defaultContentPath = path.resolve(__dirname, "../app/content/default-site-content.json");
+
+  beforeAll(async () => {
+    fs.copyFileSync(defaultContentPath, siteContentPath);
+
+    return new Promise((resolve, reject) => {
+      serverProcess = spawn("npm", ["run", "start"], {
+        cwd: path.resolve(__dirname, ".."),
+        env: {
+          ...process.env,
+          PORT: String(PORT),
+          NODE_ENV: "production",
+          PUBLIC_SITE_URL: BASE_URL,
+          CONTACT_RATE_LIMIT_SECRET: "test-secret",
+          RATE_LIMIT_DB_PATH: dbPath,
+          SMTP_HOST: "localhost",
+          SMTP_PORT: "2525",
+          SMTP_USER: "test",
+          SMTP_PASS: "test",
+          SMTP_FROM: "from@example.com",
+          SMTP_TO: "to@example.com",
+          CONTACT_RATE_LIMIT_MAX: "10",
+          TRUST_PROXY: "true",
+          ADMIN_PASSWORD_HASH: "",
+          ADMIN_SESSION_SECRET: "",
+          SITE_CONTENT_PATH: siteContentPath,
+        },
+      });
+
+      const timeout = setTimeout(() => reject(new Error("Server startup timeout")), 15000);
+
+      serverProcess.stdout?.on("data", (data) => {
+        if (data.toString().includes(String(PORT))) {
+          clearTimeout(timeout);
+          resolve(undefined);
+        }
+      });
+      serverProcess.stderr?.on("data", (data) => console.error("Server error (no-admin):", data.toString()));
+      serverProcess.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+      serverProcess.on("exit", (code) => {
+        clearTimeout(timeout);
+        if (code !== 0 && code !== null) {
+          reject(new Error(`Server exited with code ${code}`));
+        }
+      });
+    });
+  });
+
+  afterAll(() => {
+    if (serverProcess) serverProcess.kill();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("GET /fr/ -> 200", async () => {
+    const res = await fetch(`${BASE_URL}/fr/`);
+    expect(res.status).toBe(200);
+  });
+
+  it("GET /en/contact -> 200", async () => {
+    const res = await fetch(`${BASE_URL}/en/contact`);
+    expect(res.status).toBe(200);
+  });
+
+  it("GET /admin -> 503 with safe error message", async () => {
+    const res = await fetch(`${BASE_URL}/admin`);
+    expect(res.status).toBe(503);
+    const html = await res.text();
+    expect(html).toContain("Administration temporairement indisponible");
+    // Must not leak any secret variable name or stack trace
+    expect(html).not.toContain("ADMIN_PASSWORD_HASH");
+    expect(html).not.toContain("ADMIN_SESSION_SECRET");
+    expect(html).not.toContain("Error:");
+    expect(html).not.toMatch(/at\s+\S+\s+\(/); // no stack trace frames
+  });
+
+  it("POST /admin -> 503 with generic message", async () => {
+    const res = await fetch(`${BASE_URL}/admin`, {
+      method: "POST",
+      body: new URLSearchParams({ password: "anything" }),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Origin": BASE_URL,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      redirect: "manual",
+    });
+    expect(res.status).toBe(503);
+    const html = await res.text();
+    expect(html).toContain("Administration temporairement indisponible");
+    expect(html).not.toContain("ADMIN_PASSWORD_HASH");
+    expect(html).not.toContain("ADMIN_SESSION_SECRET");
+  });
+});
