@@ -174,10 +174,10 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     const beforeOriginContent = fs.readFileSync(portfolioContentPath);
     const badOriginRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
       method: "POST",
-      headers: { 
-        "Cookie": authCookie, 
+      headers: {
+        "Cookie": authCookie,
         "Origin": "http://evil.com",
-        "Content-Type": "application/x-www-form-urlencoded" 
+        "Content-Type": "application/x-www-form-urlencoded"
       },
       body: new URLSearchParams({ csrfToken: csrfToken2, revision })
     });
@@ -248,7 +248,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
       body: new URLSearchParams({ csrfToken: csrfToken2, revision: "oldrevision000", titleFr: "T", titleEn: "T", descriptionFr: "D", descriptionEn: "D" }),
     });
     expect(conflictCreate.status).toBe(409);
-    
+
     const conflictEdit = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
       method: "POST",
       headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
@@ -324,12 +324,12 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
       redirect: "manual"
     });
     expect(createRes2.status).toBe(302);
-    
+
     let portfolioData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
     const p1 = portfolioData.projects[0].id;
     const p2 = portfolioData.projects[1].id;
     let rev = portfolioData.revision;
-    
+
     const moveUp = await fetch(`${BASE_URL}/admin/portfolio`, {
       method: "POST",
       headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
@@ -337,7 +337,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
       redirect: "manual"
     });
     expect(moveUp.status).toBe(302);
-    
+
     portfolioData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
     expect(portfolioData.projects[0].id).toBe(p2);
     expect(portfolioData.projects[1].id).toBe(p1);
@@ -367,7 +367,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
       redirect: "manual"
     });
     expect(delRes2.status).toBe(302);
-    
+
     const finalDel = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
     expect(finalDel.projects.length).toBe(0);
 

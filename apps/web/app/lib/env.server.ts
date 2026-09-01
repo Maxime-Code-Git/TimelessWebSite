@@ -39,8 +39,13 @@ function validateProductionPath(val: string, name: string, isMedia: boolean): st
   try {
     stat = fs.statSync(val);
     exists = true;
-  } catch {
-    // exists remains false
+  } catch (err: unknown) {
+    if (err && typeof err === "object" && "code" in err && (err as { code: unknown }).code === "ENOENT") {
+      // exists remains false
+    } else {
+      // eslint-disable-next-line preserve-caught-error
+      throw new Error(`CRITICAL: ${name} or its parent directory is not writable or does not exist.`);
+    }
   }
 
   try {
@@ -64,7 +69,8 @@ function validateProductionPath(val: string, name: string, isMedia: boolean): st
     if (error instanceof Error && error.message && error.message.includes(`must be a`)) {
       throw error;
     }
-    throw new Error(`CRITICAL: ${name} or its parent directory is not writable or does not exist.`, { cause: error });
+    // eslint-disable-next-line preserve-caught-error
+    throw new Error(`CRITICAL: ${name} or its parent directory is not writable or does not exist.`);
   }
 
   if (isMedia) {

@@ -319,6 +319,43 @@ describe("Environment Validation — fail-fast on import", () => {
       expect(err).not.toBeNull();
       expect(err!.message).toContain("PORTFOLIO_CONTENT_PATH or its parent directory is not writable or does not exist");
       expect(err!.message).not.toContain(tempFile);
+      expect((err as { cause?: unknown }).cause).toBeUndefined();
+    } finally {
+      vi.doUnmock("node:fs");
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should fail immediately without exposing path if statSync throws EACCES", async () => {
+    const env = validEnv();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-test-prod-stat-eacces-"));
+    const tempFile = path.join(tempDir, "portfolio.json");
+
+    env.PORTFOLIO_CONTENT_PATH = tempFile;
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+
+    vi.doMock("node:fs", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs")>();
+      return {
+        ...actual,
+        statSync: (p: fs.PathLike, options?: fs.StatOptions) => {
+          if (p === tempFile) {
+            const error = new Error(`EACCES: permission denied, stat '${tempFile}'`) as Error & { code?: string };
+            error.code = "EACCES";
+            throw error;
+          }
+          return actual.statSync(p, options);
+        }
+      };
+    });
+
+    try {
+      const err = await captureImportError();
+      expect(err).not.toBeNull();
+      expect(err!.message).toContain("PORTFOLIO_CONTENT_PATH or its parent directory is not writable or does not exist");
+      expect(err!.message).not.toContain(tempFile);
+      expect((err as { cause?: unknown }).cause).toBeUndefined();
     } finally {
       vi.doUnmock("node:fs");
       fs.rmSync(tempDir, { recursive: true, force: true });
