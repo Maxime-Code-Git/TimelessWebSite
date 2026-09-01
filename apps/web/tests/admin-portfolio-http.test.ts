@@ -169,7 +169,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     });
     expect(badMethodRes.status).toBe(405);
 
-    // 2. Origin invalide -> 400 (React Router intercepts this before action and throws 400)
+    // 2. Origin invalide -> 400 (La protection cross-origin intégrée de React Router intercepte ceci et renvoie 400)
     const beforeOriginFiles = fs.readdirSync(tempDir);
     const beforeOriginContent = fs.readFileSync(portfolioContentPath);
     const badOriginRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {

@@ -4,7 +4,7 @@ test.describe('Admin CSP and Styles', () => {
   test('should not have any inline styles on /admin login and dashboard', async ({ page, request }) => {
     const pageErrors: string[] = [];
     const cspErrors: string[] = [];
-    
+
     page.on('pageerror', (err) => pageErrors.push(err.message));
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
@@ -79,7 +79,7 @@ test.describe('Admin CSP and Styles', () => {
     await page.fill('textarea[name="descriptionFr"]', 'Desc');
     await page.fill('textarea[name="descriptionEn"]', 'Desc');
     await page.click('button[type="submit"]');
-    
+
     // Now on /admin/portfolio
     const editLink = page.locator('a', { hasText: 'Modifier' }).first();
     const href = await editLink.getAttribute('href');

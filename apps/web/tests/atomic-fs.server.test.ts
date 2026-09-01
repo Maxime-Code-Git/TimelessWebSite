@@ -34,7 +34,7 @@ describe("atomic-fs.server", () => {
     vi.spyOn(Date, "now").mockReturnValue(1234567890);
     atomicWrite(testFile, "v1");
     atomicWrite(testFile, "v2");
-    
+
     const backups = getBackups(testFile);
     expect(backups.length).toBe(2);
     expect(backups[0]).not.toBe(backups[1]);
@@ -89,7 +89,7 @@ describe("atomic-fs.server", () => {
       vi.spyOn(Date, "now").mockReturnValue(1000000 + i * 1000);
       atomicWrite(testFile, `v${i}`);
     }
-    
+
     const beforeBackups = getBackups(testFile);
     expect(beforeBackups.length).toBe(5);
 
@@ -97,15 +97,15 @@ describe("atomic-fs.server", () => {
     const renameSpy = vi.spyOn(fs, "renameSync").mockImplementation(() => {
       throw new Error("Rename failed");
     });
-    
+
     expect(() => atomicWrite(testFile, "v6")).toThrow("Rename failed");
-    
+
     expect(fs.readFileSync(testFile, "utf-8")).toBe("v5"); // original kept
     expect(fs.readdirSync(tempDir).filter(f => f.includes(".tmp."))).toHaveLength(0); // no temp
-    
+
     const afterBackups = getBackups(testFile);
     expect(afterBackups).toEqual(beforeBackups); // exactly 5 old backups unchanged
-    
+
     renameSpy.mockRestore();
   });
 
@@ -158,7 +158,7 @@ describe("atomic-fs.server", () => {
 
     // Verify it doesn't throw
     atomicWrite(testFile, "new-content");
-    
+
     expect(dirFsyncCalled).toBe(true);
     expect(fs.readFileSync(testFile, "utf-8")).toBe("new-content");
     fsyncSpy.mockRestore();

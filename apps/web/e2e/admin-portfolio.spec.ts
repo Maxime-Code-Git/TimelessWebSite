@@ -49,7 +49,7 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     // 1. Create first project
     await page.click('a[href="/admin/portfolio"]');
     await page.click('a[href="/admin/portfolio/new"]');
-    
+
     // Check no publish option
     await expect(page.locator('input[name="published"]')).not.toBeVisible();
 
@@ -80,7 +80,7 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     await modifyLinks.last().click();
     await expect(page.locator('input[name="slugFr"]')).toHaveValue('test-mariage-fr-1');
     await expect(page.locator('input[name="slugEn"]')).toHaveValue('test-wedding-en-1');
-    
+
     // Change the title to make it distinct for reordering tests
     await page.fill('input[name="titleFr"]', 'Test Mariage FR 2');
     await page.click('button[type="submit"]');
@@ -93,7 +93,7 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     // Wait for buttons
     const upButtons = page.locator('button:has-text("Monter")');
     const downButtons = page.locator('button:has-text("Descendre")');
-    
+
     // First item cannot go up
     await expect(upButtons.first()).toBeDisabled();
     // Second item cannot go down
@@ -104,14 +104,14 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     // After reload, first item should be the one we just moved
     await expect(page.locator('h3').first()).toHaveText('Test Mariage FR 2 / Test Wedding EN');
     await expect(page.locator('h3').nth(1)).toHaveText('Test Mariage FR / Test Wedding EN');
-    
+
     // 5. Aperçu authentifié
     await page.locator('a:has-text("Aperçu")').first().click();
     await expect(page.locator('h1')).toHaveText('Aperçu du Projet (Brouillon)');
     const res = await page.request.get(page.url());
     expect(res.headers()['cache-control']).toContain('no-store');
     expect(res.headers()['x-robots-tag']).toContain('noindex, nofollow');
-    
+
     const previewUrl = page.url();
 
     // 6. Tentative anonyme d'aperçu -> redirection

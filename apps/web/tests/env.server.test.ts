@@ -290,13 +290,124 @@ describe("Environment Validation — fail-fast on import", () => {
 
   it("should fail in production if destination is not writable", async () => {
     const env = validEnv();
-    // /root is generally not writable for normal users
-    env.PORTFOLIO_CONTENT_PATH = "/root/portfolio.json";
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-test-prod-nowrite-"));
+    const tempFile = path.join(tempDir, "portfolio.json");
+
+    // Create the file so it "exists"
+    fs.writeFileSync(tempFile, "{}");
+
+    env.PORTFOLIO_CONTENT_PATH = tempFile;
     setEnv(env);
     process.env.NODE_ENV = "production";
+
+    // Mock accessSync specifically for this test
+    vi.doMock("node:fs", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs")>();
+      return {
+        ...actual,
+        accessSync: (p: fs.PathLike, mode?: number) => {
+          if (p === tempFile || p === tempDir) {
+            throw new Error("EACCES: permission denied");
+          }
+          return actual.accessSync(p, mode);
+        }
+      };
+    });
+
+    try {
+      const err = await captureImportError();
+      expect(err).not.toBeNull();
+      expect(err!.message).toContain("PORTFOLIO_CONTENT_PATH or its parent directory is not writable or does not exist");
+      expect(err!.message).not.toContain(tempFile);
+    } finally {
+      vi.doUnmock("node:fs");
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should fail in production if PORTFOLIO_CONTENT_PATH points to a directory", async () => {
+    const env = validEnv();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-test-prod-content-dir-"));
+    env.PORTFOLIO_CONTENT_PATH = tempDir;
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+
+    const err = await captureImportError();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("PORTFOLIO_CONTENT_PATH must be a regular file");
+    expect(err!.message).not.toContain(tempDir);
+  });
+
+  it("should fail in production if PORTFOLIO_MEDIA_PATH points to a file", async () => {
+    const env = validEnv();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-test-prod-media-file-"));
+    const tempFile = path.join(tempDir, "media.txt");
+    fs.writeFileSync(tempFile, "");
+
+    env.PORTFOLIO_CONTENT_PATH = path.join(tempDir, "portfolio.json");
+    env.PORTFOLIO_MEDIA_PATH = tempFile;
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+
+    const err = await captureImportError();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("PORTFOLIO_MEDIA_PATH must be a directory");
+    expect(err!.message).not.toContain(tempFile);
+  });
+
+  it("should fail in production if PORTFOLIO_MEDIA_PATH is relative", async () => {
+    const env = validEnv();
+    env.PORTFOLIO_MEDIA_PATH = "data/media";
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+
     const err = await captureImportError();
     expect(err).not.toBeNull();
-    expect(err!.message).toContain("PORTFOLIO_CONTENT_PATH or its parent directory is not writable");
+    expect(err!.message).toContain("PORTFOLIO_MEDIA_PATH must be an absolute path");
+  });
+
+  it("should fail in production if PORTFOLIO_MEDIA_PATH is missing", async () => {
+    const env = validEnv();
+    delete env.PORTFOLIO_MEDIA_PATH;
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("Environment variable PORTFOLIO_MEDIA_PATH is missing");
+  });
+
+  it("should resolve symlinks and reject if real path is under public or build", async () => {
+    // We can only test this if symlinks are supported (POSIX)
+    if (os.platform() === 'win32') return;
+
+    const env = validEnv();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-test-symlink-"));
+
+    // Create a symlink pointing to REAL process.cwd()/public
+    const realPublic = path.join(process.cwd(), "public");
+    if (!fs.existsSync(realPublic)) {
+       fs.rmSync(tempDir, { recursive: true, force: true });
+       return; // Skip if no real public dir
+    }
+
+    const realSymlinkPath = path.join(tempDir, "real-symlink");
+    fs.symlinkSync(realPublic, realSymlinkPath, "dir");
+
+    env.PORTFOLIO_MEDIA_PATH = realSymlinkPath;
+    env.PORTFOLIO_CONTENT_PATH = path.join(tempDir, "portfolio.json");
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+
+    const err = await captureImportError();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("PORTFOLIO_MEDIA_PATH must not be under public or build directories");
   });
 
   it("should accept valid absolute paths in production", async () => {
@@ -308,7 +419,7 @@ describe("Environment Validation — fail-fast on import", () => {
     process.env.NODE_ENV = "production";
     const err = await captureImportError();
     fs.rmSync(tempDir, { recursive: true, force: true });
-    
+
     if (err !== null) {
       throw new Error(`Expected env.server import to succeed in prod: ${err.message}`);
     }

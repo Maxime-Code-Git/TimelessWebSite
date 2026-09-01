@@ -33,25 +33,60 @@ function validateProductionPath(val: string, name: string, isMedia: boolean): st
   if (!path.isAbsolute(val)) {
     throw new Error(`CRITICAL: Environment variable ${name} must be an absolute path.`);
   }
-  
+
+  let exists = false;
+  let stat: fs.Stats | undefined;
+  try {
+    stat = fs.statSync(val);
+    exists = true;
+  } catch {
+    // exists remains false
+  }
+
+  try {
+    if (exists) {
+      if (isMedia && !stat!.isDirectory()) {
+        throw new Error(`CRITICAL: ${name} must be a directory.`);
+      }
+      if (!isMedia && !stat!.isFile()) {
+        throw new Error(`CRITICAL: ${name} must be a regular file.`);
+      }
+      fs.accessSync(val, fs.constants.W_OK);
+    } else {
+      const parentDir = path.dirname(val);
+      const parentStat = fs.statSync(parentDir);
+      if (!parentStat.isDirectory()) {
+        throw new Error(`CRITICAL: The parent of ${name} must be a directory.`);
+      }
+      fs.accessSync(parentDir, fs.constants.W_OK);
+    }
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message && error.message.includes(`must be a`)) {
+      throw error;
+    }
+    throw new Error(`CRITICAL: ${name} or its parent directory is not writable or does not exist.`, { cause: error });
+  }
+
   if (isMedia) {
+    let realPathToCheck = val;
+    try {
+      realPathToCheck = fs.realpathSync(exists ? val : path.dirname(val));
+    } catch {
+      // Ignored
+    }
     const forbiddenDirs = ["public", "build"].map(d => path.join(process.cwd(), d));
     for (const fDir of forbiddenDirs) {
-      const rel = path.relative(fDir, val);
+      let realFDir = fDir;
+      try {
+        realFDir = fs.realpathSync(fDir);
+      } catch {
+        // Ignored
+      }
+      const rel = path.relative(realFDir, realPathToCheck);
       if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
         throw new Error(`CRITICAL: ${name} must not be under public or build directories.`);
       }
     }
-  }
-  
-  try {
-    if (fs.existsSync(val)) {
-      fs.accessSync(val, fs.constants.W_OK);
-    } else {
-      fs.accessSync(path.dirname(val), fs.constants.W_OK);
-    }
-  } catch {
-    throw new Error(`CRITICAL: ${name} or its parent directory is not writable.`);
   }
 
   return val;
