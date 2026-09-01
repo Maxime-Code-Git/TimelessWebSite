@@ -1,3 +1,5 @@
+import * as path from "node:path";
+import * as os from "node:os";
 import "../../../../scripts/env-loader.js";
 
 export function requireEnvVar(name: string): string {
@@ -8,7 +10,41 @@ export function requireEnvVar(name: string): string {
   return value;
 }
 
+function validateTestPath(val: string | undefined, name: string): string {
+  if (!val) throw new Error(`CRITICAL: ${name} is required in test.`);
+  const resolved = path.resolve(val);
+  const tmp = os.tmpdir();
+  const relTmp = path.relative(tmp, resolved);
+  if (relTmp.startsWith("..") || path.isAbsolute(relTmp)) {
+    throw new Error(`CRITICAL: ${name} must be under os.tmpdir() in tests.`);
+  }
+  const forbiddenDirs = ["data", "public", "build"].map(d => path.join(process.cwd(), d));
+  for (const fDir of forbiddenDirs) {
+    const rel = path.relative(fDir, resolved);
+    if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
+      throw new Error(`CRITICAL: ${name} must not be under ${fDir} in tests.`);
+    }
+  }
+  return val;
+}
+
 export const ENV = {
+  get PORTFOLIO_CONTENT_PATH() {
+    const isProd = process.env.NODE_ENV === "production";
+    const isTest = process.env.NODE_ENV === "test";
+    const val = process.env.PORTFOLIO_CONTENT_PATH;
+    if (isProd && !val) throw new Error("CRITICAL: Environment variable PORTFOLIO_CONTENT_PATH is missing. Please check your .env files.");
+    if (isTest) return validateTestPath(val, "PORTFOLIO_CONTENT_PATH");
+    return val || "./data/portfolio.json";
+  },
+  get PORTFOLIO_MEDIA_PATH() {
+    const isProd = process.env.NODE_ENV === "production";
+    const isTest = process.env.NODE_ENV === "test";
+    const val = process.env.PORTFOLIO_MEDIA_PATH;
+    if (isProd && !val) throw new Error("CRITICAL: Environment variable PORTFOLIO_MEDIA_PATH is missing. Please check your .env files.");
+    if (isTest) return validateTestPath(val, "PORTFOLIO_MEDIA_PATH");
+    return val || "./data/media/portfolio";
+  },
   get PUBLIC_SITE_URL() {
     const url = requireEnvVar("PUBLIC_SITE_URL");
     try {
@@ -98,3 +134,5 @@ void ENV.SMTP_PORT;
 void ENV.PUBLIC_SITE_URL;
 void ENV.CONTACT_RATE_LIMIT_MAX;
 void ENV.TRUST_PROXY;
+void ENV.PORTFOLIO_CONTENT_PATH;
+void ENV.PORTFOLIO_MEDIA_PATH;

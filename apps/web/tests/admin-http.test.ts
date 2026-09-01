@@ -39,6 +39,8 @@ describe("Real HTTP isolation WITH valid admin config", () => {
           ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$xDSx00u+uSs9AcMqypmthw$ubmjWhg1XWL+Yp496qb5LLlTx0FK4lwqy9pvKa5ills",
           ADMIN_SESSION_SECRET: "12345678901234567890123456789012", // 32 chars
           SITE_CONTENT_PATH: siteContentPath,
+          PORTFOLIO_CONTENT_PATH: path.join(tempDir, "portfolio.json"),
+          PORTFOLIO_MEDIA_PATH: path.join(tempDir, "media")
         },
       });
 
@@ -220,6 +222,8 @@ describe("Real HTTP isolation WITHOUT admin config", () => {
           ADMIN_PASSWORD_HASH: "",
           ADMIN_SESSION_SECRET: "",
           SITE_CONTENT_PATH: siteContentPath,
+          PORTFOLIO_CONTENT_PATH: path.join(tempDir, "portfolio.json"),
+          PORTFOLIO_MEDIA_PATH: path.join(tempDir, "media")
         },
       });
 

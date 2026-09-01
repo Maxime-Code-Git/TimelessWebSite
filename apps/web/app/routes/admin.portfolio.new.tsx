@@ -4,8 +4,9 @@ import {
   redirect,
 } from "react-router";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "react-router";
-import { createProjectDraft, generateSlug, getPortfolioContent } from "../lib/portfolio-content.server";
-import { requireValidAdminSession, validateAdminFormData } from "../lib/admin-auth.server";
+import { createProjectDraft, getPortfolioContent } from "../lib/portfolio-content.server";
+import { requireValidAdminSession, validateAdminFormData, ActionSecurityError } from "../lib/admin-auth.server";
+import { RevisionConflictError, CorruptedContentError } from "../lib/site-content.server";
 import styles from "./admin.module.css";
 import * as crypto from "node:crypto";
 import { commitSession } from "../lib/session.server";
@@ -30,38 +31,63 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const formData = await validateAdminFormData(request);
-  const previousRevision = formData.get("revision") as string;
+  const headers = new Headers();
+  headers.set("Cache-Control", "no-store");
+  headers.set("X-Robots-Tag", "noindex, nofollow");
 
-  const titleFr = formData.get("titleFr") as string;
-  const titleEn = formData.get("titleEn") as string;
-  const slugFr = formData.get("slugFr") as string || generateSlug(titleFr || "");
-  const slugEn = formData.get("slugEn") as string || generateSlug(titleEn || "");
-  const descriptionFr = formData.get("descriptionFr") as string;
-  const descriptionEn = formData.get("descriptionEn") as string;
-  const location = formData.get("location") as string || null;
-  const date = formData.get("date") as string || null;
+  let formData: FormData;
+  try {
+    formData = await validateAdminFormData(request);
+  } catch (err: unknown) {
+    if (err instanceof ActionSecurityError) {
+      return Response.json({ error: err.message }, { status: err.status, headers });
+    }
+    return Response.json({ error: "Bad Request" }, { status: 400, headers });
+  }
+
+  const previousRevision = formData.get("revision");
+  if (typeof previousRevision !== "string") return Response.json({ error: "Invalid revision" }, { status: 422, headers });
+
+  const titleFr = formData.get("titleFr");
+  const titleEn = formData.get("titleEn");
+  const slugFr = formData.get("slugFr");
+  const slugEn = formData.get("slugEn");
+  const descriptionFr = formData.get("descriptionFr");
+  const descriptionEn = formData.get("descriptionEn");
+  const location = formData.get("location");
+  const date = formData.get("date");
+
+  if (
+    typeof titleFr !== "string" || typeof titleEn !== "string" ||
+    typeof descriptionFr !== "string" || typeof descriptionEn !== "string"
+  ) {
+    return Response.json({ error: "Missing required fields" }, { status: 422, headers });
+  }
 
   try {
     createProjectDraft({
       title: { fr: titleFr, en: titleEn },
-      slug: { fr: slugFr, en: slugEn },
+      slug: { fr: typeof slugFr === "string" ? slugFr : "", en: typeof slugEn === "string" ? slugEn : "" },
       description: { fr: descriptionFr, en: descriptionEn },
-      location,
-      date,
+      location: typeof location === "string" && location.trim() ? location : null,
+      date: typeof date === "string" && date.trim() ? date : null,
     }, previousRevision);
 
-    return redirect("/admin/portfolio");
-  } catch (err: any) {
-    if (err.name === "RevisionConflictError") {
-      return new Response("Revision conflict", { status: 409 });
+    return redirect("/admin/portfolio", { headers });
+  } catch (err: unknown) {
+    if (err instanceof RevisionConflictError) {
+      return Response.json({ error: "Revision conflict" }, { status: 409, headers });
     }
-    return Response.json({ error: err.message }, { status: 400 });
+    if (err instanceof CorruptedContentError) {
+      return Response.json({ error: "Corrupted content" }, { status: 409, headers });
+    }
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return Response.json({ error: msg }, { status: 422, headers });
   }
 }
 
 export default function AdminPortfolioNew() {
-  const { csrfToken, revision } = useLoaderData<typeof loader>();
+  const { csrfToken, revision } = useLoaderData() as unknown as { csrfToken: string; revision: string };
   const actionData = useActionData<{ error?: string }>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -73,57 +99,57 @@ export default function AdminPortfolioNew() {
           <h1 className={styles.headerTitle}>Nouveau Projet</h1>
           <p className={styles.headerSubtitle}>Créer un nouveau brouillon</p>
         </div>
-        <Link to="/admin/portfolio" className={styles.logoutButton} style={{ textDecoration: 'none' }}>
+        <Link to="/admin/portfolio" className={`${styles.logoutButton} ${styles.noDecoration}`}>
           Annuler
         </Link>
       </header>
       <main className={styles.mainContent}>
-        <div className={styles.loginCard} style={{ maxWidth: '800px' }}>
+        <div className={`${styles.loginCard} ${styles.projectFormCard || ''}`}>
           <Form method="post" className={styles.form}>
             <input type="hidden" name="csrfToken" value={csrfToken} />
             <input type="hidden" name="revision" value={revision} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className={styles.grid}>
               <div>
-                <label className={styles.label}>Titre (FR)</label>
-                <input name="titleFr" required className={styles.input} />
+                <label htmlFor="titleFr" className={styles.label}>Titre (FR)</label>
+                <input id="titleFr" name="titleFr" required className={styles.input} />
               </div>
               <div>
-                <label className={styles.label}>Titre (EN)</label>
-                <input name="titleEn" required className={styles.input} />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div>
-                <label className={styles.label}>Slug (FR) - Optionnel, généré auto</label>
-                <input name="slugFr" className={styles.input} />
-              </div>
-              <div>
-                <label className={styles.label}>Slug (EN) - Optionnel, généré auto</label>
-                <input name="slugEn" className={styles.input} />
+                <label htmlFor="titleEn" className={styles.label}>Titre (EN)</label>
+                <input id="titleEn" name="titleEn" required className={styles.input} />
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className={styles.grid}>
               <div>
-                <label className={styles.label}>Description (FR)</label>
-                <textarea name="descriptionFr" required className={styles.input} rows={4} />
+                <label htmlFor="slugFr" className={styles.label}>Slug (FR) - Optionnel, généré auto</label>
+                <input id="slugFr" name="slugFr" className={styles.input} />
               </div>
               <div>
-                <label className={styles.label}>Description (EN)</label>
-                <textarea name="descriptionEn" required className={styles.input} rows={4} />
+                <label htmlFor="slugEn" className={styles.label}>Slug (EN) - Optionnel, généré auto</label>
+                <input id="slugEn" name="slugEn" className={styles.input} />
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className={styles.grid}>
               <div>
-                <label className={styles.label}>Lieu (Optionnel)</label>
-                <input name="location" className={styles.input} />
+                <label htmlFor="descriptionFr" className={styles.label}>Description (FR)</label>
+                <textarea id="descriptionFr" name="descriptionFr" required className={styles.input} rows={4} />
               </div>
               <div>
-                <label className={styles.label}>Date (Optionnel YYYY-MM-DD)</label>
-                <input name="date" type="date" className={styles.input} />
+                <label htmlFor="descriptionEn" className={styles.label}>Description (EN)</label>
+                <textarea id="descriptionEn" name="descriptionEn" required className={styles.input} rows={4} />
+              </div>
+            </div>
+
+            <div className={styles.grid}>
+              <div>
+                <label htmlFor="location" className={styles.label}>Lieu (Optionnel)</label>
+                <input id="location" name="location" className={styles.input} />
+              </div>
+              <div>
+                <label htmlFor="date" className={styles.label}>Date (Optionnel YYYY-MM-DD)</label>
+                <input id="date" name="date" type="date" className={styles.input} />
               </div>
             </div>
 

@@ -11,6 +11,15 @@ import {
   deleteEmptyProject,
 } from "../app/lib/portfolio-content.server";
 
+import { vi } from "vitest";
+
+vi.mock("../app/lib/env.server", () => ({
+  ENV: {
+    get PORTFOLIO_CONTENT_PATH() { return process.env.PORTFOLIO_CONTENT_PATH || ""; },
+    get PORTFOLIO_MEDIA_PATH() { return process.env.PORTFOLIO_MEDIA_PATH || ""; },
+  }
+}));
+
 describe("portfolio-content.server", () => {
   let tempDir: string;
   let portfolioPath: string;
@@ -124,35 +133,12 @@ describe("portfolio-content.server", () => {
       description: { fr: "D1", en: "D1" },
       location: "Paris",
       date: "2025-01-01",
-      status: "draft",
     }, rev);
 
     const updated = getPortfolioContent().projects[0];
     expect(updated.title.fr).toBe("T1 Mod");
     expect(updated.location).toBe("Paris");
     expect(updated.date).toBe("2025-01-01");
-  });
-
-  it("refuses to publish without photos and cover", () => {
-    let rev = getPortfolioContent().revision;
-    rev = createProjectDraft({
-      title: { fr: "T1", en: "T1" },
-      slug: { fr: "slug1", en: "slug-en1" },
-      description: { fr: "D1", en: "D1" },
-      location: null,
-      date: null,
-    }, rev);
-
-    const project = getPortfolioContent().projects[0];
-
-    expect(() => updateProjectMetadata(project.id, {
-      title: { fr: "T1", en: "T1" },
-      slug: { fr: "slug1", en: "slug-en1" },
-      description: { fr: "D1", en: "D1" },
-      location: null,
-      date: null,
-      status: "published",
-    }, rev)).toThrow("Cannot publish a project without photos");
   });
 
   it("reorders projects", () => {
@@ -236,5 +222,95 @@ describe("portfolio-content.server", () => {
     // Ensure no temp files leaked
     const files = fs.readdirSync(tempDir);
     expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
+  });
+
+  describe("Validation stricte des métadonnées", () => {
+    let rev: string;
+    beforeEach(() => {
+      rev = getPortfolioContent().revision;
+    });
+
+    it("refuse un titre vide ou composé d'espaces", () => {
+      expect(() => createProjectDraft({
+        title: { fr: "   ", en: "Title" },
+        slug: { fr: "titre", en: "title" },
+        description: { fr: "Desc", en: "Desc" },
+        location: null, date: null,
+      }, rev)).toThrow("Title is required");
+
+      expect(() => createProjectDraft({
+        title: { fr: "Titre", en: "" },
+        slug: { fr: "titre", en: "title" },
+        description: { fr: "Desc", en: "Desc" },
+        location: null, date: null,
+      }, rev)).toThrow("Title is required");
+    });
+
+    it("refuse une description vide ou composée d'espaces", () => {
+      expect(() => createProjectDraft({
+        title: { fr: "Titre", en: "Title" },
+        slug: { fr: "titre", en: "title" },
+        description: { fr: "   \n  ", en: "Desc" },
+        location: null, date: null,
+      }, rev)).toThrow("Text is required");
+    });
+
+    it("refuse du HTML dans le titre et la description", () => {
+      expect(() => createProjectDraft({
+        title: { fr: "Titre <script>", en: "Title" },
+        slug: { fr: "titre", en: "title" },
+        description: { fr: "Desc", en: "Desc" },
+        location: null, date: null,
+      }, rev)).toThrow("HTML is not allowed");
+
+      expect(() => createProjectDraft({
+        title: { fr: "Titre", en: "Title" },
+        slug: { fr: "titre", en: "title" },
+        description: { fr: "<b>Desc</b>", en: "Desc" },
+        location: null, date: null,
+      }, rev)).toThrow("HTML is not allowed");
+    });
+
+    it("refuse une date impossible ou un timestamp", () => {
+      expect(() => createProjectDraft({
+        title: { fr: "Titre", en: "Title" },
+        slug: { fr: "titre", en: "title" },
+        description: { fr: "Desc", en: "Desc" },
+        location: null, date: "2024-13-45",
+      }, rev)).toThrow("Invalid date format or impossible date");
+
+      expect(() => createProjectDraft({
+        title: { fr: "Titre", en: "Title" },
+        slug: { fr: "titre", en: "title" },
+        description: { fr: "Desc", en: "Desc" },
+        location: null, date: "1700000000",
+      }, rev)).toThrow("Invalid date format or impossible date");
+    });
+
+    it("auto-génère et gère les collisions de slug", () => {
+      rev = createProjectDraft({
+        title: { fr: "Mon beau mariage !", en: "My beautiful wedding !" },
+        slug: { fr: "", en: "" },
+        description: { fr: "Desc", en: "Desc" },
+        location: null, date: null,
+      }, rev);
+
+      let portfolio = getPortfolioContent();
+      expect(portfolio.projects[0].slug.fr).toBe("mon-beau-mariage");
+      expect(portfolio.projects[0].slug.en).toBe("my-beautiful-wedding");
+
+      // Auto collision
+      createProjectDraft({
+        title: { fr: "Mon beau mariage !", en: "My beautiful wedding !" },
+        slug: { fr: "", en: "" },
+        description: { fr: "Desc", en: "Desc" },
+        location: null, date: null,
+      }, rev);
+
+      portfolio = getPortfolioContent();
+      const p2 = portfolio.projects.find(p => p.id !== portfolio.projects[0].id)!;
+      expect(p2.slug.fr).toMatch(/^mon-beau-mariage(-[0-9]+)?$/);
+      expect(p2.slug.fr).not.toBe("mon-beau-mariage");
+    });
   });
 });

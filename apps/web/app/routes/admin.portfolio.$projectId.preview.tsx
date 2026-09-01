@@ -31,24 +31,24 @@ export default function AdminPortfolioPreview() {
           <h1 className={styles.headerTitle}>Aperçu du Projet (Brouillon)</h1>
           <p className={styles.headerSubtitle}>Vérifiez les métadonnées</p>
         </div>
-        <Link to="/admin/portfolio" className={styles.logoutButton} style={{ textDecoration: 'none' }}>
+        <Link to="/admin/portfolio" className={`${styles.logoutButton} ${styles.noDecoration}`}>
           Retour
         </Link>
       </header>
       <main className={styles.mainContent}>
         <div className={styles.dashboardCard}>
-          <div style={{ padding: '1rem', backgroundColor: '#f9f9f9', borderRadius: '4px', marginBottom: '2rem' }}>
+          <div className={styles.previewWarning}>
             <p><strong>Attention :</strong> Ceci est un aperçu sécurisé. Le projet n'est pas visible par le public s'il est en brouillon.</p>
             <p>Aucune photo n'est encore disponible dans ce projet (fonctionnalité prévue dans la prochaine phase).</p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+          <div className={styles.previewGrid}>
             <div>
               <h3>Version Française</h3>
               <p><strong>Titre :</strong> {project.title.fr}</p>
               <p><strong>Slug :</strong> {project.slug.fr}</p>
               <p><strong>Description :</strong></p>
-              <p style={{ whiteSpace: 'pre-wrap', backgroundColor: '#eee', padding: '1rem' }}>{project.description.fr}</p>
+              <p className={styles.previewDesc}>{project.description.fr}</p>
             </div>
 
             <div>
@@ -56,11 +56,11 @@ export default function AdminPortfolioPreview() {
               <p><strong>Titre :</strong> {project.title.en}</p>
               <p><strong>Slug :</strong> {project.slug.en}</p>
               <p><strong>Description :</strong></p>
-              <p style={{ whiteSpace: 'pre-wrap', backgroundColor: '#eee', padding: '1rem' }}>{project.description.en}</p>
+              <p className={styles.previewDesc}>{project.description.en}</p>
             </div>
           </div>
 
-          <div style={{ marginTop: '2rem' }}>
+          <div className={styles.mt8}>
             <h3>Détails communs</h3>
             <p><strong>Lieu :</strong> {project.location || "Non spécifié"}</p>
             <p><strong>Date :</strong> {project.date || "Non spécifiée"}</p>

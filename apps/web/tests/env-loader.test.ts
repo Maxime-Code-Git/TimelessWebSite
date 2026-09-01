@@ -78,6 +78,26 @@ describe("env-loader isolation in test mode", () => {
   });
 
   it("should export loadEnvLocal as a callable function without executing it", async () => {
+    const validConfig = {
+      PORT: "3000",
+      NODE_ENV: "production",
+      PUBLIC_SITE_URL: "https://example.com",
+      CONTACT_RATE_LIMIT_SECRET: "secret123",
+      RATE_LIMIT_DB_PATH: "./rate-limit.db",
+      SMTP_HOST: "smtp.example.com",
+      SMTP_PORT: "587",
+      SMTP_USER: "user",
+      SMTP_PASS: "pass",
+      SMTP_FROM: "from@example.com",
+      SMTP_TO: "to@example.com",
+      CONTACT_RATE_LIMIT_MAX: "10",
+      ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$xDSx00u+uSs9AcMqypmthw$ubmjWhg1XWL+Yp496qb5LLlTx0FK4lwqy9pvKa5ills",
+      ADMIN_SESSION_SECRET: "12345678901234567890123456789012",
+      SITE_CONTENT_PATH: "./site-content.json",
+      PORTFOLIO_CONTENT_PATH: "./portfolio.json",
+      PORTFOLIO_MEDIA_PATH: "./media"
+    };
+
     // Never set NODE_ENV=development. Always test in test mode.
     process.env.NODE_ENV = "test";
 

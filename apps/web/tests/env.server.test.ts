@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import * as os from "node:os";
+import * as path from "node:path";
 
 /**
  * These tests verify that importing env.server.ts itself throws
@@ -26,6 +28,8 @@ describe("Environment Validation — fail-fast on import", () => {
       RATE_LIMIT_DB_PATH: "./db.sqlite",
       ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$...",
       ADMIN_SESSION_SECRET: "admin_secret",
+      PORTFOLIO_CONTENT_PATH: path.join(os.tmpdir(), "portfolio.json"),
+      PORTFOLIO_MEDIA_PATH: path.join(os.tmpdir(), "media")
     };
   }
 
@@ -76,6 +80,8 @@ describe("Environment Validation — fail-fast on import", () => {
     "CONTACT_RATE_LIMIT_SECRET",
     "RATE_LIMIT_DB_PATH",
     "PUBLIC_SITE_URL",
+    "PORTFOLIO_CONTENT_PATH",
+    "PORTFOLIO_MEDIA_PATH"
   ];
 
   for (const varName of requiredVars) {
@@ -86,7 +92,11 @@ describe("Environment Validation — fail-fast on import", () => {
 
       const err = await captureImportError();
       expect(err).not.toBeNull();
-      expect(err!.message).toContain(`${varName} is missing`);
+      if (varName.startsWith("PORTFOLIO_")) {
+        expect(err!.message).toContain(`${varName} is required in test`);
+      } else {
+        expect(err!.message).toContain(`${varName} is missing`);
+      }
     });
   }
 
@@ -184,7 +194,7 @@ describe("Environment Validation — fail-fast on import", () => {
     // Import should succeed with all valid vars
     if (err !== null) {
       // If it fails unexpectedly, fail the test explicitly with a generic message
-      throw new Error("Expected env.server import to succeed");
+      throw new Error(`Expected env.server import to succeed: ${err.message}`);
     }
     // Either way, the sentinel must not appear — captureImportError
     // never retains the resolved module, so no serialization leak.

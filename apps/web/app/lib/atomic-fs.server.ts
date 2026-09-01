@@ -25,15 +25,22 @@ export function createBackup(filePath: string): string | null {
   return backupPath;
 }
 
-export function rotateBackups(filePath: string): void {
+export function getBackups(filePath: string): string[] {
   const dir = path.dirname(filePath);
   const baseName = path.basename(filePath);
 
+  if (!fs.existsSync(dir)) return [];
+
   const files = fs.readdirSync(dir);
-  const backups = files
+  return files
     .filter(f => f.startsWith(baseName) && f.endsWith(".bak"))
     .sort()
     .reverse();
+}
+
+export function rotateBackups(filePath: string): void {
+  const backups = getBackups(filePath);
+  const dir = path.dirname(filePath);
 
   if (backups.length > 5) {
     for (let i = 5; i < backups.length; i++) {

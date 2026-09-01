@@ -1,31 +1,20 @@
 import fs from "node:fs";
-import path from "node:path";
 import crypto from "node:crypto";
 import { z } from "zod";
 import { atomicWriteJson } from "./atomic-fs.server";
 import { RevisionConflictError, CorruptedContentError } from "./site-content.server";
+import { ENV } from "./env.server";
 
 export function getPortfolioContentPath(): string {
-  if (process.env.NODE_ENV === "production" && !process.env.PORTFOLIO_CONTENT_PATH) {
-    throw new Error("PORTFOLIO_CONTENT_PATH is required in production");
-  }
-  return process.env.PORTFOLIO_CONTENT_PATH
-    ? path.resolve(process.env.PORTFOLIO_CONTENT_PATH)
-    : path.join(process.cwd(), "data", "portfolio.json");
+  return ENV.PORTFOLIO_CONTENT_PATH;
 }
 
 export function getPortfolioMediaPath(): string {
-  if (process.env.NODE_ENV === "production" && !process.env.PORTFOLIO_MEDIA_PATH) {
-    throw new Error("PORTFOLIO_MEDIA_PATH is required in production");
-  }
-  return process.env.PORTFOLIO_MEDIA_PATH
-    ? path.resolve(process.env.PORTFOLIO_MEDIA_PATH)
-    : path.join(process.cwd(), "data", "media", "portfolio");
+  return ENV.PORTFOLIO_MEDIA_PATH;
 }
 
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 const slugSchema = z.string()
   .min(3, "Slug too short")
@@ -33,32 +22,16 @@ const slugSchema = z.string()
   .regex(slugRegex, "Invalid slug format");
 
 const textSchema = z.string()
+  .trim()
   .min(1, "Text is required")
   .max(2000, "Text is too long")
-  .refine(val => !val.includes("<") && !val.includes(">"), "HTML is not allowed");
+  .refine(val => !/<[a-z][\s\S]*>/i.test(val), "HTML is not allowed");
 
 const titleSchema = z.string()
+  .trim()
   .min(1, "Title is required")
   .max(100, "Title is too long")
-  .refine(val => !val.includes("<") && !val.includes(">"), "HTML is not allowed");
-
-export const photoSchema = z.object({
-  id: z.string().uuid(),
-  category: z.enum(["ceremony", "portraits", "reception"]),
-  alt: z.object({
-    fr: textSchema,
-    en: textSchema,
-  }).strict(),
-  order: z.number().int().min(0),
-  originalFormat: z.enum(["jpeg", "png", "webp"]),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-  status: z.literal("processed"),
-  variants: z.record(z.string(), z.object({
-    id: z.string(),
-    sizeBytes: z.number().int().positive(),
-  }).strict()),
-}).strict();
+  .refine(val => !/<[a-z][\s\S]*>/i.test(val), "HTML is not allowed");
 
 export const projectSchema = z.object({
   id: z.string().uuid(),
@@ -74,24 +47,37 @@ export const projectSchema = z.object({
     fr: textSchema,
     en: textSchema,
   }).strict(),
-  location: z.string().max(255).nullable().refine(val => !val || (!val.includes("<") && !val.includes(">")), "HTML is not allowed"),
-  date: z.string().regex(dateRegex, "Invalid date format (YYYY-MM-DD)").nullable(),
-  status: z.enum(["draft", "published"]),
+  location: z.string().trim().max(255).nullable().refine(val => !val || !/<[a-z][\s\S]*>/i.test(val), "HTML is not allowed"),
+  date: z.string().nullable().refine(val => {
+    if (!val) return true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return false;
+    const d = new Date(val);
+    return !isNaN(d.getTime()) && d.toISOString().startsWith(val);
+  }, "Invalid date format or impossible date"),
+  status: z.literal("draft"),
   order: z.number().int().min(0),
-  coverPhotoId: z.string().uuid().nullable(),
-  createdAt: z.string().regex(isoDateRegex, "Must be valid ISO with ms"),
-  updatedAt: z.string().regex(isoDateRegex, "Must be valid ISO with ms"),
-  photos: z.array(photoSchema),
+  coverPhotoId: z.null(),
+  createdAt: z.string().refine(val => {
+    if (!isoDateRegex.test(val)) return false;
+    return !isNaN(new Date(val).getTime());
+  }, "Must be valid ISO with ms"),
+  updatedAt: z.string().refine(val => {
+    if (!isoDateRegex.test(val)) return false;
+    return !isNaN(new Date(val).getTime());
+  }, "Must be valid ISO with ms"),
+  photos: z.array(z.never()).default([]),
 }).strict();
 
 export const portfolioSchema = z.object({
   schemaVersion: z.literal(1),
   revision: z.string().regex(/^[0-9a-f]{32}$/, "Invalid revision format"),
-  updatedAt: z.string().regex(isoDateRegex, "Must be valid ISO with ms"),
+  updatedAt: z.string().refine(val => {
+    if (!isoDateRegex.test(val)) return false;
+    return !isNaN(new Date(val).getTime());
+  }, "Must be valid ISO with ms"),
   projects: z.array(projectSchema),
 }).strict();
 
-export type Photo = z.infer<typeof photoSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type Portfolio = z.infer<typeof portfolioSchema>;
 
@@ -170,6 +156,7 @@ function savePortfolio(portfolio: Portfolio, previousRevision: string) {
 
 export function generateSlug(text: string): string {
   return text
+    .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -200,8 +187,15 @@ export function createProjectDraft(data: Omit<Project, "id" | "createdAt" | "upd
   const portfolio = getPortfolioContent();
   const nextOrder = portfolio.projects.length > 0 ? Math.max(...portfolio.projects.map(p => p.order)) + 1 : 0;
 
+  const existingFrSlugs = portfolio.projects.map(p => p.slug.fr);
+  const existingEnSlugs = portfolio.projects.map(p => p.slug.en);
+
+  const slugFr = data.slug.fr ? data.slug.fr : generateUniqueSlug(generateSlug(data.title.fr), existingFrSlugs);
+  const slugEn = data.slug.en ? data.slug.en : generateUniqueSlug(generateSlug(data.title.en), existingEnSlugs);
+
   const newProject: Project = {
     ...data,
+    slug: { fr: slugFr, en: slugEn },
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -217,29 +211,23 @@ export function createProjectDraft(data: Omit<Project, "id" | "createdAt" | "upd
   return savePortfolio(portfolio, previousRevision);
 }
 
-export function updateProjectMetadata(projectId: string, data: Omit<Project, "id" | "createdAt" | "updatedAt" | "photos" | "coverPhotoId" | "order">, previousRevision: string): string {
+export function updateProjectMetadata(projectId: string, data: Omit<Project, "id" | "createdAt" | "updatedAt" | "photos" | "coverPhotoId" | "order" | "status">, previousRevision: string): string {
   const portfolio = getPortfolioContent();
   const index = portfolio.projects.findIndex(p => p.id === projectId);
   if (index === -1) throw new Error("Project not found");
 
+  const existingFrSlugs = portfolio.projects.filter(p => p.id !== projectId).map(p => p.slug.fr);
+  const existingEnSlugs = portfolio.projects.filter(p => p.id !== projectId).map(p => p.slug.en);
+
+  const slugFr = data.slug.fr ? data.slug.fr : generateUniqueSlug(generateSlug(data.title.fr), existingFrSlugs);
+  const slugEn = data.slug.en ? data.slug.en : generateUniqueSlug(generateSlug(data.title.en), existingEnSlugs);
+
   const updatedProject: Project = {
     ...portfolio.projects[index],
     ...data,
+    slug: { fr: slugFr, en: slugEn },
     updatedAt: new Date().toISOString(),
   };
-
-  if (updatedProject.status === "published") {
-    if (updatedProject.photos.length === 0) {
-      throw new Error("Cannot publish a project without photos");
-    }
-    if (!updatedProject.coverPhotoId) {
-      throw new Error("Cannot publish a project without a cover photo");
-    }
-    const coverExists = updatedProject.photos.find(p => p.id === updatedProject.coverPhotoId);
-    if (!coverExists) {
-      throw new Error("Cover photo not found in this project");
-    }
-  }
 
   checkSlugsUnique(portfolio.projects, updatedProject);
 
@@ -252,12 +240,23 @@ export function reorderProjects(projectIds: string[], previousRevision: string):
   if (projectIds.length !== portfolio.projects.length) {
     throw new Error("Invalid number of project IDs");
   }
+  
+  const uniqueIds = new Set(projectIds);
+  if (uniqueIds.size !== projectIds.length) {
+    throw new Error("Duplicate project IDs found");
+  }
+
+  const existingIds = new Set(portfolio.projects.map(p => p.id));
+  for (const id of projectIds) {
+    if (!existingIds.has(id)) {
+      throw new Error(`Project ${id} not found in portfolio`);
+    }
+  }
 
   const newProjects: Project[] = [];
   for (let i = 0; i < projectIds.length; i++) {
     const id = projectIds[i];
-    const project = portfolio.projects.find(p => p.id === id);
-    if (!project) throw new Error(`Project ${id} not found`);
+    const project = portfolio.projects.find(p => p.id === id)!;
     newProjects.push({ ...project, order: i, updatedAt: new Date().toISOString() });
   }
 

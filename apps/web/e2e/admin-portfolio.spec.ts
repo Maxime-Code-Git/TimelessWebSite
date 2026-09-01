@@ -1,17 +1,34 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
+
+function validatePath(val: string | undefined, name: string) {
+  if (!val) throw new Error(`${name} is required`);
+  const resolved = path.resolve(val);
+  const tmp = os.tmpdir();
+  const relTmp = path.relative(tmp, resolved);
+  if (relTmp.startsWith('..') || path.isAbsolute(relTmp)) throw new Error('Must be under os.tmpdir()');
+  const dirName = path.dirname(resolved).split(path.sep).pop() || '';
+  if (!dirName.startsWith('timeless-e2e-')) throw new Error('Must be under timeless-e2e-');
+  const forbidden = ['data', 'public', 'build'].map(d => path.join(process.cwd(), d));
+  for (const f of forbidden) {
+    const rel = path.relative(f, resolved);
+    if (!rel.startsWith('..') && !path.isAbsolute(rel)) throw new Error('Forbidden path ' + f);
+  }
+}
 
 test.describe('Admin Portfolio (Phase 3C.1)', () => {
   test.beforeEach(async ({ page }) => {
-    if (process.env.PORTFOLIO_CONTENT_PATH) {
-      const defaultPortfolio = {
-        schemaVersion: 1,
-        revision: "00000000000000000000000000000000",
-        updatedAt: new Date().toISOString(),
-        projects: []
-      };
-      fs.writeFileSync(process.env.PORTFOLIO_CONTENT_PATH, JSON.stringify(defaultPortfolio, null, 2));
-    }
+    validatePath(process.env.PORTFOLIO_CONTENT_PATH, 'PORTFOLIO_CONTENT_PATH');
+    validatePath(process.env.PORTFOLIO_MEDIA_PATH, 'PORTFOLIO_MEDIA_PATH');
+    const defaultPortfolio = {
+      schemaVersion: 1,
+      revision: "00000000000000000000000000000000",
+      updatedAt: new Date().toISOString(),
+      projects: []
+    };
+    fs.writeFileSync(process.env.PORTFOLIO_CONTENT_PATH!, JSON.stringify(defaultPortfolio, null, 2));
     // 1. Login
     await page.goto('/admin');
     const passwordInput = page.locator('input[name="password"]');
@@ -72,21 +89,4 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     await expect(page.locator('h3', { hasText: 'Test Mariage Modifié' })).not.toBeVisible();
   });
 
-  test('should refuse to publish without media', async ({ page }) => {
-    // Create new project
-    await page.goto('/admin/portfolio/new');
-    await page.fill('input[name="titleFr"]', 'No Media FR');
-    await page.fill('input[name="titleEn"]', 'No Media EN');
-    await page.fill('textarea[name="descriptionFr"]', 'Desc');
-    await page.fill('textarea[name="descriptionEn"]', 'Desc');
-    await page.click('button[type="submit"]');
-
-    // Try to publish
-    await page.click('a:has-text("Modifier")');
-    await page.selectOption('select[name="status"]', 'published');
-    await page.click('button[type="submit"]');
-
-    // Should show error
-    await expect(page.locator('[role="alert"]')).toHaveText(/Cannot publish a project without photos/);
-  });
 });
