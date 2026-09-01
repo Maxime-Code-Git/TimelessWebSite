@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import * as os from "node:os";
+import * as fs from "node:fs";
 import "../../../../scripts/env-loader.js";
 
 export function requireEnvVar(name: string): string {
@@ -28,12 +29,43 @@ function validateTestPath(val: string | undefined, name: string): string {
   return resolved;
 }
 
+function validateProductionPath(val: string, name: string, isMedia: boolean): string {
+  if (!path.isAbsolute(val)) {
+    throw new Error(`CRITICAL: Environment variable ${name} must be an absolute path.`);
+  }
+  
+  if (isMedia) {
+    const forbiddenDirs = ["public", "build"].map(d => path.join(process.cwd(), d));
+    for (const fDir of forbiddenDirs) {
+      const rel = path.relative(fDir, val);
+      if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
+        throw new Error(`CRITICAL: ${name} must not be under public or build directories.`);
+      }
+    }
+  }
+  
+  try {
+    if (fs.existsSync(val)) {
+      fs.accessSync(val, fs.constants.W_OK);
+    } else {
+      fs.accessSync(path.dirname(val), fs.constants.W_OK);
+    }
+  } catch {
+    throw new Error(`CRITICAL: ${name} or its parent directory is not writable.`);
+  }
+
+  return val;
+}
+
 export const ENV = {
   get PORTFOLIO_CONTENT_PATH() {
     const isProd = process.env.NODE_ENV === "production";
     const isTest = process.env.NODE_ENV === "test";
     const val = process.env.PORTFOLIO_CONTENT_PATH;
-    if (isProd && !val) throw new Error("CRITICAL: Environment variable PORTFOLIO_CONTENT_PATH is missing. Please check your .env files.");
+    if (isProd) {
+      if (!val) throw new Error("CRITICAL: Environment variable PORTFOLIO_CONTENT_PATH is missing. Please check your .env files.");
+      return validateProductionPath(val, "PORTFOLIO_CONTENT_PATH", false);
+    }
     if (isTest) return validateTestPath(val, "PORTFOLIO_CONTENT_PATH");
     return path.resolve(val || "./data/portfolio.json");
   },
@@ -41,7 +73,10 @@ export const ENV = {
     const isProd = process.env.NODE_ENV === "production";
     const isTest = process.env.NODE_ENV === "test";
     const val = process.env.PORTFOLIO_MEDIA_PATH;
-    if (isProd && !val) throw new Error("CRITICAL: Environment variable PORTFOLIO_MEDIA_PATH is missing. Please check your .env files.");
+    if (isProd) {
+      if (!val) throw new Error("CRITICAL: Environment variable PORTFOLIO_MEDIA_PATH is missing. Please check your .env files.");
+      return validateProductionPath(val, "PORTFOLIO_MEDIA_PATH", true);
+    }
     if (isTest) return validateTestPath(val, "PORTFOLIO_MEDIA_PATH");
     return path.resolve(val || "./data/media/portfolio");
   },

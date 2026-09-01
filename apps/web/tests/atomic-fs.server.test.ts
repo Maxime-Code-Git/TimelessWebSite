@@ -14,6 +14,7 @@ describe("atomic-fs.server", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -29,79 +30,81 @@ describe("atomic-fs.server", () => {
   });
 
   it("resists multiple backups in the same millisecond without overwriting", () => {
-    // Write original
     fs.writeFileSync(testFile, "v0");
-
     vi.spyOn(Date, "now").mockReturnValue(1234567890);
-    
     atomicWrite(testFile, "v1");
     atomicWrite(testFile, "v2");
     
-    vi.restoreAllMocks();
-
     const backups = getBackups(testFile);
     expect(backups.length).toBe(2);
     expect(backups[0]).not.toBe(backups[1]);
-    
-    // Sort chronologically (getBackups returns reverse sort, so backups[0] is newest (v1), backups[1] is oldest (v0))
-    // Wait: actually v0 was backed up before writing v1. Then v1 was backed up before writing v2.
-    // So the two backups contain v0 and v1.
     const contents = backups.map(b => fs.readFileSync(path.join(tempDir, b), "utf-8")).sort();
     expect(contents).toEqual(["v0", "v1"]);
   });
 
+  it("maintains exactly 5 backups maximum and keeps them unchanged when a new one is rotated", () => {
+    fs.writeFileSync(testFile, "v0");
+    for (let i = 1; i <= 7; i++) {
+      vi.spyOn(Date, "now").mockReturnValue(1000000 + i * 1000);
+      atomicWrite(testFile, `v${i}`);
+    }
+    const backups = getBackups(testFile);
+    expect(backups.length).toBe(5);
+    const contents = backups.map(b => fs.readFileSync(path.join(tempDir, b), "utf-8")).sort();
+    // v0 and v1 were rotated out (v7 is the main file, so backups contain v2, v3, v4, v5, v6)
+    expect(contents).toEqual(["v2", "v3", "v4", "v5", "v6"]);
+  });
+
   it("handles writeSync returning 0 and throws without modifying original", () => {
     fs.writeFileSync(testFile, "original");
-    
-    const writeSpy = vi.spyOn(fs, "writeSync").mockImplementation(() => 0);
-    
+    const writeSpy = vi.spyOn(fs, "writeSync").mockImplementation((() => 0) as typeof fs.writeSync);
     expect(() => atomicWriteJson(testFile, { updated: true })).toThrow("Wrote 0 bytes");
-    
     expect(fs.readFileSync(testFile, "utf-8")).toBe("original");
-    const tmpFiles = fs.readdirSync(tempDir).filter(f => f.includes(".tmp."));
-    expect(tmpFiles).toHaveLength(0);
-    
+    expect(fs.readdirSync(tempDir).filter(f => f.includes(".tmp."))).toHaveLength(0);
     writeSpy.mockRestore();
   });
 
   it("handles partial writes correctly", () => {
     const originalWriteSync = fs.writeSync;
     let callCount = 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const writeSpy = vi.spyOn(fs, "writeSync").mockImplementation((...args: any[]) => {
-      callCount++;
-      if (callCount === 1) {
-        // First call writes only 1 byte
-        const fd = args[0];
-        const buffer = args[1];
-        const offset = args[2] || 0;
-        const position = args[4];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return (originalWriteSync as any)(fd, buffer, offset, 1, position);
-      }
-      // Subsequent calls write the rest
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (originalWriteSync as any)(...args);
-    });
+    const writeSpy = vi.spyOn(fs, "writeSync").mockImplementation(
+      ((fd: number, buffer: NodeJS.ArrayBufferView, offset?: number | null, length?: number | null, position?: number | null): number => {
+        callCount++;
+        if (callCount === 1) {
+          return originalWriteSync(fd, buffer, offset, 1, position);
+        }
+        return originalWriteSync(fd, buffer, offset, length, position);
+      }) as typeof fs.writeSync
+    );
 
     atomicWrite(testFile, "Test");
     expect(fs.readFileSync(testFile, "utf-8")).toBe("Test");
     expect(callCount).toBe(2);
-    
     writeSpy.mockRestore();
   });
 
-  it("leaves no temp files on rename failure", () => {
-    fs.writeFileSync(testFile, "original");
+  it("leaves no temp files and deletes the new backup on rename failure, preserving the 5 old backups", () => {
+    fs.writeFileSync(testFile, "v0");
+    for (let i = 1; i <= 5; i++) {
+      vi.spyOn(Date, "now").mockReturnValue(1000000 + i * 1000);
+      atomicWrite(testFile, `v${i}`);
+    }
     
+    const beforeBackups = getBackups(testFile);
+    expect(beforeBackups.length).toBe(5);
+
+    vi.spyOn(Date, "now").mockReturnValue(2000000);
     const renameSpy = vi.spyOn(fs, "renameSync").mockImplementation(() => {
       throw new Error("Rename failed");
     });
     
-    expect(() => atomicWriteJson(testFile, { updated: true })).toThrow("Rename failed");
+    expect(() => atomicWrite(testFile, "v6")).toThrow("Rename failed");
     
-    expect(fs.readFileSync(testFile, "utf-8")).toBe("original");
-    expect(fs.readdirSync(tempDir).filter(f => f.includes(".tmp."))).toHaveLength(0);
+    expect(fs.readFileSync(testFile, "utf-8")).toBe("v5"); // original kept
+    expect(fs.readdirSync(tempDir).filter(f => f.includes(".tmp."))).toHaveLength(0); // no temp
+    
+    const afterBackups = getBackups(testFile);
+    expect(afterBackups).toEqual(beforeBackups); // exactly 5 old backups unchanged
     
     renameSpy.mockRestore();
   });
@@ -111,11 +114,9 @@ describe("atomic-fs.server", () => {
     const copySpy = vi.spyOn(fs, "copyFileSync").mockImplementation(() => {
       throw new Error("Copy failed");
     });
-
     expect(() => atomicWrite(testFile, "new")).toThrow("Copy failed");
     expect(fs.readFileSync(testFile, "utf-8")).toBe("original");
     expect(fs.readdirSync(tempDir).filter(f => f.includes(".tmp."))).toHaveLength(0);
-
     copySpy.mockRestore();
   });
 
@@ -124,67 +125,60 @@ describe("atomic-fs.server", () => {
     const chmodSpy = vi.spyOn(fs, "chmodSync").mockImplementation(() => {
       throw new Error("Chmod failed");
     });
-
     expect(() => atomicWrite(testFile, "new")).toThrow("Chmod failed");
     expect(fs.readFileSync(testFile, "utf-8")).toBe("original");
     expect(fs.readdirSync(tempDir).filter(f => f.includes(".tmp."))).toHaveLength(0);
-    // backup should be cleaned up
     expect(fs.readdirSync(tempDir).filter(f => f.includes(".bak"))).toHaveLength(0);
-
     chmodSpy.mockRestore();
   });
 
   it("handles fsyncSync failure on temp file", () => {
-    const fsyncSpy = vi.spyOn(fs, "fsyncSync").mockImplementation((fd) => {
-      // Check if it's not a directory fd
-      if (typeof fd === "number" && fd > 0) {
+    const fsyncSpy = vi.spyOn(fs, "fsyncSync").mockImplementation((fd: number) => {
+      const stat = fs.fstatSync(fd);
+      if (!stat.isDirectory()) {
         throw new Error("Fsync failed");
       }
     });
-
     expect(() => atomicWrite(testFile, "new")).toThrow("Fsync failed");
     expect(fs.readdirSync(tempDir).filter(f => f.includes(".tmp."))).toHaveLength(0);
-
     fsyncSpy.mockRestore();
   });
 
   it("handles directory fsync (best-effort) without throwing", () => {
     let dirFsyncCalled = false;
-    const fsyncSpy = vi.spyOn(fs, "fsyncSync").mockImplementation((fd) => {
-      try {
-        const stat = fs.fstatSync(fd);
-        if (stat.isDirectory()) {
-          dirFsyncCalled = true;
-          throw new Error("Dir Fsync failed");
-        }
-      } catch {
-        // ignored
+    const originalFsyncSync = fs.fsyncSync;
+    const fsyncSpy = vi.spyOn(fs, "fsyncSync").mockImplementation((fd: number) => {
+      const stat = fs.fstatSync(fd);
+      if (stat.isDirectory()) {
+        dirFsyncCalled = true;
+        throw new Error("Dir Fsync failed");
       }
+      return originalFsyncSync(fd);
     });
 
-    atomicWrite(testFile, "new");
+    // Verify it doesn't throw
+    atomicWrite(testFile, "new-content");
+    
     expect(dirFsyncCalled).toBe(true);
-    expect(fs.readFileSync(testFile, "utf-8")).toBe("new");
-
+    expect(fs.readFileSync(testFile, "utf-8")).toBe("new-content");
     fsyncSpy.mockRestore();
   });
 
-  it("handles rotation (best-effort) without throwing", () => {
-    fs.writeFileSync(testFile, "original");
-    // Ensure we trigger rotation
-    for (let i=0; i<6; i++) {
+  it("handles rotation (best-effort) after rename without throwing", () => {
+    fs.writeFileSync(testFile, "v0");
+    for (let i = 1; i <= 6; i++) {
+      vi.spyOn(Date, "now").mockReturnValue(1000000 + i * 1000);
       atomicWrite(testFile, `v${i}`);
     }
-    const unlinkSpy = vi.spyOn(fs, "unlinkSync").mockImplementation((p) => {
+    const unlinkSpy = vi.spyOn(fs, "unlinkSync").mockImplementation((p: fs.PathLike) => {
       if (String(p).includes(".bak")) {
         throw new Error("Unlink failed");
       }
       fs.rmSync(p);
     });
 
-    atomicWrite(testFile, "new"); // Should not throw despite unlink failing
-    expect(fs.readFileSync(testFile, "utf-8")).toBe("new");
-
+    atomicWrite(testFile, "new-content"); // Should not throw despite unlink failing
+    expect(fs.readFileSync(testFile, "utf-8")).toBe("new-content");
     unlinkSpy.mockRestore();
   });
 

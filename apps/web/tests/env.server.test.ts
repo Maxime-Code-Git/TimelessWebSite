@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as os from "node:os";
 import * as path from "node:path";
+import * as fs from "node:fs";
+
+vi.mock("../../../scripts/env-loader.js", () => ({}));
 
 /**
  * These tests verify that importing env.server.ts itself throws
@@ -17,6 +20,7 @@ describe("Environment Validation — fail-fast on import", () => {
 
   function validEnv(): Record<string, string> {
     return {
+      TRUST_PROXY: "true",
       SMTP_PORT: "2525",
       PUBLIC_SITE_URL: "https://example.com",
       SMTP_HOST: "localhost",
@@ -229,6 +233,22 @@ describe("Environment Validation — fail-fast on import", () => {
     expect(err!.message).toContain("Environment variable PORTFOLIO_CONTENT_PATH is missing");
   });
 
+  it("should fail in production if TRUST_PROXY is missing or false", async () => {
+    const env = validEnv();
+    delete env.TRUST_PROXY;
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+    let err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("TRUST_PROXY=true is required in production");
+
+    env.TRUST_PROXY = "false";
+    setEnv(env);
+    err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("TRUST_PROXY=true is required in production");
+  });
+
   it("should allow fallback in development mode", async () => {
     const env = validEnv();
     delete env.PORTFOLIO_CONTENT_PATH;
@@ -236,6 +256,62 @@ describe("Environment Validation — fail-fast on import", () => {
     process.env.NODE_ENV = "development";
     const err = await captureImportError();
     expect(err).toBeNull(); // Import should succeed in development with fallback
+  });
+
+  it("should fail in production if portfolio path is relative", async () => {
+    const env = validEnv();
+    env.PORTFOLIO_CONTENT_PATH = "data/portfolio.json";
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("PORTFOLIO_CONTENT_PATH must be an absolute path");
+  });
+
+  it("should fail in production if media path is under public", async () => {
+    const env = validEnv();
+    env.PORTFOLIO_MEDIA_PATH = path.join(process.cwd(), "public", "media");
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("PORTFOLIO_MEDIA_PATH must not be under public or build directories");
+  });
+
+  it("should fail in production if media path is under build", async () => {
+    const env = validEnv();
+    env.PORTFOLIO_MEDIA_PATH = path.join(process.cwd(), "build", "client", "media");
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("PORTFOLIO_MEDIA_PATH must not be under public or build directories");
+  });
+
+  it("should fail in production if destination is not writable", async () => {
+    const env = validEnv();
+    // /root is generally not writable for normal users
+    env.PORTFOLIO_CONTENT_PATH = "/root/portfolio.json";
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("PORTFOLIO_CONTENT_PATH or its parent directory is not writable");
+  });
+
+  it("should accept valid absolute paths in production", async () => {
+    const env = validEnv();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-test-prod-"));
+    env.PORTFOLIO_CONTENT_PATH = path.join(tempDir, "portfolio.json");
+    env.PORTFOLIO_MEDIA_PATH = path.join(tempDir, "media");
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+    const err = await captureImportError();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    
+    if (err !== null) {
+      throw new Error(`Expected env.server import to succeed in prod: ${err.message}`);
+    }
   });
 
   // ---------------------------------------------------------------

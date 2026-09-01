@@ -2,24 +2,28 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Admin CSP and Styles', () => {
   test('should not have any inline styles on /admin login and dashboard', async ({ page, request }) => {
+    const pageErrors: string[] = [];
+    const cspErrors: string[] = [];
+    
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') {
+        const text = msg.text().toLowerCase();
+        if (text.includes('content security policy') || text.includes('csp')) {
+          cspErrors.push(msg.text());
+        }
+      }
+    });
+
     // 1. Check CSP header
     const response = await request.get('/admin');
     const csp = response.headers()['content-security-policy'];
     expect(csp).toBeDefined();
     expect(csp).not.toContain("'unsafe-inline'");
 
-    const errors: string[] = [];
-    page.on('pageerror', (err) => errors.push(err.message));
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') {
-        errors.push(msg.text());
-      }
-    });
-
     // 2. Check Login Page
     await page.goto('/admin');
-    const inlineStylesLogin = await page.locator('[style]').count();
-    expect(inlineStylesLogin).toBe(0);
+    expect(await page.locator('[style]').count()).toBe(0);
 
     // 3. Login and check Dashboard
     await page.fill('input[name="password"]', 'e2e_password');
@@ -27,9 +31,7 @@ test.describe('Admin CSP and Styles', () => {
 
     // Wait for dashboard to load
     await expect(page.locator('h1')).toContainText('Administration Timeless');
-
-    const inlineStylesDashboard = await page.locator('[style]').count();
-    expect(inlineStylesDashboard).toBe(0);
+    expect(await page.locator('[style]').count()).toBe(0);
 
     // 4. Verify Pricing Page
     const pricingRes = await page.goto('/admin/pricing');
@@ -38,10 +40,8 @@ test.describe('Admin CSP and Styles', () => {
     expect(cspHeaderPricing).toBeDefined();
     expect(cspHeaderPricing).not.toContain("'unsafe-inline'");
     await expect(page.locator('h1')).toContainText('Formules et tarifs');
-    const inlineStylesPricing = await page.locator('[style]').count();
-    expect(inlineStylesPricing).toBe(0);
-    const undefinedClassesPricing = await page.locator('[class*="undefined"]').count();
-    expect(undefinedClassesPricing).toBe(0);
+    expect(await page.locator('[style]').count()).toBe(0);
+    expect(await page.locator('[class*="undefined"]').count()).toBe(0);
 
     // 5. Verify Settings Page
     const settingsRes = await page.goto('/admin/settings');
@@ -50,16 +50,12 @@ test.describe('Admin CSP and Styles', () => {
     expect(cspHeaderSettings).toBeDefined();
     expect(cspHeaderSettings).not.toContain("'unsafe-inline'");
     await expect(page.locator('h1')).toContainText('Textes et informations');
-    const inlineStylesSettings = await page.locator('[style]').count();
-    expect(inlineStylesSettings).toBe(0);
-    const undefinedClassesSettings = await page.locator('[class*="undefined"]').count();
-    expect(undefinedClassesSettings).toBe(0);
+    expect(await page.locator('[style]').count()).toBe(0);
+    expect(await page.locator('[class*="undefined"]').count()).toBe(0);
 
     // Verify no CSP errors were logged during the whole navigation
-    const cspErrors = errors.filter(e => e.toLowerCase().includes('content security policy') || e.toLowerCase().includes('csp'));
     expect(cspErrors).toHaveLength(0);
-    // Also verify no other page errors occurred
-    expect(errors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+    expect(pageErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
 
     // 6. Verify Portfolio Pages
     const checkRoute = async (route: string) => {
@@ -70,7 +66,8 @@ test.describe('Admin CSP and Styles', () => {
       expect(cspHeader).not.toContain("'unsafe-inline'");
       expect(await page.locator('[style]').count()).toBe(0);
       expect(await page.locator('[class*="undefined"]').count()).toBe(0);
-      expect(errors.filter(e => e.toLowerCase().includes('content security policy') || e.toLowerCase().includes('csp'))).toHaveLength(0);
+      expect(cspErrors).toHaveLength(0);
+      expect(pageErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
     };
 
     await checkRoute('/admin/portfolio');
@@ -95,6 +92,6 @@ test.describe('Admin CSP and Styles', () => {
     // Clean up
     await page.goto('/admin/portfolio');
     page.on('dialog', dialog => dialog.accept());
-    await page.click('button:has-text("Supprimer")');
+    await page.locator('button:has-text("Supprimer")').first().click();
   });
 });

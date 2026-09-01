@@ -80,7 +80,14 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     await modifyLinks.last().click();
     await expect(page.locator('input[name="slugFr"]')).toHaveValue('test-mariage-fr-1');
     await expect(page.locator('input[name="slugEn"]')).toHaveValue('test-wedding-en-1');
-    await page.click('a:has-text("Retour")');
+    
+    // Change the title to make it distinct for reordering tests
+    await page.fill('input[name="titleFr"]', 'Test Mariage FR 2');
+    await page.click('button[type="submit"]');
+
+    // Wait for dashboard and verify order
+    await expect(page.locator('h3').first()).toHaveText('Test Mariage FR / Test Wedding EN');
+    await expect(page.locator('h3').nth(1)).toHaveText('Test Mariage FR 2 / Test Wedding EN');
 
     // 4. Reorder projects
     // Wait for buttons
@@ -95,7 +102,8 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     // Move second item up
     await upButtons.nth(1).click();
     // After reload, first item should be the one we just moved
-    await expect(page.locator('h3').first()).toHaveText('Test Mariage FR / Test Wedding EN');
+    await expect(page.locator('h3').first()).toHaveText('Test Mariage FR 2 / Test Wedding EN');
+    await expect(page.locator('h3').nth(1)).toHaveText('Test Mariage FR / Test Wedding EN');
     
     // 5. Aperçu authentifié
     await page.locator('a:has-text("Aperçu")').first().click();

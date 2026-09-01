@@ -169,18 +169,21 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     });
     expect(badMethodRes.status).toBe(405);
 
-    // 2. Origin invalide -> 403
+    // 2. Origin invalide -> 400 (React Router intercepts this before action and throws 400)
+    const beforeOriginFiles = fs.readdirSync(tempDir);
+    const beforeOriginContent = fs.readFileSync(portfolioContentPath);
     const badOriginRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
       method: "POST",
       headers: { 
         "Cookie": authCookie, 
         "Origin": "http://evil.com",
-        "Host": "evil.com",
         "Content-Type": "application/x-www-form-urlencoded" 
       },
       body: new URLSearchParams({ csrfToken: csrfToken2, revision })
     });
     expect(badOriginRes.status).toBe(400);
+    expect(fs.readFileSync(portfolioContentPath)).toEqual(beforeOriginContent);
+    expect(fs.readdirSync(tempDir)).toEqual(beforeOriginFiles);
 
     // 3. MIME invalide -> 415
     const badMimeRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
