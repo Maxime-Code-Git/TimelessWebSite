@@ -334,3 +334,67 @@
   font-size: 0.875rem;
   color: #6b7280;
 }
+
+.successMessage {
+  font-size: 0.875rem;
+  color: #059669;
+  background-color: #ecfdf5;
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem;
+  margin-bottom: 1rem;
+}
+
+.watermarkPreviewSection {
+  margin-top: 1.5rem;
+}
+
+.watermarkPreviewGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .watermarkPreviewGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.watermarkPreviewLight {
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  padding: 1rem;
+  overflow: hidden;
+}
+
+.watermarkPreviewDark {
+  background-color: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  padding: 1rem;
+  overflow: hidden;
+}
+
+.watermarkPreviewText {
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  font-weight: 600;
+  font-size: 1.5rem;
+  opacity: 0.45;
+  color: #6b7280;
+  text-align: center;
+  word-break: break-word;
+}
+
+.watermarkPreviewDark .watermarkPreviewText {
+  color: #d1d5db;
+}

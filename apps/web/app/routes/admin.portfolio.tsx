@@ -128,6 +128,9 @@ export default function AdminPortfolio() {
           <Link to="/admin" className={`${styles.logoutButton} ${styles.noDecoration}`}>
             Retour
           </Link>
+          <Link to="/admin/portfolio/watermark" className={`${styles.actionButton} ${styles.actionButtonSecondary} ${styles.noDecoration}`}>
+            Filigrane
+          </Link>
           <Link to="/admin/portfolio/new" className={`${styles.logoutButton} ${styles.noDecoration}`}>
             + Nouveau Projet
           </Link>

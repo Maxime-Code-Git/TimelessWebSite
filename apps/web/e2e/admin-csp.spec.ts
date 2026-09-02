@@ -71,6 +71,7 @@ test.describe('Admin CSP and Styles', () => {
     };
 
     await checkRoute('/admin/portfolio');
+    await checkRoute('/admin/portfolio/watermark');
     await checkRoute('/admin/portfolio/new');
 
     // Create a temporary project to test the edit and preview routes

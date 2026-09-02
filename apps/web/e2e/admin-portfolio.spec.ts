@@ -45,6 +45,21 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     await expect(portfolioLink).toHaveText(/Portfolio public/);
   });
 
+  test('should manage watermark text', async ({ page }) => {
+    await page.goto('/admin/portfolio');
+    await page.click('a[href="/admin/portfolio/watermark"]');
+    
+    await expect(page.locator('h1')).toHaveText('Filigrane du Portfolio');
+    await expect(page.locator('input[name="watermarkText"]')).toHaveValue('Timeless');
+    
+    await page.fill('input[name="watermarkText"]', 'Mon Studio & Co');
+    await page.click('button[type="submit"]');
+    
+    await expect(page.locator('text=Filigrane mis à jour avec succès.')).toBeVisible();
+    await expect(page.locator('input[name="watermarkText"]')).toHaveValue('Mon Studio & Co');
+    // Ensure raw text with & is displayed properly
+  });
+
   test('should completely manage draft projects and respect constraints', async ({ page, context }) => {
     // 1. Create first project
     await page.click('a[href="/admin/portfolio"]');
