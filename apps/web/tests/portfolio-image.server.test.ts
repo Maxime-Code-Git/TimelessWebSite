@@ -264,7 +264,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       fs.writeFileSync(filePath, buffer);
 
       const result = await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
       expect(result.originalWidth).toBe(800);
@@ -276,7 +276,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       await createTestJpeg(300, 200, filePath);
 
       const result = await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
       // Only 480p should be produced (at natural size since 300 < 480)
@@ -291,7 +291,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       await createTestJpeg(3000, 2000, filePath);
 
       const result = await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
       expect(result.variants.length).toBeGreaterThanOrEqual(4);
@@ -307,7 +307,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       await createTestJpeg(2000, 1500, filePath);
 
       const result = await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
       for (const variant of result.variants) {
@@ -322,11 +322,11 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       await createTestJpeg(1000, 800, filePath);
 
       const result = await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
       for (const variant of result.variants) {
-        const variantPath = path.join(mediaDir, "test-project-id", variant.name, `${variant.fileId}.webp`);
+        const variantPath = path.join(mediaDir, "00000000-0000-4000-8000-000000000000", variant.name, `${variant.fileId}.webp`);
         expect(fs.existsSync(variantPath)).toBe(true);
         const meta = await sharp(variantPath).metadata();
         expect(meta.format).toBe("webp");
@@ -342,11 +342,11 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       fs.writeFileSync(filePath, buffer);
 
       const result = await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
       for (const variant of result.variants) {
-        const variantPath = path.join(mediaDir, "test-project-id", variant.name, `${variant.fileId}.webp`);
+        const variantPath = path.join(mediaDir, "00000000-0000-4000-8000-000000000000", variant.name, `${variant.fileId}.webp`);
         const meta = await sharp(variantPath).metadata();
         expect(meta.exif).toBeUndefined();
       }
@@ -359,11 +359,11 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       await createTestJpeg(800, 600, filePath);
 
       const result = await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
       for (const variant of result.variants) {
-        const variantPath = path.join(mediaDir, "test-project-id", variant.name, `${variant.fileId}.webp`);
+        const variantPath = path.join(mediaDir, "00000000-0000-4000-8000-000000000000", variant.name, `${variant.fileId}.webp`);
         const stat = fs.statSync(variantPath);
         expect(stat.mode & 0o777).toBe(0o600);
       }
@@ -376,10 +376,10 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       await createTestJpeg(800, 600, filePath);
 
       await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
-      const projectDir = path.join(mediaDir, "test-project-id");
+      const projectDir = path.join(mediaDir, "00000000-0000-4000-8000-000000000000");
       const stat = fs.statSync(projectDir);
       expect(stat.mode & 0o777).toBe(0o700);
     });
@@ -396,14 +396,14 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       fs.mkdirSync(mediaDir2);
 
       const result1 = await processImage(
-        filePath1, tempDir, "proj1", mediaDir1, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath1, tempDir, "00000000-0000-4000-8000-000000000001", mediaDir1, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
       );
       const result2 = await processImage(
-        filePath2, tempDir, "proj2", mediaDir2, "Different Mark", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath2, tempDir, "00000000-0000-4000-8000-000000000002", mediaDir2, "Different Mark", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
-      const variant1Path = path.join(mediaDir1, "proj1", result1.variants[0].name, `${result1.variants[0].fileId}.webp`);
-      const variant2Path = path.join(mediaDir2, "proj2", result2.variants[0].name, `${result2.variants[0].fileId}.webp`);
+      const variant1Path = path.join(mediaDir1, "00000000-0000-4000-8000-000000000001", result1.variants[0].name, `${result1.variants[0].fileId}.webp`);
+      const variant2Path = path.join(mediaDir2, "00000000-0000-4000-8000-000000000002", result2.variants[0].name, `${result2.variants[0].fileId}.webp`);
 
       const buf1 = fs.readFileSync(variant1Path);
       const buf2 = fs.readFileSync(variant2Path);
@@ -419,10 +419,10 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       fs.writeFileSync(filePath, buffer);
 
       const result = await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "WATERMARK", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "WATERMARK", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
-      const variantPath = path.join(mediaDir, "test-project-id", result.variants[0].name, `${result.variants[0].fileId}.webp`);
+      const variantPath = path.join(mediaDir, "00000000-0000-4000-8000-000000000000", result.variants[0].name, `${result.variants[0].fileId}.webp`);
       const variantBuffer = fs.readFileSync(variantPath);
 
       // Extract center pixel - if watermark is applied, it should differ from pure red
@@ -448,7 +448,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
 
       const wmRevision = "aabb0000ccdd1111eeff2222aabb3333";
       const result = await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "Timeless", wmRevision
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", wmRevision
       );
 
       expect(result.appliedWatermarkRevision).toBe(wmRevision);
@@ -459,7 +459,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       await createTestPng(1200, 900, filePath);
 
       const result = await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
       expect(result.originalFormat).toBe("png");
@@ -472,7 +472,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       await createTestJpeg(800, 600, filePath);
 
       const result = await processImage(
-        filePath, tempDir, "test-project-id", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
+        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
       );
 
       const resultJson = JSON.stringify(result);

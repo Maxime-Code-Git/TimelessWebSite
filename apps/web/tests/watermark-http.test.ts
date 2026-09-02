@@ -84,7 +84,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
   async function login(): Promise<string> {
     const getRes = await fetch(`${BASE_URL}/admin`);
     const anonCookie = getRes.headers.get("Set-Cookie") || "";
-    
+
     const text = await getRes.text();
     const csrfMatch = text.match(/name="csrfToken"[^>]*value="([^"]+)"/);
     const csrfToken = csrfMatch ? csrfMatch[1] : "";
@@ -104,17 +104,17 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
     return loginRes.headers.get("Set-Cookie") || anonCookie;
   }
 
-  async function getCsrfAndRevision(authCookie: string): Promise<{ csrfToken: string; revision: string }> {
+  async function getCsrfAndRevision(authCookie: string): Promise<{ csrfToken: string; portfolioRevision: string }> {
     const res = await fetch(`${BASE_URL}/admin/portfolio/watermark`, {
       headers: { "Cookie": authCookie },
       redirect: "manual"
     });
     const html = await res.text();
     const csrfMatch = html.match(/name="csrfToken"[^>]*value="([^"]+)"/);
-    const revisionMatch = html.match(/name="revision"[^>]*value="([^"]+)"/);
+    const revisionMatch = html.match(/name="portfolioRevision"[^>]*value="([^"]+)"/);
     return {
       csrfToken: csrfMatch?.[1] || "",
-      revision: revisionMatch?.[1] || "",
+      portfolioRevision: revisionMatch?.[1] || "",
     };
   }
 
@@ -135,11 +135,16 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
     });
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/admin");
+
+    // Vérifier la destruction du cookie
+    const setCookie = res.headers.get("Set-Cookie");
+    expect(setCookie).toBeTruthy();
+    expect(setCookie).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/);
   });
 
   it("modification authentifiee avec CSRF valide", async () => {
     const authCookie = await login();
-    const { csrfToken, revision } = await getCsrfAndRevision(authCookie);
+    const { csrfToken, portfolioRevision } = await getCsrfAndRevision(authCookie);
 
     const res = await fetch(`${BASE_URL}/admin/portfolio/watermark`, {
       method: "POST",
@@ -149,7 +154,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
         "Origin": BASE_URL,
         "x-forwarded-for": "127.0.0.1"
       },
-      body: `csrfToken=${encodeURIComponent(csrfToken)}&revision=${encodeURIComponent(revision)}&watermarkText=Mon+Studio`,
+      body: `csrfToken=${encodeURIComponent(csrfToken)}&portfolioRevision=${encodeURIComponent(portfolioRevision)}&watermarkText=Mon+Studio`,
       redirect: "manual",
     });
     expect(res.status).toBe(200);
@@ -162,7 +167,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
     const updatedStr = fs.readFileSync(portfolioContentPath, "utf-8");
     const updated = JSON.parse(updatedStr);
     expect(updated.watermark.text).toBe("Mon Studio");
-    expect(updated.revision).not.toBe(revision);
+    expect(updated.revision).not.toBe(portfolioRevision);
     expect(updated.revision).toMatch(/^[a-f0-9]{32}$/);
     expect(updated.watermark.revision).toBeDefined();
     expect(updated.watermark.revision).toMatch(/^[a-f0-9]{32}$/);
@@ -170,7 +175,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
 
   it("Origin externe rejetee -> 400 (React Router protection)", async () => {
     const authCookie = await login();
-    const { csrfToken, revision } = await getCsrfAndRevision(authCookie);
+    const { csrfToken, portfolioRevision } = await getCsrfAndRevision(authCookie);
 
     const res = await fetch(`${BASE_URL}/admin/portfolio/watermark`, {
       method: "POST",
@@ -179,7 +184,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
         "Cookie": authCookie,
         "Origin": "https://evil.com",
       },
-      body: `csrfToken=${encodeURIComponent(csrfToken)}&revision=${encodeURIComponent(revision)}&watermarkText=Hacked`,
+      body: `csrfToken=${encodeURIComponent(csrfToken)}&portfolioRevision=${encodeURIComponent(portfolioRevision)}&watermarkText=Hacked`,
       redirect: "manual",
     });
     // React Router's built-in CSRF protection returns 400
@@ -204,7 +209,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
 
   it("CSRF incorrect -> 403", async () => {
     const authCookie = await login();
-    const { revision } = await getCsrfAndRevision(authCookie);
+    const { portfolioRevision } = await getCsrfAndRevision(authCookie);
 
     const res = await fetch(`${BASE_URL}/admin/portfolio/watermark`, {
       method: "POST",
@@ -213,7 +218,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
         "Cookie": authCookie,
         "Origin": BASE_URL,
       },
-      body: `csrfToken=wrong-csrf-token&revision=${encodeURIComponent(revision)}&watermarkText=Test`,
+      body: `csrfToken=wrong-csrf-token&portfolioRevision=${encodeURIComponent(portfolioRevision)}&watermarkText=Test`,
       redirect: "manual",
     });
     expect(res.status).toBe(403);
@@ -231,7 +236,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
         "Origin": BASE_URL,
         "Connection": "close"
       },
-      body: `csrfToken=test&revision=test&watermarkText=${largeBody}`,
+      body: `csrfToken=test&portfolioRevision=test&watermarkText=${largeBody}`,
       redirect: "manual",
     });
     expect(res.status).toBe(413);
@@ -248,41 +253,59 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
         "Cookie": authCookie,
         "Origin": BASE_URL,
       },
-      body: `csrfToken=${encodeURIComponent(csrfToken)}&revision=stale_stale_stale_stale_stale_s&watermarkText=Test`,
+      body: `csrfToken=${encodeURIComponent(csrfToken)}&portfolioRevision=stale_stale_stale_stale_stale_s&watermarkText=Test`,
       redirect: "manual",
     });
     expect(res.status).toBe(409);
   });
 
   it("JSON corrompu -> 409 et octets inchanges", async () => {
+    // Clean up old backups from previous tests
+    const oldFiles = fs.readdirSync(tempDir);
+    for (const f of oldFiles) {
+      if (f.includes(".bak") || f.includes(".tmp")) {
+        fs.unlinkSync(path.join(tempDir, f));
+      }
+    }
+
+    // First get a valid CSRF token and session BEFORE corrupting
+    const authCookie = await login();
+    const { csrfToken, portfolioRevision } = await getCsrfAndRevision(authCookie);
+
     // Corrupt the file
     const corruptedContent = "{ completely broken";
     fs.writeFileSync(portfolioContentPath, corruptedContent);
 
-    const authCookie = await login();
-    await fetch(`${BASE_URL}/admin/portfolio/watermark`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Cookie": authCookie,
-        "Origin": BASE_URL,
-      },
-      body: `csrfToken=anything&revision=anything&watermarkText=Test`,
-      redirect: "manual",
-    });
+    try {
+      const res = await fetch(`${BASE_URL}/admin/portfolio/watermark`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Cookie": authCookie,
+          "Origin": BASE_URL,
+        },
+        body: `csrfToken=${encodeURIComponent(csrfToken)}&portfolioRevision=${encodeURIComponent(portfolioRevision)}&watermarkText=Test`,
+        redirect: "manual",
+      });
 
-    // The CSRF validation happens first (403), so restore and accept the first error
-    // But we need to specifically test the corrupted path
-    const afterContent = fs.readFileSync(portfolioContentPath, "utf-8");
-    expect(afterContent).toBe(corruptedContent);
+      // Expect 409 from CorruptedContentError
+      expect(res.status).toBe(409);
 
-    // Restore for other tests
-    fs.writeFileSync(portfolioContentPath, JSON.stringify({
-      schemaVersion: 1,
-      revision: "00000000000000000000000000000000",
-      updatedAt: new Date().toISOString(),
-      projects: [],
-    }));
+      const afterContent = fs.readFileSync(portfolioContentPath, "utf-8");
+      expect(afterContent).toBe(corruptedContent);
+
+      const files = fs.readdirSync(tempDir);
+      const hasBackups = files.some(f => f.includes(".tmp") || f.includes(".bak"));
+      expect(hasBackups).toBe(false);
+    } finally {
+      // Restore for other tests
+      fs.writeFileSync(portfolioContentPath, JSON.stringify({
+        schemaVersion: 1,
+        revision: "00000000000000000000000000000000",
+        updatedAt: new Date().toISOString(),
+        projects: [],
+      }));
+    }
   });
 
   it("watermark route should have Cache-Control and X-Robots-Tag headers", async () => {

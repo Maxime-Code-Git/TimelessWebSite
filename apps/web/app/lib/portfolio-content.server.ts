@@ -113,7 +113,7 @@ export const portfolioSchema = z.object({
   }, "Must be valid ISO with ms"),
   projects: z.array(projectSchema),
   watermark: watermarkConfigSchema,
-});
+}).strict();
 
 export type Portfolio = z.infer<typeof portfolioSchema>;
 export type Project = z.infer<typeof projectSchema>;
@@ -218,53 +218,51 @@ export function validateWatermarkText(text: string): string {
   if (typeof text !== "string") {
     throw new ValidationError("Watermark text must be a string");
   }
-  if (text.length === 0 || text.trim().length === 0) {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
     throw new ValidationError("Watermark text cannot be empty");
   }
-  if (text.length > WATERMARK_TEXT_MAX_LENGTH) {
+  if (trimmed.length > WATERMARK_TEXT_MAX_LENGTH) {
     throw new ValidationError("Watermark text is too long");
   }
   // eslint-disable-next-line no-control-regex
-  if (/[\x00-\x1f\x7f]/.test(text)) {
+  if (/[\x00-\x1f\x7f]/.test(trimmed)) {
     throw new ValidationError("Control characters are not allowed");
   }
-  if (/<[a-z/!][^>]*>/i.test(text)) {
+  if (/<[a-z/!][^>]*>/i.test(trimmed)) {
     throw new ValidationError("HTML tags are not allowed");
   }
-  return text;
+  return trimmed;
 }
 
-export function updateWatermarkText(text: string, previousPortfolioRevision: string): string {
+export function updateWatermarkText(text: string, previousPortfolioRevision: string): { portfolioRevision: string, watermarkRevision: string } {
   const validatedText = validateWatermarkText(text);
-  const portfolio = getPortfolioContent();
-
-  if (portfolio.revision !== previousPortfolioRevision && fs.existsSync(getPortfolioContentPath())) {
-    throw new RevisionConflictError();
-  }
 
   const current = getRawPortfolioContent();
   if (current.isCorrupted) {
     throw new CorruptedContentError();
   }
 
+  if (current.content.revision !== previousPortfolioRevision && fs.existsSync(getPortfolioContentPath())) {
+    throw new RevisionConflictError();
+  }
+
   const now = new Date().toISOString();
+  const watermarkRevision = crypto.randomBytes(16).toString("hex");
   const newWatermark: WatermarkConfig = {
     mode: "text" as const,
     text: validatedText,
-    revision: crypto.randomBytes(16).toString("hex"),
+    revision: watermarkRevision,
     updatedAt: now,
   };
 
   const newContent: Portfolio = {
-    ...portfolio,
+    ...current.content,
     watermark: newWatermark,
-    revision: crypto.randomBytes(16).toString("hex"),
-    updatedAt: now,
   };
 
-  const parsed = portfolioSchema.parse(newContent);
-  atomicWriteJson(getPortfolioContentPath(), parsed);
-  return newContent.revision;
+  const portfolioRevision = savePortfolio(newContent, previousPortfolioRevision);
+  return { portfolioRevision, watermarkRevision };
 }
 
 export function generateSlug(text: string): string {

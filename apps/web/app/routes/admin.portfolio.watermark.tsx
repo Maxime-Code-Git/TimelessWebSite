@@ -34,7 +34,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return Response.json(
     {
       watermarkText: portfolio.watermark.text,
-      revision: portfolio.revision,
+      portfolioRevision: portfolio.revision,
+      watermarkRevision: portfolio.watermark.revision,
       csrfToken,
     },
     { headers: responseHeaders }
@@ -61,14 +62,14 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json({ error: "Invalid watermark text" }, { status: 422, headers: responseHeaders });
   }
 
-  const previousRevision = formData.get("revision");
+  const previousRevision = formData.get("portfolioRevision");
   if (typeof previousRevision !== "string") {
     return Response.json({ error: "Invalid revision" }, { status: 422, headers: responseHeaders });
   }
 
   try {
-    const newRevision = updateWatermarkText(text, previousRevision);
-    return Response.json({ success: true, revision: newRevision }, { headers: responseHeaders });
+    const { portfolioRevision, watermarkRevision } = updateWatermarkText(text, previousRevision);
+    return Response.json({ success: true, portfolioRevision, watermarkRevision }, { headers: responseHeaders });
   } catch (err: unknown) {
     if (err instanceof RevisionConflictError) {
       return Response.json({ error: "Revision conflict" }, { status: 409, headers: responseHeaders });
@@ -85,24 +86,25 @@ export async function action({ request }: ActionFunctionArgs) {
 
 interface LoaderData {
   watermarkText: string;
-  revision: string;
+  portfolioRevision: string;
+  watermarkRevision: string;
   csrfToken: string;
 }
 
 interface ActionData {
   success?: boolean;
-  revision?: string;
+  portfolioRevision?: string;
+  watermarkRevision?: string;
   error?: string;
 }
 
 export default function AdminPortfolioWatermark() {
-  const { watermarkText, revision, csrfToken } = useLoaderData() as unknown as LoaderData;
+  const { watermarkText, portfolioRevision, csrfToken } = useLoaderData() as unknown as LoaderData;
   const actionData = useActionData() as unknown as ActionData | undefined;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
-  const currentRevision = actionData?.revision ?? revision;
-  const currentText = actionData?.success ? (actionData as ActionData & { success: true }).revision ? watermarkText : watermarkText : watermarkText;
+  const currentPortfolioRevision = actionData?.portfolioRevision ?? portfolioRevision;
 
   return (
     <div className={styles.container}>
@@ -128,7 +130,7 @@ export default function AdminPortfolioWatermark() {
 
           <Form method="post" className={styles.form}>
             <input type="hidden" name="csrfToken" value={csrfToken} />
-            <input type="hidden" name="revision" value={currentRevision} />
+            <input type="hidden" name="portfolioRevision" value={currentPortfolioRevision} />
 
             <div>
               <label htmlFor="watermarkText" className={styles.label}>Texte du filigrane (max. 40 caractères)</label>
@@ -136,7 +138,7 @@ export default function AdminPortfolioWatermark() {
                 id="watermarkText"
                 type="text"
                 name="watermarkText"
-                defaultValue={currentText}
+                defaultValue={watermarkText}
                 maxLength={40}
                 className={styles.input}
                 required
@@ -148,10 +150,10 @@ export default function AdminPortfolioWatermark() {
               <h3 className={styles.dashboardTitle}>Aperçu approximatif</h3>
               <div className={styles.watermarkPreviewGrid}>
                 <div className={styles.watermarkPreviewLight}>
-                  <span className={styles.watermarkPreviewText}>{currentText}</span>
+                  <span className={styles.watermarkPreviewText}>{watermarkText}</span>
                 </div>
                 <div className={styles.watermarkPreviewDark}>
-                  <span className={styles.watermarkPreviewText}>{currentText}</span>
+                  <span className={styles.watermarkPreviewText}>{watermarkText}</span>
                 </div>
               </div>
             </div>

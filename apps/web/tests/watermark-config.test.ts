@@ -106,13 +106,14 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(initial));
 
-    const newRevision = updateWatermarkText("Mon Studio", "aaaa0000bbbb1111cccc2222dddd3333");
-    expect(newRevision).toMatch(/^[0-9a-f]{32}$/);
+    const { portfolioRevision, watermarkRevision } = updateWatermarkText("Mon Studio", "aaaa0000bbbb1111cccc2222dddd3333");
+    expect(portfolioRevision).toMatch(/^[0-9a-f]{32}$/);
+    expect(watermarkRevision).toMatch(/^[0-9a-f]{32}$/);
 
     const updated = getPortfolioContent();
     expect(updated.watermark.text).toBe("Mon Studio");
-    expect(updated.watermark.revision).not.toBe("00000000000000000000000000000000");
-    expect(updated.revision).not.toBe("aaaa0000bbbb1111cccc2222dddd3333");
+    expect(updated.watermark.revision).toBe(watermarkRevision);
+    expect(updated.revision).toBe(portfolioRevision);
   });
 
   it("should store raw text with ampersand and redisplay it unescaped", () => {
@@ -131,6 +132,75 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
 
     const portfolio = getPortfolioContent();
     expect(portfolio.watermark.text).toBe("Timeless & Co");
+  });
+
+  it("should trim text and store the cleaned version", () => {
+    const initial = {
+      schemaVersion: 1,
+      revision: "aaaa0000bbbb1111cccc2222dddd3333",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      projects: [],
+    };
+    fs.writeFileSync(portfolioPath, JSON.stringify(initial));
+
+    updateWatermarkText("   Mon Studio   ", "aaaa0000bbbb1111cccc2222dddd3333");
+
+    const rawJson = JSON.parse(fs.readFileSync(portfolioPath, "utf-8"));
+    expect(rawJson.watermark.text).toBe("Mon Studio");
+  });
+
+  it("should apply 40 character limit after trimming", () => {
+    // 40 chars of text, plus spaces around it
+    const text = "   " + "a".repeat(40) + "   ";
+    expect(validateWatermarkText(text)).toBe("a".repeat(40));
+
+    // 41 chars of text should throw
+    expect(() => validateWatermarkText("a".repeat(41))).toThrow(ValidationError);
+  });
+
+  it("should reject unknown properties due to strict schema", () => {
+    const initial = {
+      schemaVersion: 1,
+      revision: "aaaa0000bbbb1111cccc2222dddd3333",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      projects: [],
+      unknownProperty: "should fail",
+    };
+    fs.writeFileSync(portfolioPath, JSON.stringify(initial));
+
+    expect(() => getPortfolioContent()).toThrow(CorruptedContentError);
+  });
+
+  it("should preserve other mutations during update", () => {
+    const initial = {
+      schemaVersion: 1,
+      revision: "aaaa0000bbbb1111cccc2222dddd3333",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      projects: [
+        {
+          id: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          slug: { fr: "test-fr", en: "test-en" },
+          title: { fr: "Test", en: "Test" },
+          description: { fr: "Test", en: "Test" },
+          location: null,
+          date: null,
+          status: "draft",
+          order: 0,
+          coverPhotoId: null,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          photos: [],
+        }
+      ],
+    };
+    fs.writeFileSync(portfolioPath, JSON.stringify(initial));
+
+    updateWatermarkText("Updated", "aaaa0000bbbb1111cccc2222dddd3333");
+
+    const updated = getPortfolioContent();
+    expect(updated.projects.length).toBe(1);
+    expect(updated.projects[0].id).toBe("3fa85f64-5717-4562-b3fc-2c963f66afa6");
+
   });
 
   it("should throw RevisionConflictError on stale revision", () => {
@@ -226,9 +296,11 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(initial));
 
-    updateWatermarkText("NewMark", "aaaa0000bbbb1111cccc2222dddd3333");
+    const { portfolioRevision, watermarkRevision } = updateWatermarkText("NewMark", "aaaa0000bbbb1111cccc2222dddd3333");
 
     const updated = getPortfolioContent();
+    expect(updated.revision).toBe(portfolioRevision);
+    expect(updated.watermark.revision).toBe(watermarkRevision);
     expect(updated.revision).not.toBe("aaaa0000bbbb1111cccc2222dddd3333");
     expect(updated.watermark.revision).not.toBe("00000000000000000000000000000000");
     expect(updated.watermark.revision).not.toBe(updated.revision);
