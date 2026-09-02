@@ -274,8 +274,8 @@ function ensureStrictDirectory(dirPath: string, basePath: string, allowMissing: 
     if (rel.startsWith("..") || path.isAbsolute(rel)) {
       throw new Error("Outside base path");
     }
-  } catch (err: any) {
-    if (err.code === "ENOENT" && allowMissing) {
+  } catch (err: unknown) {
+    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT" && allowMissing) {
       // Missing is fine for creation when allowed
       return;
     }
@@ -288,9 +288,9 @@ function ensureStrictDirectoryCreated(dirPath: string, basePath: string): void {
   if (!fs.existsSync(dirPath)) {
     try {
       fs.mkdirSync(dirPath, { recursive: true, mode: 0o700 });
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Ignore EEXIST in case of race conditions
-      if (err.code !== "EEXIST") {
+      if (!(err instanceof Error) || (err as NodeJS.ErrnoException).code !== "EEXIST") {
         // eslint-disable-next-line preserve-caught-error
         throw new Error("Image processing failed due to an internal error.");
       }
@@ -309,8 +309,7 @@ function ensureStrictDirectoryCreated(dirPath: string, basePath: string): void {
     if (rel.startsWith("..") || path.isAbsolute(rel)) {
       throw new Error("Outside base path");
     }
-  } catch (err) {
-    // eslint-disable-next-line preserve-caught-error
+  } catch {
     throw new Error("Image processing failed due to an internal error.");
   }
 }
@@ -495,8 +494,7 @@ export async function processImage(
     )) {
       throw err;
     }
-    console.error("DEBUG processImage catch:", err);
-    // eslint-disable-next-line preserve-caught-error
+        // eslint-disable-next-line preserve-caught-error
     throw new Error("Image processing failed due to an internal error.");
   }
 }

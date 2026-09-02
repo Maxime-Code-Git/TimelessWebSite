@@ -53,15 +53,15 @@ describe("admin:hash script", () => {
 
   // Helper to run the script with mocked TTY and inputs
   async function runScriptWithMockTty(inputs: string[]): Promise<{ stdout: string, stderr: string, code: number | null }> {
-    const mockTtyPath = path.join(__dirname, "mock-tty.js");
+    const mockTtyPath = path.join(__dirname, `mock-tty-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.js`);
     fs.writeFileSync(mockTtyPath, `
       process.stdout.isTTY = true;
       process.stdin.isTTY = true;
-      import("../scripts/admin-hash.js").catch(console.error);
+      import("../scripts/admin-hash.js").catch(() => {});
     `);
 
     return new Promise((resolve) => {
-      const child = exec("node mock-tty.js", { cwd: __dirname });
+      const child = exec(`node ${path.basename(mockTtyPath)}`, { cwd: __dirname });
 
       let stdout = "";
       let stderr = "";

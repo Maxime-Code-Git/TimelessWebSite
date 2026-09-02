@@ -295,6 +295,9 @@ describe("portfolio-content.server", () => {
       expect(contentAfter.revision).toBe("11111111111111111111111111111111");
       expect(contentAfter.watermark.text).toBe("Timeless");
 
+      const backups = fs.readdirSync(tempDir).filter(f => f.startsWith("portfolio.json.backup"));
+      expect(backups).toHaveLength(0);
+
       // Ensure no temp files leaked
       const files = fs.readdirSync(tempDir);
       expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
