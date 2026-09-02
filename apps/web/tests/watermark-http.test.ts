@@ -4,6 +4,35 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 
+import { createRequire } from "node:module";
+
+const requireModule = createRequire(import.meta.url);
+const servePkgPath = requireModule.resolve("@react-router/serve/package.json");
+const serveBin = path.join(path.dirname(servePkgPath), "bin.cjs");
+
+async function stopServer(proc: ChildProcess | undefined) {
+  if (!proc || proc.exitCode !== null || proc.signalCode !== null) return;
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        proc.kill("SIGKILL");
+        resolve();
+      }
+    }, 2000);
+    proc.once("close", () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+    proc.kill("SIGTERM");
+  });
+}
+
+
 describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
   let serverProcess: ChildProcess;
   const PORT = 43215;
@@ -28,7 +57,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
     }));
 
     return new Promise((resolve, reject) => {
-      serverProcess = spawn("npm", ["run", "start"], {
+      serverProcess = spawn(process.execPath, [serveBin, "./build/server/index.js"], {
         cwd: path.resolve(__dirname, ".."),
         env: {
           ...process.env,
@@ -52,9 +81,12 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
           PORTFOLIO_CONTENT_PATH: portfolioContentPath,
           PORTFOLIO_MEDIA_PATH: portfolioMediaPath,
         },
+        stdio: ["ignore", "pipe", "pipe"]
       });
 
-      const timeout = setTimeout(() => reject(new Error("Server startup timeout")), 15000);
+      const timeout = setTimeout(() => {
+        stopServer(serverProcess).finally(() => reject(new Error("Server startup timeout")));
+      }, 15000);
 
       serverProcess.stdout?.on("data", (data) => {
         if (data.toString().includes(String(PORT))) {
@@ -65,19 +97,19 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
       serverProcess.stderr?.on("data", (data) => console.warn("Server error:", data.toString()));
       serverProcess.on("error", (err) => {
         clearTimeout(timeout);
-        reject(err);
+        stopServer(serverProcess).finally(() => reject(err));
       });
       serverProcess.on("exit", (code) => {
         clearTimeout(timeout);
         if (code !== 0 && code !== null) {
-          reject(new Error(`Server exited with code ${code}`));
+          stopServer(serverProcess).finally(() => reject(new Error(`Server exited with code ${code}`)));
         }
       });
     });
   });
 
-  afterAll(() => {
-    if (serverProcess) serverProcess.kill();
+  afterAll(async () => {
+    await stopServer(serverProcess);
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 

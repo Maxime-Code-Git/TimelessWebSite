@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { pathToFileURL } from "node:url";
 
 describe("admin:hash script", () => {
   const scriptPath = path.resolve(__dirname, "../scripts/admin-hash.js");
@@ -11,14 +12,14 @@ describe("admin:hash script", () => {
     expect(fs.existsSync(scriptPath)).toBe(true);
   });
 
-  it("should fail gracefully without command-line arguments", async () => {
-    const result = await runSpawn([scriptPath, "arg1"], [], 0);
+  it("should fail gracefully with command-line arguments", async () => {
+    const result = await runSpawn([scriptPath, "arg1"]);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain("Les arguments en ligne de commande sont refusés par sécurité.");
   });
 
   it("should fail without a TTY", async () => {
-    const result = await runSpawn([scriptPath], [], 0);
+    const result = await runSpawn([scriptPath]);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain("Ce script nécessite un terminal interactif (TTY).");
   });
@@ -36,7 +37,7 @@ describe("admin:hash script", () => {
     fs.writeFileSync(mockTtyPath, `
       process.stdout.isTTY = true;
       process.stdin.isTTY = true;
-      import("${scriptPath.replace(/\\/g, "/")}").catch(() => {});
+      import("${pathToFileURL(scriptPath).href}").catch(() => {});
     `);
 
     return new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
@@ -99,7 +100,8 @@ describe("admin:hash script", () => {
           clearTimeout(timer);
           // Detect premature closure before all prompts appeared
           if (inputIndex < inputs.length && code !== 0) {
-            // Script exited before we could send all inputs — expected for short password case
+            reject(new Error(`Process closed prematurely with code ${code} before all inputs were sent`));
+            return;
           }
           resolve({ stdout, stderr, code });
         }
@@ -116,7 +118,7 @@ describe("admin:hash script", () => {
   /**
    * Simple spawn helper for non-TTY tests (args validation, TTY check).
    */
-  function runSpawn(args: string[], _inputs: string[], _promptsExpected: number): Promise<{ stdout: string; stderr: string; code: number | null }> {
+  function runSpawn(args: string[]): Promise<{ stdout: string; stderr: string; code: number | null }> {
     return new Promise((resolve, reject) => {
       const child = spawn(process.execPath, args, {
         cwd: path.resolve(__dirname, ".."),

@@ -344,7 +344,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       }
     });
 
-    it("should strip EXIF/GPS from variants", async () => {
+    it("should strip EXIF Copyright from variants", async () => {
       const filePath = path.join(tempDir, "exif.jpg");
       const buffer = await sharp({
         create: { width: 800, height: 600, channels: 3, background: { r: 128, g: 128, b: 128 } }
@@ -538,7 +538,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
   // === Watermark Rendering and CWD ===
 
   describe("Watermark rendering from different CWD", () => {
-    const repoRoot = path.resolve(__dirname, "../../../..");
+    const repoRoot = path.resolve(__dirname, "../../..");
     const appsWeb = path.resolve(__dirname, "..");
     const cwdCases = [
       { label: "repo root", dir: repoRoot },
