@@ -5,6 +5,14 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { fileTypeFromBuffer } from "file-type";
 
+/** Business error safe to expose to the caller. */
+export class SafeImageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SafeImageError";
+  }
+}
+
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MiB
 const MAX_PIXELS = 80_000_000;
 const MAX_DIMENSION = 12000;
@@ -64,7 +72,7 @@ function resolveFontPath(): string {
     current = parent;
   }
 
-  throw new Error("Required font file is not available.");
+  throw new SafeImageError("Required font file is not available.");
 }
 
 let cachedFontPath: string | null = null;
@@ -153,20 +161,26 @@ function validateConfinement(filePath: string, allowedDir: string): void {
 
   const rel = path.relative(resolvedAllowed, resolvedFile);
   if (rel.startsWith("..") || path.isAbsolute(rel)) {
-    throw new Error("Image validation failed.");
+    throw new SafeImageError("Image validation failed.");
   }
 
   if (fs.existsSync(resolvedFile)) {
+    // Reject symlink sources regardless of target
+    const lstat = fs.lstatSync(resolvedFile);
+    if (lstat.isSymbolicLink()) {
+      throw new SafeImageError("Image validation failed.");
+    }
+
     const realFilePath = fs.realpathSync(resolvedFile);
     let realAllowedDir: string;
     try {
       realAllowedDir = fs.realpathSync(resolvedAllowed);
     } catch {
-      throw new Error("Image validation failed.");
+      throw new SafeImageError("Image validation failed.");
     }
     const realRel = path.relative(realAllowedDir, realFilePath);
     if (realRel.startsWith("..") || path.isAbsolute(realRel)) {
-      throw new Error("Image validation failed.");
+      throw new SafeImageError("Image validation failed.");
     }
   }
 }
@@ -182,7 +196,7 @@ export async function validateImageFile(
     // 2. Size check
     const stat = fs.statSync(filePath);
     if (stat.size > MAX_FILE_SIZE) {
-      throw new Error("Image file exceeds the maximum allowed size.");
+      throw new SafeImageError("Image file exceeds the maximum allowed size.");
     }
 
     // 3. Magic bytes check (read first 4100 bytes)
@@ -197,7 +211,7 @@ export async function validateImageFile(
     const uint8View = new Uint8Array(headerBuffer.buffer, headerBuffer.byteOffset, headerBuffer.byteLength);
     const fileTypeResult = await fileTypeFromBuffer(uint8View);
     if (!fileTypeResult || !ALLOWED_MIME_TYPES.has(fileTypeResult.mime)) {
-      throw new Error("Unsupported image format.");
+      throw new SafeImageError("Unsupported image format.");
     }
 
     // 4. Sharp metadata check
@@ -206,12 +220,12 @@ export async function validateImageFile(
     const height = metadata.height;
 
     if (!width || !height) {
-      throw new Error("Could not determine image dimensions.");
+      throw new SafeImageError("Could not determine image dimensions.");
     }
 
     // Check for animated/multi-page images
     if (metadata.pages && metadata.pages > 1) {
-      throw new Error("Animated or multi-page images are not supported.");
+      throw new SafeImageError("Animated or multi-page images are not supported.");
     }
 
     // Apply orientation to get actual dimensions
@@ -224,16 +238,16 @@ export async function validateImageFile(
 
     // Numeric overflow protection (JS Number is safe up to 9 quadrillion, but to be safe)
     if (!Number.isSafeInteger(orientedWidth) || !Number.isSafeInteger(orientedHeight)) {
-      throw new Error("Invalid image dimensions.");
+      throw new SafeImageError("Invalid image dimensions.");
     }
 
     const totalPixels = orientedWidth * orientedHeight;
     if (totalPixels > MAX_PIXELS) {
-      throw new Error("Image resolution exceeds the maximum allowed pixels.");
+      throw new SafeImageError("Image resolution exceeds the maximum allowed pixels.");
     }
 
     if (orientedWidth > MAX_DIMENSION || orientedHeight > MAX_DIMENSION) {
-      throw new Error("Image dimensions exceed the maximum allowed size.");
+      throw new SafeImageError("Image dimensions exceed the maximum allowed size.");
     }
 
     return {
@@ -242,18 +256,11 @@ export async function validateImageFile(
       height: orientedHeight,
     };
   } catch (err) {
-    if (err instanceof Error && (
-      err.message.startsWith("Image") ||
-      err.message.startsWith("Unsupported") ||
-      err.message.startsWith("Animated") ||
-      err.message.startsWith("Could not") ||
-      err.message.startsWith("Invalid")
-    )) {
+    if (err instanceof SafeImageError) {
       throw err;
     }
     // Mask all other errors (system errors, ENOENT, EACCES, etc.)
-    // eslint-disable-next-line preserve-caught-error
-    throw new Error("Image processing failed due to an internal error.");
+    throw new SafeImageError("Image processing failed due to an internal error.");
   }
 }
 
@@ -279,8 +286,7 @@ function ensureStrictDirectory(dirPath: string, basePath: string, allowMissing: 
       // Missing is fine for creation when allowed
       return;
     }
-    // eslint-disable-next-line preserve-caught-error
-    throw new Error("Image processing failed due to an internal error.");
+    throw new SafeImageError("Image processing failed due to an internal error.");
   }
 }
 
@@ -291,8 +297,7 @@ function ensureStrictDirectoryCreated(dirPath: string, basePath: string): void {
     } catch (err: unknown) {
       // Ignore EEXIST in case of race conditions
       if (!(err instanceof Error) || (err as NodeJS.ErrnoException).code !== "EEXIST") {
-        // eslint-disable-next-line preserve-caught-error
-        throw new Error("Image processing failed due to an internal error.");
+        throw new SafeImageError("Image processing failed due to an internal error.");
       }
     }
   }
@@ -310,7 +315,7 @@ function ensureStrictDirectoryCreated(dirPath: string, basePath: string): void {
       throw new Error("Outside base path");
     }
   } catch {
-    throw new Error("Image processing failed due to an internal error.");
+    throw new SafeImageError("Image processing failed due to an internal error.");
   }
 }
 
@@ -329,7 +334,7 @@ function atomicWriteFile(targetPath: string, content: Buffer, mode: number): voi
     let bytesWritten = 0;
     while (bytesWritten < content.length) {
       const written = fs.writeSync(fd, content, bytesWritten, content.length - bytesWritten, bytesWritten);
-      if (written <= 0) throw new Error("Write failed.");
+      if (written <= 0) throw new SafeImageError("Image processing failed due to an internal error.");
       bytesWritten += written;
     }
     fs.fsyncSync(fd);
@@ -369,7 +374,7 @@ export async function processImage(
 ): Promise<ImageProcessingResult> {
   // Validate UUID
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
-    throw new Error("Invalid project ID.");
+    throw new SafeImageError("Invalid project ID.");
   }
 
   const { format, width, height } = await validateImageFile(tempFilePath, allowedTempDir);
@@ -484,17 +489,9 @@ export async function processImage(
       } catch { /* ignore */ }
     }
 
-    if (err instanceof Error && (
-      err.message.startsWith("Image") ||
-      err.message.startsWith("Unsupported") ||
-      err.message.startsWith("Animated") ||
-      err.message.startsWith("Could not") ||
-      err.message.startsWith("Invalid") ||
-      err.message.startsWith("Required font")
-    )) {
+    if (err instanceof SafeImageError) {
       throw err;
     }
-        // eslint-disable-next-line preserve-caught-error
-    throw new Error("Image processing failed due to an internal error.");
+    throw new SafeImageError("Image processing failed due to an internal error.");
   }
 }

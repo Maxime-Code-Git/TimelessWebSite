@@ -74,20 +74,25 @@ describe("portfolio-content.server", () => {
 
   it("fails portfolioSchema.safeParse on unknown property directly", () => {
     const valid = {
-      schemaVersion: 1,
+      schemaVersion: 1 as const,
       revision: crypto.randomBytes(16).toString("hex"),
       updatedAt: new Date().toISOString(),
       projects: [],
       watermark: {
+        mode: "text" as const,
         text: "Test",
         revision: crypto.randomBytes(16).toString("hex"),
-      }
+        updatedAt: new Date().toISOString(),
+      },
     };
 
-    // safeParse directly on the exact schema used for writing
+    // First: the valid object MUST pass
+    expect(portfolioSchema.safeParse(valid).success).toBe(true);
+
+    // Then: adding an unknown property MUST fail (proves .strict())
     const result = portfolioSchema.safeParse({
       ...valid,
-      unknownProperty: true
+      unknownProperty: true,
     });
     expect(result.success).toBe(false);
   });
