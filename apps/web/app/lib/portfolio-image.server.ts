@@ -257,6 +257,64 @@ export async function validateImageFile(
   }
 }
 
+function ensureStrictDirectory(dirPath: string, basePath: string, allowMissing: boolean = true): void {
+  try {
+    const stat = fs.lstatSync(dirPath);
+    if (stat.isSymbolicLink()) {
+      throw new Error("Directory is a symlink");
+    }
+    if (!stat.isDirectory()) {
+      throw new Error("Not a directory");
+    }
+
+    // Canonical resolution check
+    const realBase = fs.realpathSync(basePath);
+    const realDir = fs.realpathSync(dirPath);
+    const rel = path.relative(realBase, realDir);
+    if (rel.startsWith("..") || path.isAbsolute(rel)) {
+      throw new Error("Outside base path");
+    }
+  } catch (err: any) {
+    if (err.code === "ENOENT" && allowMissing) {
+      // Missing is fine for creation when allowed
+      return;
+    }
+    // eslint-disable-next-line preserve-caught-error
+    throw new Error("Image processing failed due to an internal error.");
+  }
+}
+
+function ensureStrictDirectoryCreated(dirPath: string, basePath: string): void {
+  if (!fs.existsSync(dirPath)) {
+    try {
+      fs.mkdirSync(dirPath, { recursive: true, mode: 0o700 });
+    } catch (err: any) {
+      // Ignore EEXIST in case of race conditions
+      if (err.code !== "EEXIST") {
+        // eslint-disable-next-line preserve-caught-error
+        throw new Error("Image processing failed due to an internal error.");
+      }
+    }
+  }
+
+  // Re-verify after creation
+  try {
+    const stat = fs.lstatSync(dirPath);
+    if (stat.isSymbolicLink() || !stat.isDirectory()) {
+      throw new Error("Invalid directory");
+    }
+    const realBase = fs.realpathSync(basePath);
+    const realDir = fs.realpathSync(dirPath);
+    const rel = path.relative(realBase, realDir);
+    if (rel.startsWith("..") || path.isAbsolute(rel)) {
+      throw new Error("Outside base path");
+    }
+  } catch (err) {
+    // eslint-disable-next-line preserve-caught-error
+    throw new Error("Image processing failed due to an internal error.");
+  }
+}
+
 function generateFileId(): string {
   return crypto.randomBytes(16).toString("hex");
 }
@@ -302,12 +360,6 @@ function atomicWriteFile(targetPath: string, content: Buffer, mode: number): voi
   }
 }
 
-function ensureDir(dirPath: string, mode: number): void {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true, mode });
-  }
-}
-
 export async function processImage(
   tempFilePath: string,
   allowedTempDir: string,
@@ -329,15 +381,17 @@ export async function processImage(
 
   try {
     const resolvedMediaBasePath = path.resolve(mediaBasePath);
+    ensureStrictDirectory(resolvedMediaBasePath, resolvedMediaBasePath, false);
+
     const projectDir = path.resolve(resolvedMediaBasePath, projectId);
-    validateConfinement(projectDir, resolvedMediaBasePath);
     const originalsDir = path.resolve(projectDir, "originals");
-    validateConfinement(originalsDir, resolvedMediaBasePath);
 
     for (const dir of [projectDir, originalsDir]) {
       if (!fs.existsSync(dir)) {
-        ensureDir(dir, 0o700);
+        ensureStrictDirectoryCreated(dir, resolvedMediaBasePath);
         createdDirs.push(dir);
+      } else {
+        ensureStrictDirectory(dir, resolvedMediaBasePath);
       }
     }
 
@@ -357,11 +411,12 @@ export async function processImage(
       }
 
       const variantDir = path.resolve(projectDir, breakpoint.name);
-      validateConfinement(variantDir, resolvedMediaBasePath);
 
       if (!fs.existsSync(variantDir)) {
-        ensureDir(variantDir, 0o700);
+        ensureStrictDirectoryCreated(variantDir, resolvedMediaBasePath);
         createdDirs.push(variantDir);
+      } else {
+        ensureStrictDirectory(variantDir, resolvedMediaBasePath);
       }
 
       let resizeWidth: number;
@@ -440,6 +495,7 @@ export async function processImage(
     )) {
       throw err;
     }
+    console.error("DEBUG processImage catch:", err);
     // eslint-disable-next-line preserve-caught-error
     throw new Error("Image processing failed due to an internal error.");
   }

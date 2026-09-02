@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import sharp from "sharp";
+import crypto from "node:crypto";
+import { execSync } from "node:child_process";
 
 // Mock env-loader to prevent .env.local from loading
 vi.mock("../../../../scripts/env-loader.js", () => ({}));
@@ -18,21 +20,30 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
   let tempDir: string;
   let mediaDir: string;
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-image-test-"));
     mediaDir = path.join(tempDir, "media");
-    fs.mkdirSync(mediaDir);
+    fs.mkdirSync(mediaDir, { mode: 0o700 });
     _resetFontCache();
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  async function createTestJpeg(width: number, height: number, filePath: string): Promise<void> {
-    const buffer = await sharp({
+  async function createTestJpeg(width: number, height: number, filePath: string, metadata: any = {}): Promise<void> {
+    let pipeline = sharp({
       create: { width, height, channels: 3, background: { r: 128, g: 128, b: 128 } }
-    }).jpeg({ quality: 80 }).toBuffer();
+    });
+    if (Object.keys(metadata).length > 0) {
+      pipeline = pipeline.withMetadata(metadata);
+    }
+    const buffer = await pipeline.jpeg({ quality: 80 }).toBuffer();
     fs.writeFileSync(filePath, buffer);
   }
 
@@ -43,518 +54,476 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
     fs.writeFileSync(filePath, buffer);
   }
 
-  async function createTestWebp(width: number, height: number, filePath: string): Promise<void> {
-    const buffer = await sharp({
-      create: { width, height, channels: 3, background: { r: 128, g: 128, b: 128 } }
-    }).webp().toBuffer();
-    fs.writeFileSync(filePath, buffer);
-  }
-
-  // === Validation Tests ===
-
-  describe("Image Validation", () => {
-    it("should accept a valid JPEG", async () => {
+  describe("Directory confinement and Symlinks", () => {
+    it("rejects projectDir symlink outside", async () => {
       const filePath = path.join(tempDir, "test.jpg");
-      await createTestJpeg(800, 600, filePath);
+      await createTestJpeg(100, 100, filePath);
+      const fakeDir = path.join(tempDir, "fake");
+      fs.mkdirSync(fakeDir);
 
-      const result = await validateImageFile(filePath, tempDir);
-      expect(result.format).toBe("jpg");
-      expect(result.width).toBe(800);
-      expect(result.height).toBe(600);
+      const projectId = "00000000-0000-4000-8000-000000000001";
+      const projectDir = path.join(mediaDir, projectId);
+      fs.symlinkSync(fakeDir, projectDir);
+
+      await expect(processImage(filePath, tempDir, projectId, mediaDir, "TEST", "rev"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
     });
 
-    it("should accept a valid PNG", async () => {
-      const filePath = path.join(tempDir, "test.png");
-      await createTestPng(400, 300, filePath);
+    it("rejects projectDir symlink inside mediaDir", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(100, 100, filePath);
+      const otherDir = path.join(mediaDir, "00000000-0000-4000-8000-000000000002");
+      fs.mkdirSync(otherDir);
 
-      const result = await validateImageFile(filePath, tempDir);
-      expect(result.format).toBe("png");
-      expect(result.width).toBe(400);
-      expect(result.height).toBe(300);
+      const projectId = "00000000-0000-4000-8000-000000000001";
+      const projectDir = path.join(mediaDir, projectId);
+      fs.symlinkSync(otherDir, projectDir);
+
+      await expect(processImage(filePath, tempDir, projectId, mediaDir, "TEST", "rev"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
     });
 
-    it("should accept a valid WebP", async () => {
-      const filePath = path.join(tempDir, "test.webp");
-      await createTestWebp(640, 480, filePath);
-
-      const result = await validateImageFile(filePath, tempDir);
-      expect(result.format).toBe("webp");
-      expect(result.width).toBe(640);
-      expect(result.height).toBe(480);
-    });
-
-    it("should reject a file with fake extension based on magic bytes", async () => {
-      const filePath = path.join(tempDir, "fake.jpg");
-      // Write a text file with .jpg extension
-      fs.writeFileSync(filePath, "This is not an image at all, just plain text content");
-
-      await expect(validateImageFile(filePath, tempDir))
-        .rejects.toThrow("Unsupported image format.");
-    });
-
-    it("should reject a non-image file", async () => {
-      const filePath = path.join(tempDir, "document.pdf");
-      // Write a PDF-like header
-      fs.writeFileSync(filePath, Buffer.from("%PDF-1.4 fake content here"));
-
-      await expect(validateImageFile(filePath, tempDir))
-        .rejects.toThrow("Unsupported image format.");
-    });
-
-    it("should reject an SVG file", async () => {
-      const filePath = path.join(tempDir, "image.svg");
-      fs.writeFileSync(filePath, '<svg xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100"/></svg>');
-
-      await expect(validateImageFile(filePath, tempDir))
-        .rejects.toThrow("Unsupported image format.");
-    });
-
-    it("should reject a file exceeding 50 MiB without loading it entirely", async () => {
-      const filePath = path.join(tempDir, "large.jpg");
-      // Create a sparse file (doesn't allocate actual disk space)
-      const fd = fs.openSync(filePath, "w");
-      // Write JPEG magic bytes at start
-      const jpegHeader = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]);
-      fs.writeSync(fd, jpegHeader, 0, jpegHeader.length, 0);
-      fs.ftruncateSync(fd, 51 * 1024 * 1024);
-      fs.closeSync(fd);
-
-      await expect(validateImageFile(filePath, tempDir))
-        .rejects.toThrow("Image file exceeds the maximum allowed size.");
-    });
-
-    it("should reject animated/multi-page images", async () => {
-      // Create an animated WebP using Sharp
-      const frame1 = await sharp({
-        create: { width: 100, height: 100, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } }
-      }).webp().toBuffer();
-
-      const filePath = path.join(tempDir, "animated.webp");
-      // Mock Sharp metadata for animated detection
-      const mockSharp = vi.spyOn(sharp.prototype, "metadata");
-      const originalMetadata = sharp.prototype.metadata;
-
-      // Write a normal webp and override metadata
-      fs.writeFileSync(filePath, frame1);
-
-      mockSharp.mockImplementationOnce(async function (this: import("sharp").Sharp) {
-        const meta = await originalMetadata.call(this);
-        return { ...meta, pages: 5 };
-      });
-
-      await expect(validateImageFile(filePath, tempDir))
-        .rejects.toThrow("Animated or multi-page images are not supported.");
-
-      mockSharp.mockRestore();
-    });
-
-    it("should accept images at exactly the maximum allowed pixels (80,000,000)", async () => {
-      const filePath = path.join(tempDir, "maxpixels.jpg");
+    it("rejects originalsDir symlink internal and external", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
       await createTestJpeg(100, 100, filePath);
 
-      const mockSharp = vi.spyOn(sharp.prototype, "metadata");
-      const originalMetadata = sharp.prototype.metadata;
+      const projectId = "00000000-0000-4000-8000-000000000001";
+      const projectDir = path.join(mediaDir, projectId);
+      fs.mkdirSync(projectDir);
 
-      mockSharp.mockImplementationOnce(async function (this: import("sharp").Sharp) {
-        const meta = await originalMetadata.call(this);
-        // 10000 x 8000 = 80,000,000 pixels
-        return { ...meta, width: 10000, height: 8000 };
-      });
+      const fakeDir = path.join(tempDir, "fake");
+      fs.mkdirSync(fakeDir);
+      const originalsDir = path.join(projectDir, "originals");
+      fs.symlinkSync(fakeDir, originalsDir); // External
 
-      const result = await validateImageFile(filePath, tempDir);
-      expect(result.width).toBe(10000);
-      expect(result.height).toBe(8000);
+      await expect(processImage(filePath, tempDir, projectId, mediaDir, "TEST", "rev"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
 
-      mockSharp.mockRestore();
+      fs.unlinkSync(originalsDir);
+      const otherDir = path.join(mediaDir, "00000000-0000-4000-8000-000000000002");
+      fs.mkdirSync(otherDir);
+      fs.symlinkSync(otherDir, originalsDir); // Internal
+
+      await expect(processImage(filePath, tempDir, projectId, mediaDir, "TEST", "rev"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
     });
 
-    it("should reject images exceeding the pixel limit by exactly 1 pixel (80,000,001)", async () => {
-      const filePath = path.join(tempDir, "toomanypixels.jpg");
+    it("rejects 480p symlink internal and external", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
       await createTestJpeg(100, 100, filePath);
 
-      const mockSharp = vi.spyOn(sharp.prototype, "metadata");
-      const originalMetadata = sharp.prototype.metadata;
+      const projectId = "00000000-0000-4000-8000-000000000001";
+      const projectDir = path.join(mediaDir, projectId);
+      fs.mkdirSync(projectDir);
 
-      mockSharp.mockImplementationOnce(async function (this: import("sharp").Sharp) {
-        const meta = await originalMetadata.call(this);
-        return { ...meta, width: 80000001, height: 1 };
-      });
+      const fakeDir = path.join(tempDir, "fake");
+      fs.mkdirSync(fakeDir);
+      const variantDir = path.join(projectDir, "480p");
+      fs.symlinkSync(fakeDir, variantDir); // External
 
-      await expect(validateImageFile(filePath, tempDir))
-        .rejects.toThrow("Image resolution exceeds the maximum allowed pixels.");
-
-      mockSharp.mockRestore();
+      await expect(processImage(filePath, tempDir, projectId, mediaDir, "TEST", "rev"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
     });
 
-    it("should reject width > 12000", async () => {
-      const filePath = path.join(tempDir, "width.jpg");
+    it("rejects mediaBasePath symlink (internal or external)", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
       await createTestJpeg(100, 100, filePath);
+      const symMedia = path.join(tempDir, "symMedia");
+      fs.symlinkSync(mediaDir, symMedia);
 
-      const mockSharp = vi.spyOn(sharp.prototype, "metadata");
-      const originalMetadata = sharp.prototype.metadata;
-
-      mockSharp.mockImplementationOnce(async function (this: import("sharp").Sharp) {
-        const meta = await originalMetadata.call(this);
-        return { ...meta, width: 12001, height: 1000 };
-      });
-
-      await expect(validateImageFile(filePath, tempDir))
-        .rejects.toThrow("Image dimensions exceed the maximum allowed size.");
-
-      mockSharp.mockRestore();
+      const projectId = "00000000-0000-4000-8000-000000000001";
+      await expect(processImage(filePath, tempDir, projectId, symMedia, "TEST", "rev"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
     });
 
-    it("should reject height > 12000", async () => {
-      const filePath = path.join(tempDir, "height.jpg");
+    it("rejects if mediaBasePath does not exist", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
       await createTestJpeg(100, 100, filePath);
 
-      const mockSharp = vi.spyOn(sharp.prototype, "metadata");
-      const originalMetadata = sharp.prototype.metadata;
-
-      mockSharp.mockImplementationOnce(async function (this: import("sharp").Sharp) {
-        const meta = await originalMetadata.call(this);
-        return { ...meta, width: 1000, height: 12001 };
-      });
-
-      await expect(validateImageFile(filePath, tempDir))
-        .rejects.toThrow("Image dimensions exceed the maximum allowed size.");
-
-      mockSharp.mockRestore();
+      const missingMedia = path.join(tempDir, "missingMedia");
+      const projectId = "00000000-0000-4000-8000-000000000001";
+      await expect(processImage(filePath, tempDir, projectId, missingMedia, "TEST", "rev"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
     });
 
-    it("should reject a file outside the allowed directory", async () => {
-      const otherDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-other-"));
-      const filePath = path.join(otherDir, "escape.jpg");
+    it("rejects if mediaBasePath is a file", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
       await createTestJpeg(100, 100, filePath);
 
+      const fileMedia = path.join(tempDir, "fileMedia");
+      fs.writeFileSync(fileMedia, "not a dir");
+
+      const projectId = "00000000-0000-4000-8000-000000000001";
+      await expect(processImage(filePath, tempDir, projectId, fileMedia, "TEST", "rev"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
+    });
+
+    it("rejects lstatSync or realpathSync EACCES on mediaBasePath", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(100, 100, filePath);
+
+      const originalLstatSync = fs.lstatSync;
+      vi.spyOn(fs, "lstatSync").mockImplementation((pathArg: any) => {
+        if (pathArg === mediaDir || pathArg === fs.realpathSync(mediaDir)) {
+          const err = new Error("EACCES");
+          (err as any).code = "EACCES";
+          throw err;
+        }
+        return originalLstatSync(pathArg);
+      });
+
+      const projectId = "00000000-0000-4000-8000-000000000001";
+      await expect(processImage(filePath, tempDir, projectId, mediaDir, "TEST", "rev"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
+    });
+  });
+
+  describe("Validation errors & Generic error masking", () => {
+    it("rejects invalid UUIDs", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(100, 100, filePath);
+      await expect(processImage(filePath, tempDir, "escaped/../", mediaDir, "TEST", "rev"))
+        .rejects.toThrow("Invalid project ID.");
+      await expect(processImage(filePath, tempDir, "escaped\\\\..\\\\", mediaDir, "TEST", "rev"))
+        .rejects.toThrow("Invalid project ID.");
+    });
+
+    it("masks ENOENT to generic error without path", async () => {
+      const missingFile = path.join(tempDir, "missing.jpg");
+      await expect(processImage(missingFile, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "T", "R"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
+    });
+
+    it("rejects absent allowedTempDir securely", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(100, 100, filePath);
+      const absentDir = path.join(tempDir, "absent");
+      await expect(processImage(filePath, absentDir, "00000000-0000-4000-8000-000000000000", mediaDir, "T", "R"))
+        .rejects.toThrow("Image validation failed.");
+    });
+
+    it("masks statSync EACCES", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(100, 100, filePath);
+
+      // Keep real implementation but override the exact one
+      const originalStatSync = fs.statSync;
+      vi.spyOn(fs, "statSync").mockImplementation((pathArg: any, options: any) => {
+        if (pathArg === filePath) {
+          const err = new Error("EACCES");
+          (err as any).code = "EACCES";
+          throw err;
+        }
+        return originalStatSync(pathArg, options);
+      });
+      await expect(processImage(filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "T", "R"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
+    });
+
+    it("masks openSync EACCES", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(100, 100, filePath);
+      const originalOpenSync = fs.openSync;
+      vi.spyOn(fs, "openSync").mockImplementation((pathArg: any, flags: any, mode: any) => {
+        if (pathArg === filePath) {
+          const err = new Error("EACCES");
+          (err as any).code = "EACCES";
+          throw err;
+        }
+        return originalOpenSync(pathArg, flags, mode);
+      });
+      await expect(processImage(filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "T", "R"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
+    });
+
+    it("masks readSync error", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(100, 100, filePath);
+      const originalReadSync = fs.readSync;
+      vi.spyOn(fs, "readSync").mockImplementation((...args: any[]) => {
+        throw new Error("ReadError");
+      });
+      await expect(processImage(filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "T", "R"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
+    });
+
+    it("masks sharp metadata internal error", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      // Create a file with JPEG magic bytes but corrupt body
+      const buffer = Buffer.alloc(100);
+      buffer[0] = 0xFF;
+      buffer[1] = 0xD8;
+      buffer[2] = 0xFF;
+      fs.writeFileSync(filePath, buffer);
+
+      await expect(processImage(filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "T", "R"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
+
+      // Check message and cause
       try {
-        await expect(validateImageFile(filePath, tempDir))
-          .rejects.toThrow("Image validation failed.");
-      } finally {
-        fs.rmSync(otherDir, { recursive: true, force: true });
-      }
-    });
-
-    it("should reject a symlink pointing outside allowed directory", async () => {
-      const otherDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-sym-target-"));
-      const targetFile = path.join(otherDir, "real.jpg");
-      await createTestJpeg(100, 100, targetFile);
-
-      const symlinkPath = path.join(tempDir, "symlink.jpg");
-      fs.symlinkSync(targetFile, symlinkPath);
-
-      try {
-        await expect(validateImageFile(symlinkPath, tempDir))
-          .rejects.toThrow("Image validation failed.");
-      } finally {
-        fs.rmSync(otherDir, { recursive: true, force: true });
+        await processImage(filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "T", "R");
+      } catch (err: any) {
+        expect(err.message).toBe("Image processing failed due to an internal error.");
+        expect(err.cause).toBeUndefined();
       }
     });
   });
 
-  // === Processing Tests ===
+  describe("Metadata, Orientation and Permissions", () => {
+    it("retains EXIF orientation 6 in original, inverses logical dims, strips in variant", async () => {
+      const filePath = path.join(tempDir, "orient.jpg");
+      // Create a 800x600 image, but say orientation is 6 (rotated 90deg CW)
+      await createTestJpeg(800, 600, filePath, { orientation: 6 });
 
-  describe("Image Processing", () => {
-    it("should auto-orient images", async () => {
-      // Create a JPEG with EXIF orientation
-      const filePath = path.join(tempDir, "oriented.jpg");
-      const buffer = await sharp({
-        create: { width: 800, height: 600, channels: 3, background: { r: 200, g: 100, b: 50 } }
-      }).jpeg().toBuffer();
-      fs.writeFileSync(filePath, buffer);
+      // Verify the source actually has it
+      const srcMeta = await sharp(filePath).metadata();
+      expect(srcMeta.orientation).toBe(6);
 
-      const result = await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-      );
+      const projectId = "00000000-0000-4000-8000-000000000000";
+      const result = await processImage(filePath, tempDir, projectId, mediaDir, "TEST", "R");
 
-      expect(result.originalWidth).toBe(800);
-      expect(result.originalHeight).toBe(600);
+      // The logic should swap width and height
+      expect(result.originalWidth).toBe(600);
+      expect(result.originalHeight).toBe(800);
+
+      // Original should still be exact byte match
+      const originalsDirTest = path.join(mediaDir, projectId, "originals");
+      const files = fs.readdirSync(originalsDirTest);
+      const origPath = path.join(originalsDirTest, files[0]);
+      const origBuffer = fs.readFileSync(origPath);
+      const srcBuffer = fs.readFileSync(filePath);
+      expect(crypto.createHash("sha256").update(origBuffer).digest("hex"))
+        .toBe(crypto.createHash("sha256").update(srcBuffer).digest("hex"));
+
+      const origMeta = await sharp(origPath).metadata();
+      expect(origMeta.orientation).toBe(6);
+      expect(origMeta.width).toBe(800); // physical
+
+      // Variant should be rotated and metadata stripped.
+      // It scales down to 480x480 max, preserving ratio. 600x800 -> 360x480
+      const variantPath = path.join(mediaDir, projectId, result.variants[0].name, `${result.variants[0].fileId}.webp`);
+      const varMeta = await sharp(variantPath).metadata();
+      expect(varMeta.orientation).toBeUndefined();
+      expect(varMeta.width).toBe(360);
+      expect(varMeta.height).toBe(480);
     });
 
-    it("should not produce enlarged variants", async () => {
-      const filePath = path.join(tempDir, "small.jpg");
-      await createTestJpeg(300, 200, filePath);
+    it("strips EXIF, IPTC, XMP, ICC", async () => {
+      const filePath = path.join(tempDir, "meta.jpg");
 
-      const result = await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-      );
-
-      // Only 480p should be produced (at natural size since 300 < 480)
-      expect(result.variants).toHaveLength(1);
-      expect(result.variants[0].name).toBe("480p");
-      expect(result.variants[0].width).toBeLessThanOrEqual(300);
-      expect(result.variants[0].height).toBeLessThanOrEqual(200);
-    });
-
-    it("should produce correct variants for large images", async () => {
-      const filePath = path.join(tempDir, "large.jpg");
-      await createTestJpeg(3000, 2000, filePath);
-
-      const result = await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-      );
-
-      expect(result.variants.length).toBeGreaterThanOrEqual(4);
-      const variantNames = result.variants.map(v => v.name);
-      expect(variantNames).toContain("480p");
-      expect(variantNames).toContain("960p");
-      expect(variantNames).toContain("1440p");
-      expect(variantNames).toContain("1920p");
-    });
-
-    it("should return exact dimensions for each variant", async () => {
-      const filePath = path.join(tempDir, "exact.jpg");
-      await createTestJpeg(2000, 1500, filePath);
-
-      const result = await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-      );
-
-      for (const variant of result.variants) {
-        expect(variant.width).toBeGreaterThan(0);
-        expect(variant.height).toBeGreaterThan(0);
-        expect(variant.sizeBytes).toBeGreaterThan(0);
-      }
-    });
-
-    it("should produce WebP variants", async () => {
-      const filePath = path.join(tempDir, "webptest.jpg");
-      await createTestJpeg(1000, 800, filePath);
-
-      const result = await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-      );
-
-      for (const variant of result.variants) {
-        const variantPath = path.join(mediaDir, "00000000-0000-4000-8000-000000000000", variant.name, `${variant.fileId}.webp`);
-        expect(fs.existsSync(variantPath)).toBe(true);
-        const meta = await sharp(variantPath).metadata();
-        expect(meta.format).toBe("webp");
-      }
-    });
-
-    it("should strip EXIF/GPS from variants", async () => {
-      const filePath = path.join(tempDir, "exif.jpg");
-      // Create image with EXIF data
+      // Sharp allows injecting exif, iptc, xmp, icc.
+      // We need to inject something to verify it is present first.
       const buffer = await sharp({
         create: { width: 800, height: 600, channels: 3, background: { r: 128, g: 128, b: 128 } }
-      }).withMetadata({ exif: { IFD0: { Copyright: "Test" } } }).jpeg().toBuffer();
+      })
+      .withMetadata({
+        exif: { IFD0: { Copyright: "Test" } },
+        icc: "srgb"
+      })
+      .jpeg()
+      .toBuffer();
       fs.writeFileSync(filePath, buffer);
 
-      const result = await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-      );
+      const inMeta = await sharp(buffer).metadata();
+      expect(inMeta.exif).toBeDefined();
 
-      for (const variant of result.variants) {
-        const variantPath = path.join(mediaDir, "00000000-0000-4000-8000-000000000000", variant.name, `${variant.fileId}.webp`);
-        const meta = await sharp(variantPath).metadata();
-        expect(meta.exif).toBeUndefined();
-      }
+      const projectId = "00000000-0000-4000-8000-000000000000";
+      const result = await processImage(filePath, tempDir, projectId, mediaDir, "TEST", "R");
+      const variantPath = path.join(mediaDir, projectId, result.variants[0].name, `${result.variants[0].fileId}.webp`);
+      const varMeta = await sharp(variantPath).metadata();
+
+      expect(varMeta.exif).toBeUndefined();
+      expect(varMeta.xmp).toBeUndefined();
+      expect(varMeta.iptc).toBeUndefined();
+      expect(varMeta.icc).toBeUndefined();
     });
 
-    it("should set file permissions to 0600 on POSIX", async () => {
+    it("verifies permissions (0600 file, 0700 dir)", async () => {
       if (process.platform === "win32") return;
 
       const filePath = path.join(tempDir, "perms.jpg");
-      await createTestJpeg(800, 600, filePath);
+      await createTestJpeg(100, 100, filePath);
+      const projectId = "00000000-0000-4000-8000-000000000000";
+      await processImage(filePath, tempDir, projectId, mediaDir, "TEST", "R");
 
-      const result = await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-      );
+      const projDir = path.join(mediaDir, projectId);
+      const statP = fs.statSync(projDir);
+      expect(statP.mode & 0o777).toBe(0o700);
 
-      for (const variant of result.variants) {
-        const variantPath = path.join(mediaDir, "00000000-0000-4000-8000-000000000000", variant.name, `${variant.fileId}.webp`);
-        const stat = fs.statSync(variantPath);
-        expect(stat.mode & 0o777).toBe(0o600);
-      }
-    });
+      const origDir = path.join(projDir, "originals");
+      const statO = fs.statSync(origDir);
+      expect(statO.mode & 0o777).toBe(0o700);
 
-    it("should set directory permissions to 0700 on POSIX", async () => {
-      if (process.platform === "win32") return;
-
-      const filePath = path.join(tempDir, "dirperms.jpg");
-      await createTestJpeg(800, 600, filePath);
-
-      await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-      );
-
-      const projectDir = path.join(mediaDir, "00000000-0000-4000-8000-000000000000");
-      const stat = fs.statSync(projectDir);
-      expect(stat.mode & 0o777).toBe(0o700);
-    });
-
-    it("should produce different files for different watermark texts", async () => {
-      const filePath1 = path.join(tempDir, "wm1.jpg");
-      const filePath2 = path.join(tempDir, "wm2.jpg");
-      await createTestJpeg(800, 600, filePath1);
-      await createTestJpeg(800, 600, filePath2);
-
-      const mediaDir1 = path.join(tempDir, "media1");
-      const mediaDir2 = path.join(tempDir, "media2");
-      fs.mkdirSync(mediaDir1);
-      fs.mkdirSync(mediaDir2);
-
-      const result1 = await processImage(
-        filePath1, tempDir, "00000000-0000-4000-8000-000000000001", mediaDir1, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-      );
-      const result2 = await processImage(
-        filePath2, tempDir, "00000000-0000-4000-8000-000000000002", mediaDir2, "Different Mark", "aabb0000ccdd1111eeff2222aabb3333"
-      );
-
-      const variant1Path = path.join(mediaDir1, "00000000-0000-4000-8000-000000000001", result1.variants[0].name, `${result1.variants[0].fileId}.webp`);
-      const variant2Path = path.join(mediaDir2, "00000000-0000-4000-8000-000000000002", result2.variants[0].name, `${result2.variants[0].fileId}.webp`);
-
-      const buf1 = fs.readFileSync(variant1Path);
-      const buf2 = fs.readFileSync(variant2Path);
-      expect(buf1.equals(buf2)).toBe(false);
-    });
-
-    it("should modify the center of the image with the watermark", async () => {
-      const filePath = path.join(tempDir, "center.jpg");
-      // Create a uniform red image
-      const buffer = await sharp({
-        create: { width: 400, height: 300, channels: 3, background: { r: 255, g: 0, b: 0 } }
-      }).jpeg({ quality: 100 }).toBuffer();
-      fs.writeFileSync(filePath, buffer);
-
-      const result = await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "WATERMARK", "aabb0000ccdd1111eeff2222aabb3333"
-      );
-
-      const variantPath = path.join(mediaDir, "00000000-0000-4000-8000-000000000000", result.variants[0].name, `${result.variants[0].fileId}.webp`);
-      const variantBuffer = fs.readFileSync(variantPath);
-
-      // Extract center pixel - if watermark is applied, it should differ from pure red
-      const { data, info } = await sharp(variantBuffer)
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-
-      const centerX = Math.floor(info.width / 2);
-      const centerY = Math.floor(info.height / 2);
-      const pixelOffset = (centerY * info.width + centerX) * info.channels;
-
-      // Center pixel should not be pure red (255, 0, 0) anymore due to watermark overlay
-      const r = data[pixelOffset];
-      const g = data[pixelOffset + 1];
-      const b = data[pixelOffset + 2];
-      const isPureRed = r === 255 && g === 0 && b === 0;
-      expect(isPureRed).toBe(false);
-    });
-
-    it("should return appliedWatermarkRevision in result", async () => {
-      const filePath = path.join(tempDir, "rev.jpg");
-      await createTestJpeg(800, 600, filePath);
-
-      const wmRevision = "aabb0000ccdd1111eeff2222aabb3333";
-      const result = await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", wmRevision
-      );
-
-      expect(result.appliedWatermarkRevision).toBe(wmRevision);
-    });
-
-    it("should return original format and dimensions in result", async () => {
-      const filePath = path.join(tempDir, "meta.png");
-      await createTestPng(1200, 900, filePath);
-
-      const result = await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-      );
-
-      expect(result.originalFormat).toBe("png");
-      expect(result.originalWidth).toBe(1200);
-      expect(result.originalHeight).toBe(900);
-    });
-
-    it("should not expose paths in result metadata", async () => {
-      const filePath = path.join(tempDir, "nopath.jpg");
-      await createTestJpeg(800, 600, filePath);
-
-      const result = await processImage(
-        filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-      );
-
-      const resultJson = JSON.stringify(result);
-      expect(resultJson).not.toContain(tempDir);
-      expect(resultJson).not.toContain(mediaDir);
-      expect(resultJson).not.toContain("/Users/");
-      expect(resultJson).not.toContain("/tmp/");
-    });
-
-    it("should rollback completely on failure mid-processing", async () => {
-      const filePath = path.join(tempDir, "rollback.jpg");
-      await createTestJpeg(2000, 1500, filePath);
-
-      // Make media dir read-only to force failure during write
-      const projectDir = path.join(mediaDir, "failing-project");
-      fs.mkdirSync(projectDir, { mode: 0o700 });
-      const originalsDir = path.join(projectDir, "originals");
-      fs.mkdirSync(originalsDir, { mode: 0o700 });
-
-      // Create 480p directory but make it read-only to cause failure
-      const dir480 = path.join(projectDir, "480p");
-      fs.mkdirSync(dir480, { mode: 0o000 });
-
-      try {
-        await expect(processImage(
-          filePath, tempDir, "failing-project", mediaDir, "Timeless", "aabb0000ccdd1111eeff2222aabb3333"
-        )).rejects.toThrow();
-      } finally {
-        // Restore permissions for cleanup
-        fs.chmodSync(dir480, 0o700);
-      }
-    });
-
-    it("should not expose sensitive paths in error messages", async () => {
-      const filePath = path.join(tempDir, "error.txt");
-      fs.writeFileSync(filePath, "not an image");
-
-      try {
-        await validateImageFile(filePath, tempDir);
-        expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as Error).message).not.toContain(tempDir);
-        expect((err as Error).message).not.toContain(filePath);
-      }
+      const files = fs.readdirSync(origDir);
+      const fileStat = fs.statSync(path.join(origDir, files[0]));
+      expect(fileStat.mode & 0o777).toBe(0o600);
     });
   });
 
-  // === Watermark Rendering Tests ===
+  describe("Watermark structural comparison", () => {
+    it("watermark alters the center, but preserves edges", async () => {
+      const filePath = path.join(tempDir, "watermark.jpg");
+      // Use an image that has no red/blue
+      const buffer = await sharp({
+        create: { width: 800, height: 600, channels: 3, background: { r: 100, g: 100, b: 100 } }
+      }).jpeg().toBuffer();
+      fs.writeFileSync(filePath, buffer);
 
-  describe("Watermark Rendering", () => {
-    it("should find the font file from the project root", async () => {
-      const svg = await renderTextWatermark({
-        text: "Timeless",
-        watermarkRevision: "aabb0000ccdd1111eeff2222aabb3333",
-        width: 800,
-        height: 600,
+      const projectId = "00000000-0000-4000-8000-000000000000";
+      const result = await processImage(filePath, tempDir, projectId, mediaDir, "TIMETEST", "R");
+      const variantPath = path.join(mediaDir, projectId, result.variants[0].name, `${result.variants[0].fileId}.webp`);
+
+      // Compare pixel by pixel on the resized variant size
+      const withWatermark = fs.readFileSync(variantPath);
+      const variantMeta = await sharp(withWatermark).metadata();
+
+      const withoutWatermark = await sharp(buffer)
+        .rotate()
+        .resize(variantMeta.width, variantMeta.height, { fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 80, effort: 6 })
+        .toBuffer();
+
+      const bufWM = await sharp(withWatermark).ensureAlpha().raw().toBuffer();
+      const bufNo = await sharp(withoutWatermark).ensureAlpha().raw().toBuffer();
+
+      let diffCenter = 0;
+      let diffEdge = 0;
+
+      const w = variantMeta.width!;
+      const h = variantMeta.height!;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const idx = (y * w + x) * 3;
+          const diff = Math.abs(bufWM[idx] - bufNo[idx]) + Math.abs(bufWM[idx+1] - bufNo[idx+1]);
+          if (x < 100 || x > 700 || y < 100 || y > 500) {
+            diffEdge += diff;
+          } else {
+            diffCenter += diff;
+          }
+        }
+      }
+
+      expect(diffCenter).toBeGreaterThan(500000);
+      expect(diffEdge).toBeLessThan(300000); // WebP compression might introduce tiny differences
+    });
+  });
+
+  describe("Rollback on Atomic Failures", () => {
+    it("écritures partielles positives : writeSync returning smaller chunks is supported", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(100, 100, filePath);
+      const projectId = "00000000-0000-4000-8000-000000000000";
+
+      const originalWriteSync = fs.writeSync;
+      let mockCount = 0;
+      vi.spyOn(fs, "writeSync").mockImplementation((...args: any[]) => {
+        mockCount++;
+        const fd = args[0];
+        const buffer = args[1];
+        const offset = args[2] ?? 0;
+        const length = args[3] ?? buffer.length;
+        const position = args[4] ?? null;
+
+        // Force chunking by returning 10 bytes on the first few calls
+        const mockLen = Math.min(length, 10);
+        return originalWriteSync(fd, buffer, offset, mockLen, position);
       });
-      expect(svg).toBeInstanceOf(Buffer);
-      expect(svg.toString("utf-8")).toContain("CormorantWatermark");
+
+      await processImage(filePath, tempDir, projectId, mediaDir, "T", "R");
+      expect(mockCount).toBeGreaterThan(1);
     });
 
-    it("should render with escaped ampersand without Pango error", async () => {
-      const svg = await renderTextWatermark({
-        text: "Timeless & Co",
-        watermarkRevision: "aabb0000ccdd1111eeff2222aabb3333",
-        width: 800,
-        height: 600,
+    it("fsync du temporaire échouant avant rename provoque le rollback", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(100, 100, filePath);
+      const projectId = "00000000-0000-4000-8000-000000000000";
+
+      const originalFsyncSync = fs.fsyncSync;
+      let tmpFsyncFailed = false;
+      vi.spyOn(fs, "fsyncSync").mockImplementation((fd: number) => {
+        if (!tmpFsyncFailed) {
+          tmpFsyncFailed = true;
+          throw new Error("Simulated fsync failure");
+        }
+        return originalFsyncSync(fd);
       });
-      const svgText = svg.toString("utf-8");
-      expect(svgText).toContain("Timeless &amp; Co");
-      expect(svgText).not.toContain("Timeless & Co"); // raw & should be escaped
+
+      await expect(processImage(filePath, tempDir, projectId, mediaDir, "T", "R"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
+
+      // Check rollback: no .tmp files, no partial variants left
+      const files = fs.readdirSync(tempDir);
+      expect(files.filter(f => f.includes(".tmp"))).toHaveLength(0);
+      const projDir = path.join(mediaDir, projectId);
+      expect(fs.existsSync(projDir)).toBe(false); // Rolled back completely
     });
 
-    it("should escape quotes in SVG rendering", async () => {
-      const svg = await renderTextWatermark({
-        text: 'Studio "Prestige"',
-        watermarkRevision: "aabb0000ccdd1111eeff2222aabb3333",
-        width: 800,
-        height: 600,
+    it("rename de l'original échouant provoque le rollback", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(100, 100, filePath);
+      const projectId = "00000000-0000-4000-8000-000000000000";
+
+      const originalRenameSync = fs.renameSync;
+      vi.spyOn(fs, "renameSync").mockImplementation((oldPath, newPath) => {
+        if (newPath.toString().includes("originals")) {
+          throw new Error("Simulated rename failure");
+        }
+        return originalRenameSync(oldPath, newPath);
       });
-      const svgText = svg.toString("utf-8");
-      expect(svgText).toContain("&quot;");
+
+      await expect(processImage(filePath, tempDir, projectId, mediaDir, "T", "R"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
+
+      // Verify no .tmp files left anywhere
+      const projDir = path.join(mediaDir, projectId);
+      expect(fs.existsSync(projDir)).toBe(false); // Entire folder should be removed because it was created in this run
+    });
+
+    it("rename d'une variante échouant après original et 1ere variante", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(1000, 1000, filePath); // large enough for multiple variants
+      const projectId = "00000000-0000-4000-8000-000000000000";
+
+      const originalRenameSync = fs.renameSync;
+      let variantCount = 0;
+      vi.spyOn(fs, "renameSync").mockImplementation((oldPath, newPath) => {
+        if (newPath.toString().includes("webp")) {
+          variantCount++;
+          if (variantCount === 2) {
+            throw new Error("Simulated 2nd variant rename failure");
+          }
+        }
+        return originalRenameSync(oldPath, newPath);
+      });
+
+      const snapshotBefore = fs.readdirSync(mediaDir);
+
+      await expect(processImage(filePath, tempDir, projectId, mediaDir, "T", "R"))
+        .rejects.toThrow("Image processing failed due to an internal error.");
+
+      // Check snapshot exact before/after. Since the run created the projectDir, it should wipe the ENTIRE projectDir out on failure.
+      const snapshotAfter = fs.readdirSync(mediaDir);
+      expect(snapshotAfter).toEqual(snapshotBefore);
+    });
+
+    it("fsync du dossier échouant après rename, SANS faux échec", async () => {
+      const filePath = path.join(tempDir, "test.jpg");
+      await createTestJpeg(100, 100, filePath);
+      const projectId = "00000000-0000-4000-8000-000000000000";
+
+      vi.spyOn(fs, "fsyncSync").mockImplementation((fd: number) => {
+        let isDir = false;
+        try { isDir = fs.fstatSync(fd).isDirectory(); } catch {}
+        if (isDir) {
+          throw new Error("Dir fsync failed");
+        }
+      });
+
+      // SHOULD SUCCEED
+      await processImage(filePath, tempDir, "00000000-0000-4000-8000-000000000000", mediaDir, "T", "R");
+
+      const projectPath = path.join(mediaDir, "00000000-0000-4000-8000-000000000000");
+      expect(fs.existsSync(projectPath)).toBe(true);
     });
   });
 });

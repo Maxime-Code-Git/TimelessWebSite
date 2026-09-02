@@ -9,6 +9,8 @@ import {
   updateProjectMetadata,
   reorderProjects,
   deleteEmptyProject,
+  portfolioSchema,
+  updateWatermarkText,
 } from "../app/lib/portfolio-content.server";
 
 import { vi } from "vitest";
@@ -59,7 +61,7 @@ describe("portfolio-content.server", () => {
     expect(() => getPortfolioContent()).toThrow("Corrupted content");
   });
 
-  it("throws CorruptedContentError on unknown property", () => {
+  it("throws CorruptedContentError on unknown property via getPortfolioContent (portfolioStorageSchema)", () => {
     fs.writeFileSync(portfolioPath, JSON.stringify({
       schemaVersion: 1,
       revision: crypto.randomBytes(16).toString("hex"),
@@ -68,6 +70,26 @@ describe("portfolio-content.server", () => {
       unknownProp: true
     }));
     expect(() => getPortfolioContent()).toThrow("Corrupted content");
+  });
+
+  it("fails portfolioSchema.safeParse on unknown property directly", () => {
+    const valid = {
+      schemaVersion: 1,
+      revision: crypto.randomBytes(16).toString("hex"),
+      updatedAt: new Date().toISOString(),
+      projects: [],
+      watermark: {
+        text: "Test",
+        revision: crypto.randomBytes(16).toString("hex"),
+      }
+    };
+
+    // safeParse directly on the exact schema used for writing
+    const result = portfolioSchema.safeParse({
+      ...valid,
+      unknownProperty: true
+    });
+    expect(result.success).toBe(false);
   });
 
   it("throws CorruptedContentError on invalid revision", () => {
@@ -222,6 +244,63 @@ describe("portfolio-content.server", () => {
     // Ensure no temp files leaked
     const files = fs.readdirSync(tempDir);
     expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
+  });
+
+  it("throws RevisionConflictError on concurrent mutation in updateWatermarkText using spy", () => {
+    // Write something to ensure the file actually exists on disk
+    let rev = getPortfolioContent().revision;
+    rev = createProjectDraft({
+      title: { fr: "Init", en: "Init" },
+      slug: { fr: "init", en: "init" },
+      description: { fr: "Init", en: "Init" },
+      location: null, date: null,
+    }, rev);
+
+    let callCount = 0;
+    const originalReadFileSync = fs.readFileSync;
+
+    const readSpy = vi.spyOn(fs, "readFileSync").mockImplementation((pathArg, options) => {
+      // Only intercept calls to portfolio.json
+      if (pathArg.toString().includes("portfolio.json")) {
+        callCount++;
+        if (callCount === 2) {
+          // Just before the second read (which is inside getRawPortfolioContent),
+          // simulate a concurrent write by writing a valid JSON with a new revision and a dummy project
+          const concurrentContent = {
+            schemaVersion: 1,
+            revision: "11111111111111111111111111111111", // NEW REVISION
+            updatedAt: new Date().toISOString(),
+            projects: [],
+            watermark: {
+              mode: "text",
+              text: "Timeless",
+              revision: "22222222222222222222222222222222",
+              updatedAt: new Date().toISOString()
+            }
+          };
+          originalReadFileSync(pathArg, options); // Ensure it's readable, but we overwrite it
+          fs.writeFileSync(pathArg, JSON.stringify(concurrentContent, null, 2));
+        }
+      }
+      return originalReadFileSync(pathArg, options);
+    });
+
+    try {
+      expect(() => {
+        updateWatermarkText("Nouveau filigrane", rev);
+      }).toThrow("Revision conflict");
+
+      const contentAfter = JSON.parse(fs.readFileSync(portfolioPath, "utf-8"));
+      // The concurrent write must be intact
+      expect(contentAfter.revision).toBe("11111111111111111111111111111111");
+      expect(contentAfter.watermark.text).toBe("Timeless");
+
+      // Ensure no temp files leaked
+      const files = fs.readdirSync(tempDir);
+      expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
+    } finally {
+      readSpy.mockRestore();
+    }
   });
 
   describe("Validation stricte des métadonnées", () => {

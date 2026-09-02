@@ -259,18 +259,36 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
     expect(res.status).toBe(409);
   });
 
-  it("JSON corrompu -> 409 et octets inchanges", async () => {
-    // Clean up old backups from previous tests
-    const oldFiles = fs.readdirSync(tempDir);
-    for (const f of oldFiles) {
-      if (f.includes(".bak") || f.includes(".tmp")) {
-        fs.unlinkSync(path.join(tempDir, f));
-      }
-    }
+  it("methode non-POST -> 405 et JSON inchange", async () => {
+    const authCookie = await login();
+    const beforeContent = fs.readFileSync(portfolioContentPath, "utf-8");
 
+    const methods = ["PUT", "DELETE"];
+    for (const method of methods) {
+      const res = await fetch(`${BASE_URL}/admin/portfolio/watermark`, {
+        method,
+        headers: {
+          "Cookie": authCookie,
+          "Origin": BASE_URL,
+        },
+        redirect: "manual",
+      });
+      expect(res.status).toBe(405);
+
+      const afterContent = fs.readFileSync(portfolioContentPath, "utf-8");
+      expect(afterContent).toBe(beforeContent);
+    }
+  });
+
+  it("JSON corrompu -> 409 et octets inchanges", async () => {
     // First get a valid CSRF token and session BEFORE corrupting
     const authCookie = await login();
     const { csrfToken, portfolioRevision } = await getCsrfAndRevision(authCookie);
+
+    // Record existing backups before we do anything
+    const oldFiles = fs.readdirSync(tempDir);
+    const existingBackups = oldFiles.filter(f => f.includes(".bak"));
+    const existingBackupBuffers = existingBackups.map(f => fs.readFileSync(path.join(tempDir, f)));
 
     // Corrupt the file
     const corruptedContent = "{ completely broken";
@@ -294,9 +312,20 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
       const afterContent = fs.readFileSync(portfolioContentPath, "utf-8");
       expect(afterContent).toBe(corruptedContent);
 
-      const files = fs.readdirSync(tempDir);
-      const hasBackups = files.some(f => f.includes(".tmp") || f.includes(".bak"));
-      expect(hasBackups).toBe(false);
+      const currentFiles = fs.readdirSync(tempDir);
+      const currentBackups = currentFiles.filter(f => f.includes(".bak"));
+
+      // Ensure exact same backups
+      expect(currentBackups.sort()).toEqual(existingBackups.sort());
+
+      for (let i = 0; i < currentBackups.length; i++) {
+        const currentBuf = fs.readFileSync(path.join(tempDir, currentBackups[i]));
+        const originalBuf = existingBackupBuffers[existingBackups.indexOf(currentBackups[i])];
+        expect(currentBuf.equals(originalBuf)).toBe(true);
+      }
+
+      // No temp files
+      expect(currentFiles.filter(f => f.includes(".tmp"))).toHaveLength(0);
     } finally {
       // Restore for other tests
       fs.writeFileSync(portfolioContentPath, JSON.stringify({
