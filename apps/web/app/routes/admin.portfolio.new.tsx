@@ -102,7 +102,11 @@ export default function AdminPortfolioNew() {
   const [slugFr, setSlugFr] = useState("");
   const [slugEn, setSlugEn] = useState("");
 
-  const generateSlug = (text: string) => text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const generateSlug = (text: string) => {
+    let slug = text.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+    if (slug.length > 100) slug = slug.substring(0, 100).replace(/-+$/, "");
+    return slug;
+  };
 
   const derivedSlugFr = isCustomSlug ? slugFr : generateSlug(titleFr);
   const derivedSlugEn = isCustomSlug ? slugEn : generateSlug(titleEn);
@@ -165,12 +169,7 @@ export default function AdminPortfolioNew() {
                 </div>
               </div>
             )}
-            {!isCustomSlug && (
-              <>
-                <input type="hidden" name="slugFr" value={derivedSlugFr} />
-                <input type="hidden" name="slugEn" value={derivedSlugEn} />
-              </>
-            )}
+
 
             <div className={styles.grid}>
               <div>

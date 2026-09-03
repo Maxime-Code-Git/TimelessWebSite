@@ -15,6 +15,9 @@ export function getPortfolioMediaPath(): string {
 
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const fileIdRegex = /^[0-9a-f]{32}$/;
+const variantFileIdRegex = /^[0-9a-f]{32}-(480p|960p|1440p|1920p)$/;
+const revisionHexRegex = /^[0-9a-f]{32}$/;
 
 const slugSchema = z.string()
   .min(3, "Slug too short")
@@ -36,31 +39,31 @@ const titleSchema = z.string()
 
 const variantResultSchema = z.object({
   name: z.enum(["480p", "960p", "1440p", "1920p"]),
-  width: z.number().int(),
-  height: z.number().int(),
-  sizeBytes: z.number().int(),
-  fileId: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  sizeBytes: z.number().int().nonnegative(),
+  fileId: z.string().regex(variantFileIdRegex, "Invalid variant fileId"),
 }).strict();
 
 export const photoSchema = z.object({
   id: z.string().uuid(),
-  fileId: z.string(),
-  originalFormat: z.string(),
-  originalWidth: z.number().int(),
-  originalHeight: z.number().int(),
+  fileId: z.string().regex(fileIdRegex, "Invalid fileId format"),
+  originalFormat: z.enum(["jpeg", "png", "webp"]),
+  originalWidth: z.number().int().positive(),
+  originalHeight: z.number().int().positive(),
   category: z.enum(["ceremony", "portraits", "reception"]),
   alt: z.object({
     fr: textSchema,
     en: textSchema,
   }).strict(),
   variants: z.array(variantResultSchema),
-  appliedWatermarkRevision: z.string(),
+  appliedWatermarkRevision: z.string().regex(revisionHexRegex, "Invalid watermark revision format"),
   processedAt: z.string().refine(val => {
     if (!isoDateRegex.test(val)) return false;
     const d = new Date(val);
     return !isNaN(d.getTime()) && d.toISOString() === val;
   }, "Must be valid ISO with ms"),
-}).strict();
+}).strict().refine(p => new Set(p.variants.map(v => v.name)).size === p.variants.length, "Duplicate variants");
 
 export type Photo = z.infer<typeof photoSchema>;
 
@@ -99,9 +102,21 @@ export const projectSchema = z.object({
     return !isNaN(d.getTime()) && d.toISOString() === val;
   }, "Must be valid ISO with ms"),
   photos: z.array(photoSchema),
-}).strict();
-
-const revisionHexRegex = /^[0-9a-f]{32}$/;
+}).strict().superRefine((data, ctx) => {
+  if (data.coverPhotoId !== null) {
+    if (!data.photos.some(p => p.id === data.coverPhotoId)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Cover photo must belong to project photos", path: ["coverPhotoId"] });
+    }
+  }
+  if (data.status === "published") {
+    if (!data.coverPhotoId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Published project must have a cover photo", path: ["coverPhotoId"] });
+    }
+    if (data.photos.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Published project must have at least one photo", path: ["photos"] });
+    }
+  }
+});
 
 export const watermarkConfigSchema = z.object({
   mode: z.literal("text"),
@@ -367,6 +382,7 @@ export function updateProjectMetadata(projectId: string, data: Omit<Project, "id
   const portfolio = getPortfolioContent();
   const index = portfolio.projects.findIndex(p => p.id === projectId);
   if (index === -1) throw new Error("Project not found");
+  if (portfolio.projects[index].status === "published") throw new ValidationError("Cannot modify a published project");
 
   const existingFrSlugs = portfolio.projects.filter(p => p.id !== projectId).map(p => p.slug.fr);
   const existingEnSlugs = portfolio.projects.filter(p => p.id !== projectId).map(p => p.slug.en);
@@ -409,6 +425,9 @@ export function reorderProjects(projectIds: string[], previousRevision: string):
   for (let i = 0; i < projectIds.length; i++) {
     const id = projectIds[i];
     const project = portfolio.projects.find(p => p.id === id)!;
+    if (project.order !== i && project.status === "published") {
+      throw new ValidationError("Cannot reorder a published project");
+    }
     newProjects.push({ ...project, order: i, updatedAt: new Date().toISOString() });
   }
 
@@ -420,6 +439,7 @@ export function deleteEmptyProject(projectId: string, previousRevision: string):
   const portfolio = getPortfolioContent();
   const project = portfolio.projects.find(p => p.id === projectId);
   if (!project) throw new Error("Project not found");
+  if (project.status === "published") throw new ValidationError("Cannot delete a published project");
 
   if (project.photos.length > 0) {
     throw new Error("Cannot delete a project that contains photos");
@@ -468,6 +488,7 @@ export function addPhotoToProject(projectId: string, photo: Omit<Photo, "id">, p
   const portfolio = getPortfolioContent();
   const project = portfolio.projects.find(p => p.id === projectId);
   if (!project) throw new Error("Project not found");
+  if (project.status === "published") throw new ValidationError("Cannot add a photo to a published project");
 
   const newPhoto: Photo = { ...photo, id: crypto.randomUUID() };
   project.photos.push(newPhoto);
@@ -485,6 +506,7 @@ export function updatePhotoMetadata(projectId: string, photoId: string, metadata
   const portfolio = getPortfolioContent();
   const project = portfolio.projects.find(p => p.id === projectId);
   if (!project) throw new Error("Project not found");
+  if (project.status === "published") throw new ValidationError("Cannot modify photos of a published project");
 
   const photo = project.photos.find(p => p.id === photoId);
   if (!photo) throw new Error("Photo not found");
@@ -500,6 +522,7 @@ export function setProjectCover(projectId: string, photoId: string, previousRevi
   const portfolio = getPortfolioContent();
   const project = portfolio.projects.find(p => p.id === projectId);
   if (!project) throw new Error("Project not found");
+  if (project.status === "published") throw new ValidationError("Cannot change cover photo of a published project");
 
   const photo = project.photos.find(p => p.id === photoId);
   if (!photo) throw new Error("Photo not found");
@@ -513,12 +536,13 @@ export function trashPhoto(projectId: string, photoId: string, previousRevision:
   const portfolio = getPortfolioContent();
   const project = portfolio.projects.find(p => p.id === projectId);
   if (!project) throw new Error("Project not found");
+  if (project.status === "published") throw new ValidationError("Cannot delete photos from a published project");
 
   const photoIndex = project.photos.findIndex(p => p.id === photoId);
   if (photoIndex === -1) throw new Error("Photo not found");
 
-  if (project.photos.length > 1 && project.coverPhotoId === photoId) {
-    throw new ValidationError("Cannot delete cover photo while other photos exist. Set another cover first.");
+  if (project.coverPhotoId === photoId) {
+    throw new ValidationError("Cannot delete cover photo. Set another cover first.");
   }
 
   const [trashedPhoto] = project.photos.splice(photoIndex, 1);
@@ -537,6 +561,7 @@ export function reorderProjectPhotos(projectId: string, photoIds: string[], prev
   const portfolio = getPortfolioContent();
   const project = portfolio.projects.find(p => p.id === projectId);
   if (!project) throw new Error("Project not found");
+  if (project.status === "published") throw new ValidationError("Cannot reorder photos of a published project");
 
   if (photoIds.length !== project.photos.length) throw new Error("Invalid number of photo IDs");
   const uniqueIds = new Set(photoIds);

@@ -20,7 +20,6 @@ import { trashPhotoMedia, restorePhotoMedia } from "../lib/portfolio-image.serve
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const session = await requireValidAdminSession(request);
   const projectId = params.projectId;
-  console.log("PROJECT ID LOADER HIT:", request.url);
   if (!projectId) throw new Response("Not Found", { status: 404 });
 
   const project = getProjectById(projectId);
@@ -194,16 +193,21 @@ function generateClientSlug(text: string): string {
 }
 
 function DraggablePhoto({
-  photo, projectId, isCover, onEdit, onDelete, onSetCover, onMoveUp, onMoveDown,
+  photo, projectId, isCover, onSaveEdit, onDelete, onSetCover, onMoveUp, onMoveDown,
   disabled, isFirst, isLast, index, onReorder
 }: {
   photo: Project["photos"][0], projectId: string, isCover: boolean,
-  onEdit: () => void, onDelete: () => void, onSetCover: () => void,
+  onSaveEdit: (cat: "ceremony" | "portraits" | "reception", altFr: string, altEn: string) => void, onDelete: () => void, onSetCover: () => void,
   onMoveUp: () => void, onMoveDown: () => void, disabled: boolean,
   isFirst: boolean, isLast: boolean, index: number,
   onReorder: (fromIndex: number, toIndex: number) => void
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editCat, setEditCat] = useState(photo.category);
+  const [editAltFr, setEditAltFr] = useState(photo.alt.fr);
+  const [editAltEn, setEditAltEn] = useState(photo.alt.en);
 
   const previewVariant = photo.variants.find((v: Project["photos"][0]["variants"][0]) => v.name === "480p");
   const imgUrl = previewVariant ? `/admin/portfolio/media/${projectId}/${photo.id}/480p` : "";
@@ -211,22 +215,22 @@ function DraggablePhoto({
   return (
     <div
       className={`${styles.photoCard} ${isDragOver ? styles.dragOver : ""}`}
-      draggable={!disabled}
+      draggable={!disabled && !isEditing}
       onDragStart={(e) => {
-        if (disabled) return e.preventDefault();
+        if (disabled || isEditing) return e.preventDefault();
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("application/json", JSON.stringify({ index, projectId }));
       }}
       onDragOver={(e) => {
-        if (disabled) return;
+        if (disabled || isEditing) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
       }}
-      onDragEnter={() => !disabled && setIsDragOver(true)}
-      onDragLeave={() => !disabled && setIsDragOver(false)}
+      onDragEnter={() => !disabled && !isEditing && setIsDragOver(true)}
+      onDragLeave={() => !disabled && !isEditing && setIsDragOver(false)}
       onDrop={(e) => {
         setIsDragOver(false);
-        if (disabled) return;
+        if (disabled || isEditing) return;
         try {
           const data = JSON.parse(e.dataTransfer.getData("application/json"));
           if (data.projectId !== projectId || typeof data.index !== "number") return;
@@ -239,16 +243,34 @@ function DraggablePhoto({
       <div className={styles.photoDragHandle}>≡</div>
       <img src={imgUrl} alt={photo.alt.fr} className={styles.photoImg} />
       <div className={styles.photoMeta}>
-        <p><strong>{photo.category}</strong></p>
-        <p>{photo.alt.fr || "Aucun alt"}</p>
-        <div className={styles.photoActions}>
-          <button type="button" onClick={onEdit} disabled={disabled}>Modifier</button>
-          {!isCover && <button type="button" onClick={onSetCover} disabled={disabled}>Couverture</button>}
-          {isCover && <span className={styles.coverBadge}>Couverture</span>}
-          <button type="button" onClick={onMoveUp} disabled={disabled || isFirst} title="Monter" aria-label="Monter">&uarr;</button>
-          <button type="button" onClick={onMoveDown} disabled={disabled || isLast} title="Descendre" aria-label="Descendre">&darr;</button>
-          <button type="button" onClick={onDelete} disabled={disabled} className={styles.deleteButton}>Supprimer</button>
-        </div>
+        {isEditing ? (
+          <div className={styles.flexColumnGap}>
+            <select value={editCat} onChange={e => setEditCat(e.target.value as "ceremony" | "portraits" | "reception")} className={styles.input}>
+              <option value="ceremony">Cérémonie</option>
+              <option value="portraits">Portraits</option>
+              <option value="reception">Réception</option>
+            </select>
+            <input type="text" value={editAltFr} onChange={e => setEditAltFr(e.target.value)} placeholder="Alt FR" className={styles.input} />
+            <input type="text" value={editAltEn} onChange={e => setEditAltEn(e.target.value)} placeholder="Alt EN" className={styles.input} />
+            <div className={styles.photoActions}>
+              <button type="button" onClick={() => { onSaveEdit(editCat, editAltFr, editAltEn); setIsEditing(false); }} className={styles.submitButton}>Enregistrer</button>
+              <button type="button" onClick={() => { setIsEditing(false); setEditCat(photo.category); setEditAltFr(photo.alt.fr); setEditAltEn(photo.alt.en); }} className={styles.secondaryButton}>Annuler</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p><strong>{photo.category}</strong></p>
+            <p>{photo.alt.fr || "Aucun alt"}</p>
+            <div className={styles.photoActions}>
+              <button type="button" onClick={() => setIsEditing(true)} disabled={disabled}>Modifier</button>
+              {!isCover && <button type="button" onClick={onSetCover} disabled={disabled}>Couverture</button>}
+              {isCover && <span className={styles.coverBadge}>Couverture</span>}
+              <button type="button" onClick={onMoveUp} disabled={disabled || isFirst} title="Monter" aria-label="Monter">&uarr;</button>
+              <button type="button" onClick={onMoveDown} disabled={disabled || isLast} title="Descendre" aria-label="Descendre">&darr;</button>
+              <button type="button" onClick={onDelete} disabled={disabled} className={styles.deleteButton}>Supprimer</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -302,11 +324,10 @@ export default function AdminPortfolioEdit() {
   };
 
   useEffect(() => {
-    if (uploading || uploadQueue.length === 0 || navigation.state !== "idle") return;
+    if (uploading || uploadQueue.length === 0 || navigation.state !== "idle" || uploadError) return;
 
     const file = uploadQueue[0];
     setUploading(true);
-    setUploadError(null);
     setUploadProgress({ percentage: 0, status: "uploading" });
 
     const formData = new FormData();
@@ -344,9 +365,10 @@ export default function AdminPortfolioEdit() {
           submit(null, { method: "get", action: `/admin/portfolio/${project.id}` });
         }
       } else {
-        setUploadError(`Erreur sur ${file.name}: ${xhr.responseText}`);
+        let msg = "Erreur inconnue";
+        try { msg = JSON.parse(xhr.responseText).error || msg; } catch {}
+        setUploadError(`Erreur sur ${file.name}: ${msg}`);
         setUploading(false);
-        setUploadQueue([]); // Abort the queue on error to prevent infinite loops
       }
     };
 
@@ -441,12 +463,7 @@ export default function AdminPortfolioEdit() {
             <input type="hidden" name="revision" value={localRevision} />
             <input type="hidden" name="intent" value="update" />
 
-            {!isCustomSlug && (
-              <>
-                <input type="hidden" name="slugFr" value={derivedSlugFr} />
-                <input type="hidden" name="slugEn" value={derivedSlugEn} />
-              </>
-            )}
+
 
             <div className={styles.grid}>
               <div>
@@ -489,12 +506,7 @@ export default function AdminPortfolioEdit() {
                 </div>
               </div>
             )}
-            {!isCustomSlug && (
-              <>
-                <input type="hidden" name="slugFr" value={derivedSlugFr} />
-                <input type="hidden" name="slugEn" value={derivedSlugEn} />
-              </>
-            )}
+
 
             <div className={styles.grid}>
               <div>
@@ -568,9 +580,13 @@ export default function AdminPortfolioEdit() {
               </div>
             )}
             {uploadError && (
-              <div className={styles.error}>
+              <div className={`${styles.error} ${styles.errorMargin}`}>
                 <p>{uploadError}</p>
-                <button type="button" onClick={() => setUploadQueue(uploadQueue.slice(1))}>Ignorer et continuer</button>
+                <div className={styles.errorActions}>
+                  <button type="button" onClick={() => setUploadError(null)} className={styles.secondaryButton}>Réessayer</button>
+                  <button type="button" onClick={() => { setUploadError(null); setUploadQueue(uploadQueue.slice(1)); }} className={styles.secondaryButton}>Ignorer et continuer</button>
+                  <button type="button" onClick={() => { setUploadError(null); setUploadQueue([]); }} className={styles.secondaryButton}>Tout annuler</button>
+                </div>
               </div>
             )}
           </div>
@@ -609,13 +625,7 @@ export default function AdminPortfolioEdit() {
                       fd.append("revision", localRevision);
                       submit(fd, { method: "post" });
                     }}
-                    onEdit={() => {
-                      const newCat = prompt("Catégorie (ceremony, portraits, reception) :", photo.category);
-                      if (!newCat) return;
-                      if (!["ceremony", "portraits", "reception"].includes(newCat)) return alert("Catégorie invalide");
-                      const altFr = prompt("Texte alternatif FR :", photo.alt.fr) || "";
-                      const altEn = prompt("Texte alternatif EN :", photo.alt.en) || "";
-
+                    onSaveEdit={(newCat, altFr, altEn) => {
                       const fd = new FormData();
                       fd.append("intent", "updatePhoto");
                       fd.append("photoId", photo.id);
