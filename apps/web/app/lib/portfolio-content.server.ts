@@ -33,6 +33,37 @@ const titleSchema = z.string()
   .max(100, "Title is too long")
   .refine(val => !/[<>]/.test(val), "HTML is not allowed");
 
+
+const variantResultSchema = z.object({
+  name: z.enum(["480p", "960p", "1440p", "1920p"]),
+  width: z.number().int(),
+  height: z.number().int(),
+  sizeBytes: z.number().int(),
+  fileId: z.string(),
+}).strict();
+
+export const photoSchema = z.object({
+  id: z.string().uuid(),
+  fileId: z.string(),
+  originalFormat: z.string(),
+  originalWidth: z.number().int(),
+  originalHeight: z.number().int(),
+  category: z.enum(["ceremony", "portraits", "reception"]),
+  alt: z.object({
+    fr: textSchema,
+    en: textSchema,
+  }).strict(),
+  variants: z.array(variantResultSchema),
+  appliedWatermarkRevision: z.string(),
+  processedAt: z.string().refine(val => {
+    if (!isoDateRegex.test(val)) return false;
+    const d = new Date(val);
+    return !isNaN(d.getTime()) && d.toISOString() === val;
+  }, "Must be valid ISO with ms"),
+}).strict();
+
+export type Photo = z.infer<typeof photoSchema>;
+
 export const projectSchema = z.object({
   id: z.string().uuid(),
   slug: z.object({
@@ -54,9 +85,9 @@ export const projectSchema = z.object({
     const d = new Date(val);
     return !isNaN(d.getTime()) && d.toISOString().startsWith(val);
   }, "Invalid date format or impossible date"),
-  status: z.literal("draft"),
+  status: z.enum(["draft", "published"]),
   order: z.number().int().min(0),
-  coverPhotoId: z.null(),
+  coverPhotoId: z.string().uuid().nullable(),
   createdAt: z.string().refine(val => {
     if (!isoDateRegex.test(val)) return false;
     const d = new Date(val);
@@ -67,7 +98,7 @@ export const projectSchema = z.object({
     const d = new Date(val);
     return !isNaN(d.getTime()) && d.toISOString() === val;
   }, "Must be valid ISO with ms"),
-  photos: z.array(z.never()),
+  photos: z.array(photoSchema),
 }).strict();
 
 const revisionHexRegex = /^[0-9a-f]{32}$/;
@@ -153,10 +184,12 @@ export function getRawPortfolioContent(): { content: Portfolio; isCorrupted: boo
         };
         return { content: portfolio, isCorrupted: false };
       } else {
+        console.error("VALIDATION FAILED", JSON.stringify(validated.error.issues, null, 2));
         return { content: createDefaultPortfolio(), isCorrupted: true };
       }
     }
-  } catch {
+  } catch (err) {
+    console.error("CATCH ERROR", err);
     return { content: createDefaultPortfolio(), isCorrupted: true };
   }
   return { content: createDefaultPortfolio(), isCorrupted: false };
@@ -198,6 +231,7 @@ function savePortfolio(portfolio: Portfolio, previousRevision: string) {
     throw new CorruptedContentError();
   }
   if (current.content.revision !== previousRevision && fs.existsSync(getPortfolioContentPath())) {
+    console.error("REVISION CONFLICT! current:", current.content.revision, "previous:", previousRevision);
     throw new RevisionConflictError();
   }
 
@@ -266,19 +300,26 @@ export function updateWatermarkText(text: string, previousPortfolioRevision: str
 }
 
 export function generateSlug(text: string): string {
-  return text
+  let slug = text
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^a-z0-9-]+/g, "-") // replace non-alphanumeric (except dashes) with single dash
+    .replace(/-+/g, "-") // fuse multiple dashes
+    .replace(/^-+|-+$/g, ""); // trim dashes
+
+  if (slug.length > 100) {
+    slug = slug.substring(0, 100).replace(/-+$/, "");
+  }
+  return slug;
 }
 
 export function generateUniqueSlug(baseSlug: string, existingSlugs: string[]): string {
   let slug = baseSlug || "project";
-  if (slug.length < 3) slug = slug.padEnd(3, "0");
-  if (slug.length > 100) slug = slug.substring(0, 100).replace(/-+$/, "");
+  if (slug.length < 3) {
+    slug = slug.padEnd(3, "0");
+  }
 
   let uniqueSlug = slug;
   let counter = 1;
@@ -301,8 +342,8 @@ export function createProjectDraft(data: Omit<Project, "id" | "createdAt" | "upd
   const existingFrSlugs = portfolio.projects.map(p => p.slug.fr);
   const existingEnSlugs = portfolio.projects.map(p => p.slug.en);
 
-  const slugFr = data.slug.fr && data.slug.fr.trim() ? data.slug.fr.trim() : generateUniqueSlug(generateSlug(data.title.fr), existingFrSlugs);
-  const slugEn = data.slug.en && data.slug.en.trim() ? data.slug.en.trim() : generateUniqueSlug(generateSlug(data.title.en), existingEnSlugs);
+  const slugFr = generateUniqueSlug(generateSlug(data.slug.fr && data.slug.fr.trim() ? data.slug.fr : data.title.fr), existingFrSlugs);
+  const slugEn = generateUniqueSlug(generateSlug(data.slug.en && data.slug.en.trim() ? data.slug.en : data.title.en), existingEnSlugs);
 
   const newProject: Project = {
     ...data,
@@ -330,8 +371,8 @@ export function updateProjectMetadata(projectId: string, data: Omit<Project, "id
   const existingFrSlugs = portfolio.projects.filter(p => p.id !== projectId).map(p => p.slug.fr);
   const existingEnSlugs = portfolio.projects.filter(p => p.id !== projectId).map(p => p.slug.en);
 
-  const slugFr = data.slug.fr && data.slug.fr.trim() ? data.slug.fr.trim() : generateUniqueSlug(generateSlug(data.title.fr), existingFrSlugs);
-  const slugEn = data.slug.en && data.slug.en.trim() ? data.slug.en.trim() : generateUniqueSlug(generateSlug(data.title.en), existingEnSlugs);
+  const slugFr = generateUniqueSlug(generateSlug(data.slug.fr && data.slug.fr.trim() ? data.slug.fr : data.title.fr), existingFrSlugs);
+  const slugEn = generateUniqueSlug(generateSlug(data.slug.en && data.slug.en.trim() ? data.slug.en : data.title.en), existingEnSlugs);
 
   const updatedProject: Project = {
     ...portfolio.projects[index],
@@ -385,5 +426,130 @@ export function deleteEmptyProject(projectId: string, previousRevision: string):
   }
 
   portfolio.projects = portfolio.projects.filter(p => p.id !== projectId);
+  return savePortfolio(portfolio, previousRevision);
+}
+
+
+export function publishProject(projectId: string, previousRevision: string): string {
+  const portfolio = getPortfolioContent();
+  const project = portfolio.projects.find(p => p.id === projectId);
+  if (!project) throw new Error("Project not found");
+
+  if (!project.title.fr || !project.title.en) throw new ValidationError("Missing titles");
+  if (!project.description.fr || !project.description.en) throw new ValidationError("Missing descriptions");
+  if (!project.slug.fr || !project.slug.en) throw new ValidationError("Missing slugs");
+  if (project.photos.length === 0) throw new ValidationError("Project must have at least one photo");
+  if (!project.coverPhotoId) throw new ValidationError("Cover photo is missing");
+
+  const coverExists = project.photos.some(p => p.id === project.coverPhotoId);
+  if (!coverExists) throw new ValidationError("Cover photo is invalid");
+
+  for (const photo of project.photos) {
+    if (!photo.category) throw new ValidationError("Category missing on photo");
+    if (!photo.alt.fr || !photo.alt.en) throw new ValidationError("Alt text missing on photo");
+  }
+
+  project.status = "published";
+  project.updatedAt = new Date().toISOString();
+  return savePortfolio(portfolio, previousRevision);
+}
+
+export function unpublishProject(projectId: string, previousRevision: string): string {
+  const portfolio = getPortfolioContent();
+  const project = portfolio.projects.find(p => p.id === projectId);
+  if (!project) throw new Error("Project not found");
+
+  project.status = "draft";
+  project.updatedAt = new Date().toISOString();
+  return savePortfolio(portfolio, previousRevision);
+}
+
+export function addPhotoToProject(projectId: string, photo: Omit<Photo, "id">, previousRevision: string): { newRevision: string, newPhotoId: string } {
+  const portfolio = getPortfolioContent();
+  const project = portfolio.projects.find(p => p.id === projectId);
+  if (!project) throw new Error("Project not found");
+
+  const newPhoto: Photo = { ...photo, id: crypto.randomUUID() };
+  project.photos.push(newPhoto);
+
+  if (!project.coverPhotoId) {
+    project.coverPhotoId = newPhoto.id;
+  }
+
+  project.updatedAt = new Date().toISOString();
+  const newRevision = savePortfolio(portfolio, previousRevision);
+  return { newRevision, newPhotoId: newPhoto.id };
+}
+
+export function updatePhotoMetadata(projectId: string, photoId: string, metadata: { category?: "ceremony"|"portraits"|"reception", alt?: {fr: string, en: string} }, previousRevision: string): string {
+  const portfolio = getPortfolioContent();
+  const project = portfolio.projects.find(p => p.id === projectId);
+  if (!project) throw new Error("Project not found");
+
+  const photo = project.photos.find(p => p.id === photoId);
+  if (!photo) throw new Error("Photo not found");
+
+  if (metadata.category) photo.category = metadata.category;
+  if (metadata.alt) photo.alt = metadata.alt;
+
+  project.updatedAt = new Date().toISOString();
+  return savePortfolio(portfolio, previousRevision);
+}
+
+export function setProjectCover(projectId: string, photoId: string, previousRevision: string): string {
+  const portfolio = getPortfolioContent();
+  const project = portfolio.projects.find(p => p.id === projectId);
+  if (!project) throw new Error("Project not found");
+
+  const photo = project.photos.find(p => p.id === photoId);
+  if (!photo) throw new Error("Photo not found");
+
+  project.coverPhotoId = photo.id;
+  project.updatedAt = new Date().toISOString();
+  return savePortfolio(portfolio, previousRevision);
+}
+
+export function trashPhoto(projectId: string, photoId: string, previousRevision: string): { newRevision: string, trashedPhoto: Photo } {
+  const portfolio = getPortfolioContent();
+  const project = portfolio.projects.find(p => p.id === projectId);
+  if (!project) throw new Error("Project not found");
+
+  const photoIndex = project.photos.findIndex(p => p.id === photoId);
+  if (photoIndex === -1) throw new Error("Photo not found");
+
+  if (project.photos.length > 1 && project.coverPhotoId === photoId) {
+    throw new ValidationError("Cannot delete cover photo while other photos exist. Set another cover first.");
+  }
+
+  const [trashedPhoto] = project.photos.splice(photoIndex, 1);
+  if (project.coverPhotoId === photoId) {
+    project.coverPhotoId = null;
+  }
+
+  project.updatedAt = new Date().toISOString();
+  const newRevision = savePortfolio(portfolio, previousRevision);
+
+  // Real deletion from disk or moving to .trash will be handled by the caller route.
+  return { newRevision, trashedPhoto };
+}
+
+export function reorderProjectPhotos(projectId: string, photoIds: string[], previousRevision: string): string {
+  const portfolio = getPortfolioContent();
+  const project = portfolio.projects.find(p => p.id === projectId);
+  if (!project) throw new Error("Project not found");
+
+  if (photoIds.length !== project.photos.length) throw new Error("Invalid number of photo IDs");
+  const uniqueIds = new Set(photoIds);
+  if (uniqueIds.size !== photoIds.length) throw new Error("Duplicate photo IDs found");
+
+  const newPhotos: Photo[] = [];
+  for (const id of photoIds) {
+    const photo = project.photos.find(p => p.id === id);
+    if (!photo) throw new Error(`Photo ${id} not found`);
+    newPhotos.push(photo);
+  }
+
+  project.photos = newPhotos;
+  project.updatedAt = new Date().toISOString();
   return savePortfolio(portfolio, previousRevision);
 }

@@ -4,6 +4,7 @@ import {
   redirect,
 } from "react-router";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "react-router";
+import { useState } from "react";
 import { createProjectDraft, getPortfolioContent } from "../lib/portfolio-content.server";
 import { requireValidAdminSession, validateAdminFormData, ActionSecurityError } from "../lib/admin-auth.server";
 import { RevisionConflictError, CorruptedContentError } from "../lib/site-content.server";
@@ -91,9 +92,20 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function AdminPortfolioNew() {
   const { csrfToken, revision } = useLoaderData() as unknown as { csrfToken: string; revision: string };
-  const actionData = useActionData<{ error?: string }>();
+  const actionData = useActionData<{ error?: string; fieldErrors?: Record<string, string> }>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+
+  const [isCustomSlug, setIsCustomSlug] = useState(false);
+  const [titleFr, setTitleFr] = useState("");
+  const [titleEn, setTitleEn] = useState("");
+  const [slugFr, setSlugFr] = useState("");
+  const [slugEn, setSlugEn] = useState("");
+
+  const generateSlug = (text: string) => text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+  const derivedSlugFr = isCustomSlug ? slugFr : generateSlug(titleFr);
+  const derivedSlugEn = isCustomSlug ? slugEn : generateSlug(titleEn);
 
   return (
     <div className={styles.container}>
@@ -115,24 +127,50 @@ export default function AdminPortfolioNew() {
             <div className={styles.grid}>
               <div>
                 <label htmlFor="titleFr" className={styles.label}>Titre (FR)</label>
-                <input id="titleFr" name="titleFr" required className={styles.input} />
+                <input id="titleFr" name="titleFr" required className={styles.input} value={titleFr} onChange={e => setTitleFr(e.target.value)} />
+                {actionData?.fieldErrors?.["title.fr"] && <p className={styles.fieldError}>{actionData.fieldErrors["title.fr"]}</p>}
               </div>
               <div>
                 <label htmlFor="titleEn" className={styles.label}>Titre (EN)</label>
-                <input id="titleEn" name="titleEn" required className={styles.input} />
+                <input id="titleEn" name="titleEn" required className={styles.input} value={titleEn} onChange={e => setTitleEn(e.target.value)} />
+                {actionData?.fieldErrors?.["title.en"] && <p className={styles.fieldError}>{actionData.fieldErrors["title.en"]}</p>}
               </div>
             </div>
 
-            <div className={styles.grid}>
-              <div>
-                <label htmlFor="slugFr" className={styles.label}>Slug (FR) - Optionnel, généré auto</label>
-                <input id="slugFr" name="slugFr" className={styles.input} />
-              </div>
-              <div>
-                <label htmlFor="slugEn" className={styles.label}>Slug (EN) - Optionnel, généré auto</label>
-                <input id="slugEn" name="slugEn" className={styles.input} />
-              </div>
+            <div className={styles.slugPreview}>
+              <p><strong>Aperçu URL (FR):</strong> /fr/portfolio/{derivedSlugFr || "..."}</p>
+              <p><strong>Aperçu URL (EN):</strong> /en/portfolio/{derivedSlugEn || "..."}</p>
+              {!isCustomSlug && (
+                <button type="button" onClick={() => {
+                  setSlugFr(derivedSlugFr);
+                  setSlugEn(derivedSlugEn);
+                  setIsCustomSlug(true);
+                }} className={styles.secondaryButton}>
+                  Personnaliser l'URL
+                </button>
+              )}
             </div>
+
+            {isCustomSlug && (
+              <div className={styles.grid}>
+                <div>
+                  <label htmlFor="slugFr" className={styles.label}>Slug personnalisé (FR)</label>
+                  <input id="slugFr" name="slugFr" className={styles.input} value={slugFr} onChange={e => setSlugFr(e.target.value)} />
+                  {actionData?.fieldErrors?.["slug.fr"] && <p className={styles.fieldError}>{actionData.fieldErrors["slug.fr"]}</p>}
+                </div>
+                <div>
+                  <label htmlFor="slugEn" className={styles.label}>Slug personnalisé (EN)</label>
+                  <input id="slugEn" name="slugEn" className={styles.input} value={slugEn} onChange={e => setSlugEn(e.target.value)} />
+                  {actionData?.fieldErrors?.["slug.en"] && <p className={styles.fieldError}>{actionData.fieldErrors["slug.en"]}</p>}
+                </div>
+              </div>
+            )}
+            {!isCustomSlug && (
+              <>
+                <input type="hidden" name="slugFr" value={derivedSlugFr} />
+                <input type="hidden" name="slugEn" value={derivedSlugEn} />
+              </>
+            )}
 
             <div className={styles.grid}>
               <div>

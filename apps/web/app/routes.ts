@@ -52,6 +52,8 @@ export default [
   route("admin/portfolio/new", "routes/admin.portfolio.new.tsx"),
   route("admin/portfolio/:projectId", "routes/admin.portfolio.$projectId.tsx"),
   route("admin/portfolio/:projectId/preview", "routes/admin.portfolio.$projectId.preview.tsx"),
+  route("admin/portfolio/:projectId/upload", "routes/admin.portfolio.$projectId_.upload.tsx"),
+  route("admin/portfolio/media/:projectId/:photoId/:variant", "routes/admin.portfolio.media.$projectId.$photoId.$variant.tsx"),
 
   // ── Catch-all (404) ───────────────────────────────────────
   route("*", "routes/404.tsx"),

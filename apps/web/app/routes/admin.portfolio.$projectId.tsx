@@ -1,19 +1,26 @@
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
-  redirect,
+  redirect
 } from "react-router";
-import { Form, Link, useActionData, useLoaderData, useNavigation } from "react-router";
-import { getProjectById, getPortfolioContent, updateProjectMetadata, type Project } from "../lib/portfolio-content.server";
+import { Form, Link, useActionData, useLoaderData, useNavigation, useSubmit } from "react-router";
+import { getProjectById, getPortfolioContent, updateProjectMetadata, publishProject, unpublishProject, setProjectCover, trashPhoto, updatePhotoMetadata, reorderProjectPhotos } from "../lib/portfolio-content.server";
+import type { Project } from "../lib/portfolio-content.server";
 import { requireValidAdminSession, validateAdminFormData, ActionSecurityError } from "../lib/admin-auth.server";
-import { RevisionConflictError, CorruptedContentError } from "../lib/site-content.server";
+import { RevisionConflictError, CorruptedContentError, ValidationError } from "../lib/site-content.server";
 import styles from "./admin.module.css";
 import * as crypto from "node:crypto";
 import { commitSession } from "../lib/session.server";
+import { useState, useEffect, useRef } from "react";
+import { z } from "zod";
+
+import { getPortfolioMediaPath } from "../lib/portfolio-content.server";
+import { trashPhotoMedia, restorePhotoMedia } from "../lib/portfolio-image.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const session = await requireValidAdminSession(request);
   const projectId = params.projectId;
+  console.log("PROJECT ID LOADER HIT:", request.url);
   if (!projectId) throw new Response("Not Found", { status: 404 });
 
   const project = getProjectById(projectId);
@@ -56,32 +63,90 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const previousRevision = formData.get("revision");
   if (typeof previousRevision !== "string") return Response.json({ error: "Invalid revision" }, { status: 422, headers });
 
-  const titleFr = formData.get("titleFr");
-  const titleEn = formData.get("titleEn");
-  const slugFr = formData.get("slugFr");
-  const slugEn = formData.get("slugEn");
-  const descriptionFr = formData.get("descriptionFr");
-  const descriptionEn = formData.get("descriptionEn");
-  const location = formData.get("location");
-  const date = formData.get("date");
-
-  if (
-    typeof titleFr !== "string" || typeof titleEn !== "string" ||
-    typeof descriptionFr !== "string" || typeof descriptionEn !== "string"
-  ) {
-    return Response.json({ error: "Missing required fields" }, { status: 422, headers });
-  }
+  const intent = formData.get("intent");
 
   try {
-    updateProjectMetadata(projectId, {
-      title: { fr: titleFr, en: titleEn },
-      slug: { fr: typeof slugFr === "string" ? slugFr : "", en: typeof slugEn === "string" ? slugEn : "" },
-      description: { fr: descriptionFr, en: descriptionEn },
-      location: typeof location === "string" && location.trim() ? location : null,
-      date: typeof date === "string" && date.trim() ? date : null,
-    }, previousRevision);
+    if (intent === "publish") {
+      publishProject(projectId, previousRevision);
+      return redirect(`/admin/portfolio`, { headers });
+    }
 
-    return redirect(`/admin/portfolio`, { headers });
+    if (intent === "unpublish") {
+      unpublishProject(projectId, previousRevision);
+      return redirect(`/admin/portfolio`, { headers });
+    }
+
+    if (intent === "setCover") {
+      const photoId = formData.get("photoId") as string;
+      setProjectCover(projectId, photoId, previousRevision);
+      return Response.json({ success: true }, { headers });
+    }
+
+    if (intent === "updatePhoto") {
+      const photoId = formData.get("photoId") as string;
+      const category = formData.get("category") as "ceremony" | "portraits" | "reception";
+      const altFr = formData.get("altFr") as string;
+      const altEn = formData.get("altEn") as string;
+      updatePhotoMetadata(projectId, photoId, { category, alt: { fr: altFr, en: altEn } }, previousRevision);
+      return Response.json({ success: true }, { headers });
+    }
+
+    if (intent === "reorderPhotos") {
+      const photoIds = JSON.parse(formData.get("photoIds") as string);
+      reorderProjectPhotos(projectId, photoIds, previousRevision);
+      return Response.json({ success: true }, { headers });
+    }
+
+    if (intent === "trashPhoto") {
+      const photoId = formData.get("photoId") as string;
+      const project = getProjectById(projectId);
+      if (!project) throw new Error("Project not found");
+      const photo = project.photos.find(p => p.id === photoId);
+      if (!photo) throw new Error("Photo not found");
+
+      const mediaPath = getPortfolioMediaPath();
+
+      // 1. Move media to trash
+      trashPhotoMedia(projectId, mediaPath, photo);
+
+      try {
+        // 2. Commit metadata change
+        trashPhoto(projectId, photoId, previousRevision);
+      } catch (err) {
+        // 3. Rollback media if metadata commit fails
+        restorePhotoMedia(projectId, mediaPath, photo);
+        throw err;
+      }
+      return Response.json({ success: true }, { headers });
+    }
+
+    if (!intent || intent === "update") {
+      const titleFr = formData.get("titleFr") as string;
+      const titleEn = formData.get("titleEn") as string;
+      const slugFr = formData.get("slugFr") as string;
+      const slugEn = formData.get("slugEn") as string;
+      const descriptionFr = formData.get("descriptionFr") as string;
+      const descriptionEn = formData.get("descriptionEn") as string;
+      const location = formData.get("location") as string;
+      const date = formData.get("date") as string;
+
+      if (!titleFr || !titleEn || !descriptionFr || !descriptionEn) {
+        return Response.json({ error: "Missing required fields" }, { status: 422, headers });
+      }
+
+      updateProjectMetadata(projectId, {
+        title: { fr: titleFr, en: titleEn },
+        slug: { fr: slugFr || "", en: slugEn || "" },
+        description: { fr: descriptionFr, en: descriptionEn },
+        location: location?.trim() ? location : null,
+        date: date?.trim() ? date : null,
+      }, previousRevision);
+
+      return Response.json({ success: true }, { headers });
+    }
+
+    return Response.json({ error: "Unknown intent" }, { status: 400, headers });
+
   } catch (err: unknown) {
     if (err instanceof RevisionConflictError) {
       return Response.json({ error: "Revision conflict" }, { status: 409, headers });
@@ -89,22 +154,231 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (err instanceof CorruptedContentError) {
       return Response.json({ error: "Corrupted content" }, { status: 409, headers });
     }
+    if (err instanceof ValidationError) {
+      return Response.json({ error: err.message }, { status: 422, headers });
+    }
+    if (err instanceof z.ZodError) {
+      const fieldErrors: Record<string, string> = {};
+      for (const issue of err.issues) {
+        const pathStr = issue.path.join(".");
+        if (pathStr.includes("projects")) {
+           const parts = issue.path.slice(2);
+           fieldErrors[parts.join(".")] = issue.message;
+        }
+      }
+      return Response.json({ fieldErrors }, { status: 422, headers });
+    }
     const msg = err instanceof Error ? err.message : "Unknown error";
-    if (msg === "Project not found") {
-      return Response.json({ error: "Project not found" }, { status: 404, headers });
-    }
     if (msg.includes("is already used")) {
-      return Response.json({ error: msg }, { status: 422, headers });
+      if (msg.includes("FR slug")) return Response.json({ fieldErrors: { "slug.fr": msg } }, { status: 422, headers });
+      if (msg.includes("EN slug")) return Response.json({ fieldErrors: { "slug.en": msg } }, { status: 422, headers });
     }
-    return Response.json({ error: "Validation failed" }, { status: 422, headers });
+    return Response.json({ error: msg || "Validation failed" }, { status: 422, headers });
   }
 }
 
+function generateClientSlug(text: string): string {
+  let slug = text
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  if (slug.length > 100) {
+    slug = slug.substring(0, 100).replace(/-+$/, "");
+  }
+  return slug;
+}
+
+function DraggablePhoto({
+  photo, projectId, isCover, onEdit, onDelete, onSetCover, onMoveUp, onMoveDown,
+  disabled, isFirst, isLast, index, onReorder
+}: {
+  photo: Project["photos"][0], projectId: string, isCover: boolean,
+  onEdit: () => void, onDelete: () => void, onSetCover: () => void,
+  onMoveUp: () => void, onMoveDown: () => void, disabled: boolean,
+  isFirst: boolean, isLast: boolean, index: number,
+  onReorder: (fromIndex: number, toIndex: number) => void
+}) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const previewVariant = photo.variants.find((v: Project["photos"][0]["variants"][0]) => v.name === "480p");
+  const imgUrl = previewVariant ? `/admin/portfolio/media/${projectId}/${photo.id}/480p` : "";
+
+  return (
+    <div
+      className={`${styles.photoCard} ${isDragOver ? styles.dragOver : ""}`}
+      draggable={!disabled}
+      onDragStart={(e) => {
+        if (disabled) return e.preventDefault();
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("application/json", JSON.stringify({ index, projectId }));
+      }}
+      onDragOver={(e) => {
+        if (disabled) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }}
+      onDragEnter={() => !disabled && setIsDragOver(true)}
+      onDragLeave={() => !disabled && setIsDragOver(false)}
+      onDrop={(e) => {
+        setIsDragOver(false);
+        if (disabled) return;
+        try {
+          const data = JSON.parse(e.dataTransfer.getData("application/json"));
+          if (data.projectId !== projectId || typeof data.index !== "number") return;
+          if (data.index !== index) onReorder(data.index, index);
+        } catch {
+          // ignore invalid drop data
+        }
+      }}
+    >
+      <div className={styles.photoDragHandle}>≡</div>
+      <img src={imgUrl} alt={photo.alt.fr} className={styles.photoImg} />
+      <div className={styles.photoMeta}>
+        <p><strong>{photo.category}</strong></p>
+        <p>{photo.alt.fr || "Aucun alt"}</p>
+        <div className={styles.photoActions}>
+          <button type="button" onClick={onEdit} disabled={disabled}>Modifier</button>
+          {!isCover && <button type="button" onClick={onSetCover} disabled={disabled}>Couverture</button>}
+          {isCover && <span className={styles.coverBadge}>Couverture</span>}
+          <button type="button" onClick={onMoveUp} disabled={disabled || isFirst} title="Monter" aria-label="Monter">&uarr;</button>
+          <button type="button" onClick={onMoveDown} disabled={disabled || isLast} title="Descendre" aria-label="Descendre">&darr;</button>
+          <button type="button" onClick={onDelete} disabled={disabled} className={styles.deleteButton}>Supprimer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPortfolioEdit() {
-  const { project, csrfToken, revision } = useLoaderData() as unknown as { project: Project; csrfToken: string; revision: string };
-  const actionData = useActionData<{ error?: string }>();
+  const { project, csrfToken, revision: loaderRevision } = useLoaderData() as unknown as { project: Project; csrfToken: string; revision: string };
+  const [localRevision, setLocalRevision] = useState(loaderRevision);
+
+  // Sync localRevision if loader data changes
+  useEffect(() => {
+    setLocalRevision(loaderRevision);
+  }, [loaderRevision]);
+  const actionData = useActionData<{ error?: string, fieldErrors?: Record<string, string>, success?: boolean }>();
   const navigation = useNavigation();
+  const submit = useSubmit();
   const isSubmitting = navigation.state === "submitting";
+
+  const [titleFr, setTitleFr] = useState(project.title.fr);
+  const [titleEn, setTitleEn] = useState(project.title.en);
+
+  // existing project, slug is custom by default
+  const [isCustomSlug, setIsCustomSlug] = useState(true);
+  const [slugFr, setSlugFr] = useState(project.slug.fr);
+  const [slugEn, setSlugEn] = useState(project.slug.en);
+
+  const derivedSlugFr = isCustomSlug ? slugFr : generateClientSlug(titleFr);
+  const derivedSlugEn = isCustomSlug ? slugEn : generateClientSlug(titleEn);
+
+  // Upload Queue State
+  const [uploadQueue, setUploadQueue] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ percentage: number, status: "uploading" | "processing" | "done" } | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFiles = (files: FileList | null) => {
+    if (!files) return;
+    const toAdd = Array.from(files).filter(f => ["image/jpeg", "image/png", "image/webp"].includes(f.type));
+    if (uploadQueue.length + toAdd.length > 20) {
+      alert("Maximum 20 fichiers par lot.");
+      return;
+    }
+    const large = toAdd.find(f => f.size > 50 * 1024 * 1024);
+    if (large) {
+      alert("La taille maximum par fichier est de 50 MB.");
+      return;
+    }
+    setUploadQueue(prev => [...prev, ...toAdd]);
+  };
+
+  useEffect(() => {
+    if (uploading || uploadQueue.length === 0 || navigation.state !== "idle") return;
+
+    const file = uploadQueue[0];
+    setUploading(true);
+    setUploadError(null);
+    setUploadProgress({ percentage: 0, status: "uploading" });
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/admin/portfolio/${project.id}/upload`, true);
+    xhr.setRequestHeader("x-csrf-token", csrfToken);
+    xhr.setRequestHeader("x-portfolio-revision", localRevision);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percentage = Math.round((event.loaded * 100) / event.total);
+        if (percentage === 100) {
+          setUploadProgress({ percentage: 100, status: "processing" });
+        } else {
+          setUploadProgress({ percentage, status: "uploading" });
+        }
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const json = JSON.parse(xhr.responseText);
+          if (json.newRevision) setLocalRevision(json.newRevision);
+        } catch {
+          // ignore parse errors
+        }
+        setUploadProgress({ percentage: 100, status: "done" });
+        setUploadQueue(q => q.slice(1));
+        setUploading(false);
+        // If this is the last file, trigger a full reload to show the photos
+        if (uploadQueue.length === 1) {
+          submit(null, { method: "get", action: `/admin/portfolio/${project.id}` });
+        }
+      } else {
+        setUploadError(`Erreur sur ${file.name}: ${xhr.responseText}`);
+        setUploading(false);
+        setUploadQueue([]); // Abort the queue on error to prevent infinite loops
+      }
+    };
+
+    xhr.onerror = () => {
+      setUploadError(`Erreur réseau lors de l'envoi de ${file.name}`);
+      setUploading(false);
+    };
+
+    xhr.send(formData);
+  }, [uploadQueue, uploading, csrfToken, localRevision, project.id, submit, navigation.state]);
+
+  const handleReorder = (fromIndex: number, toIndex: number) => {
+    const ids = project.photos.map((p: Project["photos"][0]) => p.id);
+    const reordered = [...ids];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    const fd = new FormData();
+    fd.append("intent", "reorderPhotos");
+    fd.append("photoIds", JSON.stringify(reordered));
+    fd.append("csrfToken", csrfToken);
+    fd.append("revision", localRevision);
+    submit(fd, { method: "post" });
+  };
+
+  // Publish checklist
+  const isPublishable =
+    project.title.fr && project.title.en &&
+    project.description.fr && project.description.en &&
+    project.slug.fr && project.slug.en &&
+    project.photos.length > 0 && project.coverPhotoId &&
+    project.photos.every((p: Project["photos"][0]) => p.category && p.alt.fr && p.alt.en);
 
   return (
     <div className={styles.container}>
@@ -113,46 +387,125 @@ export default function AdminPortfolioEdit() {
           <h1 className={styles.headerTitle}>Modifier le Projet</h1>
           <p className={styles.headerSubtitle}>{project.title.fr}</p>
         </div>
-        <Link to="/admin/portfolio" className={`${styles.logoutButton} ${styles.noDecoration}`}>
-          Retour
-        </Link>
+        <div className={styles.headerActions}>
+          <Form method="post">
+            <input type="hidden" name="csrfToken" value={csrfToken} />
+            <input type="hidden" name="revision" value={localRevision} />
+            {project.status === "draft" ? (
+              <button
+                type="submit"
+                name="intent"
+                value="publish"
+                disabled={!isPublishable || isSubmitting}
+                className={`${styles.submitButton} ${isPublishable ? styles.btnSuccess : styles.btnSecondary}`}
+              >
+                Publier le projet
+              </button>
+            ) : (
+              <button
+                type="submit"
+                name="intent"
+                value="unpublish"
+                disabled={isSubmitting}
+                className={styles.secondaryButton}
+              >
+                Repasser en brouillon
+              </button>
+            )}
+          </Form>
+          <Link to="/admin/portfolio" className={`${styles.logoutButton} ${styles.noDecoration}`}>
+            Retour
+          </Link>
+        </div>
       </header>
+
       <main className={styles.mainContent}>
-        <div className={`${styles.loginCard} ${styles.projectFormCard || ''}`}>
+        {project.status === "draft" && !isPublishable && (
+          <div className={`${styles.error} ${styles.marginBottom}`}>
+            <strong>Checklist avant publication :</strong>
+            <ul>
+              {(!project.title.fr || !project.title.en) && <li>Titres manquants</li>}
+              {(!project.description.fr || !project.description.en) && <li>Descriptions manquantes</li>}
+              {(!project.slug.fr || !project.slug.en) && <li>Slugs manquants</li>}
+              {project.photos.length === 0 && <li>Aucune photo</li>}
+              {!project.coverPhotoId && project.photos.length > 0 && <li>Photo de couverture manquante</li>}
+              {project.photos.some((p: Project["photos"][0]) => !p.category) && <li>Catégorie manquante sur des photos</li>}
+              {project.photos.some((p: Project["photos"][0]) => !p.alt.fr || !p.alt.en) && <li>Texte alternatif manquant sur des photos</li>}
+            </ul>
+          </div>
+        )}
+
+        <div className={`${styles.loginCard} ${styles.projectFormCard || ''} ${styles.wideCard}`}>
           <Form method="post" className={styles.form}>
             <input type="hidden" name="csrfToken" value={csrfToken} />
-            <input type="hidden" name="revision" value={revision} />
+            <input type="hidden" name="revision" value={localRevision} />
+            <input type="hidden" name="intent" value="update" />
+
+            {!isCustomSlug && (
+              <>
+                <input type="hidden" name="slugFr" value={derivedSlugFr} />
+                <input type="hidden" name="slugEn" value={derivedSlugEn} />
+              </>
+            )}
 
             <div className={styles.grid}>
               <div>
                 <label htmlFor="titleFr" className={styles.label}>Titre (FR)</label>
-                <input id="titleFr" name="titleFr" required defaultValue={project.title.fr} className={styles.input} />
+                <input id="titleFr" name="titleFr" required className={styles.input} value={titleFr} onChange={e => setTitleFr(e.target.value)} />
+                {actionData?.fieldErrors?.["title.fr"] && <p className={styles.fieldError}>{actionData.fieldErrors["title.fr"]}</p>}
               </div>
               <div>
                 <label htmlFor="titleEn" className={styles.label}>Titre (EN)</label>
-                <input id="titleEn" name="titleEn" required defaultValue={project.title.en} className={styles.input} />
+                <input id="titleEn" name="titleEn" required className={styles.input} value={titleEn} onChange={e => setTitleEn(e.target.value)} />
+                {actionData?.fieldErrors?.["title.en"] && <p className={styles.fieldError}>{actionData.fieldErrors["title.en"]}</p>}
               </div>
             </div>
 
-            <div className={styles.grid}>
-              <div>
-                <label htmlFor="slugFr" className={styles.label}>Slug (FR)</label>
-                <input id="slugFr" name="slugFr" required defaultValue={project.slug.fr} className={styles.input} />
-              </div>
-              <div>
-                <label htmlFor="slugEn" className={styles.label}>Slug (EN)</label>
-                <input id="slugEn" name="slugEn" required defaultValue={project.slug.en} className={styles.input} />
-              </div>
+            <div className={styles.slugPreview}>
+              <p><strong>Aperçu URL (FR):</strong> /fr/portfolio/{derivedSlugFr || "..."}</p>
+              <p><strong>Aperçu URL (EN):</strong> /en/portfolio/{derivedSlugEn || "..."}</p>
+              {!isCustomSlug && (
+                <button type="button" onClick={() => {
+                  setSlugFr(derivedSlugFr);
+                  setSlugEn(derivedSlugEn);
+                  setIsCustomSlug(true);
+                }} className={styles.secondaryButton}>
+                  Personnaliser l'URL
+                </button>
+              )}
             </div>
+
+            {isCustomSlug && (
+              <div className={styles.grid}>
+                <div>
+                  <label htmlFor="slugFr" className={styles.label}>Slug personnalisé (FR)</label>
+                  <input id="slugFr" name="slugFr" className={styles.input} value={slugFr} onChange={e => setSlugFr(e.target.value)} />
+                  {actionData?.fieldErrors?.["slug.fr"] && <p className={styles.fieldError}>{actionData.fieldErrors["slug.fr"]}</p>}
+                </div>
+                <div>
+                  <label htmlFor="slugEn" className={styles.label}>Slug personnalisé (EN)</label>
+                  <input id="slugEn" name="slugEn" className={styles.input} value={slugEn} onChange={e => setSlugEn(e.target.value)} />
+                  {actionData?.fieldErrors?.["slug.en"] && <p className={styles.fieldError}>{actionData.fieldErrors["slug.en"]}</p>}
+                </div>
+              </div>
+            )}
+            {!isCustomSlug && (
+              <>
+                <input type="hidden" name="slugFr" value={derivedSlugFr} />
+                <input type="hidden" name="slugEn" value={derivedSlugEn} />
+              </>
+            )}
 
             <div className={styles.grid}>
               <div>
                 <label htmlFor="descriptionFr" className={styles.label}>Description (FR)</label>
                 <textarea id="descriptionFr" name="descriptionFr" required defaultValue={project.description.fr} className={styles.input} rows={4} />
+                {actionData?.fieldErrors?.["description.fr"] && <p className={styles.fieldError}>{actionData.fieldErrors["description.fr"]}</p>}
               </div>
               <div>
                 <label htmlFor="descriptionEn" className={styles.label}>Description (EN)</label>
                 <textarea id="descriptionEn" name="descriptionEn" required defaultValue={project.description.en} className={styles.input} rows={4} />
+                {actionData?.fieldErrors?.["description.en"] && <p className={styles.fieldError}>{actionData.fieldErrors["description.en"]}</p>}
               </div>
             </div>
 
@@ -160,18 +513,13 @@ export default function AdminPortfolioEdit() {
               <div>
                 <label htmlFor="location" className={styles.label}>Lieu (Optionnel)</label>
                 <input id="location" name="location" defaultValue={project.location || ""} className={styles.input} />
+                {actionData?.fieldErrors?.["location"] && <p className={styles.fieldError}>{actionData.fieldErrors["location"]}</p>}
               </div>
               <div>
                 <label htmlFor="date" className={styles.label}>Date (Optionnel YYYY-MM-DD)</label>
                 <input id="date" name="date" type="date" defaultValue={project.date || ""} className={styles.input} />
+                {actionData?.fieldErrors?.["date"] && <p className={styles.fieldError}>{actionData.fieldErrors["date"]}</p>}
               </div>
-            </div>
-
-            <div>
-              <p className={styles.label}>Statut</p>
-              <p className={styles.helpText}>
-                Brouillon (Non visible). La publication sera disponible après l'ajout réel des photos.
-              </p>
             </div>
 
             {actionData?.error && (
@@ -184,6 +532,125 @@ export default function AdminPortfolioEdit() {
               {isSubmitting ? "Sauvegarde..." : "Enregistrer les modifications"}
             </button>
           </Form>
+        </div>
+
+        {/* Photos Section */}
+        <div className={`${styles.loginCard} ${styles.wideCard} ${styles.marginTop}`}>
+          <h2>Photos ({project.photos.length})</h2>
+
+          <div className={styles.uploadZone}>
+            <input
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp"
+              onChange={e => handleFiles(e.target.files)}
+              ref={fileInputRef}
+              className={styles.hidden}
+            />
+            <button type="button" onClick={() => fileInputRef.current?.click()} className={styles.secondaryButton}>
+              Sélectionner des photos (max 20)
+            </button>
+
+            {uploadQueue.length > 0 && (
+              <div className={styles.marginTopSmall}>
+                <p>Upload en cours : reste {uploadQueue.length} fichiers...</p>
+                {uploadProgress && (
+                  <div className={styles.marginTopSmall}>
+                    <div className={styles.progressBarBg}>
+                      <div className={styles.progressBarFill} style={{width: `${uploadProgress.percentage}%`}} />
+                    </div>
+                    <p className={styles.progressText}>
+                      {uploadProgress.status === "uploading" ? `Envoi... ${uploadProgress.percentage}%` :
+                       uploadProgress.status === "processing" ? "Traitement de l'image..." : "Terminé"}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            {uploadError && (
+              <div className={styles.error}>
+                <p>{uploadError}</p>
+                <button type="button" onClick={() => setUploadQueue(uploadQueue.slice(1))}>Ignorer et continuer</button>
+              </div>
+            )}
+          </div>
+
+              <div className={styles.photoGrid}>
+                {project.photos.map((photo: Project["photos"][0], index: number) => (
+                  <DraggablePhoto
+                    key={photo.id}
+                    photo={photo}
+                    projectId={project.id}
+                    isCover={project.coverPhotoId === photo.id}
+                    disabled={isSubmitting}
+                    isFirst={index === 0}
+                    isLast={index === project.photos.length - 1}
+                    index={index}
+                    onReorder={handleReorder}
+                    onMoveUp={() => {
+                      if (index === 0) return;
+                      const ids = project.photos.map((p: Project["photos"][0]) => p.id);
+                      const reordered = [...ids]; const [m] = reordered.splice(index, 1); reordered.splice(index - 1, 0, m);
+                      const fd = new FormData();
+                      fd.append("intent", "reorderPhotos");
+                      fd.append("photoIds", JSON.stringify(reordered));
+                      fd.append("csrfToken", csrfToken);
+                      fd.append("revision", localRevision);
+                      submit(fd, { method: "post" });
+                    }}
+                    onMoveDown={() => {
+                      if (index === project.photos.length - 1) return;
+                      const ids = project.photos.map((p: Project["photos"][0]) => p.id);
+                      const reordered = [...ids]; const [m] = reordered.splice(index, 1); reordered.splice(index + 1, 0, m);
+                      const fd = new FormData();
+                      fd.append("intent", "reorderPhotos");
+                      fd.append("photoIds", JSON.stringify(reordered));
+                      fd.append("csrfToken", csrfToken);
+                      fd.append("revision", localRevision);
+                      submit(fd, { method: "post" });
+                    }}
+                    onEdit={() => {
+                      const newCat = prompt("Catégorie (ceremony, portraits, reception) :", photo.category);
+                      if (!newCat) return;
+                      if (!["ceremony", "portraits", "reception"].includes(newCat)) return alert("Catégorie invalide");
+                      const altFr = prompt("Texte alternatif FR :", photo.alt.fr) || "";
+                      const altEn = prompt("Texte alternatif EN :", photo.alt.en) || "";
+
+                      const fd = new FormData();
+                      fd.append("intent", "updatePhoto");
+                      fd.append("photoId", photo.id);
+                      fd.append("category", newCat);
+                      fd.append("altFr", altFr);
+                      fd.append("altEn", altEn);
+                      fd.append("csrfToken", csrfToken);
+                      fd.append("revision", localRevision);
+                      submit(fd, { method: "post" });
+                    }}
+                    onSetCover={() => {
+                      const fd = new FormData();
+                      fd.append("intent", "setCover");
+                      fd.append("photoId", photo.id);
+                      fd.append("csrfToken", csrfToken);
+                      fd.append("revision", localRevision);
+                      submit(fd, { method: "post" });
+                    }}
+                    onDelete={() => {
+                      if (project.photos.length > 1 && project.coverPhotoId === photo.id) {
+                        return alert("Impossible de supprimer la photo de couverture. Choisissez-en une autre d'abord.");
+                      }
+                      if (confirm("Supprimer cette photo ?")) {
+                        const fd = new FormData();
+                        fd.append("intent", "trashPhoto");
+                        fd.append("photoId", photo.id);
+                        fd.append("csrfToken", csrfToken);
+                        fd.append("revision", localRevision);
+                        submit(fd, { method: "post" });
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+
         </div>
       </main>
     </div>

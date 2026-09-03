@@ -270,7 +270,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
       }),
       redirect: "manual"
     });
-    expect(editRes.status).toBe(302);
+    expect(editRes.status).toBe(200);
     revision = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8")).revision;
 
     // 7. ancienne révision sur création, édition, ordre et suppression -> 409

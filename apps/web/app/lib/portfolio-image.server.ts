@@ -385,7 +385,7 @@ export async function processImage(
 
   try {
     const resolvedMediaBasePath = path.resolve(mediaBasePath);
-    ensureStrictDirectory(resolvedMediaBasePath, resolvedMediaBasePath, false);
+    ensureStrictDirectoryCreated(resolvedMediaBasePath, path.resolve(resolvedMediaBasePath, ".."));
 
     const projectDir = path.resolve(resolvedMediaBasePath, projectId);
     const originalsDir = path.resolve(projectDir, "originals");
@@ -490,8 +490,111 @@ export async function processImage(
     }
 
     if (err instanceof SafeImageError) {
+      console.error("SAFE IMAGE ERROR THROWN:", err.message);
       throw err;
     }
+    console.error("UNKNOWN IMAGE ERROR THROWN:", err);
     throw new SafeImageError("Image processing failed due to an internal error.");
+  }
+}
+
+export function trashPhotoMedia(
+  projectId: string,
+  mediaBasePath: string,
+  photo: { id: string; originalFormat: string; variants: { name: string; fileId: string }[] }
+): void {
+  const resolvedMediaBasePath = path.resolve(mediaBasePath);
+  const projectDir = path.resolve(resolvedMediaBasePath, projectId);
+  const trashProjectDir = path.resolve(resolvedMediaBasePath, ".trash", projectId);
+  const trashPhotoDir = path.resolve(trashProjectDir, photo.id);
+
+  // Validate confinement
+  validateConfinement(projectDir, resolvedMediaBasePath);
+
+  ensureStrictDirectoryCreated(trashProjectDir, resolvedMediaBasePath);
+  ensureStrictDirectoryCreated(trashPhotoDir, resolvedMediaBasePath);
+
+  const movedPaths: { from: string; to: string }[] = [];
+
+  try {
+    // 1. Move original
+    const origFrom = path.resolve(projectDir, "originals", `${photo.id}.${photo.originalFormat}`);
+    const origTo = path.resolve(trashPhotoDir, `original.${photo.originalFormat}`);
+    if (fs.existsSync(origFrom)) {
+      validateConfinement(origFrom, resolvedMediaBasePath);
+      fs.renameSync(origFrom, origTo);
+      movedPaths.push({ from: origFrom, to: origTo });
+    }
+
+    // 2. Move variants
+    for (const variant of photo.variants) {
+      const varFrom = path.resolve(projectDir, variant.name, `${variant.fileId}.webp`);
+      const varTo = path.resolve(trashPhotoDir, `${variant.name}-${variant.fileId}.webp`);
+      if (fs.existsSync(varFrom)) {
+        validateConfinement(varFrom, resolvedMediaBasePath);
+        fs.renameSync(varFrom, varTo);
+        movedPaths.push({ from: varFrom, to: varTo });
+      }
+    }
+
+    // 3. Write manifest
+    const manifestPath = path.resolve(trashPhotoDir, "manifest.json");
+    fs.writeFileSync(manifestPath, JSON.stringify({
+      trashedAt: new Date().toISOString(),
+      photo
+    }, null, 2));
+
+  } catch {
+    // Rollback
+    for (const { from, to } of movedPaths.reverse()) {
+      if (fs.existsSync(to)) {
+        try { fs.renameSync(to, from); } catch { /* best effort */ }
+      }
+    }
+    throw new SafeImageError("Failed to trash photo media.");
+  }
+}
+
+export function restorePhotoMedia(
+  projectId: string,
+  mediaBasePath: string,
+  photo: { id: string; originalFormat: string; variants: { name: string; fileId: string }[] }
+): void {
+  const resolvedMediaBasePath = path.resolve(mediaBasePath);
+  const projectDir = path.resolve(resolvedMediaBasePath, projectId);
+  const trashProjectDir = path.resolve(resolvedMediaBasePath, ".trash", projectId);
+  const trashPhotoDir = path.resolve(trashProjectDir, photo.id);
+
+  if (!fs.existsSync(trashPhotoDir)) return;
+
+  const movedPaths: { from: string; to: string }[] = [];
+
+  try {
+    // 1. Restore original
+    const origFrom = path.resolve(trashPhotoDir, `original.${photo.originalFormat}`);
+    const origTo = path.resolve(projectDir, "originals", `${photo.id}.${photo.originalFormat}`);
+    if (fs.existsSync(origFrom)) {
+      fs.renameSync(origFrom, origTo);
+      movedPaths.push({ from: origFrom, to: origTo });
+    }
+
+    // 2. Restore variants
+    for (const variant of photo.variants) {
+      const varFrom = path.resolve(trashPhotoDir, `${variant.name}-${variant.fileId}.webp`);
+      const varTo = path.resolve(projectDir, variant.name, `${variant.fileId}.webp`);
+      if (fs.existsSync(varFrom)) {
+        fs.renameSync(varFrom, varTo);
+        movedPaths.push({ from: varFrom, to: varTo });
+      }
+    }
+
+  } catch {
+    // Rollback the restoration (put back in trash)
+    for (const { from, to } of movedPaths.reverse()) {
+      if (fs.existsSync(to)) {
+        try { fs.renameSync(to, from); } catch { /* best effort */ }
+      }
+    }
+    throw new SafeImageError("Failed to restore photo media.");
   }
 }

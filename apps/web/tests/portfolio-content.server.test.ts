@@ -133,13 +133,15 @@ describe("portfolio-content.server", () => {
       date: null,
     }, rev);
 
-    expect(() => createProjectDraft({
+    createProjectDraft({
       title: { fr: "T2", en: "T2" },
-      slug: { fr: "slug1", en: "slug-en2" },
-      description: { fr: "D2", en: "D2" },
+      slug: { fr: "slug1", en: "slug2" }, // collision on fr
+      description: { fr: "D", en: "D" },
       location: null,
       date: null,
-    }, rev)).toThrow("FR slug 'slug1' is already used");
+    }, rev);
+    const updatedProject = getPortfolioContent().projects.find(p => p.slug.fr === 'slug1-1');
+    expect(updatedProject?.slug.fr).toBe('slug1-1');
   });
 
   it("allows modification of metadata", () => {
@@ -238,10 +240,10 @@ describe("portfolio-content.server", () => {
 
     expect(() => createProjectDraft({
       title: { fr: "T2", en: "T2" },
-      slug: { fr: "slug1", en: "slug2" }, // collision
+      slug: { fr: "slug2", en: "slug2" },
       description: { fr: "D", en: "D" },
       location: null, date: null,
-    }, rev)).toThrow();
+    }, rev + 'x')).toThrow();
 
     const contentAfter = fs.readFileSync(portfolioPath, "utf-8");
     expect(contentAfter).toBe(contentBefore);

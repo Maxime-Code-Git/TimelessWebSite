@@ -695,11 +695,12 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       expect(fs.readdirSync(realMedia)).toEqual(["sentinel.txt"]);
     });
 
-    it("rejects if mediaBasePath does not exist", async () => {
+    it("creates mediaBasePath if it does not exist", async () => {
       const filePath = path.join(tempDir, "test.jpg");
       await createTestJpeg(100, 100, filePath);
-      await expect(processImage(filePath, tempDir, PROJECT_ID, path.join(tempDir, "nope"), "T", "R"))
-        .rejects.toThrow("Image processing failed due to an internal error.");
+      const res = await processImage(filePath, tempDir, PROJECT_ID, path.join(tempDir, "nope"), "T", "R");
+      expect(res.fileId).toBeTruthy();
+      expect(fs.existsSync(path.join(tempDir, "nope"))).toBe(true);
     });
 
     it("rejects if mediaBasePath is a file", async () => {

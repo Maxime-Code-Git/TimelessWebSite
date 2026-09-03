@@ -398,3 +398,45 @@
 .watermarkPreviewDark .watermarkPreviewText {
   color: #d1d5db;
 }
+.dragOver { opacity: 0.5; outline: 2px dashed #000; }
+
+.deleteButton {
+  padding: 0.25rem 0.5rem;
+  background-color: transparent;
+  color: #ef4444;
+  font-size: 0.875rem;
+  border: 1px solid #ef4444;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+.deleteButton:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.headerActions { display: flex; gap: 1rem; }
+.btnSuccess { background-color: #059669; }
+.btnSecondary { background-color: #6b7280; }
+.marginBottom { margin-bottom: 1rem; }
+.wideCard { max-width: 800px; }
+.marginTop { margin-top: 2rem; }
+.marginTopSmall { margin-top: 1rem; }
+.hidden { display: none; }
+.progressBarBg {
+  width: 100%;
+  background-color: #eee;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.progressBarFill {
+  background-color: #3b82f6;
+  height: 100%;
+}
+.progressText {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+.photoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
