@@ -1,4 +1,4 @@
-# Timeless — Photo & Video
+# Sempra — Photo & Video
 
 A premium wedding photography and videography studio based in Belgium.
 

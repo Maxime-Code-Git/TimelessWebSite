@@ -4,7 +4,7 @@
  *
  * Reads PUBLIC_SITE_URL from environment variables.
  * In production, this MUST be set — canonical, hreflang, OG and sitemap depend on it.
- * Example: PUBLIC_SITE_URL=https://timeless.be
+ * Example: PUBLIC_SITE_URL=https://sempra.be
  */
 
 let _warned = false;

@@ -5,9 +5,11 @@
 
 `references/page-accueil-reproduite/` — 7 fichiers `.dc.html`.
 
-Logo officiel : `references/logo-officiel.png`
-— Monogramme T + symbole infini doré + cercle d'horloge + "Sempra PHOTO & VIDEO".
-NE PAS utiliser `assets/logo-header.png` / `assets/logo-1.png` du ZIP.
+Logo officiel :
+- Symbole S géométrique
+- Wordmark SEMPRA
+- Variantes dans `References/Logo/Png` et `References/Logo/Svg`
+- Ressources Web utilisées dans `apps/web/public/brand`
 
 ---
 

@@ -84,27 +84,11 @@ test.describe('Rebranding and ScrollTop', () => {
     const btn = page.locator('button[aria-label="Back to top"]');
     await expect(btn).toHaveCount(1);
   });
-});
-
   test('ScrollTop respects reduced motion', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/fr/cgv');
     const scrollBtns = page.locator('button[aria-label="Retour en haut de page"]');
     await expect(scrollBtns).toHaveCount(1);
-
-    // Evaluate if the behavior is 'auto' (it's hard to test JS window.scrollTo args directly from outside,
-    // but we can mock it or check CSS).
-    // Playwright cannot easily mock window.scrollTo behavior, but we can intercept it inside page.
-    const isAuto = await page.evaluate(() => {
-      let behavior = 'smooth';
-      const originalScrollTo = window.scrollTo;
-      window.scrollTo = function(...args: any[]) {
-        const options = args[0];
-        if (options && typeof options === 'object' && options.behavior) behavior = options.behavior;
-        return originalScrollTo.apply(window, args as any);
-      };
-      return behavior;
-    });
 
     await page.setViewportSize({ width: 500, height: 300 });
     await page.mouse.wheel(0, 5000);
@@ -113,17 +97,26 @@ test.describe('Rebranding and ScrollTop', () => {
 
     // Setup the mock before clicking
     await page.evaluate(() => {
-      (window as any).__scrollBehavior = 'smooth';
-      const originalScrollTo = window.scrollTo;
-      window.scrollTo = function(...args: any[]) {
-        const options = args[0];
-        if (options && typeof options === 'object' && options.behavior) (window as any).__scrollBehavior = options.behavior;
+      interface TestWindow extends Window {
+        __scrollBehavior?: ScrollBehavior;
+      }
+      const testWindow = window as unknown as TestWindow;
+      testWindow.__scrollBehavior = 'smooth';
+      window.scrollTo = function(optionsOrX?: ScrollToOptions | number, _y?: number) {
+        if (typeof optionsOrX === 'object' && optionsOrX !== null && optionsOrX.behavior) {
+          testWindow.__scrollBehavior = optionsOrX.behavior;
+        }
       };
     });
 
     await btn.click();
 
-    const behavior = await page.evaluate(() => (window as any).__scrollBehavior);
+    const behavior = await page.evaluate(() => {
+      interface TestWindow extends Window {
+        __scrollBehavior?: ScrollBehavior;
+      }
+      return (window as unknown as TestWindow).__scrollBehavior;
+    });
     expect(behavior).toBe('auto');
   });
 
@@ -139,15 +132,26 @@ test.describe('Rebranding and ScrollTop', () => {
     await expect(btn).toHaveAttribute('aria-hidden', 'false');
 
     await page.evaluate(() => {
-      (window as any).__scrollBehavior = 'auto';
-      window.scrollTo = function(...args: any[]) {
-        const options = args[0];
-        if (options && typeof options === 'object' && options.behavior) (window as any).__scrollBehavior = options.behavior;
+      interface TestWindow extends Window {
+        __scrollBehavior?: ScrollBehavior;
+      }
+      const testWindow = window as unknown as TestWindow;
+      testWindow.__scrollBehavior = 'auto';
+      window.scrollTo = function(optionsOrX?: ScrollToOptions | number, _y?: number) {
+        if (typeof optionsOrX === 'object' && optionsOrX !== null && optionsOrX.behavior) {
+          testWindow.__scrollBehavior = optionsOrX.behavior;
+        }
       };
     });
 
     await btn.click();
 
-    const behavior = await page.evaluate(() => (window as any).__scrollBehavior);
+    const behavior = await page.evaluate(() => {
+      interface TestWindow extends Window {
+        __scrollBehavior?: ScrollBehavior;
+      }
+      return (window as unknown as TestWindow).__scrollBehavior;
+    });
     expect(behavior).toBe('smooth');
   });
+});

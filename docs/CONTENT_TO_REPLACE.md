@@ -120,9 +120,9 @@ Si une galerie de démonstration est souhaitée pour les futurs clients :
 
 ## NOTES SUR LE NOM DU STUDIO
 
-- Le nom commercial est : **Sempra** (avec descriptif « Photo & Video »)
-- « Sempra Memory » est le nom des FICHIERS DE RÉFÉRENCE uniquement
-- Aucune occurrence de « Sempra Memory » ne doit apparaître sur le site public
+- Marque active : **Sempra** (avec descriptif « Photo & Video »)
+- « Timeless Memory » subsiste uniquement dans les noms et contenus historiques de References/page-accueil-reproduite
+- Aucune occurrence de l'ancienne marque ne doit apparaître sur le site public
 - Vérification obligatoire avant publication via grep sur le bundle final
 
 ---
