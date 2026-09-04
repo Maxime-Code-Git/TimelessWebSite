@@ -18,10 +18,10 @@ export function Footer({ lang }: FooterProps) {
   return (
     <footer className={styles.footer}>
       {/* Logo */}
-      <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Timeless — Accueil">
+      <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Sempra — Accueil">
         <img
-          src="/logo-officiel.png"
-          alt="Timeless"
+          src="/brand/sempra_horizontal_ivory.svg"
+          alt="Sempra"
           className={styles.footerLogo}
           loading="lazy"
         />

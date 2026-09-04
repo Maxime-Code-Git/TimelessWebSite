@@ -4,7 +4,7 @@ import errorStyles from "../error.module.css";
 
 export function meta(_args: Route.MetaArgs) {
   return [
-    { title: "Page introuvable — Timeless Photo & Video" },
+    { title: "Page introuvable — Sempra Photo & Video" },
     { name: "robots", content: "noindex" },
   ];
 }

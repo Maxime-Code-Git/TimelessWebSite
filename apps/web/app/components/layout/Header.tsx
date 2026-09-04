@@ -58,10 +58,10 @@ export function Header({
 
   return (
     <header className={styles.header}>
-      <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Timeless — Accueil">
+      <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Sempra — Accueil">
         <img
-          src="/logo-officiel.png"
-          alt="Timeless"
+          src="/brand/sempra_horizontal_navy.svg"
+          alt="Sempra"
           className={isHome ? styles.logoLarge : styles.logoCompact}
         />
       </Link>

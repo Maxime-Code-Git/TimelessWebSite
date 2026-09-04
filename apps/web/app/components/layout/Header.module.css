@@ -4,21 +4,23 @@
   padding: 26px 20px 0;
 }
 
-/* Homepage: large logo 173×173 */
+/* Homepage: large logo */
 .logoLarge {
   display: block;
   margin-inline: auto;
-  height: 173px;
-  width: 173px;
+  height: auto;
+  width: 100%;
+  max-width: 360px;
   object-fit: contain;
 }
 
-/* Inner pages: compact logo h=96px */
+/* Inner pages: compact logo */
 .logoCompact {
   display: block;
   margin-inline: auto;
-  height: 96px;
-  width: auto;
+  height: auto;
+  width: 100%;
+  max-width: 220px;
   object-fit: contain;
 }
 

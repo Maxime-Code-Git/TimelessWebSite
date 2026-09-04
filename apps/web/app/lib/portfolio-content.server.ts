@@ -220,7 +220,7 @@ export interface PublicPortfolioProject {
 function createDefaultWatermark(globalUpdatedAt: string): WatermarkConfig {
   return {
     mode: "text" as const,
-    text: "Timeless",
+    text: "Sempra",
     revision: "00000000000000000000000000000000",
     updatedAt: globalUpdatedAt,
   };

@@ -2,7 +2,6 @@ import type { Route } from "./+types/fr.cgv";
 import { getSeoMeta } from "~/lib/seo";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
-import { ScrollTop } from "~/components/ui/ScrollTop";
 import { useRouteLoaderData } from "react-router";
 import type { loader as rootLoader } from "../root";
 import { STUDIO_NAME } from "~/lib/business-config";
@@ -13,8 +12,8 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "Conditions Générales de Vente — Timeless",
-    description: "Conditions Générales de Vente de Timeless.",
+    title: "Conditions Générales de Vente — Sempra",
+    description: "Conditions Générales de Vente de Sempra.",
     path: "/fr/cgv",
     alternatePath: "/en/terms",
     lang: "fr",

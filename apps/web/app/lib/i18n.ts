@@ -1,5 +1,5 @@
 /**
- * Internationalization dictionary for Timeless studio.
+ * Internationalization dictionary for Sempra studio.
  *
  * All user-facing strings are centralized here.
  * FR and EN must share the exact same structure.

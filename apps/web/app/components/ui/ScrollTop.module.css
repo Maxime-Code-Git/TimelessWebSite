@@ -14,15 +14,24 @@
   justify-content: center;
   cursor: pointer;
   opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
   transform: translateY(10px);
-  transition: opacity var(--transition-base), transform var(--transition-base);
+  transition: opacity var(--transition-base), transform var(--transition-base), visibility var(--transition-base);
   z-index: 100;
   backdrop-filter: blur(4px);
 }
 
 .scrollTop.visible {
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
   transform: translateY(0);
+}
+
+.scrollTop:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .scrollTop:hover {
@@ -33,4 +42,26 @@
 .scrollTop svg {
   width: 16px;
   height: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrollTop {
+    transition: none;
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .scrollTop {
+    width: 44px;
+    height: 44px;
+    bottom: 16px;
+    right: 16px;
+  }
+}
+
+@media print {
+  .scrollTop {
+    display: none;
+  }
 }

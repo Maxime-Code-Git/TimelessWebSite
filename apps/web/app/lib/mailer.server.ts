@@ -60,7 +60,7 @@ ${data.message}
       from: fromAddress,
       to: toAddress,
       replyTo: data.email, // Visitor's email is set as Reply-To
-      subject: "[Timeless] Nouvelle demande de contact",
+      subject: "[Sempra] Nouvelle demande de contact",
       text: textBody,
     });
 

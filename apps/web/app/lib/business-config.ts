@@ -1,5 +1,5 @@
 /**
- * Business configuration for Timeless studio.
+ * Business configuration for Sempra studio.
  *
  * In Phase 3B, these values are managed from the administration panel
  * and loaded via SSR from site-content.json.
@@ -7,7 +7,7 @@
  * Some fixed constants (like the studio name) remain here.
  */
 
-export const STUDIO_NAME = "Timeless";
+export const STUDIO_NAME = "Sempra";
 export const PHOTOGRAPHER_1_ROLE = "Photographe";
 export const PHOTOGRAPHER_2_ROLE = "Vidéaste";
 

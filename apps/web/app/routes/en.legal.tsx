@@ -2,7 +2,6 @@ import type { Route } from "./+types/en.legal";
 import { getSeoMeta } from "~/lib/seo";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
-import { ScrollTop } from "~/components/ui/ScrollTop";
 import { useRouteLoaderData } from "react-router";
 import type { loader as rootLoader } from "../root";
 import { STUDIO_NAME } from "~/lib/business-config";
@@ -13,8 +12,8 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "Legal Notice — Timeless",
-    description: "Legal notice for the Timeless website.",
+    title: "Legal Notice — Sempra",
+    description: "Legal notice for the Sempra website.",
     path: "/en/legal",
     alternatePath: "/fr/mentions-legales",
     lang: "en",

@@ -7,7 +7,7 @@ import styles from "./maintenance.module.css";
 
 export function meta() {
   return [
-    { title: "Maintenance — Timeless" },
+    { title: "Maintenance — Sempra" },
     { name: "description", content: "Le site est temporairement indisponible." },
     { name: "robots", content: "noindex, nofollow" },
   ];
@@ -19,11 +19,9 @@ export default function Maintenance() {
       <main className={styles.main}>
         <div className={styles.divider}></div>
         <img
-          src="/logo-officiel.png"
-          alt="Timeless"
+          src="/brand/sempra_horizontal_navy.svg"
+          alt="Sempra"
           className={styles.logo}
-          width={80}
-          height={80}
         />
         <h1 className={styles.title}>Site en maintenance</h1>
         <p className={styles.text}>

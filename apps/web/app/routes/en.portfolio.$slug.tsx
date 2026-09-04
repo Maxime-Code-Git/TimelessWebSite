@@ -17,10 +17,10 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
   const routeData = matches.at(-1)?.loaderData as ReturnType<typeof loader> | undefined;
   const project = routeData?.project;
-  if (!project) return [{ title: "Project not found — Timeless" }];
+  if (!project) return [{ title: "Project not found — Sempra" }];
 
   return getSeoMeta({
-    title: project.title.en + " — Timeless",
+    title: project.title.en + " — Sempra",
     description: project.description.en,
     path: "/en/portfolio/" + project.slug.en,
     alternatePath: "/fr/portfolio/" + project.slug.fr,

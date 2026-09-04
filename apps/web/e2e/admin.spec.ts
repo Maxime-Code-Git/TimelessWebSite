@@ -26,14 +26,14 @@ test.describe('Admin Login Flow (Phase 3A)', () => {
     await page.click('button[type="submit"]');
 
     // Should show dashboard
-    await expect(page.locator('h1')).toContainText('Administration Timeless');
+    await expect(page.locator('h1')).toContainText('Administration Sempra');
     await expect(page.getByText('Vous êtes connecté')).toBeVisible();
     await expect(page.getByText('Galeries clients')).toBeVisible();
     await expect(page.getByText('Fonctionnalité disponible prochainement')).toHaveCount(1);
 
     // Refreshing should keep the session
     await page.reload();
-    await expect(page.locator('h1')).toContainText('Administration Timeless');
+    await expect(page.locator('h1')).toContainText('Administration Sempra');
   });
 
   test('should logout successfully', async ({ page }) => {
@@ -41,7 +41,7 @@ test.describe('Admin Login Flow (Phase 3A)', () => {
     await page.goto('/admin');
     await page.fill('input[name="password"]', 'e2e_password');
     await page.click('button[type="submit"]');
-    await expect(page.locator('h1')).toContainText('Administration Timeless');
+    await expect(page.locator('h1')).toContainText('Administration Sempra');
 
     // Logout
     await page.click('button:has-text("Se déconnecter")');

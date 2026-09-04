@@ -7,7 +7,7 @@ export const FIXTURES = {
     "Chère Camille, cher Antoine,\n\nVoici le récit de votre journée. Nous espérons que ces images vous feront revivre chaque émotion avec la même intensité.",
   introEN:
     "Dear Camille, dear Antoine,\n\nHere is the story of your day. We hope these images will make you relive every emotion with the same intensity.",
-  signature: "— L'équipe Timeless",
+  signature: "— L'équipe Sempra",
   chapters: [
     {
       id: "prep",

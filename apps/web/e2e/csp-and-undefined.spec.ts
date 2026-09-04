@@ -51,7 +51,7 @@ test.describe('Technical Fidelity & CSP', () => {
     await page.goto('/admin');
     await page.fill('input[name="password"]', 'e2e_password');
     await page.click('button[type="submit"]');
-    await expect(page.locator('h1')).toContainText('Administration Timeless');
+    await expect(page.locator('h1')).toContainText('Administration Sempra');
 
     const adminPages = ['/admin/pricing', '/admin/settings'];
 

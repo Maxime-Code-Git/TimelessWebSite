@@ -286,7 +286,7 @@ describe("portfolio-content.server", () => {
             projects: [],
             watermark: {
               mode: "text",
-              text: "Timeless",
+              text: "Sempra",
               revision: "22222222222222222222222222222222",
               updatedAt: new Date().toISOString()
             }
@@ -306,7 +306,7 @@ describe("portfolio-content.server", () => {
       const contentAfter = JSON.parse(fs.readFileSync(portfolioPath, "utf-8"));
       // The concurrent write must be intact
       expect(contentAfter.revision).toBe("11111111111111111111111111111111");
-      expect(contentAfter.watermark.text).toBe("Timeless");
+      expect(contentAfter.watermark.text).toBe("Sempra");
 
       const backups = fs.readdirSync(tempDir).filter(f => f.startsWith("portfolio.json.backup"));
       expect(backups).toHaveLength(0);

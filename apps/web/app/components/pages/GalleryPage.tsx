@@ -38,7 +38,7 @@ export function GalleryPage({
       {/* Minimal Header */}
       <header className={styles.galleryHeader}>
         <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Retour à l'accueil">
-          <img src="/logo-officiel.png" alt="Timeless" className={styles.logo} />
+          <img src="/brand/sempra_horizontal_navy.svg" alt="Sempra" className={styles.logo} />
         </Link>
 
         <div className={styles.headerActions}>
@@ -108,8 +108,8 @@ export function GalleryPage({
 
       {/* Minimal Footer */}
       <footer className={styles.galleryFooter}>
-        <img src="/logo-officiel.png" alt="Timeless" className={styles.footerLogo} />
-        <p>&copy; {new Date().getFullYear()} Timeless. {lang === "fr" ? "Tous droits réservés." : "All rights reserved."}</p>
+        <img src="/brand/sempra_horizontal_navy.svg" alt="Sempra" className={styles.footerLogo} />
+        <p>&copy; {new Date().getFullYear()} Sempra. {lang === "fr" ? "Tous droits réservés." : "All rights reserved."}</p>
       </footer>
     </div>
   );

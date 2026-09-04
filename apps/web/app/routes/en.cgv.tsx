@@ -2,7 +2,6 @@ import type { Route } from "./+types/en.cgv";
 import { getSeoMeta } from "~/lib/seo";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
-import { ScrollTop } from "~/components/ui/ScrollTop";
 import { useRouteLoaderData } from "react-router";
 import type { loader as rootLoader } from "../root";
 import { STUDIO_NAME } from "~/lib/business-config";
@@ -13,8 +12,8 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "Terms and Conditions — Timeless",
-    description: "Terms and Conditions for the Timeless website.",
+    title: "Terms and Conditions — Sempra",
+    description: "Terms and Conditions for the Sempra website.",
     path: "/en/terms",
     alternatePath: "/fr/cgv",
     lang: "en",

@@ -1,5 +1,5 @@
 /**
- * Pricing configuration for Timeless studio.
+ * Pricing configuration for Sempra studio.
  *
  * In Phase 3B, these values are managed from the administration panel
  * and loaded via SSR from site-content.json.

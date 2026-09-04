@@ -7,7 +7,7 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "Pricing & Packages — Timeless",
+    title: "Pricing & Packages — Sempra",
     description: "Discover our wedding photography and film packages. One studio for your image: one vision, from the first meeting to delivery.",
     path: "/en/pricing",
     alternatePath: "/fr/formules",

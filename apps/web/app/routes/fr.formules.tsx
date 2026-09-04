@@ -7,7 +7,7 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "Formules & Tarifs — Timeless",
+    title: "Formules & Tarifs — Sempra",
     description: "Découvrez nos formules photo et vidéo de mariage. Un seul studio pour votre image : une même vision, du premier rendez-vous à la livraison.",
     path: "/fr/formules",
     alternatePath: "/en/pricing",

@@ -30,7 +30,7 @@ export function AboutPage({ lang }: AboutPageProps) {
             <div className={styles.personCard}>
               <div className={styles.personPhoto} />
               <h2 className={styles.personName}>
-                {lang === "fr" ? "L'équipe Timeless" : "The Timeless Team"}
+                {lang === "fr" ? "L'équipe Sempra" : "The Sempra Team"}
               </h2>
               <p className={styles.personRole}>{t.personRole1} & {t.personRole2}</p>
               <p className={styles.personBio}>

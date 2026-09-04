@@ -8,7 +8,7 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "Timeless — Photo & Vidéo de mariage en Belgique",
+    title: "Sempra — Photo & Vidéo de mariage en Belgique",
     description: "Studio de photographie et vidéo de mariage haut de gamme en Belgique. Deux regards, un seul studio — pour que votre journée reste éternelle.",
     path: "/fr/",
     alternatePath: "/en/",

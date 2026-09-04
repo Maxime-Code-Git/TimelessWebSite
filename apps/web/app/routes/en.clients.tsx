@@ -7,7 +7,7 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "Client area — Timeless",
+    title: "Client area — Sempra",
     description: "Access your private and secure gallery to retrieve your photos and film.",
     path: "/en/client-area",
     alternatePath: "/fr/espace-clients",

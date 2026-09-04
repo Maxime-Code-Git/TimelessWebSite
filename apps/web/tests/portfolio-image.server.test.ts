@@ -268,7 +268,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       expect(srcMeta.width).toBe(800);
       expect(srcMeta.height).toBe(600);
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       // Logical dimensions should be swapped: 600x800
       expect(result.originalWidth).toBe(600);
@@ -294,7 +294,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const filePath = path.join(tempDir, "small.jpg");
       await createTestJpeg(300, 200, filePath);
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       // Only 480p should be produced (at natural size since 300 < 480)
       expect(result.variants).toHaveLength(1);
@@ -307,7 +307,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const filePath = path.join(tempDir, "large.jpg");
       await createTestJpeg(3000, 2000, filePath);
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       expect(result.variants.length).toBe(4);
       const byName = new Map(result.variants.map(v => [v.name, v]));
@@ -334,7 +334,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const filePath = path.join(tempDir, "webptest.jpg");
       await createTestJpeg(1000, 800, filePath);
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       for (const variant of result.variants) {
         const variantPath = path.join(mediaDir, PROJECT_ID, variant.name, `${variant.fileId}.webp`);
@@ -351,7 +351,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       }).withMetadata({ exif: { IFD0: { Copyright: "Test" } } }).jpeg().toBuffer();
       fs.writeFileSync(filePath, buffer);
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       for (const variant of result.variants) {
         const variantPath = path.join(mediaDir, PROJECT_ID, variant.name, `${variant.fileId}.webp`);
@@ -366,7 +366,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const filePath = path.join(tempDir, "perms.jpg");
       await createTestJpeg(2000, 1500, filePath);
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       // Check original file
       const origPath = path.join(mediaDir, PROJECT_ID, "originals", `${result.fileId}.${result.originalFormat}`);
@@ -385,7 +385,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const filePath = path.join(tempDir, "dirperms.jpg");
       await createTestJpeg(2000, 1500, filePath);
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       const projectDir = path.join(mediaDir, PROJECT_ID);
       expect(fs.statSync(projectDir).mode & 0o777).toBe(0o700);
@@ -413,7 +413,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const pId1 = "00000000-0000-4000-8000-000000000001";
       const pId2 = "00000000-0000-4000-8000-000000000002";
 
-      const result1 = await processImage(filePath1, tempDir, pId1, mediaDir1, "Timeless", WM_REV);
+      const result1 = await processImage(filePath1, tempDir, pId1, mediaDir1, "Sempra", WM_REV);
       const result2 = await processImage(filePath2, tempDir, pId2, mediaDir2, "Different Mark", WM_REV);
 
       const variant1Path = path.join(mediaDir1, pId1, result1.variants[0].name, `${result1.variants[0].fileId}.webp`);
@@ -505,7 +505,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const filePath = path.join(tempDir, "rev.jpg");
       await createTestJpeg(800, 600, filePath);
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       expect(result.appliedWatermarkRevision).toBe(WM_REV);
     });
@@ -514,7 +514,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const filePath = path.join(tempDir, "meta.png");
       await createTestPng(1200, 900, filePath);
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       expect(result.originalFormat).toBe("png");
       expect(result.originalWidth).toBe(1200);
@@ -525,7 +525,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const filePath = path.join(tempDir, "nopath.jpg");
       await createTestJpeg(800, 600, filePath);
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       const resultJson = JSON.stringify(result);
       expect(resultJson).not.toContain(tempDir);
@@ -542,7 +542,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const filePath = path.join(tempDir, "regression.jpg");
       await createTestJpeg(501, 619, filePath);
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       expect(result.originalWidth).toBe(501);
       expect(result.originalHeight).toBe(619);
@@ -579,7 +579,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       // So logically it is 400x800 (portrait).
       await createTestJpeg(800, 400, filePath, { orientation: 6 });
 
-      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       // processImage swaps width/height during validation for orientation >= 5
       expect(result.originalWidth).toBe(400);

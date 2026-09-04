@@ -1,4 +1,5 @@
 import type { Route } from "./+types/root";
+import { ScrollTop } from "./components/ui/ScrollTop";
 import { data } from "react-router";
 import stylesheet from "./app.css?url";
 import {
@@ -40,13 +41,14 @@ export const links: Route.LinksFunction = () => [
     type: "font/woff2",
     crossOrigin: "anonymous" as const,
   })),
-  // Favicon (will be generated from logo)
-  { rel: "icon", href: "/favicon.ico" },
+  // Favicons
+  { rel: "icon", href: "/brand/sempra_symbol_navy.svg", type: "image/svg+xml" },
+  { rel: "apple-touch-icon", href: "/brand/SempraLogoBlue.png" },
 ];
 
 export function meta(_args: Route.MetaArgs) {
   return [
-    { title: "Timeless — Photo & Video de mariage en Belgique" },
+    { title: "Sempra — Photo & Video de mariage en Belgique" },
     {
       name: "description",
       content:
@@ -84,6 +86,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {lang === "en" ? "Skip to main content" : "Aller au contenu principal"}
         </a>
         {children}
+        <ScrollTop lang={lang} />
         <ScrollRestoration />
         <Scripts />
       </body>

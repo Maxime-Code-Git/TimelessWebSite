@@ -69,7 +69,7 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
     const portfolio = getPortfolioContent();
     expect(portfolio.watermark).toBeDefined();
     expect(portfolio.watermark.mode).toBe("text");
-    expect(portfolio.watermark.text).toBe("Timeless");
+    expect(portfolio.watermark.text).toBe("Sempra");
     expect(portfolio.watermark.revision).toBe("00000000000000000000000000000000");
     expect(portfolio.watermark.updatedAt).toBe("2026-01-01T00:00:00.000Z");
   });
@@ -90,9 +90,9 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
     expect(contentAfter).toBe(contentBefore);
   });
 
-  it("should return default Timeless watermark text", () => {
+  it("should return default Sempra watermark text", () => {
     const config = getWatermarkConfig();
-    expect(config.text).toBe("Timeless");
+    expect(config.text).toBe("Sempra");
     expect(config.mode).toBe("text");
   });
 
@@ -125,13 +125,13 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(initial));
 
-    updateWatermarkText("Timeless & Co", "aaaa0000bbbb1111cccc2222dddd3333");
+    updateWatermarkText("Sempra & Co", "aaaa0000bbbb1111cccc2222dddd3333");
 
     const rawJson = JSON.parse(fs.readFileSync(portfolioPath, "utf-8"));
-    expect(rawJson.watermark.text).toBe("Timeless & Co");
+    expect(rawJson.watermark.text).toBe("Sempra & Co");
 
     const portfolio = getPortfolioContent();
-    expect(portfolio.watermark.text).toBe("Timeless & Co");
+    expect(portfolio.watermark.text).toBe("Sempra & Co");
   });
 
   it("should trim text and store the cleaned version", () => {
@@ -261,7 +261,7 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
   });
 
   it("should accept valid special characters (ampersand, quotes)", () => {
-    expect(validateWatermarkText("Timeless & Co")).toBe("Timeless & Co");
+    expect(validateWatermarkText("Sempra & Co")).toBe("Sempra & Co");
     expect(validateWatermarkText("L'Atelier")).toBe("L'Atelier");
     expect(validateWatermarkText('Studio "Prestige"')).toBe('Studio "Prestige"');
   });

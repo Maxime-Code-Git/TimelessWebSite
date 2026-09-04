@@ -25,7 +25,7 @@ test.describe("Admin portfolio upload and publication", () => {
     if (await passwordInput.isVisible()) {
       await passwordInput.fill("e2e_password");
       await page.getByRole("button", { name: "Se connecter" }).click();
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Administration Timeless");
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Administration Sempra");
     }
 
     const uniqueId = `${Date.now()}${Math.floor(Math.random() * 1000)}`;

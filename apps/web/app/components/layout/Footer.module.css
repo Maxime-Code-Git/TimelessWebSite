@@ -7,8 +7,9 @@
 }
 
 .footerLogo {
-  height: 66px;
-  width: auto;
+  height: auto;
+  width: 100%;
+  max-width: 200px;
   margin: 0 auto 30px;
   opacity: 0.95;
   display: block;

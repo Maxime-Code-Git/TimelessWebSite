@@ -30,7 +30,7 @@ test.describe('Admin CSP and Styles', () => {
     await page.click('button[type="submit"]');
 
     // Wait for dashboard to load
-    await expect(page.locator('h1')).toContainText('Administration Timeless');
+    await expect(page.locator('h1')).toContainText('Administration Sempra');
     expect(await page.locator('[style]').count()).toBe(0);
 
     // 4. Verify Pricing Page

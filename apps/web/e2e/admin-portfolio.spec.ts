@@ -35,7 +35,7 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     if (await passwordInput.isVisible()) {
       await passwordInput.fill('e2e_password');
       await page.click('button[type="submit"]');
-      await expect(page.locator('h1')).toHaveText('Administration Timeless');
+      await expect(page.locator('h1')).toHaveText('Administration Sempra');
     }
   });
 
@@ -50,7 +50,7 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     await page.click('a[href="/admin/portfolio/watermark"]');
 
     await expect(page.locator('h1')).toHaveText('Filigrane du Portfolio');
-    await expect(page.locator('input[name="watermarkText"]')).toHaveValue('Timeless');
+    await expect(page.locator('input[name="watermarkText"]')).toHaveValue('Sempra');
 
     await page.fill('input[name="watermarkText"]', 'Mon Studio & Co');
     await page.click('button[type="submit"]');

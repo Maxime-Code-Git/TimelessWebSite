@@ -13,7 +13,7 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "Portfolio — Timeless",
+    title: "Portfolio — Sempra",
     description: "Discover our wedding photography and film portfolio. An honest look at your moments, captured as they are lived.",
     path: "/en/portfolio",
     alternatePath: "/fr/portfolio",

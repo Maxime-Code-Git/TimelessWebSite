@@ -7,7 +7,7 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "About us — Timeless",
+    title: "About us — Sempra",
     description: "Two perspectives, one standard: capturing your day with precision, so it comes back to you intact in thirty years.",
     path: "/en/about",
     alternatePath: "/fr/a-propos",

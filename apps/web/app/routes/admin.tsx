@@ -229,7 +229,7 @@ export default function AdminPage() {
       <div className={styles.container}>
         <header className={styles.header}>
           <div>
-            <h1 className={styles.headerTitle}>Administration Timeless</h1>
+            <h1 className={styles.headerTitle}>Administration Sempra</h1>
             <p className={styles.headerSubtitle}>Vous êtes connecté</p>
           </div>
           <Form method="post">

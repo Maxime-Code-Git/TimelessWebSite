@@ -1,7 +1,6 @@
 import type { Route } from "./+types/fr.legal";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
-import { ScrollTop } from "~/components/ui/ScrollTop";
 import { useRouteLoaderData } from "react-router";
 import type { loader as rootLoader } from "../root";
 import { STUDIO_NAME } from "~/lib/business-config";
@@ -14,8 +13,8 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "Mentions légales — Timeless",
-    description: "Mentions légales du site Timeless.",
+    title: "Mentions légales — Sempra",
+    description: "Mentions légales du site Sempra.",
     path: "/fr/mentions-legales",
     alternatePath: "/en/legal",
     lang: "fr",

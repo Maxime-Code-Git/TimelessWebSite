@@ -8,7 +8,7 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "Contact — Timeless",
+    title: "Contact — Sempra",
     description: "Écrivez-nous pour nous parler de votre projet de mariage. Nous prendrons le temps de vous répondre sous 48h.",
     path: "/fr/contact",
     alternatePath: "/en/contact",
