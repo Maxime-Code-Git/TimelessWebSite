@@ -35,6 +35,7 @@ test.describe('Rebranding and ScrollTop', () => {
 
     // Footer logo
     const footerLogo = page.locator('footer img[alt="Sempra"]').first();
+    await footerLogo.scrollIntoViewIfNeeded();
     await expect(footerLogo).toBeVisible();
     await expect(footerLogo).toHaveAttribute('src', '/brand/sempra_horizontal_ivory.svg');
     const footerLink = page.locator('footer a[aria-label="Sempra — Accueil"]').first();
@@ -58,9 +59,7 @@ test.describe('Rebranding and ScrollTop', () => {
     await expect(btn).toHaveCSS('pointer-events', 'none');
 
     // Scroll down
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForFunction(() => window.scrollY > 0);
-
+    await page.mouse.wheel(0, 5000);
     // Button should appear
     await expect(btn).toHaveAttribute('aria-hidden', 'false');
     await expect(btn).toHaveCSS('visibility', 'visible');
