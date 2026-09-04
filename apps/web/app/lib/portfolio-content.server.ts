@@ -1,3 +1,5 @@
+import { parseVideoUrl } from "./video";
+
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { z } from "zod";
@@ -90,7 +92,11 @@ export const projectSchema = z.object({
     const d = new Date(val);
     return !isNaN(d.getTime()) && d.toISOString().startsWith(val);
   }, "Invalid date format or impossible date"),
-  videoUrl: z.string().url().max(255).nullable().optional(),
+  videoUrl: z.any().optional(), // for backward compatibility during read
+  video: z.object({
+    provider: z.enum(["youtube", "vimeo"]),
+    videoId: z.string(),
+  }).nullable().optional(),
   status: z.enum(["draft", "published"]),
   order: z.number().int().min(0),
   coverPhotoId: z.string().uuid().nullable(),
@@ -119,6 +125,17 @@ export const projectSchema = z.object({
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Published project must have at least one photo", path: ["photos"] });
     }
   }
+}).transform(data => {
+  let video = data.video ?? null;
+  if (data.videoUrl !== undefined) {
+    if (typeof data.videoUrl === "string") {
+      video = parseVideoUrl(data.videoUrl);
+    }
+  }
+  if ("videoUrl" in data) {
+    delete data.videoUrl;
+  }
+  return { ...data, video };
 });
 
 export const watermarkConfigSchema = z.object({
@@ -183,7 +200,7 @@ export interface PublicPortfolioProject {
   description: Project["description"];
   location: string | null;
   date: string | null;
-  videoUrl?: string | null;
+  video: { provider: "youtube" | "vimeo"; videoId: string } | null;
   coverPhotoId: string;
   photos: PublicPortfolioPhoto[];
 }
@@ -253,7 +270,7 @@ function toPublicProject(project: Project): PublicPortfolioProject {
     description: project.description,
     location: project.location,
     date: project.date,
-    videoUrl: project.videoUrl,
+    video: project.video,
     coverPhotoId: project.coverPhotoId!,
     photos: project.photos.map(photo => ({
       id: photo.id,
@@ -265,6 +282,8 @@ function toPublicProject(project: Project): PublicPortfolioProject {
     })),
   };
 }
+
+
 
 export function getPublishedProjects(): PublicPortfolioProject[] {
   return getPortfolioContent().projects
@@ -422,7 +441,7 @@ export function generateUniqueSlug(baseSlug: string, existingSlugs: string[]): s
   return uniqueSlug;
 }
 
-export function createProjectDraft(data: Omit<Project, "id" | "createdAt" | "updatedAt" | "photos" | "order" | "status" | "coverPhotoId">, previousRevision: string): string {
+export function createProjectDraft(data: Omit<Project, "id" | "createdAt" | "updatedAt" | "photos" | "order" | "status" | "coverPhotoId" | "video"> & { video?: { provider: "youtube" | "vimeo"; videoId: string } | null }, previousRevision: string): string {
   const portfolio = getPortfolioContent();
   const nextOrder = portfolio.projects.length > 0 ? Math.max(...portfolio.projects.map(p => p.order)) + 1 : 0;
 
@@ -442,6 +461,7 @@ export function createProjectDraft(data: Omit<Project, "id" | "createdAt" | "upd
     order: nextOrder,
     status: "draft",
     coverPhotoId: null,
+    video: data.video ?? null,
   };
 
   checkSlugsUnique(portfolio.projects, newProject);
@@ -450,7 +470,7 @@ export function createProjectDraft(data: Omit<Project, "id" | "createdAt" | "upd
   return savePortfolio(portfolio, previousRevision);
 }
 
-export function updateProjectMetadata(projectId: string, data: Omit<Project, "id" | "createdAt" | "updatedAt" | "photos" | "coverPhotoId" | "order" | "status">, previousRevision: string): string {
+export function updateProjectMetadata(projectId: string, data: Omit<Project, "id" | "createdAt" | "updatedAt" | "photos" | "order" | "status" | "coverPhotoId" | "video"> & { video?: { provider: "youtube" | "vimeo"; videoId: string } | null }, previousRevision: string): string {
   const portfolio = getPortfolioContent();
   const index = portfolio.projects.findIndex(p => p.id === projectId);
   if (index === -1) throw new Error("Project not found");
@@ -465,6 +485,7 @@ export function updateProjectMetadata(projectId: string, data: Omit<Project, "id
   const updatedProject: Project = {
     ...portfolio.projects[index],
     ...data,
+    video: data.video !== undefined ? data.video : portfolio.projects[index].video,
     slug: { fr: slugFr, en: slugEn },
     updatedAt: new Date().toISOString(),
   };

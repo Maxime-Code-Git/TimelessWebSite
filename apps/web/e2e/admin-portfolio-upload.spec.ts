@@ -138,6 +138,7 @@ test.describe("Admin portfolio upload and publication", () => {
 
     await anonymousPage.goto("/fr/portfolio");
     await expect(anonymousPage.locator('a[href="#galerie-video"]')).toBeVisible();
+    await anonymousPage.locator('button[aria-label="Lire la vidéo"]').first().click();
     await expect(anonymousPage.locator('iframe[src*="player.vimeo.com/video/76979871"]')).toBeVisible();
     await expect(anonymousPage.getByRole("link", { name: updatedTitleFr })).toBeVisible();
     await anonymousPage.getByRole("link", { name: updatedTitleFr }).click();

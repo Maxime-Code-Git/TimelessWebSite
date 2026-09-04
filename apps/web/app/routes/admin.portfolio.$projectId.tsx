@@ -5,6 +5,7 @@ import {
 } from "react-router";
 import { Form, Link, useActionData, useLoaderData, useNavigation, useSubmit } from "react-router";
 import { assertPortfolioRevision, getProjectById, getPortfolioContent, updateProjectMetadata, publishProject, unpublishProject, setProjectCover, trashPhoto, updatePhotoMetadata, reorderProjectPhotos } from "../lib/portfolio-content.server";
+import { parseVideoUrl, getCanonicalVideoUrl } from "../lib/video";
 import type { Project } from "../lib/portfolio-content.server";
 import { requireValidAdminSession, validateAdminFormData, ActionSecurityError } from "../lib/admin-auth.server";
 import { RevisionConflictError, CorruptedContentError, ValidationError } from "../lib/site-content.server";
@@ -137,13 +138,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
         return Response.json({ error: "Missing required fields" }, { status: 422, headers });
       }
 
+      let video: { provider: "youtube" | "vimeo"; videoId: string } | null = null;
+      if (videoUrl?.trim()) {
+        const parsed = parseVideoUrl(videoUrl.trim());
+        if (!parsed) {
+          return Response.json({ fieldErrors: { videoUrl: "L'URL fournie n'est pas une vidéo YouTube ou Vimeo valide." } }, { status: 422, headers });
+        }
+        video = parsed;
+      }
+
       updateProjectMetadata(projectId, {
         title: { fr: titleFr, en: titleEn },
         slug: { fr: slugFr || "", en: slugEn || "" },
         description: { fr: descriptionFr, en: descriptionEn },
         location: location?.trim() ? location : null,
         date: date?.trim() ? date : null,
-        videoUrl: videoUrl?.trim() ? videoUrl : null,
+        video,
       }, previousRevision);
 
       return Response.json({ success: true }, { headers });
@@ -583,7 +593,7 @@ export default function AdminPortfolioEdit() {
 
             <div className={styles.marginBottom}>
               <label htmlFor="videoUrl" className={styles.label}>URL Vidéo (Optionnel, YouTube ou Vimeo)</label>
-              <input id="videoUrl" name="videoUrl" type="url" disabled={isReadOnly} defaultValue={project.videoUrl || ""} className={styles.input} placeholder="https://vimeo.com/... ou https://youtube.com/watch?v=..." />
+              <input id="videoUrl" name="videoUrl" type="url" disabled={isReadOnly} defaultValue={getCanonicalVideoUrl(project.video)} className={styles.input} placeholder="https://vimeo.com/... ou https://youtube.com/watch?v=..." />
               {actionData?.fieldErrors?.["videoUrl"] && <p className={styles.fieldError}>{actionData.fieldErrors["videoUrl"]}</p>}
             </div>
 

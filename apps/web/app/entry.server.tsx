@@ -61,6 +61,8 @@ function buildCsp(nonce: string): string {
     "form-action 'self'",
     // No plugins
     "object-src 'none'",
+    // Allowed iframes for videos
+    "frame-src https://www.youtube-nocookie.com https://player.vimeo.com",
   ];
   return directives.join("; ");
 }

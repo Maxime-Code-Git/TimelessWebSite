@@ -19,6 +19,7 @@ const makeProject = (
   description: { fr: "Description", en: "Description" },
   location: null,
   date: null,
+  video: null,
   coverPhotoId: "photo-" + id,
   photos: [{
     id: "photo-" + id,

@@ -110,8 +110,7 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
     await saveButton.scrollIntoViewIfNeeded();
 
     const savePromise = page.waitForResponse(r => r.url().includes('/admin/portfolio/') && r.request().method() === 'POST');
-    await saveButton.focus();
-    await page.keyboard.press('Enter');
+    await saveButton.press('Enter');
     await savePromise;
     await page.click('a:has-text("Retour")');
 

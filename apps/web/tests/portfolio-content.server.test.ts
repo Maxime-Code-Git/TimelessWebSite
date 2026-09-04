@@ -15,7 +15,9 @@ import {
   publishProject,
   getPublishedProjects,
   getPublishedProjectBySlug,
+  projectSchema,
 } from "../app/lib/portfolio-content.server";
+import { parseVideoUrl } from "../app/lib/video";
 
 import { vi } from "vitest";
 
@@ -445,6 +447,86 @@ describe("portfolio-content.server", () => {
       expect(getPublishedProjectBySlug("fr", "mariage-a-ath")?.id).toBe(project.id);
       expect(getPublishedProjectBySlug("en", "wedding-in-ath")?.id).toBe(project.id);
       expect(getPublishedProjectBySlug("fr", "../portfolio.json")).toBeUndefined();
+    });
+  });
+
+  describe("Parsing et migration des vidéos", () => {
+    it("parse correctement les URLs YouTube", () => {
+      expect(parseVideoUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
+      expect(parseVideoUrl("https://youtube.com/watch?v=dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
+      expect(parseVideoUrl("https://m.youtube.com/watch?v=dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
+      expect(parseVideoUrl("https://youtu.be/dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
+      expect(parseVideoUrl("https://www.youtube.com/embed/dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
+      expect(parseVideoUrl("https://www.youtube.com/shorts/dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
+    });
+
+    it("parse correctement les URLs Vimeo", () => {
+      expect(parseVideoUrl("https://vimeo.com/123456789")).toEqual({ provider: "vimeo", videoId: "123456789" });
+      expect(parseVideoUrl("https://www.vimeo.com/123456789")).toEqual({ provider: "vimeo", videoId: "123456789" });
+      expect(parseVideoUrl("https://player.vimeo.com/video/123456789")).toEqual({ provider: "vimeo", videoId: "123456789" });
+    });
+
+    it("rejette les faux domaines et URLs malveillantes", () => {
+      expect(parseVideoUrl("https://youtube.com.example.com/watch?v=dQw4w9WgXcQ")).toBeNull();
+      expect(parseVideoUrl("https://evil-youtube.com/watch?v=dQw4w9WgXcQ")).toBeNull();
+      expect(parseVideoUrl("https://vimeo.com.example.com/123456789")).toBeNull();
+      expect(parseVideoUrl("https://evilvimeo.com/123456789")).toBeNull();
+      expect(parseVideoUrl("https://dailymotion.com/video/x123")).toBeNull();
+    });
+
+    it("rejette les formats invalides (HTTP, sans ID, identifiants utilisateur)", () => {
+      expect(parseVideoUrl("http://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBeNull();
+      expect(parseVideoUrl("https://www.youtube.com/watch?v=SHORT")).toBeNull(); // ID trop court (< 11)
+      expect(parseVideoUrl("https://www.youtube.com/watch")).toBeNull();
+      expect(parseVideoUrl("https://vimeo.com/abcde")).toBeNull(); // non numérique
+      expect(parseVideoUrl("https://user:pass@www.youtube.com/watch?v=dQw4w9WgXcQ")).toBeNull();
+    });
+
+    it("migre un ancien videoUrl valide vers video et supprime videoUrl", () => {
+      const parsed = projectSchema.safeParse({
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: { fr: "AAA", en: "AAA" },
+        slug: { fr: "aaa", en: "aaa" },
+        description: { fr: "AAA", en: "AAA" },
+        location: null,
+        date: null,
+        status: "draft",
+        order: 0,
+        coverPhotoId: null,
+        photos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        videoUrl: "https://vimeo.com/123456789"
+      });
+      if (!parsed.success) {
+        console.error("MIGRATION ERROR", parsed.error);
+      }
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.video).toEqual({ provider: "vimeo", videoId: "123456789" });
+        expect(parsed.data).not.toHaveProperty("videoUrl");
+      }
+    });
+
+    it("normalise l'absence de vidéo en video: null", () => {
+      const parsed = projectSchema.safeParse({
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: { fr: "AAA", en: "AAA" },
+        slug: { fr: "aaa", en: "aaa" },
+        description: { fr: "AAA", en: "AAA" },
+        location: null,
+        date: null,
+        status: "draft",
+        order: 0,
+        coverPhotoId: null,
+        photos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z"
+      });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.video).toBeNull();
+      }
     });
   });
 });

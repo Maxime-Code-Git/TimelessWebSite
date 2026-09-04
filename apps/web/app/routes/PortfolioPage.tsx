@@ -29,22 +29,59 @@ export function getPublicPhotoSrcSet(projectId: string, photo: PublicPortfolioPh
     .join(", ");
 }
 
-export function getVideoEmbedUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtube.com") || u.hostname.includes("youtu.be")) {
-      const videoId = u.hostname.includes("youtu.be") ? u.pathname.slice(1) : u.searchParams.get("v");
-      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
-    }
-    if (u.hostname.includes("vimeo.com")) {
-      const match = u.pathname.match(/\/(\d+)/);
-      return match ? `https://player.vimeo.com/video/${match[1]}` : null;
-    }
-  } catch {
-    return null;
-  }
+export function getVideoEmbedUrl(video: { provider: "youtube" | "vimeo"; videoId: string } | null | undefined): string | null {
+  if (!video) return null;
+  if (video.provider === "youtube") return `https://www.youtube-nocookie.com/embed/${video.videoId}`;
+  if (video.provider === "vimeo") return `https://player.vimeo.com/video/${video.videoId}`;
   return null;
+}
+
+function VideoPlayer({ project, lang }: { project: PublicPortfolioProject; lang: Lang }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const embedUrl = getVideoEmbedUrl(project.video)!;
+  const cover = project.photos.find(photo => photo.id === project.coverPhotoId)!;
+
+  return (
+    <div>
+      <h3 className={styles.videoItemTitle}>{project.title[lang]}</h3>
+      <div className={styles.videoPlayerWrap}>
+        {!isPlaying ? (
+          <>
+            <img
+              src={getPublicPhotoUrl(project.id, cover)}
+              srcSet={getPublicPhotoSrcSet(project.id, cover)}
+              sizes="(max-width: 760px) 100vw, 760px"
+              width={cover.width}
+              height={cover.height}
+              alt={cover.alt[lang]}
+              className={styles.videoElement}
+              loading="lazy"
+              decoding="async"
+            />
+            <button
+              type="button"
+              className={styles.videoPlayBtn}
+              onClick={() => setIsPlaying(true)}
+              aria-label={lang === "fr" ? "Lire la vidéo" : "Play video"}
+            >
+              ▶
+            </button>
+          </>
+        ) : (
+          <iframe
+            src={`${embedUrl}?autoplay=1`}
+            title={project.title[lang]}
+            className={styles.videoIframe}
+            frameBorder="0"
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          ></iframe>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
@@ -63,7 +100,7 @@ export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
     activeFilter === "all" || project.photos.some(photo => photo.category === activeFilter)
   ));
 
-  const projectsWithVideo = projects.filter(p => getVideoEmbedUrl(p.videoUrl));
+  const projectsWithVideo = projects.filter(p => p.video !== null && p.video !== undefined);
   const hasVideos = projectsWithVideo.length > 0;
 
   return (
@@ -154,25 +191,10 @@ export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
           <section id="galerie-video" className={styles.videoSection}>
             <p className={styles.videoEyebrow}>{t.videoEyebrow}</p>
             <h2 className={styles.videoTitle}>{t.videoTitle}</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "56px" }}>
-              {projectsWithVideo.map(project => {
-                const embedUrl = getVideoEmbedUrl(project.videoUrl)!;
-                return (
-                  <div key={project.id}>
-                    <h3 style={{ color: "var(--ivory)", fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: "20px", marginBottom: "20px" }}>{project.title[lang]}</h3>
-                    <div className={styles.videoPlayerWrap}>
-                      <iframe
-                        src={embedUrl}
-                        title={project.title[lang]}
-                        frameBorder="0"
-                        allow="autoplay; fullscreen; picture-in-picture"
-                        allowFullScreen
-                        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}
-                      ></iframe>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className={styles.videoList}>
+              {projectsWithVideo.map(project => (
+                <VideoPlayer key={project.id} project={project} lang={lang} />
+              ))}
             </div>
           </section>
         )}
