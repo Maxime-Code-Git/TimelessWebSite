@@ -63,6 +63,10 @@ async function parseSingleUpload(
     resolveParser = resolve;
     rejectParser = reject;
   });
+  // Busboy can reject while the Fetch reader is still awaiting its next chunk.
+  // Attach a handler immediately so Node never treats that short window as an
+  // unhandled rejection; the original promise is still awaited below.
+  void parserDone.catch(() => undefined);
 
   const parser = busboy({
     headers: { "content-type": contentType },
@@ -167,6 +171,7 @@ async function parseSingleUpload(
     parser.destroy();
     stopActiveWrite();
     await waitForFileWrite();
+    await parserDone.catch(() => undefined);
     throw error;
   } finally {
     reader.releaseLock();

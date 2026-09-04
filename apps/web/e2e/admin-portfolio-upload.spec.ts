@@ -1,18 +1,17 @@
 import { expect, test } from "@playwright/test";
+import crypto from "node:crypto";
 import sharp from "sharp";
 
 test.describe("Admin portfolio upload and publication", () => {
   let validJpegBuffer: Buffer;
 
   test.beforeAll(async () => {
-    validJpegBuffer = await sharp({
-      create: {
-        width: 10,
-        height: 10,
-        channels: 3,
-        background: { r: 255, g: 0, b: 0 },
-      },
-    }).jpeg().toBuffer();
+    const width = 800;
+    const height = 600;
+    const pixels = crypto.randomBytes(width * height * 3);
+    validJpegBuffer = await sharp(pixels, {
+      raw: { width, height, channels: 3 },
+    }).jpeg({ quality: 90 }).toBuffer();
   });
 
   test("manages photos and exposes only a published project", async ({ page }) => {

@@ -184,6 +184,31 @@ describe("admin-portfolio-upload-http.test.ts", () => {
     expect(json.error).toMatch(/Unsupported image type/i);
   });
 
+  it("returns a controlled 400 response for a truncated multipart upload", async () => {
+    const { cookie, csrfToken } = await getValidCookieAndCsrf();
+    const boundary = "------TruncatedBoundary" + Date.now();
+    const contentType = "multipart/form-data; boundary=" + boundary;
+    const body = Buffer.from(
+      `--${boundary}\r\n` +
+      'Content-Disposition: form-data; name="file"; filename="partial.jpg"\r\n' +
+      "Content-Type: image/jpeg\r\n\r\n" +
+      "partial-image-without-closing-boundary"
+    );
+    const req = createRequest({
+      method: "POST",
+      cookie,
+      csrfToken,
+      origin: "http://localhost",
+      contentType,
+      body,
+      revision: "a".repeat(32),
+    });
+
+    const res = await action(createActionArgs(req));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "Upload stream failed." });
+  });
+
 
 
   it("rolls back files if JSON update fails", async () => {

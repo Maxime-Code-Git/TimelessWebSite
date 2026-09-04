@@ -282,9 +282,11 @@ function DraggablePhoto({
 export default function AdminPortfolioEdit() {
   const { project, csrfToken, revision: loaderRevision } = useLoaderData() as unknown as { project: Project; csrfToken: string; revision: string };
   const [localRevision, setLocalRevision] = useState(loaderRevision);
+  const revisionRef = useRef(loaderRevision);
 
   // Sync localRevision if loader data changes
   useEffect(() => {
+    revisionRef.current = loaderRevision;
     setLocalRevision(loaderRevision);
   }, [loaderRevision]);
   const actionData = useActionData<{ error?: string, fieldErrors?: Record<string, string>, success?: boolean }>();
@@ -311,9 +313,14 @@ export default function AdminPortfolioEdit() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const isReadOnly = project.status === "published";
+  const currentUploadFile = uploadQueue[0] ?? null;
 
   const handleFiles = (files: FileList | File[] | null) => {
     if (!files) return;
+    if (uploading || uploadQueue.length > 0) {
+      alert("Un lot est déjà en cours d'envoi.");
+      return;
+    }
     const toAdd = Array.from(files).filter(f => ["image/jpeg", "image/png", "image/webp"].includes(f.type));
     if (uploadQueue.length + toAdd.length > 20) {
       alert("Maximum 20 fichiers par lot.");
@@ -328,9 +335,9 @@ export default function AdminPortfolioEdit() {
   };
 
   useEffect(() => {
-    if (uploading || uploadQueue.length === 0 || navigation.state !== "idle" || uploadError) return;
+    if (!currentUploadFile || navigation.state !== "idle" || uploadError) return;
 
-    const file = uploadQueue[0];
+    const file = currentUploadFile;
     setUploading(true);
     setUploadProgress({ percentage: 0, status: "uploading" });
 
@@ -341,7 +348,7 @@ export default function AdminPortfolioEdit() {
     xhrRef.current = xhr;
     xhr.open("POST", `/admin/portfolio/${project.id}/upload`, true);
     xhr.setRequestHeader("x-csrf-token", csrfToken);
-    xhr.setRequestHeader("x-portfolio-revision", localRevision);
+    xhr.setRequestHeader("x-portfolio-revision", revisionRef.current);
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -359,7 +366,10 @@ export default function AdminPortfolioEdit() {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const json = JSON.parse(xhr.responseText);
-          if (json.newRevision) setLocalRevision(json.newRevision);
+          if (typeof json.newRevision === "string") {
+            revisionRef.current = json.newRevision;
+            setLocalRevision(json.newRevision);
+          }
         } catch {
           // ignore parse errors
         }
@@ -386,6 +396,7 @@ export default function AdminPortfolioEdit() {
 
     xhr.onabort = () => {
       if (xhrRef.current === xhr) xhrRef.current = null;
+      setUploading(false);
     };
 
     xhr.send(formData);
@@ -395,7 +406,7 @@ export default function AdminPortfolioEdit() {
         xhr.abort();
       }
     };
-  }, [uploadQueue, uploading, csrfToken, localRevision, project.id, submit, navigation.state]);
+  }, [currentUploadFile, csrfToken, project.id, submit, navigation.state, uploadError]);
 
   const handleReorder = (fromIndex: number, toIndex: number) => {
     const ids = project.photos.map((p: Project["photos"][0]) => p.id);
@@ -605,7 +616,12 @@ export default function AdminPortfolioEdit() {
               ref={fileInputRef}
               className={styles.hidden}
             />
-            <button type="button" onClick={() => fileInputRef.current?.click()} className={styles.secondaryButton}>
+            <button
+              type="button"
+              disabled={uploading || uploadQueue.length > 0}
+              onClick={() => fileInputRef.current?.click()}
+              className={styles.secondaryButton}
+            >
               Sélectionner des photos (max 20)
             </button>
             <p className={styles.helpText}>ou glissez vos images JPEG, PNG ou WebP ici</p>
