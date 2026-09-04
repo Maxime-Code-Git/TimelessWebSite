@@ -94,10 +94,11 @@ test.describe("Admin portfolio upload and publication", () => {
     const anonymousAdminMediaResponse = await anonymousPage.goto(new URL(firstAdminImageUrl!, page.url()).toString());
     expect(anonymousAdminMediaResponse?.status()).toBe(401);
 
-    await expect(photoCards.filter({ has: page.getByText("Couverture", { exact: true }) })).toHaveCount(1);
+    const coverBadge = page.locator("span").filter({ hasText: /^Couverture$/ });
+    await expect(photoCards.filter({ has: coverBadge })).toHaveCount(1);
     const secondPhotoUrl = await adminImages.nth(1).getAttribute("src");
     await photoCards.nth(1).getByRole("button", { name: "Couverture" }).click();
-    const coverCard = photoCards.filter({ has: page.getByText("Couverture", { exact: true }) });
+    const coverCard = photoCards.filter({ has: coverBadge });
     await expect(coverCard.locator("img")).toHaveAttribute("src", secondPhotoUrl!);
 
     const firstPhotoCard = photoCards.nth(0);
@@ -173,7 +174,7 @@ test.describe("Admin portfolio upload and publication", () => {
       coverWarning = dialog.message();
       await dialog.accept();
     });
-    await currentCards.filter({ has: page.getByText("Couverture", { exact: true }) })
+    await currentCards.filter({ has: coverBadge })
       .getByRole("button", { name: "Supprimer" }).click();
     expect(coverWarning).toContain("Impossible de supprimer la photo de couverture");
 
