@@ -1,17 +1,177 @@
 import { type ActionFunctionArgs } from "react-router";
-import { requireValidAdminSession } from "../lib/admin-auth.server";
-import { validateOrigin } from "../lib/security.server";
-import { addPhotoToProject, getPortfolioMediaPath, getWatermarkConfig, getProjectById } from "../lib/portfolio-content.server";
-import { RevisionConflictError } from "../lib/site-content.server";
-import { processImage, SafeImageError } from "../lib/portfolio-image.server";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
+import { once } from "node:events";
+import { finished } from "node:stream/promises";
 import busboy from "busboy";
-import { Readable } from "node:stream";
+import { requireValidAdminSession } from "../lib/admin-auth.server";
+import { validateOrigin } from "../lib/security.server";
+import {
+  addPhotoToProject,
+  assertPortfolioRevision,
+  getPortfolioMediaPath,
+  getWatermarkConfig,
+  getProjectById,
+} from "../lib/portfolio-content.server";
+import {
+  CorruptedContentError,
+  RevisionConflictError,
+  ValidationError,
+} from "../lib/site-content.server";
+import {
+  processImage,
+  removeProcessedImage,
+  SafeImageError,
+} from "../lib/portfolio-image.server";
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MiB
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+class UploadRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "UploadRequestError";
+  }
+}
+
+function jsonError(message: string, status: number): Response {
+  return Response.json({ error: message }, {
+    status,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
+async function parseSingleUpload(
+  request: Request,
+  contentType: string,
+  tempDirectory: string
+): Promise<string> {
+  if (!request.body) throw new UploadRequestError("Upload body is missing.", 400);
+
+  const reader = request.body.getReader();
+  let activeWriteStream: fs.WriteStream | null = null;
+  let fileWritePromise: Promise<void> | null = null;
+  let uploadedFilePath: string | null = null;
+  let fileCount = 0;
+  let settled = false;
+  let resolveParser!: () => void;
+  let rejectParser!: (error: Error) => void;
+
+  const parserDone = new Promise<void>((resolve, reject) => {
+    resolveParser = resolve;
+    rejectParser = reject;
+  });
+
+  const parser = busboy({
+    headers: { "content-type": contentType },
+    limits: {
+      files: 1,
+      fields: 0,
+      parts: 2,
+      fileSize: MAX_FILE_SIZE,
+    },
+  });
+
+  const fail = (error: Error) => {
+    if (settled) return;
+    settled = true;
+    activeWriteStream?.destroy();
+    rejectParser(error);
+  };
+
+  const stopActiveWrite = () => activeWriteStream?.destroy();
+  const waitForFileWrite = async () => {
+    if (fileWritePromise) await fileWritePromise.catch(() => undefined);
+  };
+
+  parser.on("file", (fieldName, file, info) => {
+    fileCount += 1;
+    if (fieldName !== "file" || fileCount !== 1) {
+      file.resume();
+      fail(new UploadRequestError("The upload must contain exactly one file.", 400));
+      return;
+    }
+    if (!allowedMimeTypes.has(info.mimeType)) {
+      file.resume();
+      fail(new UploadRequestError("Unsupported image type.", 415));
+      return;
+    }
+
+    const tempPath = path.join(tempDirectory, crypto.randomUUID());
+    activeWriteStream = fs.createWriteStream(tempPath, {
+      flags: "wx",
+      mode: 0o600,
+    });
+
+    file.on("limit", () => {
+      fail(new UploadRequestError("File too large.", 413));
+    });
+    file.on("error", () => {
+      fail(new UploadRequestError("Upload stream failed.", 400));
+    });
+    activeWriteStream.on("error", () => {
+      fail(new UploadRequestError("Upload storage failed.", 500));
+    });
+
+    const currentWriteStream = activeWriteStream;
+    fileWritePromise = finished(currentWriteStream).then(() => {
+      uploadedFilePath = tempPath;
+      activeWriteStream = null;
+    });
+    void fileWritePromise.catch(error => {
+      fail(error instanceof UploadRequestError
+        ? error
+        : new UploadRequestError("Upload storage failed.", 500));
+    });
+    file.pipe(currentWriteStream);
+  });
+
+  parser.on("partsLimit", () => fail(new UploadRequestError("Too many upload parts.", 400)));
+  parser.on("filesLimit", () => fail(new UploadRequestError("Too many files.", 400)));
+  parser.on("fieldsLimit", () => fail(new UploadRequestError("Unexpected form fields.", 400)));
+  parser.on("error", () => fail(new UploadRequestError("Invalid multipart body.", 400)));
+  parser.on("close", () => {
+    void (async () => {
+      try {
+        if (fileWritePromise) await fileWritePromise;
+        if (fileCount !== 1 || !uploadedFilePath) {
+          throw new UploadRequestError("The upload must contain exactly one file.", 400);
+        }
+        if (!settled) {
+          settled = true;
+          resolveParser();
+        }
+      } catch (error: unknown) {
+        fail(error instanceof Error
+          ? error
+          : new UploadRequestError("Upload failed.", 400));
+      }
+    })();
+  });
+
+  try {
+    while (!settled) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!parser.write(Buffer.from(value))) {
+        await Promise.race([once(parser, "drain"), parserDone]);
+      }
+    }
+    if (!settled) parser.end();
+    await parserDone;
+    return uploadedFilePath!;
+  } catch (error: unknown) {
+    await reader.cancel().catch(() => undefined);
+    parser.destroy();
+    stopActiveWrite();
+    await waitForFileWrite();
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+}
 
 export async function loader() {
   return new Response(null, { status: 405, headers: { Allow: "POST" } });
@@ -22,222 +182,97 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return new Response(null, { status: 405, headers: { Allow: "POST" } });
   }
 
-  // 1. Session admin and POST
   const session = await requireValidAdminSession(request);
+  if (!validateOrigin(request)) return jsonError("Forbidden", 403);
 
-  // 2. Strict Origin check
-  if (!validateOrigin(request)) {
-    return new Response("Forbidden", { status: 403 });
-  }
-
-  // 3. CSRF Validation via custom header
   const csrfToken = request.headers.get("x-csrf-token");
   if (!csrfToken || csrfToken !== session.get("csrfToken")) {
-    return new Response("Forbidden", { status: 403 });
+    return jsonError("Forbidden", 403);
   }
 
-  // 4. Content-Type Validation
-  const contentType = request.headers.get("Content-Type") || "";
-  if (!contentType.toLowerCase().startsWith("multipart/form-data") || !contentType.includes("boundary=")) {
-    return new Response("Unsupported Media Type", { status: 415 });
+  const contentType = request.headers.get("Content-Type") ?? "";
+  if (!/^multipart\/form-data\s*;[^\r\n]*boundary=/i.test(contentType)) {
+    return jsonError("Unsupported Media Type", 415);
   }
 
   const projectId = params.projectId;
   if (!projectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
-    return new Response("Not Found", { status: 404 });
+    return jsonError("Not Found", 404);
   }
 
   const previousRevision = request.headers.get("x-portfolio-revision");
-  if (!previousRevision) {
-    return new Response(JSON.stringify({ error: "Missing revision" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  if (!previousRevision || !/^[0-9a-f]{32}$/.test(previousRevision)) {
+    return jsonError("Invalid revision", 400);
+  }
+
+  try {
+    assertPortfolioRevision(previousRevision);
+  } catch (error: unknown) {
+    if (error instanceof RevisionConflictError || error instanceof CorruptedContentError) {
+      return jsonError("Revision conflict", 409);
+    }
+    return jsonError("Internal Server Error", 500);
   }
 
   const project = getProjectById(projectId);
-  if (!project) {
-    return new Response("Not Found", { status: 404 });
-  }
+  if (!project) return jsonError("Not Found", 404);
   if (project.status === "published") {
-    return new Response(JSON.stringify({ error: "Cannot upload to a published project" }), { status: 422, headers: { "Content-Type": "application/json" } });
+    return jsonError("Unpublish this project before adding photos.", 422);
   }
 
-  let tmpDir: string;
+  let tempDirectory: string | null = null;
   try {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-portfolio-upload-"));
-    fs.chmodSync(tmpDir, 0o700);
-  } catch (err) {
-    return new Response("Internal Server Error", { status: 500 });
-  }
+    tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-portfolio-upload-"));
+    fs.chmodSync(tempDirectory, 0o700);
 
-  try {
-    let uploadedFilePath: string | null = null;
-    let fileCount = 0;
-
-    await new Promise<void>((resolve, reject) => {
-      let isAborted = false;
-      const bb = busboy({ headers: { "content-type": contentType }, limits: { files: 1, fields: 0, parts: 1, fileSize: MAX_FILE_SIZE } });
-      const filePromises: Promise<void>[] = [];
-      let activeStream: fs.WriteStream | null = null;
-
-      bb.on("file", (name, file, _info) => {
-        if (name !== "file") {
-          file.resume();
-          return reject(new Error("Unexpected field"));
-        }
-
-        const mime = _info.mimeType;
-        if (mime !== "image/jpeg" && mime !== "image/png" && mime !== "image/webp") {
-          file.resume();
-          return reject(new Error("Unsupported file type"));
-        }
-
-        fileCount++;
-        if (fileCount > 1) {
-          file.resume();
-          return reject(new Error("Too many files per request"));
-        }
-
-        const tmpPath = path.join(tmpDir, crypto.randomUUID());
-        let fd: number;
-        try {
-          fd = fs.openSync(tmpPath, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL, 0o600);
-        } catch (err) {
-          file.resume();
-          return reject(new Error("Failed to create temp file"));
-        }
-
-        const writeStream = fs.createWriteStream("", { fd });
-        activeStream = writeStream;
-
-        const filePromise = new Promise<void>((fileResolve, fileReject) => {
-          file.on("limit", () => {
-            if (activeStream) {
-              activeStream.destroy();
-              activeStream = null;
-            }
-            fileReject(new Error("File too large"));
-          });
-
-          writeStream.on("finish", () => {
-            if (!isAborted) uploadedFilePath = tmpPath;
-            activeStream = null;
-            fileResolve();
-          });
-
-          writeStream.on("error", (err) => {
-            activeStream = null;
-            fileReject(new Error("Stream write error"));
-          });
-        });
-
-        filePromises.push(filePromise);
-        file.pipe(writeStream);
-      });
-
-      bb.on("partsLimit", () => reject(new Error("Too many parts")));
-      bb.on("filesLimit", () => reject(new Error("Too many files")));
-      bb.on("fieldsLimit", () => reject(new Error("Too many fields")));
-
-      bb.on("error", (err) => {
-        isAborted = true;
-        if (activeStream) activeStream.destroy();
-        reject(new Error("Busboy error"));
-      });
-
-      bb.on("close", () => {
-        Promise.all(filePromises).then(() => resolve()).catch(reject);
-      });
-
-      if (!request.body) return reject(new Error("No body"));
-
-      const reader = request.body.getReader();
-      const stream = new Readable({
-        async read() {
-          try {
-            const { done, value } = await reader.read();
-            if (done) {
-              this.push(null);
-            } else {
-              this.push(Buffer.from(value));
-            }
-          } catch (err) {
-            isAborted = true;
-            this.destroy(err as Error);
-          }
-        }
-      });
-
-      stream.on("error", (err) => {
-        isAborted = true;
-        reject(new Error("Readable stream error"));
-      });
-
-      stream.pipe(bb);
-    });
-
-    if (!uploadedFilePath || !fs.existsSync(uploadedFilePath)) {
-      return new Response(JSON.stringify({ error: "File missing or failed" }), { status: 400, headers: { "Content-Type": "application/json" } });
-    }
-
-    let processResult;
-    try {
-      const watermark = getWatermarkConfig();
-      processResult = await processImage(
-        uploadedFilePath,
-        tmpDir,
-        projectId,
-        getPortfolioMediaPath(),
-        watermark.text,
-        watermark.revision
-      );
-    } catch (err: unknown) {
-      if (err instanceof SafeImageError) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 422, headers: { "Content-Type": "application/json" } });
-      }
-      return new Response("Internal Server Error", { status: 500 });
-    }
+    const uploadedFilePath = await parseSingleUpload(request, contentType, tempDirectory);
+    const watermark = getWatermarkConfig();
+    const processed = await processImage(
+      uploadedFilePath,
+      tempDirectory,
+      projectId,
+      getPortfolioMediaPath(),
+      watermark.text,
+      watermark.revision
+    );
 
     try {
       const result = addPhotoToProject(projectId, {
-        fileId: processResult.fileId,
-        originalFormat: processResult.originalFormat,
-        originalWidth: processResult.originalWidth,
-        originalHeight: processResult.originalHeight,
+        fileId: processed.fileId,
+        originalFormat: processed.originalFormat,
+        originalWidth: processed.originalWidth,
+        originalHeight: processed.originalHeight,
         category: "ceremony",
         alt: { fr: "À définir", en: "To be defined" },
-        variants: processResult.variants,
-        appliedWatermarkRevision: processResult.appliedWatermarkRevision,
+        variants: processed.variants,
+        appliedWatermarkRevision: processed.appliedWatermarkRevision,
         processedAt: new Date().toISOString(),
       }, previousRevision);
 
-      return new Response(JSON.stringify({ success: true, newRevision: result.newRevision, photoId: result.newPhotoId }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    } catch (err: unknown) {
+      return Response.json({
+        success: true,
+        newRevision: result.newRevision,
+        photoId: result.newPhotoId,
+      }, { headers: { "Cache-Control": "no-store" } });
+    } catch (error: unknown) {
       try {
-        const originalPath = path.join(getPortfolioMediaPath(), projectId, "originals", `${processResult.fileId}.${processResult.originalFormat}`);
-        if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath);
-      } catch { /* ignore */ }
-
-      for (const variant of processResult.variants) {
-        const variantPath = path.join(getPortfolioMediaPath(), projectId, variant.name, `${variant.fileId}.webp`);
-        try { if (fs.existsSync(variantPath)) fs.unlinkSync(variantPath); } catch { /* ignore */ }
+        removeProcessedImage(projectId, getPortfolioMediaPath(), processed);
+      } catch {
+        return jsonError("Generated media cleanup failed.", 500);
       }
-
-      if (err instanceof RevisionConflictError) {
-        return new Response(JSON.stringify({ error: "Revision conflict" }), { status: 409, headers: { "Content-Type": "application/json" } });
+      if (error instanceof RevisionConflictError || error instanceof CorruptedContentError) {
+        return jsonError("Revision conflict", 409);
       }
-      return new Response(JSON.stringify({ error: "Validation error" }), { status: 422, headers: { "Content-Type": "application/json" } });
+      if (error instanceof ValidationError) return jsonError(error.message, 422);
+      return jsonError("Internal Server Error", 500);
     }
-
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Upload failed";
-    const status = message === "File too large" ? 413 : 400;
-    const errorMsg = message === "File too large" ? message : "Upload failed";
-    return new Response(JSON.stringify({ error: errorMsg }), { status, headers: { "Content-Type": "application/json" } });
+  } catch (error: unknown) {
+    if (error instanceof UploadRequestError) return jsonError(error.message, error.status);
+    if (error instanceof SafeImageError) return jsonError(error.message, 422);
+    return jsonError("Internal Server Error", 500);
   } finally {
-    try {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    } catch { /* ignore */ }
+    if (tempDirectory) {
+      try { fs.rmSync(tempDirectory, { recursive: true, force: true }); } catch { /* best-effort */ }
+    }
   }
 }

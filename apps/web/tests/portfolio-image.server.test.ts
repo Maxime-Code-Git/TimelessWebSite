@@ -65,7 +65,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       await createTestJpeg(800, 600, filePath);
 
       const result = await validateImageFile(filePath, tempDir);
-      expect(result.format).toBe("jpg");
+      expect(result.format).toBe("jpeg");
       expect(result.width).toBe(800);
       expect(result.height).toBe(600);
     });
@@ -276,7 +276,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
 
       // Original file should be byte-identical to source (SHA-256)
       const srcHash = crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
-      const origPath = path.join(mediaDir, PROJECT_ID, "originals", `${result.fileId}.jpg`);
+      const origPath = path.join(mediaDir, PROJECT_ID, "originals", `${result.fileId}.jpeg`);
       const origHash = crypto.createHash("sha256").update(fs.readFileSync(origPath)).digest("hex");
       expect(origHash).toBe(srcHash);
 

@@ -1,8 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
 import { processContactAction } from '../app/lib/contact.server';
+import { closeRateLimitDatabase } from '../app/lib/rate-limit.server';
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+const TEST_DIRECTORY = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-contact-test-"));
+const TEST_DB = path.join(TEST_DIRECTORY, "rate-limit.db");
+process.env.CONTACT_TEST_RATE_LIMIT_DB_PATH = TEST_DB;
 
 vi.mock("../app/lib/env.server", () => {
   return {
@@ -10,7 +17,9 @@ vi.mock("../app/lib/env.server", () => {
       PUBLIC_SITE_URL: "http://localhost:4173",
       TRUST_PROXY: true,
       CONTACT_RATE_LIMIT_SECRET: "test-secret",
-      RATE_LIMIT_DB_PATH: "./tests/rate-limit.test.db",
+      get RATE_LIMIT_DB_PATH() {
+        return process.env.CONTACT_TEST_RATE_LIMIT_DB_PATH!;
+      },
       SMTP_HOST: "localhost",
       SMTP_PORT: 2525,
       SMTP_USER: "test",
@@ -30,8 +39,13 @@ vi.mock("../app/lib/mailer.server", () => {
 });
 
 describe('Contact Server Logic', () => {
-  const TEST_DB = "./tests/rate-limit.test.db";
   let consoleSpy: MockInstance;
+
+  afterAll(() => {
+    closeRateLimitDatabase();
+    fs.rmSync(TEST_DIRECTORY, { recursive: true, force: true });
+    delete process.env.CONTACT_TEST_RATE_LIMIT_DB_PATH;
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();

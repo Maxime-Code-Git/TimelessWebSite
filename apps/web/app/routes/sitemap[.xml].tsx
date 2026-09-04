@@ -4,6 +4,8 @@
  * Returns 503 when PUBLIC_SITE_URL is not configured (production misconfiguration).
  * Only public pages are included — private areas (gallery, client-area) are excluded.
  */
+import { getPublishedProjects } from "../lib/portfolio-content.server";
+
 export async function loader() {
   const siteUrl = process.env.PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "";
 
@@ -33,9 +35,30 @@ export async function loader() {
     { loc: "/en/contact", changefreq: "monthly", priority: "0.9" },
   ];
 
+  let publishedProjects;
+  try {
+    publishedProjects = getPublishedProjects();
+  } catch {
+    return new Response(
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- sitemap temporarily unavailable -->",
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/xml; charset=utf-8",
+          "Retry-After": "3600",
+        },
+      }
+    );
+  }
+
+  const projectRoutes = publishedProjects.flatMap(project => [
+    { loc: `/fr/portfolio/${project.slug.fr}`, changefreq: "monthly", priority: "0.7" },
+    { loc: `/en/portfolio/${project.slug.en}`, changefreq: "monthly", priority: "0.7" },
+  ]);
+
   const today = new Date().toISOString().split("T")[0];
 
-  const urlEntries = PUBLIC_ROUTES.map(
+  const urlEntries = [...PUBLIC_ROUTES, ...projectRoutes].map(
     ({ loc, changefreq, priority }) => `
   <url>
     <loc>${siteUrl}${loc}</loc>

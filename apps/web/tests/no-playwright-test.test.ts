@@ -1,14 +1,23 @@
 import { expect, test } from "vitest";
-import { execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 
 test("no PLAYWRIGHT_TEST in apps/web/app", () => {
-  try {
-    const output = execSync("grep -r 'PLAYWRIGHT_TEST' apps/web/app || true", {
-      encoding: "utf-8",
-    });
-    // The grep command returns the matched lines. We expect it to be empty.
-    expect(output.trim()).toBe("");
-  } catch {
-    // If grep fails, it means no match was found (which is good)
+  const appDirectory = path.resolve(__dirname, "../app");
+  const pendingDirectories = [appDirectory];
+  const matchingFiles: string[] = [];
+
+  while (pendingDirectories.length > 0) {
+    const directory = pendingDirectories.pop()!;
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const entryPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        pendingDirectories.push(entryPath);
+      } else if (entry.isFile() && fs.readFileSync(entryPath, "utf8").includes("PLAYWRIGHT_TEST")) {
+        matchingFiles.push(path.relative(appDirectory, entryPath));
+      }
+    }
   }
+
+  expect(matchingFiles).toEqual([]);
 });

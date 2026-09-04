@@ -9,11 +9,13 @@ export default [
   route("robots.txt", "routes/robots[.txt].tsx"),
   route("sitemap.xml", "routes/sitemap[.xml].tsx"),
   route("maintenance", "routes/maintenance.tsx"),
+  route("portfolio/media/:projectId/:photoId/:variant", "routes/portfolio.media.$projectId.$photoId.$variant.tsx"),
 
   // ── French routes ─────────────────────────────────────────
   ...prefix("fr", [
     index("routes/fr._index.tsx"),
     route("portfolio", "routes/fr.portfolio.tsx"),
+    route("portfolio/:slug", "routes/fr.portfolio.$slug.tsx"),
     route("formules", "routes/fr.formules.tsx"),
     route("a-propos", "routes/fr.about.tsx"),
     route("contact", "routes/fr.contact.tsx"),
@@ -28,6 +30,7 @@ export default [
   ...prefix("en", [
     index("routes/en._index.tsx"),
     route("portfolio", "routes/en.portfolio.tsx"),
+    route("portfolio/:slug", "routes/en.portfolio.$slug.tsx"),
     route("pricing", "routes/en.pricing.tsx"),
     route("about", "routes/en.about.tsx"),
     route("contact", "routes/en.contact.tsx"),

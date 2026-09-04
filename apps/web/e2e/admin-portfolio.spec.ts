@@ -120,7 +120,7 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
 
     // 5. Aperçu authentifié
     await page.locator('a:has-text("Aperçu")').first().click();
-    await expect(page.locator('h1')).toHaveText('Aperçu du Projet (Brouillon)');
+    await expect(page.locator('h1')).toHaveText('Aperçu du Projet');
     const res = await page.request.get(page.url());
     expect(res.headers()['cache-control']).toContain('no-store');
     expect(res.headers()['x-robots-tag']).toContain('noindex, nofollow');

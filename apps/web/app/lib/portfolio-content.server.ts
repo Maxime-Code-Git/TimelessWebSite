@@ -56,14 +56,16 @@ export const photoSchema = z.object({
     fr: textSchema,
     en: textSchema,
   }).strict(),
-  variants: z.array(variantResultSchema),
+  variants: z.array(variantResultSchema).min(1, "At least one image variant is required"),
   appliedWatermarkRevision: z.string().regex(revisionHexRegex, "Invalid watermark revision format"),
   processedAt: z.string().refine(val => {
     if (!isoDateRegex.test(val)) return false;
     const d = new Date(val);
     return !isNaN(d.getTime()) && d.toISOString() === val;
   }, "Must be valid ISO with ms"),
-}).strict().refine(p => new Set(p.variants.map(v => v.name)).size === p.variants.length, "Duplicate variants");
+}).strict()
+  .refine(p => new Set(p.variants.map(v => v.name)).size === p.variants.length, "Duplicate variants")
+  .refine(p => p.variants.some(v => v.name === "480p"), "A 480p variant is required");
 
 export type Photo = z.infer<typeof photoSchema>;
 
@@ -164,6 +166,26 @@ export const portfolioSchema = z.object({
 export type Portfolio = z.infer<typeof portfolioSchema>;
 export type Project = z.infer<typeof projectSchema>;
 
+export interface PublicPortfolioPhoto {
+  id: string;
+  category: Photo["category"];
+  alt: Photo["alt"];
+  width: number;
+  height: number;
+  variants: Array<Pick<Photo["variants"][number], "name" | "width" | "height">>;
+}
+
+export interface PublicPortfolioProject {
+  id: string;
+  slug: Project["slug"];
+  title: Project["title"];
+  description: Project["description"];
+  location: string | null;
+  date: string | null;
+  coverPhotoId: string;
+  photos: PublicPortfolioPhoto[];
+}
+
 function createDefaultWatermark(globalUpdatedAt: string): WatermarkConfig {
   return {
     mode: "text" as const,
@@ -199,12 +221,10 @@ export function getRawPortfolioContent(): { content: Portfolio; isCorrupted: boo
         };
         return { content: portfolio, isCorrupted: false };
       } else {
-        console.error("VALIDATION FAILED", JSON.stringify(validated.error.issues, null, 2));
         return { content: createDefaultPortfolio(), isCorrupted: true };
       }
     }
-  } catch (err) {
-    console.error("CATCH ERROR", err);
+  } catch {
     return { content: createDefaultPortfolio(), isCorrupted: true };
   }
   return { content: createDefaultPortfolio(), isCorrupted: false };
@@ -221,6 +241,56 @@ export function getPortfolioContent(): Portfolio {
 export function getProjectById(projectId: string): Project | undefined {
   const portfolio = getPortfolioContent();
   return portfolio.projects.find(p => p.id === projectId);
+}
+
+function toPublicProject(project: Project): PublicPortfolioProject {
+  return {
+    id: project.id,
+    slug: project.slug,
+    title: project.title,
+    description: project.description,
+    location: project.location,
+    date: project.date,
+    coverPhotoId: project.coverPhotoId!,
+    photos: project.photos.map(photo => ({
+      id: photo.id,
+      category: photo.category,
+      alt: photo.alt,
+      width: photo.originalWidth,
+      height: photo.originalHeight,
+      variants: photo.variants.map(({ name, width, height }) => ({ name, width, height })),
+    })),
+  };
+}
+
+export function getPublishedProjects(): PublicPortfolioProject[] {
+  return getPortfolioContent().projects
+    .filter((project): project is Project & { coverPhotoId: string } => (
+      project.status === "published" &&
+      project.coverPhotoId !== null &&
+      project.photos.some(photo => photo.id === project.coverPhotoId)
+    ))
+    .sort((a, b) => a.order - b.order)
+    .map(toPublicProject);
+}
+
+export function getPublishedProjectBySlug(
+  lang: "fr" | "en",
+  slug: string
+): PublicPortfolioProject | undefined {
+  if (!slugRegex.test(slug) || slug.length > 100) return undefined;
+  return getPublishedProjects().find(project => project.slug[lang] === slug);
+}
+
+export function assertPortfolioRevision(previousRevision: string): void {
+  const current = getRawPortfolioContent();
+  if (current.isCorrupted) throw new CorruptedContentError();
+  if (
+    fs.existsSync(getPortfolioContentPath()) &&
+    current.content.revision !== previousRevision
+  ) {
+    throw new RevisionConflictError();
+  }
 }
 
 export function getWatermarkConfig(): WatermarkConfig {
@@ -246,7 +316,6 @@ function savePortfolio(portfolio: Portfolio, previousRevision: string) {
     throw new CorruptedContentError();
   }
   if (current.content.revision !== previousRevision && fs.existsSync(getPortfolioContentPath())) {
-    console.error("REVISION CONFLICT! current:", current.content.revision, "previous:", previousRevision);
     throw new RevisionConflictError();
   }
 

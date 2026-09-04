@@ -35,8 +35,8 @@ export default function AdminPortfolioPreview() {
     <div className={styles.container}>
       <header className={styles.header}>
         <div>
-          <h1 className={styles.headerTitle}>Aperçu du Projet (Brouillon)</h1>
-          <p className={styles.headerSubtitle}>Vérifiez les métadonnées</p>
+          <h1 className={styles.headerTitle}>Aperçu du Projet</h1>
+          <p className={styles.headerSubtitle}>Vérifiez les textes et les photos</p>
         </div>
         <Link to="/admin/portfolio" className={`${styles.logoutButton} ${styles.noDecoration}`}>
           Retour
@@ -46,7 +46,7 @@ export default function AdminPortfolioPreview() {
         <div className={styles.dashboardCard}>
           <div className={styles.previewWarning}>
             <p><strong>Attention :</strong> Ceci est un aperçu sécurisé. Le projet n'est pas visible par le public s'il est en brouillon.</p>
-            <p>Aucune photo n'est encore disponible dans ce projet (fonctionnalité prévue dans la prochaine phase).</p>
+            <p>{project.photos.length} photo(s) dans ce projet.</p>
           </div>
 
           <div className={styles.previewGrid}>
@@ -73,6 +73,30 @@ export default function AdminPortfolioPreview() {
             <p><strong>Date :</strong> {project.date || "Non spécifiée"}</p>
             <p><strong>Statut :</strong> {project.status}</p>
           </div>
+
+          {project.photos.length > 0 && (
+            <div className={`${styles.photoGrid} ${styles.mt8}`}>
+              {project.photos.map(photo => (
+                <figure key={photo.id} className={styles.photoCard}>
+                  <img
+                    src={`/admin/portfolio/media/${project.id}/${photo.id}/480p`}
+                    alt={photo.alt.fr}
+                    className={styles.photoImg}
+                  />
+                  <figcaption className={styles.photoMeta}>
+                    {photo.category} — {photo.alt.fr}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
+
+          {project.status === "published" && (
+            <div className={`${styles.projectActions} ${styles.mt8}`}>
+              <Link to={`/fr/portfolio/${project.slug.fr}`} className={styles.actionButton}>Voir la page FR</Link>
+              <Link to={`/en/portfolio/${project.slug.en}`} className={styles.actionButton}>Voir la page EN</Link>
+            </div>
+          )}
         </div>
       </main>
     </div>

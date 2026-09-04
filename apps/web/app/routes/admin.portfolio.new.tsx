@@ -108,8 +108,8 @@ export default function AdminPortfolioNew() {
     return slug;
   };
 
-  const derivedSlugFr = isCustomSlug ? slugFr : generateSlug(titleFr);
-  const derivedSlugEn = isCustomSlug ? slugEn : generateSlug(titleEn);
+  const derivedSlugFr = generateSlug(isCustomSlug ? slugFr : titleFr);
+  const derivedSlugEn = generateSlug(isCustomSlug ? slugEn : titleEn);
 
   return (
     <div className={styles.container}>
@@ -144,6 +144,7 @@ export default function AdminPortfolioNew() {
             <div className={styles.slugPreview}>
               <p><strong>Aperçu URL (FR):</strong> /fr/portfolio/{derivedSlugFr || "..."}</p>
               <p><strong>Aperçu URL (EN):</strong> /en/portfolio/{derivedSlugEn || "..."}</p>
+              <p className={styles.helpText}>Les majuscules, accents et espaces sont corrigés automatiquement.</p>
               {!isCustomSlug && (
                 <button type="button" onClick={() => {
                   setSlugFr(derivedSlugFr);

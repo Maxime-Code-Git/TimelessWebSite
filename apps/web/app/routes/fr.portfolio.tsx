@@ -1,6 +1,12 @@
 import type { Route } from "./+types/fr.portfolio";
+import { useLoaderData } from "react-router";
 import { getSeoMeta } from "~/lib/seo";
+import { getPublishedProjects } from "~/lib/portfolio-content.server";
 import { PortfolioPage } from "./PortfolioPage";
+
+export function loader() {
+  return { projects: getPublishedProjects() };
+}
 
 export function meta({ matches }: Route.MetaArgs) {
   const rootData = matches.find((m) => m?.id === "root")?.loaderData as { PUBLIC_SITE_URL?: string } | undefined;
@@ -18,5 +24,6 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function PortfolioFr() {
-  return <PortfolioPage lang="fr" />;
+  const { projects } = useLoaderData<typeof loader>();
+  return <PortfolioPage lang="fr" projects={projects} />;
 }

@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
-import sharp from 'sharp';
+import { expect, test } from "@playwright/test";
+import sharp from "sharp";
 
-test.describe('Admin Portfolio Upload and Publish (Phase 3C.2B)', () => {
+test.describe("Admin portfolio upload and publication", () => {
   let validJpegBuffer: Buffer;
 
   test.beforeAll(async () => {
@@ -10,202 +10,178 @@ test.describe('Admin Portfolio Upload and Publish (Phase 3C.2B)', () => {
         width: 10,
         height: 10,
         channels: 3,
-        background: { r: 255, g: 0, b: 0 }
-      }
+        background: { r: 255, g: 0, b: 0 },
+      },
     }).jpeg().toBuffer();
   });
 
-  test('should completely manage project with uploads, media route, and publication', async ({ page }) => {
-    test.setTimeout(60000); // Allow more time for uploads
+  test("manages photos and exposes only a published project", async ({ page }) => {
+    test.setTimeout(90_000);
 
-    page.on('console', msg => console.log(`BROWSER CONSOLE: ${msg.type()} - ${msg.text()}`));
-    page.on('pageerror', error => console.log(`BROWSER ERROR: ${error.message}`));
+    const pageErrors: string[] = [];
+    page.on("pageerror", error => pageErrors.push(error.message));
 
-    // 1. Login
-    await page.goto('/admin');
+    await page.goto("/admin");
     const passwordInput = page.locator('input[name="password"]');
     if (await passwordInput.isVisible()) {
-      await passwordInput.fill('e2e_password');
-      await page.click('button:has-text("Se connecter")');
-      await expect(page.locator('h1')).toHaveText('Administration Timeless');
+      await passwordInput.fill("e2e_password");
+      await page.getByRole("button", { name: "Se connecter" }).click();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Administration Timeless");
     }
 
-    const uniqueId = Date.now().toString() + Math.floor(Math.random() * 1000);
+    const uniqueId = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
     const titleFr = `Projet Complet FR ${uniqueId}`;
     const titleEn = `Complete Project EN ${uniqueId}`;
+    const updatedTitleFr = `${titleFr} Modifié`;
+    const slugFr = `projet-complet-fr-${uniqueId}`;
+    const slugEn = `complete-project-en-${uniqueId}`;
 
-    // 2. Create a project with auto-slug
-    await page.click('a[href="/admin/portfolio"]');
-    await page.click('a[href="/admin/portfolio/new"]');
+    await page.locator('a[href="/admin/portfolio"]').click();
+    await page.locator('a[href="/admin/portfolio/new"]').click();
     await page.fill('input[name="titleFr"]', titleFr);
     await page.fill('input[name="titleEn"]', titleEn);
-    await page.fill('textarea[name="descriptionFr"]', 'Desc FR complète');
-    await page.fill('textarea[name="descriptionEn"]', 'Desc EN complète');
-    await page.click('button[type="submit"]');
+    await page.fill('textarea[name="descriptionFr"]', "Desc FR complète");
+    await page.fill('textarea[name="descriptionEn"]', "Complete EN description");
+    await expect(page.getByText(`/fr/portfolio/${slugFr}`, { exact: false })).toBeVisible();
+    await expect(page.getByText(`/en/portfolio/${slugEn}`, { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "Créer le brouillon" }).click();
 
-    await expect(page).toHaveURL('/admin/portfolio');
-    await expect(page.locator('h3', { hasText: `${titleFr} / ${titleEn}` }).first()).toBeVisible();
+    await expect(page).toHaveURL("/admin/portfolio");
+    const dashboardCard = page.locator("li", {
+      has: page.getByRole("heading", { name: `${titleFr} / ${titleEn}` }),
+    });
+    await dashboardCard.getByRole("link", { name: "Modifier" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Modifier le Projet");
 
-    // 3. Enter edit mode
-    const projectCard1 = page.locator('div', { has: page.locator('h3', { hasText: `${titleFr} / ${titleEn}` }) }).first();
-    await projectCard1.locator('a:has-text("Modifier")').first().click();
-    await expect(page.locator('h1')).toHaveText('Modifier le Projet');
-
-    // Test 405 on upload route with real HTTP requests
-    const uploadUrl = page.url() + '/upload';
-    for (const method of ['get', 'put', 'patch', 'delete'] as const) {
-      const resp = await page.request[method](uploadUrl);
-      expect(resp.status()).toBe(405);
-      expect(resp.headers()['allow']).toBe('POST');
+    const uploadUrl = `${page.url()}/upload`;
+    for (const method of ["get", "put", "patch", "delete"] as const) {
+      const response = await page.request[method](uploadUrl);
+      expect(response.status()).toBe(405);
+      expect(response.headers().allow).toBe("POST");
     }
 
-    // Ensure "Publier le projet" button is disabled
-    const publishBtn = page.locator('button:has-text("Publier le projet")');
-    await expect(publishBtn).toBeDisabled();
+    const publishButton = page.getByRole("button", { name: "Publier le projet" });
+    await expect(publishButton).toBeDisabled();
 
-    // 4. Generate two valid images in memory and use setInputFiles
-    // In our UI, there is an input[type="file"] ref that is hidden, triggered by a button.
-    const fileChooserPromise = page.waitForEvent('filechooser');
-    await page.click('button:has-text("Sélectionner des photos")');
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: /Sélectionner des photos/ }).click();
     const fileChooser = await fileChooserPromise;
-
     await fileChooser.setFiles([
-      { name: 'photo1.jpg', mimeType: 'image/jpeg', buffer: validJpegBuffer },
-      { name: 'photo2.jpg', mimeType: 'image/jpeg', buffer: validJpegBuffer },
+      { name: "photo1.jpg", mimeType: "image/jpeg", buffer: validJpegBuffer },
+      { name: "photo2.jpg", mimeType: "image/jpeg", buffer: validJpegBuffer },
     ]);
 
-    // Wait for processing to finish (we should see two "Modifier" buttons indicating two photos were added)
-    // Wait for processing to finish (we should see two "Modifier" buttons indicating two photos were added, OR an error)
-    await expect(
-      page.locator('button:has-text("Modifier")').first().or(page.locator('div[class*="error"] p').first())
-    ).toBeVisible({ timeout: 10000 });
+    const photoCards = page.locator('div[class*="photoCard"]');
+    await expect(photoCards).toHaveCount(2, { timeout: 30_000 });
+    await expect(page.locator('div[class*="error"]')).toHaveCount(0);
 
-    const errorToast = page.locator('div[class*="error"] p');
-    if (await errorToast.count() > 0) {
-      console.log("UPLOAD UI ERROR:", await errorToast.first().textContent());
-      throw new Error("Upload failed: " + await errorToast.first().textContent());
-    }
+    const adminImages = page.locator('img[src*="/admin/portfolio/media/"]');
+    await expect(adminImages).toHaveCount(2);
+    const firstAdminImageUrl = await adminImages.first().getAttribute("src");
+    expect(firstAdminImageUrl).not.toBeNull();
 
-    await expect(page.locator('button:has-text("Modifier")')).toHaveCount(2);
+    const adminMediaResponse = await page.request.get(firstAdminImageUrl!);
+    expect(adminMediaResponse.status()).toBe(200);
+    expect(adminMediaResponse.headers()["content-type"]).toBe("image/webp");
+    expect(adminMediaResponse.headers()["cache-control"]).toBe("no-store, max-age=0");
+    expect(adminMediaResponse.headers()["x-content-type-options"]).toBe("nosniff");
+    expect(adminMediaResponse.headers()["x-robots-tag"]).toBe("noindex, nofollow");
 
-    // 5. Verify the two photos are shown via admin media route
-    const images = page.locator('img[src*="/admin/portfolio/media/"]');
-    await expect(images).toHaveCount(2);
-
-    // Also verify the HTTP response of one of these images returns a 200 via the media route
-    const imgSrc = await images.first().getAttribute('src');
-    expect(imgSrc).not.toBeNull();
-    const response = await page.request.get(imgSrc!);
-    expect(response.status()).toBe(200);
-    expect(response.headers()['content-type']).toBe('image/webp');
-    expect(response.headers()['cache-control']).toBe('no-store, max-age=0');
-    expect(response.headers()['x-content-type-options']).toBe('nosniff');
-    expect(response.headers()['x-robots-tag']).toBe('noindex, nofollow');
-
-    // Trying to access original should return 404
-    const originalSrc = imgSrc!.replace('480p', 'original');
-    const originalResponse = await page.request.get(originalSrc);
+    const originalResponse = await page.request.get(firstAdminImageUrl!.replace("480p", "original"));
     expect(originalResponse.status()).toBe(404);
 
-    // Trying to access without session should fail
-    const context = await page.context().browser()!.newContext();
-    const anonPage = await context.newPage();
-    const anonResponse = await anonPage.goto(new URL(imgSrc!, page.url()).toString());
-    expect(anonResponse?.status()).toBe(401);
-    await context.close();
+    const anonymousContext = await page.context().browser()!.newContext();
+    const anonymousPage = await anonymousContext.newPage();
+    const anonymousAdminMediaResponse = await anonymousPage.goto(new URL(firstAdminImageUrl!, page.url()).toString());
+    expect(anonymousAdminMediaResponse?.status()).toBe(401);
 
-    // 6. Verify that the first photo is automatically the cover
-    const coverSpan = page.locator('span', { hasText: 'Couverture' });
-    await expect(coverSpan).toHaveCount(1);
+    await expect(photoCards.filter({ has: page.getByText("Couverture", { exact: true }) })).toHaveCount(1);
+    const secondPhotoUrl = await adminImages.nth(1).getAttribute("src");
+    await photoCards.nth(1).getByRole("button", { name: "Couverture" }).click();
+    const coverCard = photoCards.filter({ has: page.getByText("Couverture", { exact: true }) });
+    await expect(coverCard.locator("img")).toHaveAttribute("src", secondPhotoUrl!);
 
-    // 7. Change the cover to the second photo
-    // The second photo has a "Couverture" button
-    await page.click('button:has-text("Couverture")');
-    // Now there should still be only 1 cover span
-    await expect(page.locator('span', { hasText: 'Couverture' })).toHaveCount(1);
+    const firstPhotoCard = photoCards.nth(0);
+    await firstPhotoCard.getByRole("button", { name: "Modifier" }).click();
+    await firstPhotoCard.locator("select").selectOption("ceremony");
+    await firstPhotoCard.getByPlaceholder("Alt FR").fill("Alt FR 1");
+    await firstPhotoCard.getByPlaceholder("Alt EN").fill("Alt EN 1");
+    await firstPhotoCard.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    await expect(firstPhotoCard.getByText("ceremony", { exact: true })).toBeVisible();
+    await expect(firstPhotoCard.getByText("Alt FR 1", { exact: true })).toBeVisible();
 
-    // 8. Edit categories and alt texts
-    let currentPhoto = 1;
-    const editDialogHandler = async (dialog: import('@playwright/test').Dialog) => {
-      const msg = dialog.message();
-      if (msg.includes('Catégorie')) {
-        await dialog.accept(currentPhoto === 1 ? 'ceremony' : 'reception');
-      } else if (msg.includes('FR')) {
-        await dialog.accept(currentPhoto === 1 ? 'Alt FR 1' : 'Alt FR 2');
-      } else if (msg.includes('EN')) {
-        await dialog.accept(currentPhoto === 1 ? 'Alt EN 1' : 'Alt EN 2');
-      } else {
-        await dialog.accept();
-      }
-    };
-    page.on('dialog', editDialogHandler);
+    const secondPhotoCard = photoCards.nth(1);
+    await secondPhotoCard.getByRole("button", { name: "Modifier" }).click();
+    await secondPhotoCard.locator("select").selectOption("reception");
+    await secondPhotoCard.getByPlaceholder("Alt FR").fill("Alt FR 2");
+    await secondPhotoCard.getByPlaceholder("Alt EN").fill("Alt EN 2");
+    await secondPhotoCard.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    await expect(secondPhotoCard.getByText("reception", { exact: true })).toBeVisible();
 
-    // For the first photo
-    await page.locator('button:has-text("Modifier")').first().click();
-    await expect(page.locator('text="ceremony"').first()).toBeVisible();
-    await expect(page.locator('text="Alt FR 1"').first()).toBeVisible();
+    await expect(photoCards.nth(0).locator("strong")).toHaveText("ceremony");
+    await photoCards.nth(0).getByRole("button", { name: "Descendre" }).click();
+    await expect(photoCards.nth(0).locator("strong")).toHaveText("reception");
 
-    // For the second photo
-    currentPhoto = 2;
-    await page.locator('button:has-text("Modifier")').nth(1).click();
-    await expect(page.locator('text="reception"').first()).toBeVisible();
+    await page.fill('input[name="titleFr"]', updatedTitleFr);
+    await page.getByRole("button", { name: "Enregistrer les modifications" }).click();
+    await expect(page.locator('input[name="titleFr"]')).toHaveValue(updatedTitleFr);
 
-    page.off('dialog', editDialogHandler);
+    await expect(publishButton).toBeEnabled();
+    await publishButton.click();
+    await expect(page).toHaveURL("/admin/portfolio");
+    const publishedCard = page.locator("li", {
+      has: page.getByRole("heading", { name: `${updatedTitleFr} / ${titleEn}` }),
+    });
+    await expect(publishedCard.getByText("published", { exact: true })).toBeVisible();
 
-    // 9. Reorder the photos
-    // Verify first photo is Ceremony, second is Reception
-    await expect(page.locator('img ~ div p strong').first()).toHaveText('ceremony');
-    // Click 'Descendre' on the first photo
-    await page.locator('button[title="Descendre"]').first().click();
-    // Now the first should be reception
-    await expect(page.locator('img ~ div p strong').first()).toHaveText('reception');
+    await anonymousPage.goto("/fr/portfolio");
+    await expect(anonymousPage.getByRole("link", { name: updatedTitleFr })).toBeVisible();
+    await anonymousPage.getByRole("link", { name: updatedTitleFr }).click();
+    await expect(anonymousPage).toHaveURL(`/fr/portfolio/${slugFr}`);
+    await expect(anonymousPage.getByRole("heading", { name: updatedTitleFr })).toBeVisible();
+    await expect(anonymousPage.locator('img[src*="/portfolio/media/"]')).toHaveCount(2);
+    const publicImageUrl = await anonymousPage.locator('img[src*="/portfolio/media/"]').first().getAttribute("src");
+    expect(publicImageUrl).not.toBeNull();
+    const publicMediaResponse = await anonymousPage.request.get(publicImageUrl!);
+    expect(publicMediaResponse.status()).toBe(200);
+    expect(publicMediaResponse.headers()["content-type"]).toBe("image/webp");
+    expect(publicMediaResponse.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
 
-    // 10. Save textual modifications
-    await page.fill('input[name="titleFr"]', `${titleFr} Modifié`);
-    await page.click('button:has-text("Enregistrer les modifications")');
+    await anonymousPage.goto("/en/portfolio");
+    await expect(anonymousPage.getByRole("link", { name: titleEn })).toBeVisible();
+    await anonymousPage.getByRole("link", { name: titleEn }).click();
+    await expect(anonymousPage).toHaveURL(`/en/portfolio/${slugEn}`);
+    await expect(anonymousPage.getByRole("heading", { name: titleEn })).toBeVisible();
 
-    // 11. Publish the project
-    // Check that publish button is now enabled
-    await expect(publishBtn).toBeEnabled();
-    await publishBtn.click();
+    await publishedCard.getByRole("link", { name: "Modifier" }).click();
+    await page.getByRole("button", { name: "Repasser en brouillon" }).click();
+    await expect(page).toHaveURL("/admin/portfolio");
+    const draftCard = page.locator("li", {
+      has: page.getByRole("heading", { name: `${updatedTitleFr} / ${titleEn}` }),
+    });
+    await expect(draftCard.getByText("draft", { exact: true })).toBeVisible();
 
-    // Redirects to dashboard
-    await expect(page).toHaveURL('/admin/portfolio');
-    await expect(page.locator('text="published"').first()).toBeVisible();
+    const hiddenProjectResponse = await anonymousPage.goto(`/fr/portfolio/${slugFr}`);
+    expect(hiddenProjectResponse?.status()).toBe(404);
+    const hiddenMediaResponse = await anonymousPage.request.get(publicImageUrl!);
+    expect(hiddenMediaResponse.status()).toBe(404);
+    await anonymousContext.close();
 
-    // 12. Unpublish (Repasser en brouillon)
-    const projectCard2 = page.locator('div', { has: page.locator('h3', { hasText: `${titleFr} Modifié` }) }).first();
-    await projectCard2.locator('a:has-text("Modifier")').first().click();
-    await page.click('button:has-text("Repasser en brouillon")');
-    await expect(page).toHaveURL('/admin/portfolio');
-    await expect(page.locator('text="draft"').first()).toBeVisible();
-
-    // 13. Delete a photo (not cover)
-    const projectCard3 = page.locator('div', { has: page.locator('h3', { hasText: `${titleFr} Modifié` }) }).first();
-    await projectCard3.locator('a:has-text("Modifier")').first().click();
-
-    // Check we cannot delete the cover photo
-    let dialogFired = false;
-    page.once('dialog', async dialog => {
-      dialogFired = true;
-      expect(dialog.message()).toContain('Impossible de supprimer la photo de couverture');
+    await draftCard.getByRole("link", { name: "Modifier" }).click();
+    const currentCards = page.locator('div[class*="photoCard"]');
+    let coverWarning = "";
+    page.once("dialog", async dialog => {
+      coverWarning = dialog.message();
       await dialog.accept();
     });
-    // The cover card does NOT have a button "Couverture", but it has the text span.
-    // We can just find the "Supprimer" button that is NOT a sibling of a "Couverture" button?
-    // Actually, each photo card has a "Modifier" button.
-    const allCards = page.locator('button:has-text("Modifier")').locator('..').locator('..');
-    // The cover card is the one with the 'span:has-text("Couverture")'
-    const coverCard = allCards.filter({ has: page.locator('span:has-text("Couverture")') });
-    await coverCard.locator('button:has-text("Supprimer")').click();
-    expect(dialogFired).toBe(true);
+    await currentCards.filter({ has: page.getByText("Couverture", { exact: true }) })
+      .getByRole("button", { name: "Supprimer" }).click();
+    expect(coverWarning).toContain("Impossible de supprimer la photo de couverture");
 
-    // Delete the non-cover photo
-    page.once('dialog', async dialog => await dialog.accept());
-    const nonCoverCard = allCards.filter({ has: page.locator('button:has-text("Couverture")') }).first();
-    await nonCoverCard.locator('button:has-text("Supprimer")').click();
-
-    // Verify it was deleted (count should be 1)
-    await expect(page.locator('button:has-text("Modifier")')).toHaveCount(1);
+    page.once("dialog", dialog => dialog.accept());
+    await currentCards.filter({ has: page.getByRole("button", { name: "Couverture" }) })
+      .getByRole("button", { name: "Supprimer" }).click();
+    await expect(currentCards).toHaveCount(1);
+    expect(pageErrors).toEqual([]);
   });
 });

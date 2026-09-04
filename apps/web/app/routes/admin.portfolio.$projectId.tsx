@@ -4,7 +4,7 @@ import {
   redirect
 } from "react-router";
 import { Form, Link, useActionData, useLoaderData, useNavigation, useSubmit } from "react-router";
-import { getProjectById, getPortfolioContent, updateProjectMetadata, publishProject, unpublishProject, setProjectCover, trashPhoto, updatePhotoMetadata, reorderProjectPhotos } from "../lib/portfolio-content.server";
+import { assertPortfolioRevision, getProjectById, getPortfolioContent, updateProjectMetadata, publishProject, unpublishProject, setProjectCover, trashPhoto, updatePhotoMetadata, reorderProjectPhotos } from "../lib/portfolio-content.server";
 import type { Project } from "../lib/portfolio-content.server";
 import { requireValidAdminSession, validateAdminFormData, ActionSecurityError } from "../lib/admin-auth.server";
 import { RevisionConflictError, CorruptedContentError, ValidationError } from "../lib/site-content.server";
@@ -105,6 +105,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       const mediaPath = getPortfolioMediaPath();
 
+      // Refuse stale requests before moving any media.
+      assertPortfolioRevision(previousRevision);
+
       // 1. Move media to trash
       trashPhotoMedia(projectId, mediaPath, photo);
 
@@ -172,7 +175,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (msg.includes("FR slug")) return Response.json({ fieldErrors: { "slug.fr": msg } }, { status: 422, headers });
       if (msg.includes("EN slug")) return Response.json({ fieldErrors: { "slug.en": msg } }, { status: 422, headers });
     }
-    return Response.json({ error: msg || "Validation failed" }, { status: 422, headers });
+    return Response.json({ error: "Internal Server Error" }, { status: 500, headers });
   }
 }
 
@@ -292,13 +295,12 @@ export default function AdminPortfolioEdit() {
   const [titleFr, setTitleFr] = useState(project.title.fr);
   const [titleEn, setTitleEn] = useState(project.title.en);
 
-  // existing project, slug is custom by default
-  const [isCustomSlug, setIsCustomSlug] = useState(true);
+  const [isCustomSlug, setIsCustomSlug] = useState(false);
   const [slugFr, setSlugFr] = useState(project.slug.fr);
   const [slugEn, setSlugEn] = useState(project.slug.en);
 
-  const derivedSlugFr = isCustomSlug ? slugFr : generateClientSlug(titleFr);
-  const derivedSlugEn = isCustomSlug ? slugEn : generateClientSlug(titleEn);
+  const derivedSlugFr = generateClientSlug(isCustomSlug ? slugFr : project.slug.fr);
+  const derivedSlugEn = generateClientSlug(isCustomSlug ? slugEn : project.slug.en);
 
   // Upload Queue State
   const [uploadQueue, setUploadQueue] = useState<File[]>([]);
@@ -307,8 +309,10 @@ export default function AdminPortfolioEdit() {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const isReadOnly = project.status === "published";
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = (files: FileList | File[] | null) => {
     if (!files) return;
     const toAdd = Array.from(files).filter(f => ["image/jpeg", "image/png", "image/webp"].includes(f.type));
     if (uploadQueue.length + toAdd.length > 20) {
@@ -334,6 +338,7 @@ export default function AdminPortfolioEdit() {
     formData.append("file", file);
 
     const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
     xhr.open("POST", `/admin/portfolio/${project.id}/upload`, true);
     xhr.setRequestHeader("x-csrf-token", csrfToken);
     xhr.setRequestHeader("x-portfolio-revision", localRevision);
@@ -350,6 +355,7 @@ export default function AdminPortfolioEdit() {
     };
 
     xhr.onload = () => {
+      if (xhrRef.current === xhr) xhrRef.current = null;
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const json = JSON.parse(xhr.responseText);
@@ -366,18 +372,29 @@ export default function AdminPortfolioEdit() {
         }
       } else {
         let msg = "Erreur inconnue";
-        try { msg = JSON.parse(xhr.responseText).error || msg; } catch {}
+        try { msg = JSON.parse(xhr.responseText).error || msg; } catch { /* use the generic message */ }
         setUploadError(`Erreur sur ${file.name}: ${msg}`);
         setUploading(false);
       }
     };
 
     xhr.onerror = () => {
+      if (xhrRef.current === xhr) xhrRef.current = null;
       setUploadError(`Erreur réseau lors de l'envoi de ${file.name}`);
       setUploading(false);
     };
 
+    xhr.onabort = () => {
+      if (xhrRef.current === xhr) xhrRef.current = null;
+    };
+
     xhr.send(formData);
+
+    return () => {
+      if (xhrRef.current === xhr && xhr.readyState !== XMLHttpRequest.DONE) {
+        xhr.abort();
+      }
+    };
   }, [uploadQueue, uploading, csrfToken, localRevision, project.id, submit, navigation.state]);
 
   const handleReorder = (fromIndex: number, toIndex: number) => {
@@ -438,6 +455,16 @@ export default function AdminPortfolioEdit() {
           <Link to="/admin/portfolio" className={`${styles.logoutButton} ${styles.noDecoration}`}>
             Retour
           </Link>
+          {project.status === "published" && (
+            <>
+              <Link to={`/fr/portfolio/${project.slug.fr}`} className={`${styles.actionButton} ${styles.noDecoration}`}>
+                Voir FR
+              </Link>
+              <Link to={`/en/portfolio/${project.slug.en}`} className={`${styles.actionButton} ${styles.noDecoration}`}>
+                Voir EN
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -462,18 +489,24 @@ export default function AdminPortfolioEdit() {
             <input type="hidden" name="csrfToken" value={csrfToken} />
             <input type="hidden" name="revision" value={localRevision} />
             <input type="hidden" name="intent" value="update" />
+            {!isCustomSlug && (
+              <>
+                <input type="hidden" name="slugFr" value={derivedSlugFr} />
+                <input type="hidden" name="slugEn" value={derivedSlugEn} />
+              </>
+            )}
 
 
 
             <div className={styles.grid}>
               <div>
                 <label htmlFor="titleFr" className={styles.label}>Titre (FR)</label>
-                <input id="titleFr" name="titleFr" required className={styles.input} value={titleFr} onChange={e => setTitleFr(e.target.value)} />
+                <input id="titleFr" name="titleFr" required disabled={isReadOnly} className={styles.input} value={titleFr} onChange={e => setTitleFr(e.target.value)} />
                 {actionData?.fieldErrors?.["title.fr"] && <p className={styles.fieldError}>{actionData.fieldErrors["title.fr"]}</p>}
               </div>
               <div>
                 <label htmlFor="titleEn" className={styles.label}>Titre (EN)</label>
-                <input id="titleEn" name="titleEn" required className={styles.input} value={titleEn} onChange={e => setTitleEn(e.target.value)} />
+                <input id="titleEn" name="titleEn" required disabled={isReadOnly} className={styles.input} value={titleEn} onChange={e => setTitleEn(e.target.value)} />
                 {actionData?.fieldErrors?.["title.en"] && <p className={styles.fieldError}>{actionData.fieldErrors["title.en"]}</p>}
               </div>
             </div>
@@ -481,8 +514,9 @@ export default function AdminPortfolioEdit() {
             <div className={styles.slugPreview}>
               <p><strong>Aperçu URL (FR):</strong> /fr/portfolio/{derivedSlugFr || "..."}</p>
               <p><strong>Aperçu URL (EN):</strong> /en/portfolio/{derivedSlugEn || "..."}</p>
+              <p className={styles.helpText}>Les majuscules, accents et espaces sont corrigés automatiquement.</p>
               {!isCustomSlug && (
-                <button type="button" onClick={() => {
+                <button type="button" disabled={isReadOnly} onClick={() => {
                   setSlugFr(derivedSlugFr);
                   setSlugEn(derivedSlugEn);
                   setIsCustomSlug(true);
@@ -496,12 +530,12 @@ export default function AdminPortfolioEdit() {
               <div className={styles.grid}>
                 <div>
                   <label htmlFor="slugFr" className={styles.label}>Slug personnalisé (FR)</label>
-                  <input id="slugFr" name="slugFr" className={styles.input} value={slugFr} onChange={e => setSlugFr(e.target.value)} />
+                  <input id="slugFr" name="slugFr" disabled={isReadOnly} className={styles.input} value={slugFr} onChange={e => setSlugFr(e.target.value)} />
                   {actionData?.fieldErrors?.["slug.fr"] && <p className={styles.fieldError}>{actionData.fieldErrors["slug.fr"]}</p>}
                 </div>
                 <div>
                   <label htmlFor="slugEn" className={styles.label}>Slug personnalisé (EN)</label>
-                  <input id="slugEn" name="slugEn" className={styles.input} value={slugEn} onChange={e => setSlugEn(e.target.value)} />
+                  <input id="slugEn" name="slugEn" disabled={isReadOnly} className={styles.input} value={slugEn} onChange={e => setSlugEn(e.target.value)} />
                   {actionData?.fieldErrors?.["slug.en"] && <p className={styles.fieldError}>{actionData.fieldErrors["slug.en"]}</p>}
                 </div>
               </div>
@@ -511,12 +545,12 @@ export default function AdminPortfolioEdit() {
             <div className={styles.grid}>
               <div>
                 <label htmlFor="descriptionFr" className={styles.label}>Description (FR)</label>
-                <textarea id="descriptionFr" name="descriptionFr" required defaultValue={project.description.fr} className={styles.input} rows={4} />
+                <textarea id="descriptionFr" name="descriptionFr" required disabled={isReadOnly} defaultValue={project.description.fr} className={styles.input} rows={4} />
                 {actionData?.fieldErrors?.["description.fr"] && <p className={styles.fieldError}>{actionData.fieldErrors["description.fr"]}</p>}
               </div>
               <div>
                 <label htmlFor="descriptionEn" className={styles.label}>Description (EN)</label>
-                <textarea id="descriptionEn" name="descriptionEn" required defaultValue={project.description.en} className={styles.input} rows={4} />
+                <textarea id="descriptionEn" name="descriptionEn" required disabled={isReadOnly} defaultValue={project.description.en} className={styles.input} rows={4} />
                 {actionData?.fieldErrors?.["description.en"] && <p className={styles.fieldError}>{actionData.fieldErrors["description.en"]}</p>}
               </div>
             </div>
@@ -524,12 +558,12 @@ export default function AdminPortfolioEdit() {
             <div className={styles.grid}>
               <div>
                 <label htmlFor="location" className={styles.label}>Lieu (Optionnel)</label>
-                <input id="location" name="location" defaultValue={project.location || ""} className={styles.input} />
+                <input id="location" name="location" disabled={isReadOnly} defaultValue={project.location || ""} className={styles.input} />
                 {actionData?.fieldErrors?.["location"] && <p className={styles.fieldError}>{actionData.fieldErrors["location"]}</p>}
               </div>
               <div>
                 <label htmlFor="date" className={styles.label}>Date (Optionnel YYYY-MM-DD)</label>
-                <input id="date" name="date" type="date" defaultValue={project.date || ""} className={styles.input} />
+                <input id="date" name="date" type="date" disabled={isReadOnly} defaultValue={project.date || ""} className={styles.input} />
                 {actionData?.fieldErrors?.["date"] && <p className={styles.fieldError}>{actionData.fieldErrors["date"]}</p>}
               </div>
             </div>
@@ -540,7 +574,7 @@ export default function AdminPortfolioEdit() {
               </p>
             )}
 
-            <button type="submit" disabled={isSubmitting} className={styles.submitButton}>
+            <button type="submit" disabled={isSubmitting || isReadOnly} className={styles.submitButton}>
               {isSubmitting ? "Sauvegarde..." : "Enregistrer les modifications"}
             </button>
           </Form>
@@ -550,7 +584,19 @@ export default function AdminPortfolioEdit() {
         <div className={`${styles.loginCard} ${styles.wideCard} ${styles.marginTop}`}>
           <h2>Photos ({project.photos.length})</h2>
 
-          <div className={styles.uploadZone}>
+          {isReadOnly ? (
+            <p className={styles.successMessage}>
+              Ce projet est public. Repassez-le en brouillon pour modifier ses photos.
+            </p>
+          ) : (
+          <div
+            className={styles.uploadZone}
+            onDragOver={event => event.preventDefault()}
+            onDrop={event => {
+              event.preventDefault();
+              handleFiles(event.dataTransfer.files);
+            }}
+          >
             <input
               type="file"
               multiple
@@ -562,15 +608,20 @@ export default function AdminPortfolioEdit() {
             <button type="button" onClick={() => fileInputRef.current?.click()} className={styles.secondaryButton}>
               Sélectionner des photos (max 20)
             </button>
+            <p className={styles.helpText}>ou glissez vos images JPEG, PNG ou WebP ici</p>
 
             {uploadQueue.length > 0 && (
               <div className={styles.marginTopSmall}>
                 <p>Upload en cours : reste {uploadQueue.length} fichiers...</p>
                 {uploadProgress && (
                   <div className={styles.marginTopSmall}>
-                    <div className={styles.progressBarBg}>
-                      <div className={styles.progressBarFill} style={{width: `${uploadProgress.percentage}%`}} />
-                    </div>
+                    <progress
+                      className={styles.progressBar}
+                      max={100}
+                      value={uploadProgress.percentage}
+                    >
+                      {uploadProgress.percentage}%
+                    </progress>
                     <p className={styles.progressText}>
                       {uploadProgress.status === "uploading" ? `Envoi... ${uploadProgress.percentage}%` :
                        uploadProgress.status === "processing" ? "Traitement de l'image..." : "Terminé"}
@@ -590,6 +641,7 @@ export default function AdminPortfolioEdit() {
               </div>
             )}
           </div>
+          )}
 
               <div className={styles.photoGrid}>
                 {project.photos.map((photo: Project["photos"][0], index: number) => (
@@ -598,7 +650,7 @@ export default function AdminPortfolioEdit() {
                     photo={photo}
                     projectId={project.id}
                     isCover={project.coverPhotoId === photo.id}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isReadOnly}
                     isFirst={index === 0}
                     isLast={index === project.photos.length - 1}
                     index={index}

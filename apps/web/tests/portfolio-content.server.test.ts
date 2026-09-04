@@ -11,6 +11,10 @@ import {
   deleteEmptyProject,
   portfolioSchema,
   updateWatermarkText,
+  addPhotoToProject,
+  publishProject,
+  getPublishedProjects,
+  getPublishedProjectBySlug,
 } from "../app/lib/portfolio-content.server";
 
 import { vi } from "vitest";
@@ -400,6 +404,47 @@ describe("portfolio-content.server", () => {
       const p2 = portfolio.projects.find(p => p.id !== portfolio.projects[0].id)!;
       expect(p2.slug.fr).toMatch(/^mon-beau-mariage(-[0-9]+)?$/);
       expect(p2.slug.fr).not.toBe("mon-beau-mariage");
+    });
+
+    it("n'expose publiquement qu'un projet publié et le retrouve dans les deux langues", () => {
+      rev = createProjectDraft({
+        title: { fr: "Mariage à Ath", en: "Wedding in Ath" },
+        slug: { fr: "", en: "" },
+        description: { fr: "Une belle journée", en: "A beautiful day" },
+        location: "Ath",
+        date: "2026-06-29",
+      }, rev);
+
+      const project = getPortfolioContent().projects[0];
+      const added = addPhotoToProject(project.id, {
+        fileId: "1".repeat(32),
+        originalFormat: "jpeg",
+        originalWidth: 1200,
+        originalHeight: 800,
+        category: "ceremony",
+        alt: { fr: "Les mariés", en: "The newlyweds" },
+        variants: [{
+          name: "480p",
+          width: 480,
+          height: 320,
+          sizeBytes: 1234,
+          fileId: "1".repeat(32) + "-480p",
+        }],
+        appliedWatermarkRevision: "2".repeat(32),
+        processedAt: new Date().toISOString(),
+      }, rev);
+
+      expect(getPublishedProjects()).toEqual([]);
+
+      publishProject(project.id, added.newRevision);
+      const publicProjects = getPublishedProjects();
+      expect(publicProjects).toHaveLength(1);
+      expect(publicProjects[0].title.fr).toBe("Mariage à Ath");
+      expect(publicProjects[0]).not.toHaveProperty("status");
+      expect(publicProjects[0].photos[0]).not.toHaveProperty("fileId");
+      expect(getPublishedProjectBySlug("fr", "mariage-a-ath")?.id).toBe(project.id);
+      expect(getPublishedProjectBySlug("en", "wedding-in-ath")?.id).toBe(project.id);
+      expect(getPublishedProjectBySlug("fr", "../portfolio.json")).toBeUndefined();
     });
   });
 });

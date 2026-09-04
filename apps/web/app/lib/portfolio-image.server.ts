@@ -490,12 +490,80 @@ export async function processImage(
       } catch { /* ignore */ }
     }
 
-    if (err instanceof SafeImageError) {
-      console.error("SAFE IMAGE ERROR THROWN:", err.message);
-      throw err;
-    }
-    console.error("UNKNOWN IMAGE ERROR THROWN:", err);
+    if (err instanceof SafeImageError) throw err;
     throw new SafeImageError("Image processing failed due to an internal error.");
+  }
+}
+
+export function removeProcessedImage(
+  projectId: string,
+  mediaBasePath: string,
+  image: ImageProcessingResult
+): void {
+  const resolvedMediaBasePath = path.resolve(mediaBasePath);
+  const projectDir = path.resolve(resolvedMediaBasePath, projectId);
+  const filePaths = [
+    path.resolve(projectDir, "originals", image.fileId + "." + image.originalFormat),
+    ...image.variants.map(variant => (
+      path.resolve(projectDir, variant.name, variant.fileId + ".webp")
+    )),
+  ];
+
+  let cleanupFailed = false;
+  for (const filePath of filePaths) {
+    try {
+      validateConfinement(filePath, resolvedMediaBasePath);
+      const stat = fs.lstatSync(filePath);
+      if (stat.isSymbolicLink() || !stat.isFile()) {
+        cleanupFailed = true;
+        continue;
+      }
+      fs.unlinkSync(filePath);
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") cleanupFailed = true;
+    }
+  }
+
+  const candidateDirs = [
+    ...image.variants.map(variant => path.resolve(projectDir, variant.name)),
+    path.resolve(projectDir, "originals"),
+    projectDir,
+  ];
+  for (const candidateDir of candidateDirs) {
+    try {
+      validateConfinement(candidateDir, resolvedMediaBasePath);
+      if (fs.readdirSync(candidateDir).length === 0) fs.rmdirSync(candidateDir);
+    } catch {
+      // Directory cleanup is best-effort; only files are transactional.
+    }
+  }
+
+  if (cleanupFailed) throw new SafeImageError("Generated image cleanup failed.");
+}
+
+function assertRegularFile(filePath: string, basePath: string): void {
+  validateConfinement(filePath, basePath);
+  try {
+    const stat = fs.lstatSync(filePath);
+    if (stat.isSymbolicLink() || !stat.isFile()) {
+      throw new SafeImageError("Expected photo media is unavailable.");
+    }
+  } catch (err: unknown) {
+    if (err instanceof SafeImageError) throw err;
+    throw new SafeImageError("Expected photo media is unavailable.");
+  }
+}
+
+function assertPathMissing(filePath: string, basePath: string): void {
+  validateConfinement(filePath, basePath);
+  try {
+    fs.lstatSync(filePath);
+    throw new SafeImageError("Photo media destination already exists.");
+  } catch (err: unknown) {
+    if (err instanceof SafeImageError) throw err;
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw new SafeImageError("Photo media could not be verified.");
+    }
   }
 }
 
@@ -513,39 +581,32 @@ export function trashPhotoMedia(
   validateConfinement(trashProjectDir, resolvedMediaBasePath);
   validateConfinement(trashPhotoDir, resolvedMediaBasePath);
 
-  if (fs.existsSync(trashPhotoDir)) {
-    throw new SafeImageError("Trash destination already exists.");
-  }
+  assertPathMissing(trashPhotoDir, resolvedMediaBasePath);
 
   const origFrom = path.resolve(projectDir, "originals", `${photo.fileId}.${photo.originalFormat}`);
-  validateConfinement(origFrom, resolvedMediaBasePath);
-  if (!fs.existsSync(origFrom)) throw new SafeImageError("Original file not found.");
-  if (!fs.statSync(origFrom).isFile()) throw new SafeImageError("Original is not a regular file.");
+  assertRegularFile(origFrom, resolvedMediaBasePath);
 
   const variantsToMove: { from: string; to: string }[] = [];
   for (const variant of photo.variants) {
     const varFrom = path.resolve(projectDir, variant.name, `${variant.fileId}.webp`);
-    validateConfinement(varFrom, resolvedMediaBasePath);
-    if (!fs.existsSync(varFrom)) throw new SafeImageError(`Variant ${variant.name} not found.`);
-    if (!fs.statSync(varFrom).isFile()) throw new SafeImageError(`Variant ${variant.name} is not a regular file.`);
+    assertRegularFile(varFrom, resolvedMediaBasePath);
 
     const varTo = path.resolve(trashPhotoDir, `${variant.name}-${variant.fileId}.webp`);
-    validateConfinement(varTo, resolvedMediaBasePath);
+    assertPathMissing(varTo, resolvedMediaBasePath);
     variantsToMove.push({ from: varFrom, to: varTo });
   }
 
   let createdTrashProjectDir = false;
-  let createdTrashPhotoDir = false;
 
   if (!fs.existsSync(trashProjectDir)) {
     ensureStrictDirectoryCreated(trashProjectDir, resolvedMediaBasePath);
     createdTrashProjectDir = true;
   }
   ensureStrictDirectoryCreated(trashPhotoDir, resolvedMediaBasePath);
-  createdTrashPhotoDir = true;
 
   const movedPaths: { from: string; to: string }[] = [];
   const manifestPath = path.resolve(trashPhotoDir, "manifest.json");
+  assertPathMissing(manifestPath, resolvedMediaBasePath);
 
   try {
     const origTo = path.resolve(trashPhotoDir, `original.${photo.fileId}.${photo.originalFormat}`);
@@ -564,7 +625,7 @@ export function trashPhotoMedia(
       photo
     }, null, 2)), 0o600);
 
-  } catch (err) {
+  } catch {
     let rollbackFailed = false;
 
     for (const { from, to } of movedPaths.reverse()) {
@@ -576,16 +637,14 @@ export function trashPhotoMedia(
     if (fs.existsSync(manifestPath)) {
       try { fs.unlinkSync(manifestPath); } catch { rollbackFailed = true; }
     }
-    if (createdTrashPhotoDir && fs.existsSync(trashPhotoDir)) {
+    if (fs.existsSync(trashPhotoDir)) {
       try { fs.rmdirSync(trashPhotoDir); } catch { rollbackFailed = true; }
     }
     if (createdTrashProjectDir && fs.existsSync(trashProjectDir)) {
       try { fs.rmdirSync(trashProjectDir); } catch { rollbackFailed = true; }
     }
 
-    if (rollbackFailed) {
-      throw new Error(`CRITICAL: Rollback failed during trashPhotoMedia. State is corrupted. Original error: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    if (rollbackFailed) throw new SafeImageError("Photo media recovery failed.");
     throw new SafeImageError("Failed to trash photo media, rollback successful.");
   }
 }
@@ -600,42 +659,51 @@ export function restorePhotoMedia(
   const trashProjectDir = path.resolve(resolvedMediaBasePath, ".trash", projectId);
   const trashPhotoDir = path.resolve(trashProjectDir, photo.id);
 
-  if (!fs.existsSync(trashPhotoDir)) return;
+  validateConfinement(projectDir, resolvedMediaBasePath);
+  validateConfinement(trashProjectDir, resolvedMediaBasePath);
+  validateConfinement(trashPhotoDir, resolvedMediaBasePath);
+  ensureStrictDirectory(projectDir, resolvedMediaBasePath, false);
+  ensureStrictDirectory(trashProjectDir, resolvedMediaBasePath, false);
+  ensureStrictDirectory(trashPhotoDir, resolvedMediaBasePath, false);
 
   const movedPaths: { from: string; to: string }[] = [];
   const manifestPath = path.resolve(trashPhotoDir, "manifest.json");
+  const moves: { from: string; to: string }[] = [];
+
+  moves.push({
+    from: path.resolve(trashPhotoDir, `original.${photo.fileId}.${photo.originalFormat}`),
+    to: path.resolve(projectDir, "originals", `${photo.fileId}.${photo.originalFormat}`),
+  });
+  for (const variant of photo.variants) {
+    moves.push({
+      from: path.resolve(trashPhotoDir, `${variant.name}-${variant.fileId}.webp`),
+      to: path.resolve(projectDir, variant.name, `${variant.fileId}.webp`),
+    });
+  }
+
+  assertRegularFile(manifestPath, resolvedMediaBasePath);
+  for (const move of moves) {
+    assertRegularFile(move.from, resolvedMediaBasePath);
+    assertPathMissing(move.to, resolvedMediaBasePath);
+  }
 
   try {
-    const origFrom = path.resolve(trashPhotoDir, `original.${photo.fileId}.${photo.originalFormat}`);
-    const origTo = path.resolve(projectDir, "originals", `${photo.fileId}.${photo.originalFormat}`);
-    if (fs.existsSync(origFrom)) {
-      fs.renameSync(origFrom, origTo);
-      movedPaths.push({ from: origFrom, to: origTo });
+    for (const move of moves) {
+      fs.renameSync(move.from, move.to);
+      movedPaths.push(move);
     }
-
-    for (const variant of photo.variants) {
-      const varFrom = path.resolve(trashPhotoDir, `${variant.name}-${variant.fileId}.webp`);
-      const varTo = path.resolve(projectDir, variant.name, `${variant.fileId}.webp`);
-      if (fs.existsSync(varFrom)) {
-        fs.renameSync(varFrom, varTo);
-        movedPaths.push({ from: varFrom, to: varTo });
-      }
-    }
-
-    if (fs.existsSync(manifestPath)) {
-      fs.unlinkSync(manifestPath);
-    }
-    try { fs.rmdirSync(trashPhotoDir); } catch { /* ignore if not empty */ }
-  } catch (err) {
+  } catch {
     let rollbackFailed = false;
     for (const { from, to } of movedPaths.reverse()) {
       if (fs.existsSync(to)) {
         try { fs.renameSync(to, from); } catch { rollbackFailed = true; }
       }
     }
-    if (rollbackFailed) {
-      throw new Error(`CRITICAL: Rollback failed during restorePhotoMedia. State is corrupted. Original error: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    if (rollbackFailed) throw new SafeImageError("Photo media recovery failed.");
     throw new SafeImageError("Failed to restore photo media, rollback successful.");
   }
+
+  try { fs.unlinkSync(manifestPath); } catch { /* best-effort after complete restore */ }
+  try { fs.rmdirSync(trashPhotoDir); } catch { /* best-effort */ }
+  try { fs.rmdirSync(trashProjectDir); } catch { /* best-effort */ }
 }

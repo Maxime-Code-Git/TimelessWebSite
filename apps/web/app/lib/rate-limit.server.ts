@@ -4,10 +4,10 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { ENV } from "./env.server";
 
-let db: DatabaseSync;
+let db: DatabaseSync | undefined;
 
-function initDb() {
-  if (db) return;
+function initDb(): DatabaseSync {
+  if (db) return db;
   const dbPath = ENV.RATE_LIMIT_DB_PATH;
 
   // Ensure directory exists
@@ -26,6 +26,13 @@ function initDb() {
     CREATE INDEX IF NOT EXISTS idx_requests_hash ON requests(hash);
     CREATE INDEX IF NOT EXISTS idx_requests_timestamp ON requests(timestamp);
   `);
+  return db;
+}
+
+export function closeRateLimitDatabase(): void {
+  if (!db) return;
+  db.close();
+  db = undefined;
 }
 
 /**
@@ -33,7 +40,7 @@ function initDb() {
  * Throws an Error if rate limit is exceeded.
  */
 export function checkRateLimit(ip: string, namespace: string = "contact") {
-  initDb();
+  const database = initDb();
 
   const now = Date.now();
   // Different namespaces have different windows and limits
@@ -54,14 +61,14 @@ export function checkRateLimit(ip: string, namespace: string = "contact") {
     .digest("hex");
 
   // Use a transaction for atomic check and insert
-  db.exec("BEGIN EXCLUSIVE TRANSACTION");
+  database.exec("BEGIN EXCLUSIVE TRANSACTION");
   try {
     // 1. Cleanup old records (global cleanup for all old records older than 1 hour)
-    const cleanupStmt = db.prepare("DELETE FROM requests WHERE timestamp < ?");
+    const cleanupStmt = database.prepare("DELETE FROM requests WHERE timestamp < ?");
     cleanupStmt.run(now - 60 * 60 * 1000);
 
     // 2. Count recent requests for this specific hash
-    const countStmt = db.prepare("SELECT COUNT(*) as count FROM requests WHERE hash = ? AND timestamp >= ?");
+    const countStmt = database.prepare("SELECT COUNT(*) as count FROM requests WHERE hash = ? AND timestamp >= ?");
     const result = countStmt.get(hash, windowStart) as { count: number };
 
     if (result.count >= maxAttempts) {
@@ -69,12 +76,12 @@ export function checkRateLimit(ip: string, namespace: string = "contact") {
     }
 
     // 3. Insert new request
-    const insertStmt = db.prepare("INSERT INTO requests (hash, timestamp) VALUES (?, ?)");
+    const insertStmt = database.prepare("INSERT INTO requests (hash, timestamp) VALUES (?, ?)");
     insertStmt.run(hash, now);
 
-    db.exec("COMMIT");
+    database.exec("COMMIT");
   } catch (err) {
-    db.exec("ROLLBACK");
+    database.exec("ROLLBACK");
     throw err;
   }
 }
@@ -84,13 +91,13 @@ export function checkRateLimit(ip: string, namespace: string = "contact") {
  * Useful upon successful authentication to clear failure counters.
  */
 export function resetRateLimit(ip: string, namespace: string = "contact") {
-  initDb();
+  const database = initDb();
 
   const hash = crypto
     .createHmac("sha256", ENV.CONTACT_RATE_LIMIT_SECRET)
     .update(`${namespace}:${ip}`)
     .digest("hex");
 
-  const stmt = db.prepare("DELETE FROM requests WHERE hash = ?");
+  const stmt = database.prepare("DELETE FROM requests WHERE hash = ?");
   stmt.run(hash);
 }

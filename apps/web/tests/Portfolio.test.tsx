@@ -1,43 +1,65 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { MemoryRouter } from "react-router";
-import PortfolioFr from "../app/routes/fr.portfolio";
-import defaultContent from "../app/content/default-site-content.json";
+import { PortfolioPage } from "../app/routes/PortfolioPage";
+import type { PublicPortfolioProject } from "../app/lib/portfolio-content.server";
 
-vi.mock("react-router", async (importOriginal) => {
-  const mod = await importOriginal<typeof import("react-router")>();
-  return {
-    ...mod,
-    useRouteLoaderData: () => ({ siteContent: defaultContent })
-  };
+vi.mock("react-router", async importOriginal => {
+  const module = await importOriginal<typeof import("react-router")>();
+  return { ...module, useRouteLoaderData: () => undefined };
 });
 
+const makeProject = (
+  id: string,
+  category: "ceremony" | "portraits" | "reception"
+): PublicPortfolioProject => ({
+  id,
+  slug: { fr: "projet-" + id, en: "project-" + id },
+  title: { fr: "Projet " + id, en: "Project " + id },
+  description: { fr: "Description", en: "Description" },
+  location: null,
+  date: null,
+  coverPhotoId: "photo-" + id,
+  photos: [{
+    id: "photo-" + id,
+    category,
+    alt: { fr: "Photo " + id, en: "Photo " + id },
+    width: 800,
+    height: 600,
+    variants: [{ name: "480p", width: 480, height: 360 }],
+  }],
+});
+
+const projects = [
+  makeProject("un", "ceremony"),
+  makeProject("deux", "portraits"),
+  makeProject("trois", "reception"),
+];
+
 describe("Portfolio Component", () => {
-  it("renders all photos by default", () => {
+  it("renders every published project supplied by the loader", () => {
     const { container } = render(
       <MemoryRouter>
-        <PortfolioFr />
+        <PortfolioPage lang="fr" projects={projects} />
       </MemoryRouter>
     );
 
-    // Look for the photo wrap elements
-    const photos = container.querySelectorAll('[class*="photoWrap"]');
-    expect(photos.length).toBe(9); // 9 photos by default
+    expect(container.querySelectorAll('[class*="photoWrap"]')).toHaveLength(3);
+    expect(screen.getByRole("link", { name: "Projet un" })).toHaveAttribute(
+      "href",
+      "/fr/portfolio/projet-un"
+    );
   });
 
-  it("filters photos by category", () => {
+  it("filters projects by the categories of their photos", () => {
     const { container } = render(
       <MemoryRouter>
-        <PortfolioFr />
+        <PortfolioPage lang="fr" projects={projects} />
       </MemoryRouter>
     );
 
-    // Click on "Cérémonie"
-    const ceremonieFilter = screen.getByRole("button", { name: "Cérémonie" });
-    fireEvent.click(ceremonieFilter);
-
-    // After filtering there should be 3 photos
-    const photos = container.querySelectorAll('[class*="photoWrap"]');
-    expect(photos.length).toBe(3);
+    fireEvent.click(screen.getByRole("button", { name: "Cérémonie" }));
+    expect(container.querySelectorAll('[class*="photoWrap"]')).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Projet un" })).toBeInTheDocument();
   });
 });
