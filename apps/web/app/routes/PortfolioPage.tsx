@@ -29,6 +29,24 @@ export function getPublicPhotoSrcSet(projectId: string, photo: PublicPortfolioPh
     .join(", ");
 }
 
+export function getVideoEmbedUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtube.com") || u.hostname.includes("youtu.be")) {
+      const videoId = u.hostname.includes("youtu.be") ? u.pathname.slice(1) : u.searchParams.get("v");
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    }
+    if (u.hostname.includes("vimeo.com")) {
+      const match = u.pathname.match(/\/(\d+)/);
+      return match ? `https://player.vimeo.com/video/${match[1]}` : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
   const t = getStrings(lang).portfolio;
   const [activeFilter, setActiveFilter] = useState("all");
@@ -45,6 +63,9 @@ export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
     activeFilter === "all" || project.photos.some(photo => photo.category === activeFilter)
   ));
 
+  const projectsWithVideo = projects.filter(p => getVideoEmbedUrl(p.videoUrl));
+  const hasVideos = projectsWithVideo.length > 0;
+
   return (
     <>
       <Header lang={lang} alternateLangHref={alternateLangHref} />
@@ -54,14 +75,16 @@ export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
           <div className={styles.titleDivider} />
           <h1 className={styles.title}>{t.title}</h1>
           <p className={styles.subtitle}>{t.subtitle}</p>
-          <div className={styles.tabs}>
-            <a href="#galerie-photo" className={styles.tabBtn + " " + styles.active}>
-              {t.tabPhoto}
-            </a>
-            <a href="#galerie-video" className={styles.tabBtn}>
-              {t.tabVideo}
-            </a>
-          </div>
+          {hasVideos && (
+            <div className={styles.tabs}>
+              <a href="#galerie-photo" className={styles.tabBtn + " " + styles.active}>
+                {t.tabPhoto}
+              </a>
+              <a href="#galerie-video" className={styles.tabBtn}>
+                {t.tabVideo}
+              </a>
+            </div>
+          )}
         </section>
 
         <section className={styles.filtersSection} aria-label={lang === "fr" ? "Filtrer les projets" : "Filter projects"}>
@@ -127,15 +150,32 @@ export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
           </div>
         </section>
 
-        <section id="galerie-video" className={styles.videoSection}>
-          <p className={styles.videoEyebrow}>{t.videoEyebrow}</p>
-          <h2 className={styles.videoTitle}>{t.videoTitle}</h2>
-          <div className={styles.videoPlayerWrap}>
-            <div className={styles.videoPoster}>
-              {lang === "fr" ? "Le film n'est pas encore disponible." : "Film is not yet available."}
+        {hasVideos && (
+          <section id="galerie-video" className={styles.videoSection}>
+            <p className={styles.videoEyebrow}>{t.videoEyebrow}</p>
+            <h2 className={styles.videoTitle}>{t.videoTitle}</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "56px" }}>
+              {projectsWithVideo.map(project => {
+                const embedUrl = getVideoEmbedUrl(project.videoUrl)!;
+                return (
+                  <div key={project.id}>
+                    <h3 style={{ color: "var(--ivory)", fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: "20px", marginBottom: "20px" }}>{project.title[lang]}</h3>
+                    <div className={styles.videoPlayerWrap}>
+                      <iframe
+                        src={embedUrl}
+                        title={project.title[lang]}
+                        frameBorder="0"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowFullScreen
+                        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}
+                      ></iframe>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </main>
 
       <Footer lang={lang} />

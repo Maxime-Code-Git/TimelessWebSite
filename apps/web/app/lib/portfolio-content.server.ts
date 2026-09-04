@@ -90,6 +90,7 @@ export const projectSchema = z.object({
     const d = new Date(val);
     return !isNaN(d.getTime()) && d.toISOString().startsWith(val);
   }, "Invalid date format or impossible date"),
+  videoUrl: z.string().url().max(255).nullable().optional(),
   status: z.enum(["draft", "published"]),
   order: z.number().int().min(0),
   coverPhotoId: z.string().uuid().nullable(),
@@ -182,6 +183,7 @@ export interface PublicPortfolioProject {
   description: Project["description"];
   location: string | null;
   date: string | null;
+  videoUrl?: string | null;
   coverPhotoId: string;
   photos: PublicPortfolioPhoto[];
 }
@@ -251,6 +253,7 @@ function toPublicProject(project: Project): PublicPortfolioProject {
     description: project.description,
     location: project.location,
     date: project.date,
+    videoUrl: project.videoUrl,
     coverPhotoId: project.coverPhotoId!,
     photos: project.photos.map(photo => ({
       id: photo.id,

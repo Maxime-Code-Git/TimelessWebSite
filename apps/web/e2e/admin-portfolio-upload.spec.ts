@@ -123,6 +123,8 @@ test.describe("Admin portfolio upload and publication", () => {
     await expect(photoCards.nth(0).locator("strong")).toHaveText("reception");
 
     await page.fill('input[name="titleFr"]', updatedTitleFr);
+    await page.fill('input[name="videoUrl"]', 'https://vimeo.com/76979871');
+
     await page.getByRole("button", { name: "Enregistrer les modifications" }).click();
     await expect(page.locator('input[name="titleFr"]')).toHaveValue(updatedTitleFr);
 
@@ -135,6 +137,8 @@ test.describe("Admin portfolio upload and publication", () => {
     await expect(publishedCard.getByText("published", { exact: true })).toBeVisible();
 
     await anonymousPage.goto("/fr/portfolio");
+    await expect(anonymousPage.locator('a[href="#galerie-video"]')).toBeVisible();
+    await expect(anonymousPage.locator('iframe[src*="player.vimeo.com/video/76979871"]')).toBeVisible();
     await expect(anonymousPage.getByRole("link", { name: updatedTitleFr })).toBeVisible();
     await anonymousPage.getByRole("link", { name: updatedTitleFr }).click();
     await expect(anonymousPage).toHaveURL(`/fr/portfolio/${slugFr}`);

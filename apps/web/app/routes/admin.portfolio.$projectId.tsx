@@ -131,6 +131,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const descriptionEn = formData.get("descriptionEn") as string;
       const location = formData.get("location") as string;
       const date = formData.get("date") as string;
+      const videoUrl = formData.get("videoUrl") as string;
 
       if (!titleFr || !titleEn || !descriptionFr || !descriptionEn) {
         return Response.json({ error: "Missing required fields" }, { status: 422, headers });
@@ -142,6 +143,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         description: { fr: descriptionFr, en: descriptionEn },
         location: location?.trim() ? location : null,
         date: date?.trim() ? date : null,
+        videoUrl: videoUrl?.trim() ? videoUrl : null,
       }, previousRevision);
 
       return Response.json({ success: true }, { headers });
@@ -577,6 +579,12 @@ export default function AdminPortfolioEdit() {
                 <input id="date" name="date" type="date" disabled={isReadOnly} defaultValue={project.date || ""} className={styles.input} />
                 {actionData?.fieldErrors?.["date"] && <p className={styles.fieldError}>{actionData.fieldErrors["date"]}</p>}
               </div>
+            </div>
+
+            <div className={styles.marginBottom}>
+              <label htmlFor="videoUrl" className={styles.label}>URL Vidéo (Optionnel, YouTube ou Vimeo)</label>
+              <input id="videoUrl" name="videoUrl" type="url" disabled={isReadOnly} defaultValue={project.videoUrl || ""} className={styles.input} placeholder="https://vimeo.com/... ou https://youtube.com/watch?v=..." />
+              {actionData?.fieldErrors?.["videoUrl"] && <p className={styles.fieldError}>{actionData.fieldErrors["videoUrl"]}</p>}
             </div>
 
             {actionData?.error && (
