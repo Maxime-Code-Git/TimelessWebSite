@@ -51,7 +51,6 @@ export default function CgvEn() {
         </div>
       </main>
       <Footer lang="en" />
-      <ScrollTop />
-    </div>
+      </div>
   );
 }

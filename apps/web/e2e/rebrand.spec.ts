@@ -59,6 +59,7 @@ test.describe('Rebranding and ScrollTop', () => {
     await expect(btn).toHaveCSS('pointer-events', 'none');
 
     // Scroll down
+    await page.setViewportSize({ width: 500, height: 300 });
     await page.mouse.wheel(0, 5000);
     // Button should appear
     await expect(btn).toHaveAttribute('aria-hidden', 'false');
@@ -84,3 +85,69 @@ test.describe('Rebranding and ScrollTop', () => {
     await expect(btn).toHaveCount(1);
   });
 });
+
+  test('ScrollTop respects reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/fr/cgv');
+    const scrollBtns = page.locator('button[aria-label="Retour en haut de page"]');
+    await expect(scrollBtns).toHaveCount(1);
+
+    // Evaluate if the behavior is 'auto' (it's hard to test JS window.scrollTo args directly from outside,
+    // but we can mock it or check CSS).
+    // Playwright cannot easily mock window.scrollTo behavior, but we can intercept it inside page.
+    const isAuto = await page.evaluate(() => {
+      let behavior = 'smooth';
+      const originalScrollTo = window.scrollTo;
+      window.scrollTo = function(...args: any[]) {
+        const options = args[0];
+        if (options && typeof options === 'object' && options.behavior) behavior = options.behavior;
+        return originalScrollTo.apply(window, args as any);
+      };
+      return behavior;
+    });
+
+    await page.setViewportSize({ width: 500, height: 300 });
+    await page.mouse.wheel(0, 5000);
+    const btn = scrollBtns.first();
+    await expect(btn).toHaveAttribute('aria-hidden', 'false');
+
+    // Setup the mock before clicking
+    await page.evaluate(() => {
+      (window as any).__scrollBehavior = 'smooth';
+      const originalScrollTo = window.scrollTo;
+      window.scrollTo = function(...args: any[]) {
+        const options = args[0];
+        if (options && typeof options === 'object' && options.behavior) (window as any).__scrollBehavior = options.behavior;
+      };
+    });
+
+    await btn.click();
+
+    const behavior = await page.evaluate(() => (window as any).__scrollBehavior);
+    expect(behavior).toBe('auto');
+  });
+
+  test('ScrollTop smooth motion by default', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/fr/cgv');
+    const scrollBtns = page.locator('button[aria-label="Retour en haut de page"]');
+    await expect(scrollBtns).toHaveCount(1);
+
+    await page.setViewportSize({ width: 500, height: 300 });
+    await page.mouse.wheel(0, 5000);
+    const btn = scrollBtns.first();
+    await expect(btn).toHaveAttribute('aria-hidden', 'false');
+
+    await page.evaluate(() => {
+      (window as any).__scrollBehavior = 'auto';
+      window.scrollTo = function(...args: any[]) {
+        const options = args[0];
+        if (options && typeof options === 'object' && options.behavior) (window as any).__scrollBehavior = options.behavior;
+      };
+    });
+
+    await btn.click();
+
+    const behavior = await page.evaluate(() => (window as any).__scrollBehavior);
+    expect(behavior).toBe('smooth');
+  });

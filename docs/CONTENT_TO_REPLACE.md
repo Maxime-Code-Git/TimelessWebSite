@@ -1,4 +1,4 @@
-# Contenus à remplacer avant publication — Timeless Photo & Video
+# Contenus à remplacer avant publication — Sempra Photo & Video
 
 > Ce document liste tous les placeholders, données fictives et informations manquantes
 > identifiées dans les fichiers de référence. Ces valeurs DOIVENT être remplacées
@@ -120,9 +120,9 @@ Si une galerie de démonstration est souhaitée pour les futurs clients :
 
 ## NOTES SUR LE NOM DU STUDIO
 
-- Le nom commercial est : **Timeless** (avec descriptif « Photo & Video »)
-- « Timeless Memory » est le nom des FICHIERS DE RÉFÉRENCE uniquement
-- Aucune occurrence de « Timeless Memory » ne doit apparaître sur le site public
+- Le nom commercial est : **Sempra** (avec descriptif « Photo & Video »)
+- « Sempra Memory » est le nom des FICHIERS DE RÉFÉRENCE uniquement
+- Aucune occurrence de « Sempra Memory » ne doit apparaître sur le site public
 - Vérification obligatoire avant publication via grep sur le bundle final
 
 ---

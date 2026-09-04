@@ -51,7 +51,6 @@ export default function CgvFr() {
         </div>
       </main>
       <Footer lang="fr" />
-      <ScrollTop />
-    </div>
+      </div>
   );
 }

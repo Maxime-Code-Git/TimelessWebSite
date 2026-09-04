@@ -39,7 +39,6 @@ export default function PrivacyFr() {
         </div>
       </main>
       <Footer lang="fr" />
-      <ScrollTop />
-    </div>
+      </div>
   );
 }

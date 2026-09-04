@@ -1,5 +1,5 @@
 /**
- * @fileoverview Types partagés et utilitaires pour Timeless
+ * @fileoverview Types partagés et utilitaires pour Sempra
  * Ce module est consommé directement depuis ses sources (pas de build dist/ nécessaire).
  */
 

@@ -1,4 +1,4 @@
-# Modèle de sécurité — Timeless Photo & Video
+# Modèle de sécurité — Sempra Photo & Video
 
 > Dernière mise à jour : 2026-08-13
 > Niveau de confidentialité : usage interne / propriétaire
@@ -87,12 +87,12 @@ Générés par Sharp lors de l'upload :
 - Dimensions max : 2400px côté long (Retina sans qualité impression)
 - EXIF/IPTC/GPS supprimés
 - Orientation corrigée avant suppression des métadonnées
-- Filigrane pixel « Timeless » intégré en diagonal
+- Filigrane pixel « Sempra » intégré en diagonal
 
 ### 4.3 Filigrane pixel
 
 - Rendu via Sharp (`sharp.composite()` avec SVG texte ou layer PNG pré-généré)
-- Texte « Timeless » en diagonal à 45°
+- Texte « Sempra » en diagonal à 45°
 - Répété toutes les 300px (configurable admin : 200–500px)
 - Opacité : 35% par défaut (configurable : 20–60%)
 - Taille police : 5% de la hauteur de l'image (configurable)

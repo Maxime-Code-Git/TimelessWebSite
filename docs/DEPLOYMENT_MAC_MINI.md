@@ -1,6 +1,6 @@
 # Guide de déploiement — Mac mini auto-hébergé
 
-> Version : 2026-08 — Timeless Photo & Video
+> Version : 2026-08 — Sempra Photo & Video
 
 ---
 
@@ -13,7 +13,7 @@
 
 ### SSD externe (médias)
 - Format : APFS ou HFS+ Journalisé (APFS recommandé pour la fiabilité)
-- Montage persistant : nommé `TimelessMedia`, monté en `/Volumes/TimelessMedia`
+- Montage persistant : nommé `SempraMedia`, monté en `/Volumes/SempraMedia`
 - Permissions : propriétaire `timeless` (utilisateur dédié), mode `700`
 - Sauvegarde : second SSD dédié à la sauvegarde, monté séparément
 
@@ -114,7 +114,7 @@ Caddy gère automatiquement Let's Encrypt (renouvellement compris).
 
 ```bash
 # Créer un utilisateur non-admin dédié
-sudo sysadminctl -addUser timeless -fullName "Timeless Studio" -password [PASSWORD_FORT]
+sudo sysadminctl -addUser timeless -fullName "Sempra Studio" -password [PASSWORD_FORT]
 
 # Ne jamais faire tourner les services en root
 # Monter le SSD avec les bonnes permissions
@@ -149,7 +149,7 @@ brew install redis
 ## 7. Structure des données
 
 ```
-/Volumes/TimelessMedia/
+/Volumes/SempraMedia/
   originals/          # Photos et vidéos en pleine résolution (MODE 700)
   web/                # Aperçus Web générés (MODE 755)
   zips/               # Archives ZIP pré-générées (MODE 700)
@@ -165,7 +165,7 @@ Dans `System Settings > General > Login Items`, ajouter un script :
 ```bash
 #!/bin/bash
 # mount-media-ssd.sh
-if [ ! -d "/Volumes/TimelessMedia" ]; then
+if [ ! -d "/Volumes/SempraMedia" ]; then
   diskutil mount /dev/diskXsY  # Remplacer par l'identifiant réel
 fi
 ```
@@ -194,7 +194,7 @@ services:
       - .env.production
     volumes:
       - /Users/timeless/timeless/data/database:/data/database
-      - /Volumes/TimelessMedia:/data/media:ro  # API lit, worker écrit
+      - /Volumes/SempraMedia:/data/media:ro  # API lit, worker écrit
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
       interval: 30s
@@ -209,7 +209,7 @@ services:
       - .env.production
     volumes:
       - /Users/timeless/timeless/data/database:/data/database
-      - /Volumes/TimelessMedia:/data/media  # Worker a accès en écriture
+      - /Volumes/SempraMedia:/data/media  # Worker a accès en écriture
 
   web:
     build: ./apps/web
@@ -310,14 +310,14 @@ THRESHOLD_WARN=70
 THRESHOLD_ALERT=85
 THRESHOLD_CRITICAL=95
 
-USAGE=$(df /Volumes/TimelessMedia | tail -1 | awk '{print $5}' | tr -d '%')
+USAGE=$(df /Volumes/SempraMedia | tail -1 | awk '{print $5}' | tr -d '%')
 
 if [ $USAGE -ge $THRESHOLD_CRITICAL ]; then
-  mail -s "[CRITIQUE] SSD TimelessMedia à ${USAGE}%" admin@votredomaine.be < /dev/null
+  mail -s "[CRITIQUE] SSD SempraMedia à ${USAGE}%" admin@votredomaine.be < /dev/null
 elif [ $USAGE -ge $THRESHOLD_ALERT ]; then
-  mail -s "[ALERTE] SSD TimelessMedia à ${USAGE}%" admin@votredomaine.be < /dev/null
+  mail -s "[ALERTE] SSD SempraMedia à ${USAGE}%" admin@votredomaine.be < /dev/null
 elif [ $USAGE -ge $THRESHOLD_WARN ]; then
-  mail -s "[AVERTISSEMENT] SSD TimelessMedia à ${USAGE}%" admin@votredomaine.be < /dev/null
+  mail -s "[AVERTISSEMENT] SSD SempraMedia à ${USAGE}%" admin@votredomaine.be < /dev/null
 fi
 ```
 
@@ -333,7 +333,7 @@ brew install osx-cpu-temp
 
 ```bash
 # Health check toutes les 5 minutes via cron
-*/5 * * * * curl -sf http://localhost:3000/healthz || mail -s "[DOWN] API Timeless" admin@...
+*/5 * * * * curl -sf http://localhost:3000/healthz || mail -s "[DOWN] API Sempra" admin@...
 ```
 
 ---
@@ -350,9 +350,9 @@ brew install osx-cpu-temp
 # Script sauvegarde quotidienne (cron 3h00)
 # 1. SQLite : Litestream réplique en continu
 # 2. Médias → SSD backup
-rsync -av --checksum /Volumes/TimelessMedia/originals/ /Volumes/TimelessBackup/originals/
+rsync -av --checksum /Volumes/SempraMedia/originals/ /Volumes/SempraBackup/originals/
 # 3. Médias → hors site (chiffré)
-rclone sync /Volumes/TimelessMedia/originals/ b2:timeless-backup/originals/ --crypt-password-file=/etc/timeless/backup.key
+rclone sync /Volumes/SempraMedia/originals/ b2:timeless-backup/originals/ --crypt-password-file=/etc/timeless/backup.key
 ```
 
 ### Commande de restauration

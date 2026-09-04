@@ -78,7 +78,6 @@ export default function LegalEn() {
         </div>
       </main>
       <Footer lang="en" />
-      <ScrollTop />
-    </div>
+      </div>
   );
 }

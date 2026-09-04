@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "description": "Timeless — Studio de photographie et vidéo de mariage",
+  "description": "Sempra — Studio de photographie et vidéo de mariage",
   "workspaces": [
     "apps/*",
     "packages/*"

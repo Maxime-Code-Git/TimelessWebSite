@@ -4,7 +4,7 @@
 # Output: ADMIN_PASSWORD_HASH to add to .env.production
 set -euo pipefail
 
-echo "=== Timeless — Admin password setup ==="
+echo "=== Sempra — Admin password setup ==="
 echo ""
 echo "Enter the new admin password (input hidden):"
 read -rs PASSWORD

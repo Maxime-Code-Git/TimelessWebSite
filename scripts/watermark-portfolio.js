@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const INPUT_DIR = process.env.INPUT_DIR || path.join(__dirname, '../data/media/raw');
 const OUTPUT_DIR = process.env.OUTPUT_DIR || path.join(__dirname, '../apps/web/public/media/portfolio');
-const WATERMARK_TEXT = 'Timeless';
+const WATERMARK_TEXT = 'Sempra';
 
 async function processImages() {
   if (!fs.existsSync(INPUT_DIR)) {

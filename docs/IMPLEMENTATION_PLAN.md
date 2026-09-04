@@ -1,4 +1,4 @@
-# Plan d'implémentation — Timeless Photo & Video
+# Plan d'implémentation — Sempra Photo & Video
 # Révision 2 — 2026-08-13 (corrections post-validation utilisateur)
 
 ## Source visuelle de vérité
@@ -6,7 +6,7 @@
 `references/page-accueil-reproduite/` — 7 fichiers `.dc.html`.
 
 Logo officiel : `references/logo-officiel.png`
-— Monogramme T + symbole infini doré + cercle d'horloge + "Timeless PHOTO & VIDEO".
+— Monogramme T + symbole infini doré + cercle d'horloge + "Sempra PHOTO & VIDEO".
 NE PAS utiliser `assets/logo-header.png` / `assets/logo-1.png` du ZIP.
 
 ---
@@ -223,7 +223,7 @@ Versions stables à verrouiller au moment du `npm install` initial (seront préc
 
 Chaque page publique expose :
 ```html
-<title>[Titre page] — Timeless Photo & Video</title>
+<title>[Titre page] — Sempra Photo & Video</title>
 <meta name="description" content="...">
 <link rel="canonical" href="https://domaine.be/fr/page">
 <link rel="alternate" hreflang="fr" href="https://domaine.be/fr/page">
@@ -335,7 +335,7 @@ timeless/
     ui/         # Composants réutilisables (Header, Footer, ImageSlot…)
   data/
     database/   # SQLite WAL + Drizzle ORM + migrations versionnées
-    media/      # → /Volumes/TimelessMedia (lien symbolique, non commité)
+    media/      # → /Volumes/SempraMedia (lien symbolique, non commité)
   docs/         # Documentation
   references/   # Maquettes + polices sources (non commité en prod)
   infra/
