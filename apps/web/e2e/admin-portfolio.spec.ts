@@ -92,10 +92,27 @@ test.describe('Admin Portfolio (Phase 3C.1)', () => {
 
     const modifyLinks = page.locator('a:has-text("Modifier")');
     await modifyLinks.last().click();
+    await expect(page.locator('h1', { hasText: 'Modifier le Projet' })).toBeVisible();
 
     // Change the title to make it distinct for reordering tests
     await page.fill('input[name="titleFr"]', 'Test Mariage FR 2');
-    await page.click('button:has-text("Enregistrer les modifications")');
+    
+    const saveButton = page.getByRole("button", {
+      name: "Enregistrer les modifications",
+      exact: true,
+    });
+    await expect(saveButton).toBeVisible();
+    await expect(saveButton).toBeEnabled();
+    
+    // Blur the input to reset mobile visual viewport and close any autofill suggestions
+    await page.locator('h1').first().click();
+    
+    await saveButton.scrollIntoViewIfNeeded();
+
+    const savePromise = page.waitForResponse(r => r.url().includes('/admin/portfolio/') && r.request().method() === 'POST');
+    await saveButton.focus();
+    await page.keyboard.press('Enter');
+    await savePromise;
     await page.click('a:has-text("Retour")');
 
     // Wait for dashboard and verify order
