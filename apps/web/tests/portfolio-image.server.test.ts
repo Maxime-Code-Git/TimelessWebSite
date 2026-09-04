@@ -535,6 +535,72 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
     });
   });
 
+  // === Resize and Watermark Correctness ===
+
+  describe("Resize and Watermark Correctness", () => {
+    it("should process a 501x619 image correctly without dimension mismatch (Regression)", async () => {
+      const filePath = path.join(tempDir, "regression.jpg");
+      await createTestJpeg(501, 619, filePath);
+
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+
+      expect(result.originalWidth).toBe(501);
+      expect(result.originalHeight).toBe(619);
+
+      const variant480p = result.variants.find(v => v.name === "480p");
+      expect(variant480p).toBeDefined();
+
+      // For fit: 'inside', the largest dimension should be exactly 480
+      // 501 / 619 = ~0.809, so 480 * 0.809 = ~388.
+      expect(variant480p!.height).toBe(480);
+      expect(variant480p!.width).toBe(388);
+
+      // Verify original hasn't been changed
+      const originalPath = path.join(mediaDir, PROJECT_ID, "originals", `${result.fileId}.jpeg`);
+      const originalHash = crypto.createHash("sha256").update(fs.readFileSync(originalPath)).digest("hex");
+      const sourceHash = crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+      expect(originalHash).toBe(sourceHash);
+
+      // Verify no temporary files remain
+      const allFiles = getAllFilesRecursive(tempDir);
+      expect(allFiles.filter(f => f.includes(".tmp."))).toHaveLength(0);
+
+      // Verify the dimensions in the generated webp actually match what's reported
+      const variantPath = path.join(mediaDir, PROJECT_ID, "480p", variant480p!.fileId + ".webp");
+      const variantMeta = await sharp(variantPath).metadata();
+      expect(variantMeta.width).toBe(388);
+      expect(variantMeta.height).toBe(480);
+      expect(variantMeta.format).toBe("webp");
+    });
+
+    it("should process an image with EXIF orientation 6 correctly", async () => {
+      const filePath = path.join(tempDir, "exif6.jpg");
+      // Image is physically 800x400 (landscape), but EXIF says orientation 6 (rotate 90 CW)
+      // So logically it is 400x800 (portrait).
+      await createTestJpeg(800, 400, filePath, { orientation: 6 });
+
+      const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Timeless", WM_REV);
+
+      // processImage swaps width/height during validation for orientation >= 5
+      expect(result.originalWidth).toBe(400);
+      expect(result.originalHeight).toBe(800);
+
+      const variant480p = result.variants.find(v => v.name === "480p");
+      expect(variant480p).toBeDefined();
+
+      // Since logically it is 400x800, height determines scale.
+      // scale = 480 / 800 = 0.6. width = 400 * 0.6 = 240.
+      expect(variant480p!.width).toBe(240);
+      expect(variant480p!.height).toBe(480);
+
+      const variantPath = path.join(mediaDir, PROJECT_ID, "480p", variant480p!.fileId + ".webp");
+      const variantMeta = await sharp(variantPath).metadata();
+      expect(variantMeta.width).toBe(240);
+      expect(variantMeta.height).toBe(480);
+      expect(variantMeta.format).toBe("webp");
+    });
+  });
+
   // === Watermark Rendering and CWD ===
 
   describe("Watermark rendering from different CWD", () => {

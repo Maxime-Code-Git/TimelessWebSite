@@ -424,31 +424,32 @@ export async function processImage(
         ensureStrictDirectory(variantDir, resolvedMediaBasePath);
       }
 
-      let resizeWidth: number;
-      let resizeHeight: number;
-      if (width <= breakpoint.maxWidth && height <= breakpoint.maxWidth) {
-        resizeWidth = width;
-        resizeHeight = height;
-      } else {
-        const scale = Math.min(breakpoint.maxWidth / width, breakpoint.maxWidth / height);
-        resizeWidth = Math.round(width * scale);
-        resizeHeight = Math.round(height * scale);
-      }
-
-      const watermarkSvg = await renderTextWatermark({
-        text: watermarkText,
-        watermarkRevision,
-        width: resizeWidth,
-        height: resizeHeight,
-      });
-
       const variantFileId = `${fileId}-${breakpoint.name}`;
       const variantPath = path.resolve(variantDir, `${variantFileId}.webp`);
       validateConfinement(variantPath, resolvedMediaBasePath);
 
-      const variantBuffer = await sharp(tempFilePath, { limitInputPixels: MAX_PIXELS })
+      const { data: rawBuffer, info } = await sharp(tempFilePath, { limitInputPixels: MAX_PIXELS })
         .rotate() // auto-orientation
-        .resize(resizeWidth, resizeHeight, { fit: "inside", withoutEnlargement: true })
+        .resize(breakpoint.maxWidth, breakpoint.maxWidth, { fit: "inside", withoutEnlargement: true })
+        .toColorspace("srgb")
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      const watermarkSvg = await renderTextWatermark({
+        text: watermarkText,
+        watermarkRevision,
+        width: info.width,
+        height: info.height,
+      });
+
+      const variantBuffer = await sharp(rawBuffer, {
+        raw: {
+          width: info.width,
+          height: info.height,
+          channels: 4,
+        }
+      })
         .composite([{ input: watermarkSvg, top: 0, left: 0 }])
         .webp({ quality: WEBP_QUALITY })
         .toBuffer();
@@ -456,12 +457,10 @@ export async function processImage(
       atomicWriteFile(variantPath, variantBuffer, 0o600);
       createdFiles.push(variantPath);
 
-      const outputMeta = await sharp(variantBuffer).metadata();
-
       variants.push({
         name: breakpoint.name,
-        width: outputMeta.width ?? resizeWidth,
-        height: outputMeta.height ?? resizeHeight,
+        width: info.width,
+        height: info.height,
         sizeBytes: variantBuffer.length,
         fileId: variantFileId,
       });
