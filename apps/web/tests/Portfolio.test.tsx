@@ -64,3 +64,61 @@ describe("Portfolio Component", () => {
     expect(screen.getByRole("link", { name: "Projet un" })).toBeInTheDocument();
   });
 });
+
+describe("Portfolio Video Component", () => {
+  it("sans vidéo : aucun lien #galerie-video, aucune section vidéo, aucun iframe", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <PortfolioPage lang="fr" projects={[makeProject("novideo", "ceremony")]} />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByRole("link", { name: "Vidéo" })).not.toBeInTheDocument();
+    expect(container.querySelector('#galerie-video')).not.toBeInTheDocument();
+    expect(container.querySelector('iframe')).not.toBeInTheDocument();
+  });
+
+  it("avec vidéo (Vimeo) : bouton de lecture présent, aucun iframe avant clic, iframe créée après clic", () => {
+    const project = makeProject("withvimeo", "ceremony");
+    project.video = { provider: "vimeo", videoId: "123456789" };
+
+    const { container } = render(
+      <MemoryRouter>
+        <PortfolioPage lang="fr" projects={[project]} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("link", { name: "Vidéo" })).toHaveAttribute("href", "#galerie-video");
+    const videoSection = container.querySelector('#galerie-video');
+    expect(videoSection).toBeInTheDocument();
+
+    // No iframe initially
+    expect(container.querySelector('iframe')).not.toBeInTheDocument();
+
+    // Click play
+    const playButton = screen.getByRole("button", { name: "Lire la vidéo" });
+    fireEvent.click(playButton);
+
+    // Iframe appears
+    const iframe = container.querySelector('iframe');
+    expect(iframe).toBeInTheDocument();
+    expect(iframe).toHaveAttribute("src", expect.stringContaining("player.vimeo.com/video/123456789"));
+  });
+
+  it("URL YouTube générée avec youtube-nocookie.com", () => {
+    const project = makeProject("withyoutube", "ceremony");
+    project.video = { provider: "youtube", videoId: "dQw4w9WgXcQ" };
+
+    const { container } = render(
+      <MemoryRouter>
+        <PortfolioPage lang="en" projects={[project]} />
+      </MemoryRouter>
+    );
+
+    const playButton = screen.getByRole("button", { name: "Play video" });
+    fireEvent.click(playButton);
+
+    const iframe = container.querySelector('iframe');
+    expect(iframe).toHaveAttribute("src", expect.stringContaining("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"));
+  });
+});

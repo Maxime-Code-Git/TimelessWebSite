@@ -498,14 +498,165 @@ describe("portfolio-content.server", () => {
         updatedAt: "2026-01-01T00:00:00.000Z",
         videoUrl: "https://vimeo.com/123456789"
       });
-      if (!parsed.success) {
-        console.error("MIGRATION ERROR", parsed.error);
-      }
       expect(parsed.success).toBe(true);
       if (parsed.success) {
         expect(parsed.data.video).toEqual({ provider: "vimeo", videoId: "123456789" });
         expect(parsed.data).not.toHaveProperty("videoUrl");
       }
+    });
+
+    it("rejette une ancienne URL invalide comme contenu corrompu", () => {
+      const parsed = projectSchema.safeParse({
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: { fr: "AAA", en: "AAA" },
+        slug: { fr: "aaa", en: "aaa" },
+        description: { fr: "AAA", en: "AAA" },
+        location: null,
+        date: null,
+        status: "draft",
+        order: 0,
+        coverPhotoId: null,
+        photos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        videoUrl: "https://evil-youtube.com/watch?v=dQw4w9WgXcQ"
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it("rejette un videoUrl de mauvais type", () => {
+      const parsed = projectSchema.safeParse({
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: { fr: "AAA", en: "AAA" },
+        slug: { fr: "aaa", en: "aaa" },
+        description: { fr: "AAA", en: "AAA" },
+        location: null,
+        date: null,
+        status: "draft",
+        order: 0,
+        coverPhotoId: null,
+        photos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        videoUrl: 12345
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it("rejette la présence simultanée de video et videoUrl", () => {
+      const parsed = projectSchema.safeParse({
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: { fr: "AAA", en: "AAA" },
+        slug: { fr: "aaa", en: "aaa" },
+        description: { fr: "AAA", en: "AAA" },
+        location: null,
+        date: null,
+        status: "draft",
+        order: 0,
+        coverPhotoId: null,
+        photos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        videoUrl: "https://vimeo.com/123456789",
+        video: { provider: "vimeo", videoId: "123456789" }
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it("valide un objet YouTube stocké valide", () => {
+      const parsed = projectSchema.safeParse({
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: { fr: "AAA", en: "AAA" },
+        slug: { fr: "aaa", en: "aaa" },
+        description: { fr: "AAA", en: "AAA" },
+        location: null,
+        date: null,
+        status: "draft",
+        order: 0,
+        coverPhotoId: null,
+        photos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        video: { provider: "youtube", videoId: "dQw4w9WgXcQ" }
+      });
+      expect(parsed.success).toBe(true);
+    });
+
+    it("valide un objet Vimeo stocké valide", () => {
+      const parsed = projectSchema.safeParse({
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: { fr: "AAA", en: "AAA" },
+        slug: { fr: "aaa", en: "aaa" },
+        description: { fr: "AAA", en: "AAA" },
+        location: null,
+        date: null,
+        status: "draft",
+        order: 0,
+        coverPhotoId: null,
+        photos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        video: { provider: "vimeo", videoId: "123456789" }
+      });
+      expect(parsed.success).toBe(true);
+    });
+
+    it("rejette un objet YouTube avec ID trop court, trop long ou invalide", () => {
+      const base = {
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: { fr: "AAA", en: "AAA" },
+        slug: { fr: "aaa", en: "aaa" },
+        description: { fr: "AAA", en: "AAA" },
+        location: null,
+        date: null,
+        status: "draft",
+        order: 0,
+        coverPhotoId: null,
+        photos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      };
+      expect(projectSchema.safeParse({ ...base, video: { provider: "youtube", videoId: "short" } }).success).toBe(false);
+      expect(projectSchema.safeParse({ ...base, video: { provider: "youtube", videoId: "waytoolongidfortheyoutubevideo" } }).success).toBe(false);
+      expect(projectSchema.safeParse({ ...base, video: { provider: "youtube", videoId: "invalid@char" } }).success).toBe(false);
+    });
+
+    it("rejette un objet Vimeo avec ID non numérique ou trop long", () => {
+      const base = {
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: { fr: "AAA", en: "AAA" },
+        slug: { fr: "aaa", en: "aaa" },
+        description: { fr: "AAA", en: "AAA" },
+        location: null,
+        date: null,
+        status: "draft",
+        order: 0,
+        coverPhotoId: null,
+        photos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      };
+      expect(projectSchema.safeParse({ ...base, video: { provider: "vimeo", videoId: "abcdefgh" } }).success).toBe(false);
+      expect(projectSchema.safeParse({ ...base, video: { provider: "vimeo", videoId: "12345678901234567" } }).success).toBe(false);
+    });
+
+    it("rejette des propriétés inconnues dans video", () => {
+      const parsed = projectSchema.safeParse({
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: { fr: "AAA", en: "AAA" },
+        slug: { fr: "aaa", en: "aaa" },
+        description: { fr: "AAA", en: "AAA" },
+        location: null,
+        date: null,
+        status: "draft",
+        order: 0,
+        coverPhotoId: null,
+        photos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        video: { provider: "youtube", videoId: "dQw4w9WgXcQ", unknownProp: true }
+      });
+      expect(parsed.success).toBe(false);
     });
 
     it("normalise l'absence de vidéo en video: null", () => {
@@ -527,6 +678,42 @@ describe("portfolio-content.server", () => {
       if (parsed.success) {
         expect(parsed.data.video).toBeNull();
       }
+    });
+
+    it("la lecture de migration ne réécrit pas le JSON automatiquement", () => {
+      // Create a raw mock JSON file with videoUrl instead of video
+      const rawProject = {
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: { fr: "AAA", en: "AAA" },
+        slug: { fr: "aaa", en: "aaa" },
+        description: { fr: "AAA", en: "AAA" },
+        location: null,
+        date: null,
+        status: "draft",
+        order: 0,
+        coverPhotoId: null,
+        photos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        videoUrl: "https://vimeo.com/123456789"
+      };
+      const valid = {
+        schemaVersion: 1,
+        revision: crypto.randomBytes(16).toString("hex"),
+        updatedAt: new Date().toISOString(),
+        projects: [rawProject],
+      };
+
+      const portfolioPathLocal = process.env.PORTFOLIO_CONTENT_PATH!;
+      fs.writeFileSync(portfolioPathLocal, JSON.stringify(valid));
+
+      const contentBefore = fs.readFileSync(portfolioPathLocal, "utf-8");
+
+      const portfolio = getPortfolioContent();
+      expect(portfolio.projects[0].video).toEqual({ provider: "vimeo", videoId: "123456789" });
+
+      const contentAfter = fs.readFileSync(portfolioPathLocal, "utf-8");
+      expect(contentAfter).toBe(contentBefore); // file untouched
     });
   });
 });

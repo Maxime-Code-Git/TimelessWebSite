@@ -273,6 +273,87 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     expect(editRes.status).toBe(200);
     revision = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8")).revision;
 
+    // 6.1 Validation stricte de la vidéo (URLs invalides -> 422)
+    const badVideoUrls = [
+      "http://vimeo.com/123456", // HTTP
+      "https://evil.com/123", // bad domain
+      "https://youtube.com/watch?v=short", // invalid ID
+      "https://vimeo.com/" + "1".repeat(300) // too long
+    ];
+
+    for (const badUrl of badVideoUrls) {
+      const beforeFilesList = fs.readdirSync(tempDir);
+      const beforeContentStr = fs.readFileSync(portfolioContentPath, "utf-8");
+
+      const badVidRes = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
+        method: "POST",
+        headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          csrfToken: csrfToken2,
+          revision,
+          titleFr: "T", titleEn: "T", slugFr: "t", slugEn: "t", descriptionFr: "D", descriptionEn: "D",
+          videoUrl: badUrl
+        }),
+      });
+      expect(badVidRes.status).toBe(422);
+
+      // check that JSON is unchanged, no temp, no backup
+      expect(fs.readFileSync(portfolioContentPath, "utf-8")).toBe(beforeContentStr);
+      expect(fs.readdirSync(tempDir)).toEqual(beforeFilesList);
+    }
+
+    // 6.2 Ajout Vimeo valide
+    const vimeoRes = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
+      method: "POST",
+      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        csrfToken: csrfToken2,
+        revision,
+        titleFr: "T", titleEn: "T", slugFr: "t", slugEn: "t", descriptionFr: "D", descriptionEn: "D",
+        videoUrl: "https://vimeo.com/123456789"
+      }),
+      redirect: "manual"
+    });
+    expect(vimeoRes.status).toBe(200);
+    let currentData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
+    revision = currentData.revision;
+    expect(currentData.projects[0].video).toEqual({ provider: "vimeo", videoId: "123456789" });
+
+    // 6.3 Remplacement Vimeo -> YouTube
+    const ytRes = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
+      method: "POST",
+      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        csrfToken: csrfToken2,
+        revision,
+        titleFr: "T", titleEn: "T", slugFr: "t", slugEn: "t", descriptionFr: "D", descriptionEn: "D",
+        videoUrl: "https://youtube.com/watch?v=dQw4w9WgXcQ"
+      }),
+      redirect: "manual"
+    });
+    expect(ytRes.status).toBe(200);
+    currentData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
+    revision = currentData.revision;
+    expect(currentData.projects[0].video).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
+
+    // 6.4 Suppression en vidant le champ
+    const delVidRes = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
+      method: "POST",
+      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        csrfToken: csrfToken2,
+        revision,
+        titleFr: "T", titleEn: "T", slugFr: "t", slugEn: "t", descriptionFr: "D", descriptionEn: "D",
+        videoUrl: " " // or empty
+      }),
+      redirect: "manual"
+    });
+    expect(delVidRes.status).toBe(200);
+    currentData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
+    revision = currentData.revision;
+    expect(currentData.projects[0].video).toBeNull();
+
+
     // 7. ancienne révision sur création, édition, ordre et suppression -> 409
     const conflictCreate = await fetch(`${BASE_URL}/admin/portfolio/new`, {
       method: "POST",

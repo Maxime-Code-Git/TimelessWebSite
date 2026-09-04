@@ -71,6 +71,16 @@ export const photoSchema = z.object({
 
 export type Photo = z.infer<typeof photoSchema>;
 
+const youtubeVideoSchema = z.object({
+  provider: z.literal("youtube"),
+  videoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
+}).strict();
+
+const vimeoVideoSchema = z.object({
+  provider: z.literal("vimeo"),
+  videoId: z.string().regex(/^\d{5,15}$/),
+}).strict();
+
 export const projectSchema = z.object({
   id: z.string().uuid(),
   slug: z.object({
@@ -92,11 +102,8 @@ export const projectSchema = z.object({
     const d = new Date(val);
     return !isNaN(d.getTime()) && d.toISOString().startsWith(val);
   }, "Invalid date format or impossible date"),
-  videoUrl: z.any().optional(), // for backward compatibility during read
-  video: z.object({
-    provider: z.enum(["youtube", "vimeo"]),
-    videoId: z.string(),
-  }).nullable().optional(),
+  videoUrl: z.string().trim().url().max(255).nullable().optional(), // for backward compatibility during read
+  video: z.union([youtubeVideoSchema, vimeoVideoSchema]).nullable().optional(),
   status: z.enum(["draft", "published"]),
   order: z.number().int().min(0),
   coverPhotoId: z.string().uuid().nullable(),
@@ -125,17 +132,22 @@ export const projectSchema = z.object({
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Published project must have at least one photo", path: ["photos"] });
     }
   }
-}).transform(data => {
+}).transform((data, ctx) => {
+  if (data.video !== undefined && data.videoUrl !== undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Cannot specify both video and videoUrl", path: ["video"] });
+    return z.NEVER;
+  }
   let video = data.video ?? null;
-  if (data.videoUrl !== undefined) {
-    if (typeof data.videoUrl === "string") {
-      video = parseVideoUrl(data.videoUrl);
+  if (data.videoUrl !== undefined && data.videoUrl !== null) {
+    video = parseVideoUrl(data.videoUrl);
+    if (!video) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid videoUrl format", path: ["videoUrl"] });
+      return z.NEVER;
     }
   }
-  if ("videoUrl" in data) {
-    delete data.videoUrl;
-  }
-  return { ...data, video };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { videoUrl: _, ...rest } = data;
+  return { ...rest, video };
 });
 
 export const watermarkConfigSchema = z.object({

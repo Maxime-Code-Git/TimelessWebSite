@@ -136,10 +136,38 @@ test.describe("Admin portfolio upload and publication", () => {
     });
     await expect(publishedCard.getByText("published", { exact: true })).toBeVisible();
 
-    await anonymousPage.goto("/fr/portfolio");
+    let externalRequests = 0;
+    await anonymousPage.route("**/*", route => {
+      const url = route.request().url();
+      if (url.includes("vimeo.com") || url.includes("youtube.com")) {
+        externalRequests++;
+        return route.fulfill({ status: 200, body: "simulated-video", contentType: "text/html" });
+      }
+      return route.continue();
+    });
+
+    const portfolioResponse = await anonymousPage.goto("/fr/portfolio");
+    expect(portfolioResponse?.status()).toBe(200);
+
+    const csp = portfolioResponse?.headers()["content-security-policy"] || "";
+    expect(csp).toContain("frame-src https://www.youtube-nocookie.com https://player.vimeo.com");
+
+    const inlineStyles = await anonymousPage.locator("[style]").count();
+    expect(inlineStyles).toBe(0);
+
     await expect(anonymousPage.locator('a[href="#galerie-video"]')).toBeVisible();
+
+    // Avant le clic : aucune iframe, aucune requête
+    await expect(anonymousPage.locator('iframe')).toHaveCount(0);
+    expect(externalRequests).toBe(0);
+
+    const requestPromise = anonymousPage.waitForRequest(req => req.url().includes("vimeo.com") || req.url().includes("youtube.com"));
     await anonymousPage.locator('button[aria-label="Lire la vidéo"]').first().click();
+
+    // Après le clic : iframe présente et requête lancée
+    await requestPromise;
     await expect(anonymousPage.locator('iframe[src*="player.vimeo.com/video/76979871"]')).toBeVisible();
+    expect(externalRequests).toBeGreaterThan(0);
     await expect(anonymousPage.getByRole("link", { name: updatedTitleFr })).toBeVisible();
     await anonymousPage.getByRole("link", { name: updatedTitleFr }).click();
     await expect(anonymousPage).toHaveURL(`/fr/portfolio/${slugFr}`);
