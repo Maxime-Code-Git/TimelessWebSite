@@ -29,7 +29,7 @@ test.describe('Rebranding and ScrollTop', () => {
     // Header logo
     const headerLogo = page.locator('header img[alt="Sempra"]').first();
     await expect(headerLogo).toBeVisible();
-    await expect(headerLogo).toHaveAttribute('src', '/brand/sempra_horizontal_navy.svg');
+    await expect(headerLogo).toHaveAttribute('src', '/brand/SempraFullBlue.png');
     const headerLink = page.locator('header a[aria-label="Sempra — Accueil"]').first();
     await expect(headerLink).toBeVisible();
 
