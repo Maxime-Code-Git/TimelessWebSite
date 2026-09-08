@@ -508,3 +508,112 @@
     grid-template-columns: 1fr;
   }
 }
+
+.categoryItem {
+  padding: 10px;
+  border: 1px solid #ccc;
+  margin-bottom: 5px;
+  background: #fff;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.categoryArrows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.arrowBtn {
+  padding: 2px 5px;
+}
+.arrowBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.flex1 { flex: 1; }
+.flexRowSpaceBetween {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.flexRowGap5 {
+  display: flex;
+  gap: 5px;
+}
+.flexColGap2 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.inactiveText {
+  color: red;
+  margin-left: 10px;
+}
+.errorMessage {
+  color: red;
+  font-size: 14px;
+  margin-top: 10px;
+  width: 100%;
+  padding: 5px;
+}
+.photoItem {
+  border: 1px solid #ccc;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.photoArrows {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  display: flex;
+  gap: 2px;
+  z-index: 10;
+}
+.arrowBtnBg {
+  padding: 2px 5px;
+  background: rgba(255,255,255,0.8);
+  border: 1px solid #ccc;
+}
+.arrowBtnBg:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.photoImgCover {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+}
+.photoContent {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  height: 100%;
+}
+
+/* Replaced inline styles */
+.textRedBold { color: red; font-weight: bold; }
+.mainContentPadded { display: block; padding: 2rem; }
+.sectionCard { margin-bottom: 2rem; max-width: 100%; }
+.sectionTitle { font-size: 1.2rem; font-weight: bold; margin-bottom: 1rem; }
+.sectionTitleNoMargin { font-size: 1.2rem; font-weight: bold; }
+.videoInput { max-width: 400px; flex: 1; }
+.categoryFormRow { margin-top: 1rem; flex-wrap: wrap; }
+.sectionCardNoBottom { max-width: 100%; }
+.marginBottom1 { margin-bottom: 1rem; }
+.displayNone { display: none; }
+.uploadsContainer { margin-bottom: 1rem; padding: 1rem; background: #f3f4f6; border-radius: 5px; }
+.uploadsTitle { margin: 0 0 10px 0; }
+.uploadRow { border-bottom: 1px solid #ddd; padding: 5px 0; }
+.uploadStatusDone { color: green; }
+.uploadStatusError { color: red; }
+.uploadStatusPending { color: black; }
+.photoGridResponsive { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+.confirmDeleteText { color: red; font-weight: bold; font-size: 12px; text-align: center; }
+.photoCategoryText { font-size: 12px; color: #666; }
+.photoAltText { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.photoActionsRow { display: flex; gap: 5px; flex-wrap: wrap; margin-top: auto; }
+.photoActionButton { padding: 2px 5px; font-size: 12px; }
+.hiddenText { color: red; font-size: 12px; font-weight: bold; }

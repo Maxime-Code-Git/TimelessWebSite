@@ -45,12 +45,12 @@ export interface OpenPortfolioVariantResult {
 
 export async function openPortfolioVariant(
   mediaBasePath: string,
-  projectId: string,
+  photoId: string,
   variant: string,
   variantFileId: string
 ): Promise<OpenPortfolioVariantResult> {
   if (
-    !uuidRegex.test(projectId) ||
+    !uuidRegex.test(photoId) ||
     !variantRegex.test(variant) ||
     !variantFileIdRegex.test(variantFileId) ||
     !variantFileId.endsWith(`-${variant}`)
@@ -67,8 +67,16 @@ export async function openPortfolioVariant(
     }
     const realBasePath = await fsPromises.realpath(basePath);
 
-    const projectPath = path.resolve(basePath, projectId);
-    if (!isContained(basePath, projectPath)) throw new PortfolioMediaNotFoundError();
+    const globalV2Path = path.resolve(basePath, "global-v2");
+    if (!isContained(basePath, globalV2Path)) throw new PortfolioMediaNotFoundError();
+    await assertRealDirectory(globalV2Path, realBasePath);
+
+    const photosPath = path.resolve(globalV2Path, "photos");
+    if (!isContained(globalV2Path, photosPath)) throw new PortfolioMediaNotFoundError();
+    await assertRealDirectory(photosPath, realBasePath);
+
+    const projectPath = path.resolve(photosPath, photoId);
+    if (!isContained(photosPath, projectPath)) throw new PortfolioMediaNotFoundError();
     await assertRealDirectory(projectPath, realBasePath);
 
     const variantPath = path.resolve(projectPath, variant);

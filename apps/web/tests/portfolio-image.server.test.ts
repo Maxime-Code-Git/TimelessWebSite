@@ -240,7 +240,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       await createTestJpeg(100, 100, targetFile);
 
       const symlinkPath = path.join(tempDir, "symlink.jpg");
-      fs.symlinkSync(targetFile, symlinkPath);
+      fs.mkdirSync(path.dirname(symlinkPath), { recursive: true }); fs.symlinkSync(targetFile, symlinkPath);
 
       try {
         await expect(validateImageFile(symlinkPath, tempDir))
@@ -276,7 +276,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
 
       // Original file should be byte-identical to source (SHA-256)
       const srcHash = crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
-      const origPath = path.join(mediaDir, PROJECT_ID, "originals", `${result.fileId}.jpeg`);
+      const origPath = path.join(mediaDir, "global-v2", "photos", PROJECT_ID, "originals", `${result.fileId}.jpeg`);
       const origHash = crypto.createHash("sha256").update(fs.readFileSync(origPath)).digest("hex");
       expect(origHash).toBe(srcHash);
 
@@ -285,7 +285,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       // 600x800, scale=min(480/600, 480/800)=min(0.8,0.6)=0.6 -> 360x480
       expect(variant.width).toBe(360);
       expect(variant.height).toBe(480);
-      const variantPath = path.join(mediaDir, PROJECT_ID, variant.name, `${variant.fileId}.webp`);
+      const variantPath = path.join(mediaDir, "global-v2", "photos", PROJECT_ID, variant.name, `${variant.fileId}.webp`);
       const variantMeta = await sharp(variantPath).metadata();
       expect(variantMeta.orientation).toBeUndefined();
     });
@@ -337,7 +337,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       for (const variant of result.variants) {
-        const variantPath = path.join(mediaDir, PROJECT_ID, variant.name, `${variant.fileId}.webp`);
+        const variantPath = path.join(mediaDir, "global-v2", "photos", PROJECT_ID, variant.name, `${variant.fileId}.webp`);
         expect(fs.existsSync(variantPath)).toBe(true);
         const meta = await sharp(variantPath).metadata();
         expect(meta.format).toBe("webp");
@@ -354,7 +354,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       for (const variant of result.variants) {
-        const variantPath = path.join(mediaDir, PROJECT_ID, variant.name, `${variant.fileId}.webp`);
+        const variantPath = path.join(mediaDir, "global-v2", "photos", PROJECT_ID, variant.name, `${variant.fileId}.webp`);
         const meta = await sharp(variantPath).metadata();
         expect(meta.exif).toBeUndefined();
       }
@@ -369,12 +369,12 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
       // Check original file
-      const origPath = path.join(mediaDir, PROJECT_ID, "originals", `${result.fileId}.${result.originalFormat}`);
+      const origPath = path.join(mediaDir, "global-v2", "photos", PROJECT_ID, "originals", `${result.fileId}.${result.originalFormat}`);
       expect(fs.statSync(origPath).mode & 0o777).toBe(0o600);
 
       // Check all variant files
       for (const variant of result.variants) {
-        const variantPath = path.join(mediaDir, PROJECT_ID, variant.name, `${variant.fileId}.webp`);
+        const variantPath = path.join(mediaDir, "global-v2", "photos", PROJECT_ID, variant.name, `${variant.fileId}.webp`);
         expect(fs.statSync(variantPath).mode & 0o777).toBe(0o600);
       }
     });
@@ -387,7 +387,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
 
       const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "Sempra", WM_REV);
 
-      const projectDir = path.join(mediaDir, PROJECT_ID);
+      const projectDir = path.join(mediaDir, "global-v2", "photos", PROJECT_ID);
       expect(fs.statSync(projectDir).mode & 0o777).toBe(0o700);
 
       const originalsDir = path.join(projectDir, "originals");
@@ -407,8 +407,8 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
 
       const mediaDir1 = path.join(tempDir, "media1");
       const mediaDir2 = path.join(tempDir, "media2");
-      fs.mkdirSync(mediaDir1);
-      fs.mkdirSync(mediaDir2);
+      fs.mkdirSync(mediaDir1, { recursive: true });
+      fs.mkdirSync(mediaDir2, { recursive: true });
 
       const pId1 = "00000000-0000-4000-8000-000000000001";
       const pId2 = "00000000-0000-4000-8000-000000000002";
@@ -416,8 +416,8 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const result1 = await processImage(filePath1, tempDir, pId1, mediaDir1, "Sempra", WM_REV);
       const result2 = await processImage(filePath2, tempDir, pId2, mediaDir2, "Different Mark", WM_REV);
 
-      const variant1Path = path.join(mediaDir1, pId1, result1.variants[0].name, `${result1.variants[0].fileId}.webp`);
-      const variant2Path = path.join(mediaDir2, pId2, result2.variants[0].name, `${result2.variants[0].fileId}.webp`);
+      const variant1Path = path.join(mediaDir1, "global-v2", "photos", pId1, result1.variants[0].name, `${result1.variants[0].fileId}.webp`);
+      const variant2Path = path.join(mediaDir2, "global-v2", "photos", pId2, result2.variants[0].name, `${result2.variants[0].fileId}.webp`);
 
       const buf1 = fs.readFileSync(variant1Path);
       const buf2 = fs.readFileSync(variant2Path);
@@ -435,7 +435,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const result = await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "WATERMARK", WM_REV);
 
       const variant = result.variants[0];
-      const variantPath = path.join(mediaDir, PROJECT_ID, variant.name, `${variant.fileId}.webp`);
+      const variantPath = path.join(mediaDir, "global-v2", "photos", PROJECT_ID, variant.name, `${variant.fileId}.webp`);
       const variantBuffer = fs.readFileSync(variantPath);
 
       // Build reference: same resize + WebP, NO watermark
@@ -556,7 +556,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       expect(variant480p!.width).toBe(388);
 
       // Verify original hasn't been changed
-      const originalPath = path.join(mediaDir, PROJECT_ID, "originals", `${result.fileId}.jpeg`);
+      const originalPath = path.join(mediaDir, "global-v2", "photos", PROJECT_ID, "originals", `${result.fileId}.jpeg`);
       const originalHash = crypto.createHash("sha256").update(fs.readFileSync(originalPath)).digest("hex");
       const sourceHash = crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
       expect(originalHash).toBe(sourceHash);
@@ -566,7 +566,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       expect(allFiles.filter(f => f.includes(".tmp."))).toHaveLength(0);
 
       // Verify the dimensions in the generated webp actually match what's reported
-      const variantPath = path.join(mediaDir, PROJECT_ID, "480p", variant480p!.fileId + ".webp");
+      const variantPath = path.join(mediaDir, "global-v2", "photos", PROJECT_ID, "480p", variant480p!.fileId + ".webp");
       const variantMeta = await sharp(variantPath).metadata();
       expect(variantMeta.width).toBe(388);
       expect(variantMeta.height).toBe(480);
@@ -593,7 +593,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       expect(variant480p!.width).toBe(240);
       expect(variant480p!.height).toBe(480);
 
-      const variantPath = path.join(mediaDir, PROJECT_ID, "480p", variant480p!.fileId + ".webp");
+      const variantPath = path.join(mediaDir, "global-v2", "photos", PROJECT_ID, "480p", variant480p!.fileId + ".webp");
       const variantMeta = await sharp(variantPath).metadata();
       expect(variantMeta.width).toBe(240);
       expect(variantMeta.height).toBe(480);
@@ -664,71 +664,71 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
 
     it("rejects projectDir symlink (external)", async () => {
       const targetPath = path.join(tempDir, "fake_project");
-      fs.mkdirSync(targetPath);
+      fs.mkdirSync(targetPath, { recursive: true });
       const pId = "00000000-0000-4000-8000-000000000001";
-      const symlinkPath = path.join(mediaDir, pId);
-      fs.symlinkSync(targetPath, symlinkPath);
+      const symlinkPath = path.join(mediaDir, "global-v2", "photos", pId);
+      fs.mkdirSync(path.dirname(symlinkPath), { recursive: true }); fs.symlinkSync(targetPath, symlinkPath);
       await assertSymlinkRejection(symlinkPath, targetPath, pId);
     });
 
     it("rejects projectDir symlink (internal)", async () => {
       const pId = "00000000-0000-4000-8000-000000000001";
       const targetPath = path.join(mediaDir, "00000000-0000-4000-8000-000000000002");
-      fs.mkdirSync(targetPath);
-      const symlinkPath = path.join(mediaDir, pId);
-      fs.symlinkSync(targetPath, symlinkPath);
+      fs.mkdirSync(targetPath, { recursive: true });
+      const symlinkPath = path.join(mediaDir, "global-v2", "photos", pId);
+      fs.mkdirSync(path.dirname(symlinkPath), { recursive: true }); fs.symlinkSync(targetPath, symlinkPath);
       await assertSymlinkRejection(symlinkPath, targetPath, pId);
     });
 
     it("rejects originalsDir symlink (external)", async () => {
       const pId = "00000000-0000-4000-8000-000000000001";
-      const projectDir = path.join(mediaDir, pId);
-      fs.mkdirSync(projectDir);
+      const projectDir = path.join(mediaDir, "global-v2", "photos", pId);
+      fs.mkdirSync(projectDir, { recursive: true });
       const targetPath = path.join(tempDir, "fake_originals");
-      fs.mkdirSync(targetPath);
+      fs.mkdirSync(targetPath, { recursive: true });
       const symlinkPath = path.join(projectDir, "originals");
-      fs.symlinkSync(targetPath, symlinkPath);
+      fs.mkdirSync(path.dirname(symlinkPath), { recursive: true }); fs.symlinkSync(targetPath, symlinkPath);
       await assertSymlinkRejection(symlinkPath, targetPath, pId);
     });
 
     it("rejects originalsDir symlink (internal)", async () => {
       const pId = "00000000-0000-4000-8000-000000000001";
-      const projectDir = path.join(mediaDir, pId);
-      fs.mkdirSync(projectDir);
+      const projectDir = path.join(mediaDir, "global-v2", "photos", pId);
+      fs.mkdirSync(projectDir, { recursive: true });
       const targetPath = path.join(projectDir, "other_internal");
-      fs.mkdirSync(targetPath);
+      fs.mkdirSync(targetPath, { recursive: true });
       const symlinkPath = path.join(projectDir, "originals");
-      fs.symlinkSync(targetPath, symlinkPath);
+      fs.mkdirSync(path.dirname(symlinkPath), { recursive: true }); fs.symlinkSync(targetPath, symlinkPath);
       await assertSymlinkRejection(symlinkPath, targetPath, pId);
     });
 
     it("rejects variantDir symlink (external)", async () => {
       const pId = "00000000-0000-4000-8000-000000000001";
-      const projectDir = path.join(mediaDir, pId);
-      fs.mkdirSync(projectDir);
+      const projectDir = path.join(mediaDir, "global-v2", "photos", pId);
+      fs.mkdirSync(projectDir, { recursive: true });
       const targetPath = path.join(tempDir, "fake_480p");
-      fs.mkdirSync(targetPath);
+      fs.mkdirSync(targetPath, { recursive: true });
       const symlinkPath = path.join(projectDir, "480p");
-      fs.symlinkSync(targetPath, symlinkPath);
+      fs.mkdirSync(path.dirname(symlinkPath), { recursive: true }); fs.symlinkSync(targetPath, symlinkPath);
       await assertSymlinkRejection(symlinkPath, targetPath, pId);
     });
 
     it("rejects variantDir symlink (internal)", async () => {
       const pId = "00000000-0000-4000-8000-000000000001";
-      const projectDir = path.join(mediaDir, pId);
-      fs.mkdirSync(projectDir);
+      const projectDir = path.join(mediaDir, "global-v2", "photos", pId);
+      fs.mkdirSync(projectDir, { recursive: true });
       const targetPath = path.join(projectDir, "other_480p");
-      fs.mkdirSync(targetPath);
+      fs.mkdirSync(targetPath, { recursive: true });
       const symlinkPath = path.join(projectDir, "480p");
-      fs.symlinkSync(targetPath, symlinkPath);
+      fs.mkdirSync(path.dirname(symlinkPath), { recursive: true }); fs.symlinkSync(targetPath, symlinkPath);
       await assertSymlinkRejection(symlinkPath, targetPath, pId);
     });
 
     it("rejects mediaBasePath symlink (external)", async () => {
       const fakeMediaDir = path.join(tempDir, "fake_media");
-      fs.mkdirSync(fakeMediaDir);
+      fs.mkdirSync(fakeMediaDir, { recursive: true });
       const symlinkMediaDir = path.join(tempDir, "symlink_media");
-      fs.symlinkSync(fakeMediaDir, symlinkMediaDir);
+      fs.mkdirSync(path.dirname(symlinkMediaDir), { recursive: true }); fs.symlinkSync(fakeMediaDir, symlinkMediaDir);
 
       const sentinelPath = path.join(fakeMediaDir, "sentinel.txt");
       fs.writeFileSync(sentinelPath, "SAFE");
@@ -745,9 +745,9 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
     it("rejects mediaBasePath symlink (internal) with sentinel", async () => {
       // mediaBasePath is a symlink pointing to another directory inside tempDir
       const realMedia = path.join(tempDir, "real_media");
-      fs.mkdirSync(realMedia);
+      fs.mkdirSync(realMedia, { recursive: true });
       const symlinkMedia = path.join(tempDir, "link_media");
-      fs.symlinkSync(realMedia, symlinkMedia);
+      fs.mkdirSync(path.dirname(symlinkMedia), { recursive: true }); fs.symlinkSync(realMedia, symlinkMedia);
 
       const sentinelPath = path.join(realMedia, "sentinel.txt");
       fs.writeFileSync(sentinelPath, "UNTOUCHED");
@@ -813,8 +813,8 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
     it("rejects invalid UUIDs", async () => {
       const filePath = path.join(tempDir, "test.jpg");
       await createTestJpeg(100, 100, filePath);
-      await expect(processImage(filePath, tempDir, "invalid-uuid", mediaDir, "T", "R")).rejects.toThrow("Invalid project ID.");
-      await expect(processImage(filePath, tempDir, "../00000000-0000-4000-8000-000000000000", mediaDir, "T", "R")).rejects.toThrow("Invalid project ID.");
+      await expect(processImage(filePath, tempDir, "invalid-uuid", mediaDir, "T", "R")).rejects.toThrow("Invalid photo ID.");
+      await expect(processImage(filePath, tempDir, "../00000000-0000-4000-8000-000000000000", mediaDir, "T", "R")).rejects.toThrow("Invalid photo ID.");
     });
 
     it("masks ENOENT to generic error without path", async () => {
@@ -936,7 +936,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
         expect(error.message).not.toContain("/secret");
         expect(error.cause).toBeUndefined();
         // No output files should have been created
-        const projDir = path.join(mediaDir, PROJECT_ID);
+        const projDir = path.join(mediaDir, "global-v2", "photos", PROJECT_ID);
         expect(fs.existsSync(projDir)).toBe(false);
       }
     });
@@ -945,7 +945,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const realFile = path.join(tempDir, "real.jpg");
       await createTestJpeg(100, 100, realFile);
       const symlinkFile = path.join(tempDir, "link.jpg");
-      fs.symlinkSync(realFile, symlinkFile);
+      fs.mkdirSync(path.dirname(symlinkFile), { recursive: true }); fs.symlinkSync(realFile, symlinkFile);
 
       // Both are inside tempDir, but the source is a symlink
       await expect(validateImageFile(symlinkFile, tempDir))
@@ -961,7 +961,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       const realFile = path.join(otherDir, "external.jpg");
       await createTestJpeg(100, 100, realFile);
       const symlinkFile = path.join(tempDir, "link_ext.jpg");
-      fs.symlinkSync(realFile, symlinkFile);
+      fs.mkdirSync(path.dirname(symlinkFile), { recursive: true }); fs.symlinkSync(realFile, symlinkFile);
 
       try {
         await expect(validateImageFile(symlinkFile, tempDir))
@@ -1074,7 +1074,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       expect(fs.readFileSync(sentinelPath, "utf8")).toBe("INTACT");
 
       // Project dir should be rolled back
-      const projDir = path.join(mediaDir, PROJECT_ID);
+      const projDir = path.join(mediaDir, "global-v2", "photos", PROJECT_ID);
       expect(fs.existsSync(projDir)).toBe(false);
     });
 
@@ -1151,7 +1151,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
       // SHOULD SUCCEED because dir fsync is best-effort
       await processImage(filePath, tempDir, PROJECT_ID, mediaDir, "T", "R");
 
-      const projectPath = path.join(mediaDir, PROJECT_ID);
+      const projectPath = path.join(mediaDir, "global-v2", "photos", PROJECT_ID);
       expect(fs.existsSync(projectPath)).toBe(true);
     });
   });

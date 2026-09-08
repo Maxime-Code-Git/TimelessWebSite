@@ -49,12 +49,14 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
   beforeAll(async () => {
     fs.copyFileSync(defaultSiteContentPath, siteContentPath);
 
-    // Create empty portfolio
     fs.writeFileSync(portfolioContentPath, JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "00000000000000000000000000000000",
       updatedAt: new Date().toISOString(),
-      projects: []
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Test", revision: "00000000000000000000000000000000", updatedAt: new Date().toISOString() }
     }));
 
     return new Promise((resolve, reject) => {
@@ -117,9 +119,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
   it("GET des quatre routes sans session -> 302 vers /admin", async () => {
     const routes = [
       "/admin/portfolio",
-      "/admin/portfolio/new",
-      "/admin/portfolio/fake-id",
-      "/admin/portfolio/fake-id/preview"
+      "/admin/portfolio/watermark",
     ];
     for (const route of routes) {
       const res = await fetch(`${BASE_URL}${route}`, { redirect: "manual" });
@@ -139,12 +139,14 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     expect(html).not.toContain("completely broken JSON");
     expect(html).not.toContain(portfolioContentPath);
 
-    // Restore
     fs.writeFileSync(portfolioContentPath, JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "00000000000000000000000000000000",
       updatedAt: new Date().toISOString(),
-      projects: []
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Test", revision: "00000000000000000000000000000000", updatedAt: new Date().toISOString() }
     }));
   });
 
@@ -162,352 +164,4 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     expect(setCookie.toLowerCase()).toMatch(/max-age=0|expires=thu, 01 jan 1970/);
   });
 
-  it("Full portfolio workflow with security errors", async () => {
-    // Login
-    const getRes = await fetch(`${BASE_URL}/admin`);
-    const anonCookie = getRes.headers.get("Set-Cookie");
-    const text = await getRes.text();
-    const csrfMatch = text.match(/name="csrfToken" value="([^"]+)"/);
-    const csrfToken = csrfMatch ? csrfMatch[1] : "";
-
-    const loginRes = await fetch(`${BASE_URL}/admin`, {
-      method: "POST",
-      body: new URLSearchParams({ intent: "login", password: "test", csrfToken }),
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
-        "Cookie": anonCookie || "",
-        "x-forwarded-for": "127.0.0.1"
-      },
-      redirect: "manual",
-    });
-    expect(loginRes.status).toBe(302);
-    const authCookie = loginRes.headers.get("Set-Cookie") || "";
-
-    // GET /admin/portfolio/new to get CSRF and Revision
-    const newPageRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
-      headers: { "Cookie": authCookie }
-    });
-    const newPageText = await newPageRes.text();
-    const csrfMatch2 = newPageText.match(/name="csrfToken" value="([^"]+)"/);
-    const csrfToken2 = csrfMatch2 ? csrfMatch2[1] : "";
-    const revMatch = newPageText.match(/name="revision" value="([^"]+)"/);
-    let revision = revMatch ? revMatch[1] : "";
-
-    // 1. méthode invalide -> 405
-    const badMethodRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
-      method: "PUT",
-      headers: { "Cookie": authCookie }
-    });
-    expect(badMethodRes.status).toBe(405);
-
-    // 2. Origin invalide -> 400 (La protection cross-origin intégrée de React Router intercepte ceci et renvoie 400)
-    const beforeOriginFiles = fs.readdirSync(tempDir);
-    const beforeOriginContent = fs.readFileSync(portfolioContentPath);
-    const badOriginRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
-      method: "POST",
-      headers: {
-        "Cookie": authCookie,
-        "Origin": "http://evil.com",
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({ csrfToken: csrfToken2, revision })
-    });
-    expect(badOriginRes.status).toBe(400);
-    expect(fs.readFileSync(portfolioContentPath)).toEqual(beforeOriginContent);
-    expect(fs.readdirSync(tempDir)).toEqual(beforeOriginFiles);
-
-    // 3. MIME invalide -> 415
-    const badMimeRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/json" }
-    });
-    expect(badMimeRes.status).toBe(415);
-
-    // 4. CSRF invalide -> 403
-    const badCsrfRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ csrfToken: "invalid", revision })
-    });
-    expect(badCsrfRes.status).toBe(403);
-
-    // 5. Création d'un brouillon
-    const createRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        csrfToken: csrfToken2,
-        revision,
-        titleFr: "Titre FR",
-        titleEn: "Title EN",
-        descriptionFr: "Desc FR",
-        descriptionEn: "Desc EN"
-      }),
-      redirect: "manual"
-    });
-    expect(createRes.status).toBe(302);
-
-    // Check JSON content
-    const portfolioContent = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
-    expect(portfolioContent.projects.length).toBe(1);
-    const projectId = portfolioContent.projects[0].id;
-    revision = portfolioContent.revision;
-
-    // 6. Édition (succès)
-    const editRes = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        csrfToken: csrfToken2,
-        revision,
-        titleFr: "Titre Modifié",
-        titleEn: "Title Modified",
-        slugFr: "titre-modifie",
-        slugEn: "title-modified",
-        descriptionFr: "Desc",
-        descriptionEn: "Desc"
-      }),
-      redirect: "manual"
-    });
-    expect(editRes.status).toBe(200);
-    revision = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8")).revision;
-
-    // 6.1 Validation stricte de la vidéo (URLs invalides -> 422)
-    const badVideoUrls = [
-      "http://vimeo.com/123456", // HTTP
-      "https://evil.com/123", // bad domain
-      "https://youtube.com/watch?v=short", // invalid ID
-      "https://vimeo.com/" + "1".repeat(300) // too long
-    ];
-
-    for (const badUrl of badVideoUrls) {
-      const beforeFilesList = fs.readdirSync(tempDir);
-      const beforeContentStr = fs.readFileSync(portfolioContentPath, "utf-8");
-
-      const badVidRes = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
-        method: "POST",
-        headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          csrfToken: csrfToken2,
-          revision,
-          titleFr: "T", titleEn: "T", slugFr: "t", slugEn: "t", descriptionFr: "D", descriptionEn: "D",
-          videoUrl: badUrl
-        }),
-      });
-      expect(badVidRes.status).toBe(422);
-
-      // check that JSON is unchanged, no temp, no backup
-      expect(fs.readFileSync(portfolioContentPath, "utf-8")).toBe(beforeContentStr);
-      expect(fs.readdirSync(tempDir)).toEqual(beforeFilesList);
-    }
-
-    // 6.2 Ajout Vimeo valide
-    const vimeoRes = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        csrfToken: csrfToken2,
-        revision,
-        titleFr: "T", titleEn: "T", slugFr: "t", slugEn: "t", descriptionFr: "D", descriptionEn: "D",
-        videoUrl: "https://vimeo.com/123456789"
-      }),
-      redirect: "manual"
-    });
-    expect(vimeoRes.status).toBe(200);
-    let currentData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
-    revision = currentData.revision;
-    expect(currentData.projects[0].video).toEqual({ provider: "vimeo", videoId: "123456789" });
-
-    // 6.3 Remplacement Vimeo -> YouTube
-    const ytRes = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        csrfToken: csrfToken2,
-        revision,
-        titleFr: "T", titleEn: "T", slugFr: "t", slugEn: "t", descriptionFr: "D", descriptionEn: "D",
-        videoUrl: "https://youtube.com/watch?v=dQw4w9WgXcQ"
-      }),
-      redirect: "manual"
-    });
-    expect(ytRes.status).toBe(200);
-    currentData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
-    revision = currentData.revision;
-    expect(currentData.projects[0].video).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
-
-    // 6.4 Suppression en vidant le champ
-    const delVidRes = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        csrfToken: csrfToken2,
-        revision,
-        titleFr: "T", titleEn: "T", slugFr: "t", slugEn: "t", descriptionFr: "D", descriptionEn: "D",
-        videoUrl: " " // or empty
-      }),
-      redirect: "manual"
-    });
-    expect(delVidRes.status).toBe(200);
-    currentData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
-    revision = currentData.revision;
-    expect(currentData.projects[0].video).toBeNull();
-
-
-    // 7. ancienne révision sur création, édition, ordre et suppression -> 409
-    const conflictCreate = await fetch(`${BASE_URL}/admin/portfolio/new`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ csrfToken: csrfToken2, revision: "oldrevision000", titleFr: "T", titleEn: "T", descriptionFr: "D", descriptionEn: "D" }),
-    });
-    expect(conflictCreate.status).toBe(409);
-
-    const conflictEdit = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ csrfToken: csrfToken2, revision: "oldrevision000", titleFr: "T", titleEn: "T", descriptionFr: "D", descriptionEn: "D" }),
-    });
-    expect(conflictEdit.status).toBe(409);
-
-    const conflictReorder = await fetch(`${BASE_URL}/admin/portfolio`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ intent: "move_up", projectId, csrfToken: csrfToken2, revision: "oldrevision000" }),
-    });
-    expect(conflictReorder.status).toBe(409);
-
-    const conflictDelete = await fetch(`${BASE_URL}/admin/portfolio`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ intent: "delete", projectId, csrfToken: csrfToken2, revision: "oldrevision000" }),
-    });
-    expect(conflictDelete.status).toBe(409);
-
-
-
-    // 8. JSON corrompu -> 409, octets inchangés, aucun temp ni nouveau backup
-    const corruptedData = Buffer.from("{ completely broken JSON");
-    fs.writeFileSync(portfolioContentPath, corruptedData);
-    const beforeFiles = fs.readdirSync(tempDir);
-
-    const corruptEdit = await fetch(`${BASE_URL}/admin/portfolio/${projectId}`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ csrfToken: csrfToken2, revision, titleFr: "T", titleEn: "T", descriptionFr: "D", descriptionEn: "D" }),
-    });
-    expect(corruptEdit.status).toBe(409);
-    expect(fs.readFileSync(portfolioContentPath)).toEqual(corruptedData);
-    expect(fs.readdirSync(tempDir)).toEqual(beforeFiles);
-
-    const corruptReorder = await fetch(`${BASE_URL}/admin/portfolio`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ intent: "move_up", projectId, csrfToken: csrfToken2, revision }),
-    });
-    expect(corruptReorder.status).toBe(409);
-    expect(fs.readFileSync(portfolioContentPath)).toEqual(corruptedData);
-    expect(fs.readdirSync(tempDir)).toEqual(beforeFiles);
-
-    // Restore
-    fs.writeFileSync(portfolioContentPath, JSON.stringify({
-      schemaVersion: 1,
-      revision,
-      updatedAt: new Date().toISOString(),
-      projects: [{
-        id: projectId,
-        slug: { fr: "titre-modifie", en: "title-modified" },
-        title: { fr: "Titre Modifié", en: "Title Modified" },
-        description: { fr: "Desc", en: "Desc" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        photos: []
-      }]
-    }));
-
-    // 8.5. Test successful reordering
-    const createRes2 = await fetch(`${BASE_URL}/admin/portfolio/new`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ csrfToken: csrfToken2, revision, titleFr: "Project 2", titleEn: "Project 2 EN", descriptionFr: "D", descriptionEn: "D" }),
-      redirect: "manual"
-    });
-    expect(createRes2.status).toBe(302);
-
-    let portfolioData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
-    const p1 = portfolioData.projects[0].id;
-    const p2 = portfolioData.projects[1].id;
-    let rev = portfolioData.revision;
-
-    const moveUp = await fetch(`${BASE_URL}/admin/portfolio`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ intent: "move_up", projectId: p2, csrfToken: csrfToken2, revision: rev }),
-      redirect: "manual"
-    });
-    expect(moveUp.status).toBe(302);
-
-    portfolioData = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
-    expect(portfolioData.projects[0].id).toBe(p2);
-    expect(portfolioData.projects[1].id).toBe(p1);
-    rev = portfolioData.revision;
-
-    // 9. Suppression vide
-    const delRes = await fetch(`${BASE_URL}/admin/portfolio`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        intent: "delete",
-        projectId: p2,
-        csrfToken: csrfToken2,
-        revision: rev
-      }),
-      redirect: "manual"
-    });
-    expect(delRes.status).toBe(302);
-    const afterDel = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
-    expect(afterDel.projects.length).toBe(1); // Deleted p2, p1 remains
-
-    // Let's delete p1
-    const delRes2 = await fetch(`${BASE_URL}/admin/portfolio`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ intent: "delete", projectId: p1, csrfToken: csrfToken2, revision: afterDel.revision }),
-      redirect: "manual"
-    });
-    expect(delRes2.status).toBe(302);
-
-    const finalDel = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
-    expect(finalDel.projects.length).toBe(0);
-
-    // données invalides -> 422
-    const invalidData = await fetch(`${BASE_URL}/admin/portfolio/new`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        csrfToken: csrfToken2,
-        revision: finalDel.revision
-        // missing fields
-      }),
-    });
-    expect(invalidData.status).toBe(422);
-
-    // corps trop grand -> 413
-    const bigBody = new URLSearchParams({ csrfToken: csrfToken2, revision: finalDel.revision, titleFr: "a".repeat(1024 * 1024) });
-    const bigRes = await fetch(`${BASE_URL}/admin/portfolio/new`, {
-      method: "POST",
-      headers: { "Cookie": authCookie, "Origin": BASE_URL, "Content-Type": "application/x-www-form-urlencoded" },
-      body: bigBody
-    });
-    expect(bigRes.status).toBe(413);
-
-    // check no leakage
-    const text2 = await invalidData.text();
-    expect(text2).not.toContain(portfolioContentPath);
-    expect(text2).not.toContain("ADMIN_SESSION_SECRET");
-  });
 });

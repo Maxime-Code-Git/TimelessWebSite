@@ -72,27 +72,5 @@ test.describe('Admin CSP and Styles', () => {
 
     await checkRoute('/admin/portfolio');
     await checkRoute('/admin/portfolio/watermark');
-    await checkRoute('/admin/portfolio/new');
-
-    // Create a temporary project to test the edit and preview routes
-    await page.fill('input[name="titleFr"]', 'CSP FR');
-    await page.fill('input[name="titleEn"]', 'CSP EN');
-    await page.fill('textarea[name="descriptionFr"]', 'Desc');
-    await page.fill('textarea[name="descriptionEn"]', 'Desc');
-    await page.click('button[type="submit"]');
-
-    // Now on /admin/portfolio
-    const editLink = page.locator('a', { hasText: 'Modifier' }).first();
-    const href = await editLink.getAttribute('href');
-    expect(href).toBeDefined();
-    const projectId = href!.split('/').pop();
-
-    await checkRoute(`/admin/portfolio/${projectId}`);
-    await checkRoute(`/admin/portfolio/${projectId}/preview`);
-
-    // Clean up
-    await page.goto('/admin/portfolio');
-    page.on('dialog', dialog => dialog.accept());
-    await page.locator('button:has-text("Supprimer")').first().click();
   });
 });

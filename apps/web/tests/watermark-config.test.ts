@@ -59,10 +59,13 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
 
   it("should read old 3C.1 JSON without watermark and provide default config", () => {
     const oldJson = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "aaaa0000bbbb1111cccc2222dddd3333",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      projects: [],
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Sempra", revision: "00000000000000000000000000000000", updatedAt: "2026-01-01T00:00:00.000Z" }
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(oldJson));
 
@@ -76,10 +79,13 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
 
   it("should not rewrite the file on read of old 3C.1 JSON", () => {
     const oldJson = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "aaaa0000bbbb1111cccc2222dddd3333",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      projects: [],
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Sempra", revision: "00000000000000000000000000000000", updatedAt: "2026-01-01T00:00:00.000Z" }
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(oldJson, null, 2));
     const contentBefore = fs.readFileSync(portfolioPath, "utf-8");
@@ -99,10 +105,13 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
   it("should successfully update watermark text", () => {
     // Create initial portfolio
     const initial = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "aaaa0000bbbb1111cccc2222dddd3333",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      projects: [],
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Sempra", revision: "00000000000000000000000000000000", updatedAt: "2026-01-01T00:00:00.000Z" }
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(initial));
 
@@ -118,10 +127,13 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
 
   it("should store raw text with ampersand and redisplay it unescaped", () => {
     const initial = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "aaaa0000bbbb1111cccc2222dddd3333",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      projects: [],
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Sempra", revision: "00000000000000000000000000000000", updatedAt: "2026-01-01T00:00:00.000Z" }
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(initial));
 
@@ -136,10 +148,13 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
 
   it("should trim text and store the cleaned version", () => {
     const initial = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "aaaa0000bbbb1111cccc2222dddd3333",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      projects: [],
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Sempra", revision: "00000000000000000000000000000000", updatedAt: "2026-01-01T00:00:00.000Z" }
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(initial));
 
@@ -160,10 +175,13 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
 
   it("should reject unknown properties due to strict schema", () => {
     const initial = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "aaaa0000bbbb1111cccc2222dddd3333",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      projects: [],
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Sempra", revision: "00000000000000000000000000000000", updatedAt: "2026-01-01T00:00:00.000Z" },
       unknownProperty: "should fail",
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(initial));
@@ -173,42 +191,41 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
 
   it("should preserve other mutations during update", () => {
     const initial = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "aaaa0000bbbb1111cccc2222dddd3333",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      projects: [
+      categories: [
         {
-          id: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-          slug: { fr: "test-fr", en: "test-en" },
-          title: { fr: "Test", en: "Test" },
-          description: { fr: "Test", en: "Test" },
-          location: null,
-          date: null,
-          status: "draft",
+          id: "22222222-2222-4222-8222-222222222222",
+          name: { fr: "Test", en: "Test" },
+          slug: "test-fr",
           order: 0,
-          coverPhotoId: null,
-          createdAt: "2026-01-01T00:00:00.000Z",
-          updatedAt: "2026-01-01T00:00:00.000Z",
-          photos: [],
+          active: true,
         }
       ],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Sempra", revision: "00000000000000000000000000000000", updatedAt: "2026-01-01T00:00:00.000Z" }
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(initial));
 
     updateWatermarkText("Updated", "aaaa0000bbbb1111cccc2222dddd3333");
 
     const updated = getPortfolioContent();
-    expect(updated.projects.length).toBe(1);
-    expect(updated.projects[0].id).toBe("3fa85f64-5717-4562-b3fc-2c963f66afa6");
+    expect(updated.categories.length).toBe(1);
+    expect(updated.categories[0].id).toBe("22222222-2222-4222-8222-222222222222");
 
   });
 
   it("should throw RevisionConflictError on stale revision", () => {
     const initial = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "aaaa0000bbbb1111cccc2222dddd3333",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      projects: [],
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Sempra", revision: "00000000000000000000000000000000", updatedAt: "2026-01-01T00:00:00.000Z" }
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(initial));
 
@@ -268,10 +285,13 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
 
   it("should leave no temp or backup files after failed validation", () => {
     const initial = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "aaaa0000bbbb1111cccc2222dddd3333",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      projects: [],
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Sempra", revision: "00000000000000000000000000000000", updatedAt: "2026-01-01T00:00:00.000Z" }
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(initial));
 
@@ -289,10 +309,13 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
 
   it("should update both watermark.revision and global revision on success", () => {
     const initial = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "aaaa0000bbbb1111cccc2222dddd3333",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      projects: [],
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Sempra", revision: "00000000000000000000000000000000", updatedAt: "2026-01-01T00:00:00.000Z" }
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(initial));
 
@@ -309,10 +332,13 @@ describe("Watermark Configuration (Phase 3C.2A)", () => {
   it("should persist watermark config during next successful mutation on old JSON", () => {
     // Start with old 3C.1 JSON without watermark
     const oldJson = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "aaaa0000bbbb1111cccc2222dddd3333",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      projects: [],
+      categories: [],
+      photos: [],
+      video: null,
+      watermark: { mode: "text", text: "Sempra", revision: "00000000000000000000000000000000", updatedAt: "2026-01-01T00:00:00.000Z" }
     };
     fs.writeFileSync(portfolioPath, JSON.stringify(oldJson));
 

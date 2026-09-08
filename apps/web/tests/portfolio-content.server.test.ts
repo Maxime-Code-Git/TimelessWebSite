@@ -1,23 +1,27 @@
+import crypto from "node:crypto";
+
+
+
+
+
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
-import crypto from "node:crypto";
 import {
+  getRawPortfolioContent,
   getPortfolioContent,
-  createProjectDraft,
-  updateProjectMetadata,
-  reorderProjects,
-  deleteEmptyProject,
-  portfolioSchema,
-  updateWatermarkText,
-  addPhotoToProject,
-  publishProject,
-  getPublishedProjects,
-  getPublishedProjectBySlug,
-  projectSchema,
+  createDefaultPortfolioV2,
+  migrateLegacyPortfolio,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  reorderCategories,
+  addPhotoToPortfolio,
+  updatePhotoMetadata,
+  setPhotoVisibility,
+  trashPhoto,
 } from "../app/lib/portfolio-content.server";
-import { parseVideoUrl } from "../app/lib/video";
 
 import { vi } from "vitest";
 
@@ -28,12 +32,12 @@ vi.mock("../app/lib/env.server", () => ({
   }
 }));
 
-describe("portfolio-content.server", () => {
+describe("portfolio-content.server V2", () => {
   let tempDir: string;
   let portfolioPath: string;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "portfolio-content-test-"));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "portfolio-v2-test-"));
     portfolioPath = path.join(tempDir, "portfolio.json");
     process.env.PORTFOLIO_CONTENT_PATH = portfolioPath;
   });
@@ -44,676 +48,170 @@ describe("portfolio-content.server", () => {
   });
 
   it("returns empty valid portfolio if file absent", () => {
-    const portfolio = getPortfolioContent();
-    expect(portfolio.projects).toEqual([]);
-    expect(portfolio.schemaVersion).toBe(1);
-    expect(portfolio.revision).toHaveLength(32);
+    const raw = getRawPortfolioContent();
+    expect(raw.isCorrupted).toBe(false);
+    expect(raw.isLegacy).toBe(false);
+    expect(raw.content.schemaVersion).toBe(2);
+    expect(raw.content.categories).toEqual([]);
+    expect(raw.content.photos).toEqual([]);
   });
 
-  it("reads valid JSON", () => {
-    const valid = {
-      schemaVersion: 1,
-      revision: crypto.randomBytes(16).toString("hex"),
-      updatedAt: new Date().toISOString(),
-      projects: [],
-    };
-    fs.writeFileSync(portfolioPath, JSON.stringify(valid));
-    const portfolio = getPortfolioContent();
-    expect(portfolio.revision).toBe(valid.revision);
+  it("reads valid JSON v2", () => {
+    const defaultV2 = createDefaultPortfolioV2();
+    fs.writeFileSync(portfolioPath, JSON.stringify(defaultV2));
+    const raw = getRawPortfolioContent();
+    expect(raw.isCorrupted).toBe(false);
+    expect(raw.isLegacy).toBe(false);
+    expect(raw.content.schemaVersion).toBe(2);
   });
 
-  it("throws CorruptedContentError on corrupted JSON", () => {
-    fs.writeFileSync(portfolioPath, "{ corrupted json");
-    expect(() => getPortfolioContent()).toThrow("Corrupted content");
+  it("getRawPortfolioContent returns empty v2 without modifying if v1 detected", () => {
+    fs.writeFileSync(portfolioPath, JSON.stringify({ schemaVersion: 1, revision: "rev1", projects: [] }));
+    const raw = getRawPortfolioContent();
+    expect(raw.isCorrupted).toBe(false);
+    expect(raw.isLegacy).toBe(true);
+    expect(raw.content.schemaVersion).toBe(2);
+    // File shouldn't have changed
+    expect(JSON.parse(fs.readFileSync(portfolioPath, "utf-8")).schemaVersion).toBe(1);
   });
 
-  it("throws CorruptedContentError on unknown property via getPortfolioContent (portfolioStorageSchema)", () => {
-    fs.writeFileSync(portfolioPath, JSON.stringify({
-      schemaVersion: 1,
-      revision: crypto.randomBytes(16).toString("hex"),
-      updatedAt: new Date().toISOString(),
-      projects: [],
-      unknownProp: true
-    }));
-    expect(() => getPortfolioContent()).toThrow("Corrupted content");
-  });
+  it("migrateLegacyPortfolio creates legacy file, verifies, and atomically replaces with v2", () => {
+    const v1Content = Buffer.from(JSON.stringify({ schemaVersion: 1, revision: "abc123def456abc123def456abc123de", updatedAt: "2024-01-01T00:00:00.000Z", projects: [] }), "utf-8");
+    fs.writeFileSync(portfolioPath, v1Content);
+    migrateLegacyPortfolio("abc123def456abc123def456abc123de");
 
-  it("fails portfolioSchema.safeParse on unknown property directly", () => {
-    const valid = {
-      schemaVersion: 1 as const,
-      revision: crypto.randomBytes(16).toString("hex"),
-      updatedAt: new Date().toISOString(),
-      projects: [],
-      watermark: {
-        mode: "text" as const,
-        text: "Test",
-        revision: crypto.randomBytes(16).toString("hex"),
-        updatedAt: new Date().toISOString(),
-      },
-    };
+    const raw = getRawPortfolioContent();
+    expect(raw.isLegacy).toBe(false);
+    expect(raw.content.schemaVersion).toBe(2);
 
-    // First: the valid object MUST pass
-    expect(portfolioSchema.safeParse(valid).success).toBe(true);
+    // Exact verification
+    const expectedHash = crypto.createHash("sha256").update(v1Content).digest("hex");
+    const expectedArchiveName = `portfolio.legacy.${expectedHash}.json`;
+    const expectedArchivePath = path.resolve(path.dirname(portfolioPath), expectedArchiveName);
 
-    // Then: adding an unknown property MUST fail (proves .strict())
-    const result = portfolioSchema.safeParse({
-      ...valid,
-      unknownProperty: true,
-    });
-    expect(result.success).toBe(false);
-  });
+    const dirFiles = fs.readdirSync(path.dirname(portfolioPath)).filter(f => f.startsWith("portfolio.legacy."));
+    expect(dirFiles).toHaveLength(1);
+    expect(dirFiles[0]).toBe(expectedArchiveName);
 
-  it("throws CorruptedContentError on invalid revision", () => {
-    fs.writeFileSync(portfolioPath, JSON.stringify({
-      schemaVersion: 1,
-      revision: "too-short",
-      updatedAt: new Date().toISOString(),
-      projects: [],
-    }));
-    expect(() => getPortfolioContent()).toThrow("Corrupted content");
-  });
+    const archiveBytes = fs.readFileSync(expectedArchivePath);
+    expect(archiveBytes.equals(v1Content)).toBe(true);
 
-  it("creates a draft project", () => {
-    const rev = getPortfolioContent().revision;
-    createProjectDraft({
-      title: { fr: "Titre", en: "Title" },
-      slug: { fr: "titre", en: "title" },
-      description: { fr: "Desc", en: "Desc" },
-      location: null,
-      date: null,
-    }, rev);
-
-    const updated = getPortfolioContent();
-    expect(updated.projects).toHaveLength(1);
-    expect(updated.projects[0].status).toBe("draft");
-    expect(updated.projects[0].title.fr).toBe("Titre");
-  });
-
-  it("prevents duplicate FR slugs", () => {
-    let rev = getPortfolioContent().revision;
-    rev = createProjectDraft({
-      title: { fr: "T1", en: "T1" },
-      slug: { fr: "slug1", en: "slug-en1" },
-      description: { fr: "D1", en: "D1" },
-      location: null,
-      date: null,
-    }, rev);
-
-    createProjectDraft({
-      title: { fr: "T2", en: "T2" },
-      slug: { fr: "slug1", en: "slug2" }, // collision on fr
-      description: { fr: "D", en: "D" },
-      location: null,
-      date: null,
-    }, rev);
-    const updatedProject = getPortfolioContent().projects.find(p => p.slug.fr === 'slug1-1');
-    expect(updatedProject?.slug.fr).toBe('slug1-1');
-  });
-
-  it("allows modification of metadata", () => {
-    let rev = getPortfolioContent().revision;
-    rev = createProjectDraft({
-      title: { fr: "T1", en: "T1" },
-      slug: { fr: "slug1", en: "slug-en1" },
-      description: { fr: "D1", en: "D1" },
-      location: null,
-      date: null,
-    }, rev);
-
-    const project = getPortfolioContent().projects[0];
-
-    updateProjectMetadata(project.id, {
-      title: { fr: "T1 Mod", en: "T1" },
-      slug: { fr: "slug1-mod", en: "slug-en1" },
-      description: { fr: "D1", en: "D1" },
-      location: "Paris",
-      date: "2025-01-01",
-    }, rev);
-
-    const updated = getPortfolioContent().projects[0];
-    expect(updated.title.fr).toBe("T1 Mod");
-    expect(updated.location).toBe("Paris");
-    expect(updated.date).toBe("2025-01-01");
-  });
-
-  it("reorders projects", () => {
-    let rev = getPortfolioContent().revision;
-    rev = createProjectDraft({
-      title: { fr: "T1", en: "T1" },
-      slug: { fr: "slug1", en: "slug1" },
-      description: { fr: "D", en: "D" },
-      location: null, date: null,
-    }, rev);
-
-    rev = createProjectDraft({
-      title: { fr: "T2", en: "T2" },
-      slug: { fr: "slug2", en: "slug2" },
-      description: { fr: "D", en: "D" },
-      location: null, date: null,
-    }, rev);
-
-    const p1 = getPortfolioContent().projects[0].id;
-    const p2 = getPortfolioContent().projects[1].id;
-
-    reorderProjects([p2, p1], rev);
-    const reordered = getPortfolioContent().projects.sort((a, b) => a.order - b.order);
-    expect(reordered[0].id).toBe(p2);
-    expect(reordered[1].id).toBe(p1);
-  });
-
-  it("deletes empty project", () => {
-    let rev = getPortfolioContent().revision;
-    rev = createProjectDraft({
-      title: { fr: "T1", en: "T1" },
-      slug: { fr: "slug1", en: "slug1" },
-      description: { fr: "D", en: "D" },
-      location: null, date: null,
-    }, rev);
-
-    const id = getPortfolioContent().projects[0].id;
-    deleteEmptyProject(id, rev);
-
-    expect(getPortfolioContent().projects).toHaveLength(0);
-  });
-
-  it("throws RevisionConflictError on concurrent mutation", () => {
-    const rev = getPortfolioContent().revision;
-    createProjectDraft({
-      title: { fr: "Other", en: "Other" },
-      slug: { fr: "other-fr", en: "other-en" },
-      description: { fr: "Other desc", en: "Other desc" },
-      location: null, date: null,
-    }, rev);
-
-    expect(() => createProjectDraft({
-      title: { fr: "T2", en: "T2" },
-      slug: { fr: "slug2", en: "slug2" },
-      description: { fr: "D", en: "D" },
-      location: null, date: null,
-    }, rev)).toThrow("Revision conflict");
-  });
-
-  it("guarantees bytes unchanged on error", () => {
-    let rev = getPortfolioContent().revision;
-    rev = createProjectDraft({
-      title: { fr: "T1", en: "T1" },
-      slug: { fr: "slug1", en: "slug1" },
-      description: { fr: "D", en: "D" },
-      location: null, date: null,
-    }, rev);
-
-    const contentBefore = fs.readFileSync(portfolioPath, "utf-8");
-
-    expect(() => createProjectDraft({
-      title: { fr: "T2", en: "T2" },
-      slug: { fr: "slug2", en: "slug2" },
-      description: { fr: "D", en: "D" },
-      location: null, date: null,
-    }, rev + 'x')).toThrow();
-
-    const contentAfter = fs.readFileSync(portfolioPath, "utf-8");
-    expect(contentAfter).toBe(contentBefore);
-
-    // Ensure no temp files leaked
-    const files = fs.readdirSync(tempDir);
-    expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
-  });
-
-  it("throws RevisionConflictError on concurrent mutation in updateWatermarkText using spy", () => {
-    // Write something to ensure the file actually exists on disk
-    let rev = getPortfolioContent().revision;
-    rev = createProjectDraft({
-      title: { fr: "Init", en: "Init" },
-      slug: { fr: "init", en: "init" },
-      description: { fr: "Init", en: "Init" },
-      location: null, date: null,
-    }, rev);
-
-    let callCount = 0;
-    const originalReadFileSync = fs.readFileSync;
-
-    const readSpy = vi.spyOn(fs, "readFileSync").mockImplementation((pathArg, options) => {
-      // Only intercept calls to portfolio.json
-      if (pathArg.toString().includes("portfolio.json")) {
-        callCount++;
-        if (callCount === 2) {
-          // Just before the second read (which is inside getRawPortfolioContent),
-          // simulate a concurrent write by writing a valid JSON with a new revision and a dummy project
-          const concurrentContent = {
-            schemaVersion: 1,
-            revision: "11111111111111111111111111111111", // NEW REVISION
-            updatedAt: new Date().toISOString(),
-            projects: [],
-            watermark: {
-              mode: "text",
-              text: "Sempra",
-              revision: "22222222222222222222222222222222",
-              updatedAt: new Date().toISOString()
-            }
-          };
-          originalReadFileSync(pathArg, options); // Ensure it's readable, but we overwrite it
-          fs.writeFileSync(pathArg, JSON.stringify(concurrentContent, null, 2));
-        }
-      }
-      return originalReadFileSync(pathArg, options);
-    });
-
-    try {
-      expect(() => {
-        updateWatermarkText("Nouveau filigrane", rev);
-      }).toThrow("Revision conflict");
-
-      const contentAfter = JSON.parse(fs.readFileSync(portfolioPath, "utf-8"));
-      // The concurrent write must be intact
-      expect(contentAfter.revision).toBe("11111111111111111111111111111111");
-      expect(contentAfter.watermark.text).toBe("Sempra");
-
-      const backups = fs.readdirSync(tempDir).filter(f => f.startsWith("portfolio.json.backup"));
-      expect(backups).toHaveLength(0);
-
-      // Ensure no temp files leaked
-      const files = fs.readdirSync(tempDir);
-      expect(files.filter(f => f.includes(".tmp."))).toHaveLength(0);
-    } finally {
-      readSpy.mockRestore();
+    if (process.platform !== "win32") {
+      const stat = fs.statSync(expectedArchivePath);
+      expect((stat.mode & 0o777)).toBe(0o600);
     }
+
+    // Call it again to verify idempotency
+    const mtimeBefore = fs.statSync(expectedArchivePath).mtimeMs;
+    migrateLegacyPortfolio(raw.content.revision);
+
+    const dirFilesAfter = fs.readdirSync(path.dirname(portfolioPath)).filter(f => f.startsWith("portfolio.legacy."));
+    expect(dirFilesAfter).toHaveLength(1);
+    expect(fs.statSync(expectedArchivePath).mtimeMs).toBe(mtimeBefore);
   });
 
-  describe("Validation stricte des métadonnées", () => {
-    let rev: string;
-    beforeEach(() => {
-      rev = getPortfolioContent().revision;
-    });
+  it("migrateLegacyPortfolio rejects migration if pre-existing archive is invalid (wrong bytes)", () => {
+    const v1Content = Buffer.from(JSON.stringify({ schemaVersion: 1, revision: "abc123def456abc123def456abc123de", updatedAt: "2024-01-01T00:00:00.000Z", projects: [] }), "utf-8");
+    fs.writeFileSync(portfolioPath, v1Content);
+    const expectedHash = crypto.createHash("sha256").update(v1Content).digest("hex");
+    const expectedArchivePath = path.resolve(path.dirname(portfolioPath), `portfolio.legacy.${expectedHash}.json`);
 
-    it("refuse un titre vide ou composé d'espaces", () => {
-      expect(() => createProjectDraft({
-        title: { fr: "   ", en: "Title" },
-        slug: { fr: "titre", en: "title" },
-        description: { fr: "Desc", en: "Desc" },
-        location: null, date: null,
-      }, rev)).toThrow("Title is required");
+    fs.writeFileSync(expectedArchivePath, Buffer.from("invalid-bytes"));
+    if (process.platform !== "win32") fs.chmodSync(expectedArchivePath, 0o600);
 
-      expect(() => createProjectDraft({
-        title: { fr: "Titre", en: "" },
-        slug: { fr: "titre", en: "title" },
-        description: { fr: "Desc", en: "Desc" },
-        location: null, date: null,
-      }, rev)).toThrow("Title is required");
-    });
+    expect(() => migrateLegacyPortfolio("abc123def456abc123def456abc123de")).toThrowError("Pre-existing archive bytes mismatch");
 
-    it("refuse une description vide ou composée d'espaces", () => {
-      expect(() => createProjectDraft({
-        title: { fr: "Titre", en: "Title" },
-        slug: { fr: "titre", en: "title" },
-        description: { fr: "   \n  ", en: "Desc" },
-        location: null, date: null,
-      }, rev)).toThrow("Text is required");
-    });
-
-    it("refuse du HTML dans le titre et la description", () => {
-      expect(() => createProjectDraft({
-        title: { fr: "Titre <script>", en: "Title" },
-        slug: { fr: "titre", en: "title" },
-        description: { fr: "Desc", en: "Desc" },
-        location: null, date: null,
-      }, rev)).toThrow("HTML is not allowed");
-
-      expect(() => createProjectDraft({
-        title: { fr: "Titre", en: "Title" },
-        slug: { fr: "titre", en: "title" },
-        description: { fr: "<b>Desc</b>", en: "Desc" },
-        location: null, date: null,
-      }, rev)).toThrow("HTML is not allowed");
-    });
-
-    it("refuse une date impossible ou un timestamp", () => {
-      expect(() => createProjectDraft({
-        title: { fr: "Titre", en: "Title" },
-        slug: { fr: "titre", en: "title" },
-        description: { fr: "Desc", en: "Desc" },
-        location: null, date: "2024-13-45",
-      }, rev)).toThrow("Invalid date format or impossible date");
-
-      expect(() => createProjectDraft({
-        title: { fr: "Titre", en: "Title" },
-        slug: { fr: "titre", en: "title" },
-        description: { fr: "Desc", en: "Desc" },
-        location: null, date: "1700000000",
-      }, rev)).toThrow("Invalid date format or impossible date");
-    });
-
-    it("auto-génère et gère les collisions de slug", () => {
-      rev = createProjectDraft({
-        title: { fr: "Mon beau mariage !", en: "My beautiful wedding !" },
-        slug: { fr: "", en: "" },
-        description: { fr: "Desc", en: "Desc" },
-        location: null, date: null,
-      }, rev);
-
-      let portfolio = getPortfolioContent();
-      expect(portfolio.projects[0].slug.fr).toBe("mon-beau-mariage");
-      expect(portfolio.projects[0].slug.en).toBe("my-beautiful-wedding");
-
-      // Auto collision
-      createProjectDraft({
-        title: { fr: "Mon beau mariage !", en: "My beautiful wedding !" },
-        slug: { fr: "", en: "" },
-        description: { fr: "Desc", en: "Desc" },
-        location: null, date: null,
-      }, rev);
-
-      portfolio = getPortfolioContent();
-      const p2 = portfolio.projects.find(p => p.id !== portfolio.projects[0].id)!;
-      expect(p2.slug.fr).toMatch(/^mon-beau-mariage(-[0-9]+)?$/);
-      expect(p2.slug.fr).not.toBe("mon-beau-mariage");
-    });
-
-    it("n'expose publiquement qu'un projet publié et le retrouve dans les deux langues", () => {
-      rev = createProjectDraft({
-        title: { fr: "Mariage à Ath", en: "Wedding in Ath" },
-        slug: { fr: "", en: "" },
-        description: { fr: "Une belle journée", en: "A beautiful day" },
-        location: "Ath",
-        date: "2026-06-29",
-      }, rev);
-
-      const project = getPortfolioContent().projects[0];
-      const added = addPhotoToProject(project.id, {
-        fileId: "1".repeat(32),
-        originalFormat: "jpeg",
-        originalWidth: 1200,
-        originalHeight: 800,
-        category: "ceremony",
-        alt: { fr: "Les mariés", en: "The newlyweds" },
-        variants: [{
-          name: "480p",
-          width: 480,
-          height: 320,
-          sizeBytes: 1234,
-          fileId: "1".repeat(32) + "-480p",
-        }],
-        appliedWatermarkRevision: "2".repeat(32),
-        processedAt: new Date().toISOString(),
-      }, rev);
-
-      expect(getPublishedProjects()).toEqual([]);
-
-      publishProject(project.id, added.newRevision);
-      const publicProjects = getPublishedProjects();
-      expect(publicProjects).toHaveLength(1);
-      expect(publicProjects[0].title.fr).toBe("Mariage à Ath");
-      expect(publicProjects[0]).not.toHaveProperty("status");
-      expect(publicProjects[0].photos[0]).not.toHaveProperty("fileId");
-      expect(getPublishedProjectBySlug("fr", "mariage-a-ath")?.id).toBe(project.id);
-      expect(getPublishedProjectBySlug("en", "wedding-in-ath")?.id).toBe(project.id);
-      expect(getPublishedProjectBySlug("fr", "../portfolio.json")).toBeUndefined();
-    });
+    expect(fs.readFileSync(portfolioPath).equals(v1Content)).toBe(true);
+    expect(fs.readFileSync(expectedArchivePath).toString()).toBe("invalid-bytes");
+    expect(getRawPortfolioContent().isLegacy).toBe(true);
   });
 
-  describe("Parsing et migration des vidéos", () => {
-    it("parse correctement les URLs YouTube", () => {
-      expect(parseVideoUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
-      expect(parseVideoUrl("https://youtube.com/watch?v=dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
-      expect(parseVideoUrl("https://m.youtube.com/watch?v=dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
-      expect(parseVideoUrl("https://youtu.be/dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
-      expect(parseVideoUrl("https://www.youtube.com/embed/dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
-      expect(parseVideoUrl("https://www.youtube.com/shorts/dQw4w9WgXcQ")).toEqual({ provider: "youtube", videoId: "dQw4w9WgXcQ" });
-    });
+  it("migrateLegacyPortfolio rejects migration if pre-existing archive is a symlink", () => {
+    const v1Content = Buffer.from(JSON.stringify({ schemaVersion: 1, revision: "abc123def456abc123def456abc123de", updatedAt: "2024-01-01T00:00:00.000Z", projects: [] }), "utf-8");
+    fs.writeFileSync(portfolioPath, v1Content);
+    const expectedHash = crypto.createHash("sha256").update(v1Content).digest("hex");
+    const expectedArchivePath = path.resolve(path.dirname(portfolioPath), `portfolio.legacy.${expectedHash}.json`);
 
-    it("parse correctement les URLs Vimeo", () => {
-      expect(parseVideoUrl("https://vimeo.com/123456789")).toEqual({ provider: "vimeo", videoId: "123456789" });
-      expect(parseVideoUrl("https://www.vimeo.com/123456789")).toEqual({ provider: "vimeo", videoId: "123456789" });
-      expect(parseVideoUrl("https://player.vimeo.com/video/123456789")).toEqual({ provider: "vimeo", videoId: "123456789" });
-    });
+    const dummyTarget = path.resolve(path.dirname(portfolioPath), "dummy.txt");
+    fs.writeFileSync(dummyTarget, "dummy");
+    fs.symlinkSync(dummyTarget, expectedArchivePath);
 
-    it("rejette les faux domaines et URLs malveillantes", () => {
-      expect(parseVideoUrl("https://youtube.com.example.com/watch?v=dQw4w9WgXcQ")).toBeNull();
-      expect(parseVideoUrl("https://evil-youtube.com/watch?v=dQw4w9WgXcQ")).toBeNull();
-      expect(parseVideoUrl("https://vimeo.com.example.com/123456789")).toBeNull();
-      expect(parseVideoUrl("https://evilvimeo.com/123456789")).toBeNull();
-      expect(parseVideoUrl("https://dailymotion.com/video/x123")).toBeNull();
-    });
+    expect(() => migrateLegacyPortfolio("abc123def456abc123def456abc123de")).toThrowError("Pre-existing archive is not a regular file");
+    expect(fs.readFileSync(portfolioPath).equals(v1Content)).toBe(true);
+    expect(getRawPortfolioContent().isLegacy).toBe(true);
+  });
 
-    it("rejette les formats invalides (HTTP, sans ID, identifiants utilisateur)", () => {
-      expect(parseVideoUrl("http://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBeNull();
-      expect(parseVideoUrl("https://www.youtube.com/watch?v=SHORT")).toBeNull(); // ID trop court (< 11)
-      expect(parseVideoUrl("https://www.youtube.com/watch")).toBeNull();
-      expect(parseVideoUrl("https://vimeo.com/abcde")).toBeNull(); // non numérique
-      expect(parseVideoUrl("https://user:pass@www.youtube.com/watch?v=dQw4w9WgXcQ")).toBeNull();
-    });
+  it("migrateLegacyPortfolio rejects migration if pre-existing archive has wrong mode", () => {
+    if (process.platform === "win32") return;
+    const v1Content = Buffer.from(JSON.stringify({ schemaVersion: 1, revision: "abc123def456abc123def456abc123de", updatedAt: "2024-01-01T00:00:00.000Z", projects: [] }), "utf-8");
+    fs.writeFileSync(portfolioPath, v1Content);
+    const expectedHash = crypto.createHash("sha256").update(v1Content).digest("hex");
+    const expectedArchivePath = path.resolve(path.dirname(portfolioPath), `portfolio.legacy.${expectedHash}.json`);
 
-    it("migre un ancien videoUrl valide vers video et supprime videoUrl", () => {
-      const parsed = projectSchema.safeParse({
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        title: { fr: "AAA", en: "AAA" },
-        slug: { fr: "aaa", en: "aaa" },
-        description: { fr: "AAA", en: "AAA" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        photos: [],
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-        videoUrl: "https://vimeo.com/123456789"
-      });
-      expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data.video).toEqual({ provider: "vimeo", videoId: "123456789" });
-        expect(parsed.data).not.toHaveProperty("videoUrl");
-      }
-    });
+    fs.writeFileSync(expectedArchivePath, v1Content);
+    fs.chmodSync(expectedArchivePath, 0o777);
 
-    it("rejette une ancienne URL invalide comme contenu corrompu", () => {
-      const parsed = projectSchema.safeParse({
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        title: { fr: "AAA", en: "AAA" },
-        slug: { fr: "aaa", en: "aaa" },
-        description: { fr: "AAA", en: "AAA" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        photos: [],
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-        videoUrl: "https://evil-youtube.com/watch?v=dQw4w9WgXcQ"
-      });
-      expect(parsed.success).toBe(false);
-    });
+    expect(() => migrateLegacyPortfolio("abc123def456abc123def456abc123de")).toThrowError("Pre-existing archive mode is not 0600");
+    expect(fs.readFileSync(portfolioPath).equals(v1Content)).toBe(true);
+    expect(getRawPortfolioContent().isLegacy).toBe(true);
+  });
 
-    it("rejette un videoUrl de mauvais type", () => {
-      const parsed = projectSchema.safeParse({
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        title: { fr: "AAA", en: "AAA" },
-        slug: { fr: "aaa", en: "aaa" },
-        description: { fr: "AAA", en: "AAA" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        photos: [],
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-        videoUrl: 12345
-      });
-      expect(parsed.success).toBe(false);
-    });
+  it("creates, updates, reorders and deletes categories", () => {
+    fs.writeFileSync(portfolioPath, JSON.stringify(createDefaultPortfolioV2()));
+    let rev = getPortfolioContent().revision;
 
-    it("rejette la présence simultanée de video et videoUrl", () => {
-      const parsed = projectSchema.safeParse({
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        title: { fr: "AAA", en: "AAA" },
-        slug: { fr: "aaa", en: "aaa" },
-        description: { fr: "AAA", en: "AAA" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        photos: [],
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-        videoUrl: "https://vimeo.com/123456789",
-        video: { provider: "vimeo", videoId: "123456789" }
-      });
-      expect(parsed.success).toBe(false);
-    });
 
-    it("valide un objet YouTube stocké valide", () => {
-      const parsed = projectSchema.safeParse({
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        title: { fr: "AAA", en: "AAA" },
-        slug: { fr: "aaa", en: "aaa" },
-        description: { fr: "AAA", en: "AAA" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        photos: [],
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-        video: { provider: "youtube", videoId: "dQw4w9WgXcQ" }
-      });
-      expect(parsed.success).toBe(true);
-    });
+    rev = createCategory({ name: { fr: "Cat 1", en: "Cat 1 EN" }, slug: "cat-1", active: true }, rev);
+    rev = createCategory({ name: { fr: "Cat 2", en: "Cat 2 EN" }, slug: "cat-2", active: true }, rev);
 
-    it("valide un objet Vimeo stocké valide", () => {
-      const parsed = projectSchema.safeParse({
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        title: { fr: "AAA", en: "AAA" },
-        slug: { fr: "aaa", en: "aaa" },
-        description: { fr: "AAA", en: "AAA" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        photos: [],
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-        video: { provider: "vimeo", videoId: "123456789" }
-      });
-      expect(parsed.success).toBe(true);
-    });
+    const content = getPortfolioContent();
+    expect(content.categories).toHaveLength(2);
+    const cat1 = content.categories.find(c => c.slug === "cat-1")!;
+    const cat2 = content.categories.find(c => c.slug === "cat-2")!;
 
-    it("rejette un objet YouTube avec ID trop court, trop long ou invalide", () => {
-      const base = {
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        title: { fr: "AAA", en: "AAA" },
-        slug: { fr: "aaa", en: "aaa" },
-        description: { fr: "AAA", en: "AAA" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        photos: [],
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-      };
-      expect(projectSchema.safeParse({ ...base, video: { provider: "youtube", videoId: "short" } }).success).toBe(false);
-      expect(projectSchema.safeParse({ ...base, video: { provider: "youtube", videoId: "waytoolongidfortheyoutubevideo" } }).success).toBe(false);
-      expect(projectSchema.safeParse({ ...base, video: { provider: "youtube", videoId: "invalid@char" } }).success).toBe(false);
-    });
+    rev = updateCategory(cat1.id, { name: { fr: "Cat 1 updated", en: "Cat 1 EN" }, active: false }, rev);
+    expect(getPortfolioContent().categories.find(c => c.id === cat1.id)?.active).toBe(false);
 
-    it("rejette un objet Vimeo avec ID non numérique ou trop long", () => {
-      const base = {
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        title: { fr: "AAA", en: "AAA" },
-        slug: { fr: "aaa", en: "aaa" },
-        description: { fr: "AAA", en: "AAA" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        photos: [],
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-      };
-      expect(projectSchema.safeParse({ ...base, video: { provider: "vimeo", videoId: "abcdefgh" } }).success).toBe(false);
-      expect(projectSchema.safeParse({ ...base, video: { provider: "vimeo", videoId: "12345678901234567" } }).success).toBe(false);
-    });
+    rev = reorderCategories([cat2.id, cat1.id], rev);
+    expect(getPortfolioContent().categories[0].id).toBe(cat2.id);
 
-    it("rejette des propriétés inconnues dans video", () => {
-      const parsed = projectSchema.safeParse({
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        title: { fr: "AAA", en: "AAA" },
-        slug: { fr: "aaa", en: "aaa" },
-        description: { fr: "AAA", en: "AAA" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        photos: [],
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-        video: { provider: "youtube", videoId: "dQw4w9WgXcQ", unknownProp: true }
-      });
-      expect(parsed.success).toBe(false);
-    });
+    deleteCategory(cat1.id, rev);
+    expect(getPortfolioContent().categories).toHaveLength(1);
+  });
 
-    it("normalise l'absence de vidéo en video: null", () => {
-      const parsed = projectSchema.safeParse({
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        title: { fr: "AAA", en: "AAA" },
-        slug: { fr: "aaa", en: "aaa" },
-        description: { fr: "AAA", en: "AAA" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        photos: [],
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z"
-      });
-      expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data.video).toBeNull();
-      }
-    });
+  it("adds photo, updates metadata, checks visibility rules, trashes", () => {
+    fs.writeFileSync(portfolioPath, JSON.stringify(createDefaultPortfolioV2()));
+    let rev = getPortfolioContent().revision;
 
-    it("la lecture de migration ne réécrit pas le JSON automatiquement", () => {
-      // Create a raw mock JSON file with videoUrl instead of video
-      const rawProject = {
-        id: "123e4567-e89b-12d3-a456-426614174000",
-        title: { fr: "AAA", en: "AAA" },
-        slug: { fr: "aaa", en: "aaa" },
-        description: { fr: "AAA", en: "AAA" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        coverPhotoId: null,
-        photos: [],
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-        videoUrl: "https://vimeo.com/123456789"
-      };
-      const valid = {
-        schemaVersion: 1,
-        revision: crypto.randomBytes(16).toString("hex"),
-        updatedAt: new Date().toISOString(),
-        projects: [rawProject],
-      };
 
-      const portfolioPathLocal = process.env.PORTFOLIO_CONTENT_PATH!;
-      fs.writeFileSync(portfolioPathLocal, JSON.stringify(valid));
+    rev = createCategory({ name: { fr: "Cat", en: "Cat" }, slug: "cat", active: true }, rev);
+    const catId = getPortfolioContent().categories[0].id;
 
-      const contentBefore = fs.readFileSync(portfolioPathLocal, "utf-8");
+    const { newRevision, newPhotoId } = addPhotoToPortfolio({
+      fileId: "12345678901234567890123456789012",
+      originalFormat: "jpeg",
+      originalWidth: 1000,
+      originalHeight: 1000,
+      variants: [
+        { height: 480, width: 480, sizeBytes: 1024, name: "480p", fileId: "12345678901234567890123456789012-480p" }
+      ],
+      appliedWatermarkRevision: "12345678901234567890123456789012",
+      processedAt: new Date().toISOString()
+    }, rev);
+    rev = newRevision;
 
-      const portfolio = getPortfolioContent();
-      expect(portfolio.projects[0].video).toEqual({ provider: "vimeo", videoId: "123456789" });
 
-      const contentAfter = fs.readFileSync(portfolioPathLocal, "utf-8");
-      expect(contentAfter).toBe(contentBefore); // file untouched
-    });
+    const content = getPortfolioContent();
+    expect(content.photos).toHaveLength(1);
+    expect(content.photos[0].id).toBe(newPhotoId);
+
+    rev = updatePhotoMetadata(newPhotoId, { categoryId: catId, alt: { fr: "alt fr", en: "alt en" } }, rev);
+    expect(getPortfolioContent().photos[0].categoryId).toBe(catId);
+
+    rev = setPhotoVisibility(newPhotoId, true, rev);
+    expect(getPortfolioContent().photos[0].visible).toBe(true);
+
+    trashPhoto(newPhotoId, rev);
+    expect(getPortfolioContent().photos).toHaveLength(0);
   });
 });

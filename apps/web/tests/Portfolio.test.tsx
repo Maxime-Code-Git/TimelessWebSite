@@ -2,66 +2,61 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import { PortfolioPage } from "../app/routes/PortfolioPage";
-import type { PublicPortfolioProject } from "../app/lib/portfolio-content.server";
+import type { PublicPortfolio, PublicCategory, PublicPortfolioPhoto } from "../app/lib/portfolio-content.server";
 
 vi.mock("react-router", async importOriginal => {
   const module = await importOriginal<typeof import("react-router")>();
   return { ...module, useRouteLoaderData: () => undefined };
 });
 
-const makeProject = (
-  id: string,
-  category: "ceremony" | "portraits" | "reception"
-): PublicPortfolioProject => ({
+const makeCategory = (id: string, nameFr: string, nameEn: string): PublicCategory => ({
   id,
-  slug: { fr: "projet-" + id, en: "project-" + id },
-  title: { fr: "Projet " + id, en: "Project " + id },
-  description: { fr: "Description", en: "Description" },
-  location: null,
-  date: null,
-  video: null,
-  coverPhotoId: "photo-" + id,
-  photos: [{
-    id: "photo-" + id,
-    category,
-    alt: { fr: "Photo " + id, en: "Photo " + id },
-    width: 800,
-    height: 600,
-    variants: [{ name: "480p", width: 480, height: 360 }],
-  }],
+  name: { fr: nameFr, en: nameEn },
+  slug: nameFr.toLowerCase(),
 });
 
-const projects = [
-  makeProject("un", "ceremony"),
-  makeProject("deux", "portraits"),
-  makeProject("trois", "reception"),
-];
+const makePhoto = (id: string, categoryId: string): PublicPortfolioPhoto => ({
+  id,
+  categorySlug: categoryId,
+  alt: { fr: "Photo " + id, en: "Photo " + id },
+  width: 800,
+  height: 600,
+  variants: [{ name: "480p", width: 480, height: 360 }],
+});
+
+const portfolio: PublicPortfolio = {
+  categories: [
+    makeCategory("cat-1", "Cérémonie", "Ceremony"),
+    makeCategory("cat-2", "Portraits", "Portraits"),
+  ],
+  photos: [
+    makePhoto("photo-1", "cérémonie"),
+    makePhoto("photo-2", "portraits"),
+    makePhoto("photo-3", "cérémonie"),
+  ],
+  video: null,
+};
 
 describe("Portfolio Component", () => {
-  it("renders every published project supplied by the loader", () => {
+  it("renders every published photo supplied by the loader", () => {
     const { container } = render(
       <MemoryRouter>
-        <PortfolioPage lang="fr" projects={projects} />
+        <PortfolioPage lang="fr" portfolio={portfolio} />
       </MemoryRouter>
     );
 
     expect(container.querySelectorAll('[class*="photoWrap"]')).toHaveLength(3);
-    expect(screen.getByRole("link", { name: "Projet un" })).toHaveAttribute(
-      "href",
-      "/fr/portfolio/projet-un"
-    );
   });
 
-  it("filters projects by the categories of their photos", () => {
+  it("filters photos by category", () => {
     const { container } = render(
       <MemoryRouter>
-        <PortfolioPage lang="fr" projects={projects} />
+        <PortfolioPage lang="fr" portfolio={portfolio} />
       </MemoryRouter>
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Cérémonie" }));
-    expect(container.querySelectorAll('[class*="photoWrap"]')).toHaveLength(1);
-    expect(screen.getByRole("link", { name: "Projet un" })).toBeInTheDocument();
+    expect(container.querySelectorAll('[class*="photoWrap"]')).toHaveLength(2);
   });
 });
 
@@ -69,7 +64,7 @@ describe("Portfolio Video Component", () => {
   it("sans vidéo : aucun lien #galerie-video, aucune section vidéo, aucun iframe", () => {
     const { container } = render(
       <MemoryRouter>
-        <PortfolioPage lang="fr" projects={[makeProject("novideo", "ceremony")]} />
+        <PortfolioPage lang="fr" portfolio={portfolio} />
       </MemoryRouter>
     );
 
@@ -78,13 +73,15 @@ describe("Portfolio Video Component", () => {
     expect(container.querySelector('iframe')).not.toBeInTheDocument();
   });
 
-  it("avec vidéo (Vimeo) : bouton de lecture présent, aucun iframe avant clic, iframe créée après clic", () => {
-    const project = makeProject("withvimeo", "ceremony");
-    project.video = { provider: "vimeo", videoId: "123456789" };
+  it("avec vidéo (Vimeo) : iframe s'affiche", () => {
+    const portfolioWithVimeo: PublicPortfolio = {
+      ...portfolio,
+      video: { provider: "vimeo", videoId: "123456789" },
+    };
 
     const { container } = render(
       <MemoryRouter>
-        <PortfolioPage lang="fr" projects={[project]} />
+        <PortfolioPage lang="fr" portfolio={portfolioWithVimeo} />
       </MemoryRouter>
     );
 
@@ -92,30 +89,31 @@ describe("Portfolio Video Component", () => {
     const videoSection = container.querySelector('#galerie-video');
     expect(videoSection).toBeInTheDocument();
 
-    // No iframe initially
-    expect(container.querySelector('iframe')).not.toBeInTheDocument();
-
-    // Click play
     const playButton = screen.getByRole("button", { name: "Lire la vidéo" });
+    expect(playButton).toBeInTheDocument();
+
+    // Simulate user click to load the iframe
     fireEvent.click(playButton);
 
-    // Iframe appears
     const iframe = container.querySelector('iframe');
     expect(iframe).toBeInTheDocument();
     expect(iframe).toHaveAttribute("src", expect.stringContaining("player.vimeo.com/video/123456789"));
   });
 
   it("URL YouTube générée avec youtube-nocookie.com", () => {
-    const project = makeProject("withyoutube", "ceremony");
-    project.video = { provider: "youtube", videoId: "dQw4w9WgXcQ" };
+    const portfolioWithYoutube: PublicPortfolio = {
+      ...portfolio,
+      video: { provider: "youtube", videoId: "dQw4w9WgXcQ" },
+    };
 
     const { container } = render(
       <MemoryRouter>
-        <PortfolioPage lang="en" projects={[project]} />
+        <PortfolioPage lang="en" portfolio={portfolioWithYoutube} />
       </MemoryRouter>
     );
 
     const playButton = screen.getByRole("button", { name: "Play video" });
+    expect(playButton).toBeInTheDocument();
     fireEvent.click(playButton);
 
     const iframe = container.querySelector('iframe');

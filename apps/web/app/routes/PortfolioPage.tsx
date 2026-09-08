@@ -1,107 +1,60 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { useState, useMemo } from "react";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
 import { getStrings } from "~/lib/i18n";
-import type { PublicPortfolioPhoto, PublicPortfolioProject } from "~/lib/portfolio-content.server";
+import type { PublicPortfolio, PublicPortfolioPhoto } from "~/lib/portfolio-content.server";
 import styles from "./portfolio.module.css";
 
 interface PortfolioPageProps {
   lang: Lang;
-  projects: PublicPortfolioProject[];
+  portfolio: PublicPortfolio;
+}
+
+export function getVideoEmbedUrl(video: { provider: "youtube" | "vimeo", videoId: string } | null): string | null {
+  if (!video) return null;
+  if (video.provider === "youtube") return `https://www.youtube-nocookie.com/embed/${video.videoId}?autoplay=1`;
+  if (video.provider === "vimeo") return `https://player.vimeo.com/video/${video.videoId}?autoplay=1`;
+  return null;
 }
 
 export function getPublicPhotoUrl(
-  projectId: string,
   photo: PublicPortfolioPhoto,
   preferredVariant: "480p" | "960p" | "1440p" | "1920p" = "960p"
 ): string {
   const preferred = photo.variants.find(variant => variant.name === preferredVariant);
   const fallback = photo.variants.at(-1) ?? photo.variants[0];
   const variant = preferred ?? fallback;
-  return "/portfolio/media/" + projectId + "/" + photo.id + "/" + variant.name;
+  return "/portfolio/media/" + photo.id + "/" + variant.name;
 }
 
-export function getPublicPhotoSrcSet(projectId: string, photo: PublicPortfolioPhoto): string {
+export function getPublicPhotoSrcSet(photo: PublicPortfolioPhoto): string {
   return photo.variants
-    .map(variant => "/portfolio/media/" + projectId + "/" + photo.id + "/" + variant.name + " " + variant.width + "w")
+    .map(variant => "/portfolio/media/" + photo.id + "/" + variant.name + " " + variant.width + "w")
     .join(", ");
 }
 
-export function getVideoEmbedUrl(video: { provider: "youtube" | "vimeo"; videoId: string } | null | undefined): string | null {
-  if (!video) return null;
-  if (video.provider === "youtube") return `https://www.youtube-nocookie.com/embed/${video.videoId}`;
-  if (video.provider === "vimeo") return `https://player.vimeo.com/video/${video.videoId}`;
-  return null;
-}
-
-function VideoPlayer({ project, lang }: { project: PublicPortfolioProject; lang: Lang }) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const embedUrl = getVideoEmbedUrl(project.video)!;
-  const cover = project.photos.find(photo => photo.id === project.coverPhotoId)!;
-
-  return (
-    <div>
-      <h3 className={styles.videoItemTitle}>{project.title[lang]}</h3>
-      <div className={styles.videoPlayerWrap}>
-        {!isPlaying ? (
-          <>
-            <img
-              src={getPublicPhotoUrl(project.id, cover)}
-              srcSet={getPublicPhotoSrcSet(project.id, cover)}
-              sizes="(max-width: 760px) 100vw, 760px"
-              width={cover.width}
-              height={cover.height}
-              alt={cover.alt[lang]}
-              className={styles.videoElement}
-              loading="lazy"
-              decoding="async"
-            />
-            <button
-              type="button"
-              className={styles.videoPlayBtn}
-              onClick={() => setIsPlaying(true)}
-              aria-label={lang === "fr" ? "Lire la vidéo" : "Play video"}
-            >
-              ▶
-            </button>
-          </>
-        ) : (
-          <iframe
-            src={`${embedUrl}?autoplay=1`}
-            title={project.title[lang]}
-            className={styles.videoIframe}
-            frameBorder="0"
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          ></iframe>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
+export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
   const t = getStrings(lang).portfolio;
   const [activeFilter, setActiveFilter] = useState("all");
   const alternateLangHref = lang === "fr" ? "/en/portfolio" : "/fr/portfolio";
 
   const filters = [
     { key: "all", label: t.filterAll },
-    { key: "ceremony", label: t.filterCeremony },
-    { key: "portraits", label: t.filterPortraits },
-    { key: "reception", label: t.filterReception },
+    ...portfolio.categories.map(cat => ({
+      key: cat.slug,
+      label: cat.name[lang]
+    }))
   ];
 
-  const visibleProjects = projects.filter(project => (
-    activeFilter === "all" || project.photos.some(photo => photo.category === activeFilter)
-  ));
+  const visiblePhotos = useMemo(() => {
+    return portfolio.photos.filter(photo => (
+      activeFilter === "all" || photo.categorySlug === activeFilter
+    ));
+  }, [portfolio.photos, activeFilter]);
 
-  const projectsWithVideo = projects.filter(p => p.video !== null && p.video !== undefined);
-  const hasVideos = projectsWithVideo.length > 0;
+  const hasVideo = portfolio.video !== null;
+  const [videoPlaying, setVideoPlaying] = useState(false);
 
   return (
     <>
@@ -112,7 +65,7 @@ export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
           <div className={styles.titleDivider} />
           <h1 className={styles.title}>{t.title}</h1>
           <p className={styles.subtitle}>{t.subtitle}</p>
-          {hasVideos && (
+          {hasVideo && (
             <div className={styles.tabs}>
               <a href="#galerie-photo" className={styles.tabBtn + " " + styles.active}>
                 {t.tabPhoto}
@@ -124,7 +77,7 @@ export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
           )}
         </section>
 
-        <section className={styles.filtersSection} aria-label={lang === "fr" ? "Filtrer les projets" : "Filter projects"}>
+        <section className={styles.filtersSection} aria-label={lang === "fr" ? "Filtrer les photos" : "Filter photos"}>
           <div className={styles.filters}>
             {filters.map(filter => (
               <button
@@ -142,43 +95,31 @@ export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
 
         <section id="galerie-photo" className={styles.photoSection}>
           <div className={styles.photoInner}>
-            {visibleProjects.length === 0 ? (
+            {visiblePhotos.length === 0 ? (
               <p className={styles.emptyState}>
-                {lang === "fr" ? "Les prochains reportages arrivent bientôt." : "New stories are coming soon."}
+                {lang === "fr" ? "Notre portfolio sera bientôt disponible." : "Our portfolio will be available soon."}
               </p>
             ) : (
               <div className={styles.photoGrid}>
-                {visibleProjects.map(project => {
-                  const cover = project.photos.find(photo => photo.id === project.coverPhotoId)!;
-                  const landscape = cover.width >= cover.height;
+                {visiblePhotos.map((photo, index) => {
+                  const landscape = photo.width >= photo.height;
                   return (
                     <article
-                      key={project.id}
+                      key={photo.id}
                       className={styles.photoWrap + " " + (landscape ? styles.span2 : styles.span1)}
                     >
-                      <Link
-                        to={"/" + lang + "/portfolio/" + project.slug[lang]}
-                        className={styles.projectLink}
-                        aria-label={project.title[lang]}
-                      >
-                        <img
-                          src={getPublicPhotoUrl(project.id, cover)}
-                          srcSet={getPublicPhotoSrcSet(project.id, cover)}
-                          sizes={landscape ? "(max-width: 720px) 100vw, 1080px" : "(max-width: 720px) 100vw, 526px"}
-                          width={cover.width}
-                          height={cover.height}
-                          alt={cover.alt[lang]}
-                          className={styles.photoImage}
-                          loading="lazy"
-                          decoding="async"
-                        />
-                        <span className={styles.projectOverlay}>
-                          <strong>{project.title[lang]}</strong>
-                          {(project.location || project.date) && (
-                            <small>{[project.location, project.date].filter(Boolean).join(" · ")}</small>
-                          )}
-                        </span>
-                      </Link>
+                      <img
+                        src={getPublicPhotoUrl(photo)}
+                        srcSet={getPublicPhotoSrcSet(photo)}
+                        sizes={landscape ? "(max-width: 720px) 100vw, 1080px" : "(max-width: 720px) 100vw, 526px"}
+                        width={photo.width}
+                        height={photo.height}
+                        alt={photo.alt[lang] || ""}
+                        className={styles.photoImage}
+                        loading={index === 0 ? "eager" : "lazy"}
+                        fetchPriority={index === 0 ? "high" : "auto"}
+                        decoding="async"
+                      />
                     </article>
                   );
                 })}
@@ -187,14 +128,34 @@ export function PortfolioPage({ lang, projects }: PortfolioPageProps) {
           </div>
         </section>
 
-        {hasVideos && (
+        {hasVideo && portfolio.video && (
           <section id="galerie-video" className={styles.videoSection}>
             <p className={styles.videoEyebrow}>{t.videoEyebrow}</p>
             <h2 className={styles.videoTitle}>{t.videoTitle}</h2>
             <div className={styles.videoList}>
-              {projectsWithVideo.map(project => (
-                <VideoPlayer key={project.id} project={project} lang={lang} />
-              ))}
+              <div className={styles.videoPlayerWrap}>
+                {!videoPlaying ? (
+                  <button
+                    type="button"
+                    className={styles.playButton}
+                    onClick={() => setVideoPlaying(true)}
+                    aria-label={lang === "fr" ? "Lire la vidéo" : "Play video"}
+                  >
+                    {lang === "fr" ? "Lire la vidéo" : "Play video"}
+                  </button>
+                ) : (
+                  <iframe
+                    src={getVideoEmbedUrl(portfolio.video)!}
+                    className={styles.videoIframe}
+                    frameBorder="0"
+                    title={lang === "fr" ? "Vidéo de présentation" : "Presentation video"}
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+                    allowFullScreen
+                  ></iframe>
+                )}
+              </div>
             </div>
           </section>
         )}

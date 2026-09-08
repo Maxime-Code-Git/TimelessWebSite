@@ -9,11 +9,10 @@ import busboy from "busboy";
 import { requireValidAdminSession } from "../lib/admin-auth.server";
 import { validateOrigin } from "../lib/security.server";
 import {
-  addPhotoToProject,
+  addPhotoToPortfolio,
   assertPortfolioRevision,
   getPortfolioMediaPath,
   getWatermarkConfig,
-  getProjectById,
 } from "../lib/portfolio-content.server";
 import {
   CorruptedContentError,
@@ -63,9 +62,6 @@ async function parseSingleUpload(
     resolveParser = resolve;
     rejectParser = reject;
   });
-  // Busboy can reject while the Fetch reader is still awaiting its next chunk.
-  // Attach a handler immediately so Node never treats that short window as an
-  // unhandled rejection; the original promise is still awaited below.
   void parserDone.catch(() => undefined);
 
   const parser = busboy({
@@ -182,7 +178,7 @@ export async function loader() {
   return new Response(null, { status: 405, headers: { Allow: "POST" } });
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
     return new Response(null, { status: 405, headers: { Allow: "POST" } });
   }
@@ -200,11 +196,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return jsonError("Unsupported Media Type", 415);
   }
 
-  const projectId = params.projectId;
-  if (!projectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
-    return jsonError("Not Found", 404);
-  }
-
   const previousRevision = request.headers.get("x-portfolio-revision");
   if (!previousRevision || !/^[0-9a-f]{32}$/.test(previousRevision)) {
     return jsonError("Invalid revision", 400);
@@ -219,11 +210,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return jsonError("Internal Server Error", 500);
   }
 
-  const project = getProjectById(projectId);
-  if (!project) return jsonError("Not Found", 404);
-  if (project.status === "published") {
-    return jsonError("Unpublish this project before adding photos.", 422);
-  }
+  const photoId = crypto.randomUUID();
 
   let tempDirectory: string | null = null;
   try {
@@ -235,24 +222,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const processed = await processImage(
       uploadedFilePath,
       tempDirectory,
-      projectId,
+      photoId,
       getPortfolioMediaPath(),
       watermark.text,
       watermark.revision
     );
 
     try {
-      const result = addPhotoToProject(projectId, {
+      const result = addPhotoToPortfolio({
         fileId: processed.fileId,
         originalFormat: processed.originalFormat,
         originalWidth: processed.originalWidth,
         originalHeight: processed.originalHeight,
-        category: "ceremony",
-        alt: { fr: "À définir", en: "To be defined" },
         variants: processed.variants,
         appliedWatermarkRevision: processed.appliedWatermarkRevision,
         processedAt: new Date().toISOString(),
-      }, previousRevision);
+      }, previousRevision, photoId);
 
       return Response.json({
         success: true,
@@ -261,7 +246,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }, { headers: { "Cache-Control": "no-store" } });
     } catch (error: unknown) {
       try {
-        removeProcessedImage(projectId, getPortfolioMediaPath(), processed);
+        removeProcessedImage(photoId, getPortfolioMediaPath(), processed);
       } catch {
         return jsonError("Generated media cleanup failed.", 500);
       }

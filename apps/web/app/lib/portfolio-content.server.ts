@@ -6,6 +6,7 @@ import { z } from "zod";
 import { atomicWriteJson } from "./atomic-fs.server";
 import { RevisionConflictError, CorruptedContentError, ValidationError } from "./site-content.server";
 import { ENV } from "./env.server";
+import path from "node:path";
 
 export function getPortfolioContentPath(): string {
   return ENV.PORTFOLIO_CONTENT_PATH;
@@ -32,13 +33,6 @@ const textSchema = z.string()
   .max(2000, "Text is too long")
   .refine(val => !/[<>]/.test(val), "HTML is not allowed");
 
-const titleSchema = z.string()
-  .trim()
-  .min(1, "Title is required")
-  .max(100, "Title is too long")
-  .refine(val => !/[<>]/.test(val), "HTML is not allowed");
-
-
 const variantResultSchema = z.object({
   name: z.enum(["480p", "960p", "1440p", "1920p"]),
   width: z.number().int().positive(),
@@ -47,7 +41,81 @@ const variantResultSchema = z.object({
   fileId: z.string().regex(variantFileIdRegex, "Invalid variant fileId"),
 }).strict();
 
+export const categorySchema = z.object({
+  id: z.string().uuid(),
+  name: z.object({
+    fr: textSchema,
+    en: textSchema,
+  }).strict(),
+  slug: slugSchema,
+  order: z.number().int().min(0),
+  active: z.boolean(),
+}).strict();
+
+export type Category = z.infer<typeof categorySchema>;
+
 export const photoSchema = z.object({
+  id: z.string().uuid(),
+  fileId: z.string().regex(fileIdRegex, "Invalid fileId format"),
+  originalFormat: z.enum(["jpeg", "png", "webp"]),
+  originalWidth: z.number().int().positive(),
+  originalHeight: z.number().int().positive(),
+  categoryId: z.string().uuid().nullable(),
+  alt: z.object({
+    fr: textSchema.nullable(),
+    en: textSchema.nullable(),
+  }).strict(),
+  variants: z.array(variantResultSchema).min(1, "At least one image variant is required"),
+  appliedWatermarkRevision: z.string().regex(revisionHexRegex, "Invalid watermark revision format"),
+  processedAt: z.string().refine(val => {
+    if (!isoDateRegex.test(val)) return false;
+    const d = new Date(val);
+    return !isNaN(d.getTime()) && d.toISOString() === val;
+  }, "Must be valid ISO with ms"),
+  visible: z.boolean(),
+  order: z.number().int().min(0),
+}).strict()
+  .refine(p => new Set(p.variants.map(v => v.name)).size === p.variants.length, "Duplicate variants")
+  .refine(p => p.variants.some(v => v.name === "480p"), "A 480p variant is required");
+
+export type Photo = z.infer<typeof photoSchema>;
+
+const youtubeVideoSchema = z.object({
+  provider: z.literal("youtube"),
+  videoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
+}).strict();
+
+const vimeoVideoSchema = z.object({
+  provider: z.literal("vimeo"),
+  videoId: z.string().regex(/^\d{5,15}$/),
+}).strict();
+
+export const watermarkConfigSchema = z.object({
+  mode: z.literal("text"),
+  text: z.string()
+    .min(1, "Watermark text is required")
+    .max(40, "Watermark text is too long")
+    .refine(val => val.trim().length > 0, "Watermark text cannot be only whitespace")
+    // eslint-disable-next-line no-control-regex
+    .refine(val => !/[\x00-\x1f\x7f]/.test(val), "Control characters are not allowed")
+    .refine(val => !/<[a-z/!][^>]*>/i.test(val), "HTML tags are not allowed"),
+  revision: z.string().regex(revisionHexRegex, "Invalid watermark revision format"),
+  updatedAt: z.string().refine(val => {
+    if (!isoDateRegex.test(val)) return false;
+    const d = new Date(val);
+    return !isNaN(d.getTime()) && d.toISOString() === val;
+  }, "Must be valid ISO with ms"),
+}).strict();
+
+export type WatermarkConfig = z.infer<typeof watermarkConfigSchema>;
+
+const titleSchema = z.string()
+  .trim()
+  .min(1, "Title is required")
+  .max(100, "Title is too long")
+  .refine(val => !/[<>]/.test(val), "HTML is not allowed");
+
+const legacyPhotoSchema = z.object({
   id: z.string().uuid(),
   fileId: z.string().regex(fileIdRegex, "Invalid fileId format"),
   originalFormat: z.enum(["jpeg", "png", "webp"]),
@@ -69,19 +137,7 @@ export const photoSchema = z.object({
   .refine(p => new Set(p.variants.map(v => v.name)).size === p.variants.length, "Duplicate variants")
   .refine(p => p.variants.some(v => v.name === "480p"), "A 480p variant is required");
 
-export type Photo = z.infer<typeof photoSchema>;
-
-const youtubeVideoSchema = z.object({
-  provider: z.literal("youtube"),
-  videoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
-}).strict();
-
-const vimeoVideoSchema = z.object({
-  provider: z.literal("vimeo"),
-  videoId: z.string().regex(/^\d{5,15}$/),
-}).strict();
-
-export const projectSchema = z.object({
+const legacyProjectSchema = z.object({
   id: z.string().uuid(),
   slug: z.object({
     fr: slugSchema,
@@ -102,7 +158,7 @@ export const projectSchema = z.object({
     const d = new Date(val);
     return !isNaN(d.getTime()) && d.toISOString().startsWith(val);
   }, "Invalid date format or impossible date"),
-  videoUrl: z.string().trim().url().max(255).nullable().optional(), // for backward compatibility during read
+  videoUrl: z.string().trim().url().max(255).nullable().optional(),
   video: z.union([youtubeVideoSchema, vimeoVideoSchema]).nullable().optional(),
   status: z.enum(["draft", "published"]),
   order: z.number().int().min(0),
@@ -117,59 +173,24 @@ export const projectSchema = z.object({
     const d = new Date(val);
     return !isNaN(d.getTime()) && d.toISOString() === val;
   }, "Must be valid ISO with ms"),
-  photos: z.array(photoSchema),
-}).strict().superRefine((data, ctx) => {
-  if (data.coverPhotoId !== null) {
-    if (!data.photos.some(p => p.id === data.coverPhotoId)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Cover photo must belong to project photos", path: ["coverPhotoId"] });
+  photos: z.array(legacyPhotoSchema),
+}).strict().superRefine((val, ctx) => {
+  if (val.status === "published") {
+    if (!val.coverPhotoId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Published projects must have a cover photo", path: ["coverPhotoId"] });
+    } else {
+      const cover = val.photos.find(p => p.id === val.coverPhotoId);
+      if (!cover) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Cover photo must belong to the project", path: ["coverPhotoId"] });
+      }
     }
   }
-  if (data.status === "published") {
-    if (!data.coverPhotoId) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Published project must have a cover photo", path: ["coverPhotoId"] });
-    }
-    if (data.photos.length === 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Published project must have at least one photo", path: ["photos"] });
-    }
+  if (val.videoUrl && val.video) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Cannot have both videoUrl and video", path: ["video"] });
   }
-}).transform((data, ctx) => {
-  if (data.video !== undefined && data.videoUrl !== undefined) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Cannot specify both video and videoUrl", path: ["video"] });
-    return z.NEVER;
-  }
-  let video = data.video ?? null;
-  if (data.videoUrl !== undefined && data.videoUrl !== null) {
-    video = parseVideoUrl(data.videoUrl);
-    if (!video) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid videoUrl format", path: ["videoUrl"] });
-      return z.NEVER;
-    }
-  }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { videoUrl: _, ...rest } = data;
-  return { ...rest, video };
 });
 
-export const watermarkConfigSchema = z.object({
-  mode: z.literal("text"),
-  text: z.string()
-    .min(1, "Watermark text is required")
-    .max(40, "Watermark text is too long")
-    .refine(val => val.trim().length > 0, "Watermark text cannot be only whitespace")
-    // eslint-disable-next-line no-control-regex
-    .refine(val => !/[\x00-\x1f\x7f]/.test(val), "Control characters are not allowed")
-    .refine(val => !/<[a-z/!][^>]*>/i.test(val), "HTML tags are not allowed"),
-  revision: z.string().regex(revisionHexRegex, "Invalid watermark revision format"),
-  updatedAt: z.string().refine(val => {
-    if (!isoDateRegex.test(val)) return false;
-    const d = new Date(val);
-    return !isNaN(d.getTime()) && d.toISOString() === val;
-  }, "Must be valid ISO with ms"),
-}).strict();
-
-export type WatermarkConfig = z.infer<typeof watermarkConfigSchema>;
-
-const portfolioStorageSchema = z.object({
+const portfolioSchemaV1 = z.object({
   schemaVersion: z.literal(1),
   revision: z.string().regex(revisionHexRegex, "Invalid revision format"),
   updatedAt: z.string().refine(val => {
@@ -177,45 +198,48 @@ const portfolioStorageSchema = z.object({
     const d = new Date(val);
     return !isNaN(d.getTime()) && d.toISOString() === val;
   }, "Must be valid ISO with ms"),
-  projects: z.array(projectSchema),
+  projects: z.array(legacyProjectSchema),
   watermark: watermarkConfigSchema.optional(),
 }).strict();
 
-export const portfolioSchema = z.object({
-  schemaVersion: z.literal(1),
+export const portfolioSchemaV2 = z.object({
+  schemaVersion: z.literal(2),
   revision: z.string().regex(revisionHexRegex, "Invalid revision format"),
   updatedAt: z.string().refine(val => {
     if (!isoDateRegex.test(val)) return false;
     const d = new Date(val);
     return !isNaN(d.getTime()) && d.toISOString() === val;
   }, "Must be valid ISO with ms"),
-  projects: z.array(projectSchema),
+  categories: z.array(categorySchema),
+  photos: z.array(photoSchema),
+  video: z.union([youtubeVideoSchema, vimeoVideoSchema]).nullable(),
   watermark: watermarkConfigSchema,
-}).strict();
+}).strict().superRefine((data, ctx) => {
+  const categoryMap = new Map(data.categories.map(c => [c.id, c]));
+  for (let i = 0; i < data.photos.length; i++) {
+    const photo = data.photos[i];
+    if (photo.visible) {
+      if (!photo.categoryId) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Photo visible doit avoir une catégorie", path: ["photos", i, "categoryId"] });
+        continue;
+      }
+      const category = categoryMap.get(photo.categoryId);
+      if (!category) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Catégorie introuvable", path: ["photos", i, "categoryId"] });
+      } else if (!category.active) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Photo visible ne peut pas appartenir à une catégorie inactive", path: ["photos", i, "categoryId"] });
+      }
+      if (!photo.alt.fr || photo.alt.fr.trim() === "") {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Alt FR obligatoire", path: ["photos", i, "alt", "fr"] });
+      }
+      if (!photo.alt.en || photo.alt.en.trim() === "") {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Alt EN obligatoire", path: ["photos", i, "alt", "en"] });
+      }
+    }
+  }
+});
 
-export type Portfolio = z.infer<typeof portfolioSchema>;
-export type Project = z.infer<typeof projectSchema>;
-
-export interface PublicPortfolioPhoto {
-  id: string;
-  category: Photo["category"];
-  alt: Photo["alt"];
-  width: number;
-  height: number;
-  variants: Array<Pick<Photo["variants"][number], "name" | "width" | "height">>;
-}
-
-export interface PublicPortfolioProject {
-  id: string;
-  slug: Project["slug"];
-  title: Project["title"];
-  description: Project["description"];
-  location: string | null;
-  date: string | null;
-  video: { provider: "youtube" | "vimeo"; videoId: string } | null;
-  coverPhotoId: string;
-  photos: PublicPortfolioPhoto[];
-}
+export type Portfolio = z.infer<typeof portfolioSchemaV2>;
 
 function createDefaultWatermark(globalUpdatedAt: string): WatermarkConfig {
   return {
@@ -226,39 +250,47 @@ function createDefaultWatermark(globalUpdatedAt: string): WatermarkConfig {
   };
 }
 
-function createDefaultPortfolio(): Portfolio {
+export function createDefaultPortfolioV2(revisionOverride?: string, watermarkOverride?: WatermarkConfig): Portfolio {
   const now = new Date().toISOString();
   return {
-    schemaVersion: 1,
-    revision: crypto.randomBytes(16).toString("hex"),
+    schemaVersion: 2,
+    revision: revisionOverride || crypto.randomBytes(16).toString("hex"),
     updatedAt: now,
-    projects: [],
-    watermark: createDefaultWatermark(now),
+    categories: [],
+    photos: [],
+    video: null,
+    watermark: watermarkOverride || createDefaultWatermark(now),
   };
 }
 
-export function getRawPortfolioContent(): { content: Portfolio; isCorrupted: boolean } {
+export function getRawPortfolioContent(): { content: Portfolio; isCorrupted: boolean; isLegacy: boolean } {
   const filePath = getPortfolioContentPath();
   try {
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, "utf-8");
       const parsed = JSON.parse(content);
-      const validated = portfolioStorageSchema.safeParse(parsed);
+      if (parsed.schemaVersion === 1) {
+        // Return a fresh in-memory v2 portfolio without modifying data
+        const legacyWatermark = parsed.watermark ? watermarkConfigSchema.parse(parsed.watermark) : undefined;
+        return { content: createDefaultPortfolioV2(parsed.revision, legacyWatermark), isCorrupted: false, isLegacy: true };
+      }
+
+      const validated = portfolioSchemaV2.safeParse(parsed);
       if (validated.success) {
         const stored = validated.data;
         const portfolio: Portfolio = {
           ...stored,
           watermark: stored.watermark ?? createDefaultWatermark(stored.updatedAt),
         };
-        return { content: portfolio, isCorrupted: false };
+        return { content: portfolio, isCorrupted: false, isLegacy: false };
       } else {
-        return { content: createDefaultPortfolio(), isCorrupted: true };
+        return { content: createDefaultPortfolioV2(), isCorrupted: true, isLegacy: false };
       }
     }
   } catch {
-    return { content: createDefaultPortfolio(), isCorrupted: true };
+    return { content: createDefaultPortfolioV2(), isCorrupted: true, isLegacy: false };
   }
-  return { content: createDefaultPortfolio(), isCorrupted: false };
+  return { content: createDefaultPortfolioV2(), isCorrupted: false, isLegacy: false };
 }
 
 export function getPortfolioContent(): Portfolio {
@@ -269,51 +301,120 @@ export function getPortfolioContent(): Portfolio {
   return raw.content;
 }
 
-export function getProjectById(projectId: string): Project | undefined {
-  const portfolio = getPortfolioContent();
-  return portfolio.projects.find(p => p.id === projectId);
+export function migrateLegacyPortfolio(previousRevision: string) {
+  const filePath = getPortfolioContentPath();
+  if (!fs.existsSync(filePath)) {
+    throw new Error("Portfolio file not found");
+  }
+
+  const contentBuffer = fs.readFileSync(filePath);
+  const contentString = contentBuffer.toString("utf-8");
+
+  let parsed;
+  try {
+    parsed = JSON.parse(contentString);
+  } catch {
+    throw new Error("Invalid JSON");
+  }
+
+  if (parsed.schemaVersion !== 1) {
+    if (parsed.schemaVersion === 2 && parsed.revision === previousRevision) {
+      return;
+    }
+    throw new Error("Not a legacy portfolio");
+  }
+
+  if (parsed.revision !== previousRevision) {
+    throw new RevisionConflictError();
+  }
+
+  const v1Data = portfolioSchemaV1.parse(parsed);
+
+  const hash = crypto.createHash("sha256").update(contentBuffer).digest("hex");
+  const dirPath = path.dirname(filePath);
+  const archivePath = path.resolve(dirPath, `portfolio.legacy.${hash}.json`);
+
+  let fd;
+  let archiveCreatedByUs = false;
+  try {
+    try {
+      const stats = fs.lstatSync(archivePath);
+      if (stats.isSymbolicLink() || !stats.isFile()) {
+        throw new Error("Pre-existing archive is not a regular file");
+      }
+
+      if ((stats.mode & 0o777) !== 0o600) {
+        throw new Error("Pre-existing archive mode is not 0600");
+      }
+
+      const existingContent = fs.readFileSync(archivePath);
+      if (!existingContent.equals(contentBuffer)) {
+        throw new Error("Pre-existing archive bytes mismatch");
+      }
+      // If it exists, is a regular file, mode is 0600 and bytes match, we skip creating it
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith("Pre-existing archive")) {
+        throw err;
+      }
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        fd = fs.openSync(archivePath, "wx", 0o600);
+        archiveCreatedByUs = true;
+        let bytesWritten = 0;
+        while (bytesWritten < contentBuffer.length) {
+          const written = fs.writeSync(fd, contentBuffer, bytesWritten, contentBuffer.length - bytesWritten, null);
+          if (written <= 0) {
+            // eslint-disable-next-line preserve-caught-error
+            throw new Error("Failed to write to archive: zero bytes written");
+          }
+          bytesWritten += written;
+        }
+        fs.fsyncSync(fd);
+      } else {
+        throw new Error("Failed to access archive securely", { cause: err });
+      }
+    }
+  } catch (error) {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch { /* best-effort cleanup on failure */ }
+    }
+    if (archiveCreatedByUs && fs.existsSync(archivePath)) {
+      try { fs.unlinkSync(archivePath); } catch { /* ignore */ }
+    }
+    throw error;
+  }
+
+  if (fd !== undefined) {
+    fs.closeSync(fd);
+  }
+
+  let dirFd;
+  try {
+    dirFd = fs.openSync(dirPath, "r");
+    fs.fsyncSync(dirFd);
+  } finally {
+    if (dirFd !== undefined) {
+      fs.closeSync(dirFd);
+    }
+  }
+
+  if (archiveCreatedByUs && fd !== undefined) {
+    const writtenContent = fs.readFileSync(archivePath);
+    if (!writtenContent.equals(contentBuffer)) {
+      try { fs.unlinkSync(archivePath); } catch { /* ignore */ }
+      throw new Error("Archive bytes verification failed");
+    }
+  }
+
+  const legacyWatermark = v1Data.watermark ? watermarkConfigSchema.parse(v1Data.watermark) : undefined;
+  const newRevision = crypto.randomBytes(16).toString("hex");
+  const newV2 = createDefaultPortfolioV2(newRevision, legacyWatermark);
+  atomicWriteJson(filePath, portfolioSchemaV2.parse(newV2));
+  return { newRevision: newV2.revision };
 }
 
-function toPublicProject(project: Project): PublicPortfolioProject {
-  return {
-    id: project.id,
-    slug: project.slug,
-    title: project.title,
-    description: project.description,
-    location: project.location,
-    date: project.date,
-    video: project.video,
-    coverPhotoId: project.coverPhotoId!,
-    photos: project.photos.map(photo => ({
-      id: photo.id,
-      category: photo.category,
-      alt: photo.alt,
-      width: photo.originalWidth,
-      height: photo.originalHeight,
-      variants: photo.variants.map(({ name, width, height }) => ({ name, width, height })),
-    })),
-  };
-}
-
-
-
-export function getPublishedProjects(): PublicPortfolioProject[] {
-  return getPortfolioContent().projects
-    .filter((project): project is Project & { coverPhotoId: string } => (
-      project.status === "published" &&
-      project.coverPhotoId !== null &&
-      project.photos.some(photo => photo.id === project.coverPhotoId)
-    ))
-    .sort((a, b) => a.order - b.order)
-    .map(toPublicProject);
-}
-
-export function getPublishedProjectBySlug(
-  lang: "fr" | "en",
-  slug: string
-): PublicPortfolioProject | undefined {
-  if (!slugRegex.test(slug) || slug.length > 100) return undefined;
-  return getPublishedProjects().find(project => project.slug[lang] === slug);
+export function isPortfolioLegacy(): boolean {
+  const raw = getRawPortfolioContent();
+  return raw.isLegacy;
 }
 
 export function assertPortfolioRevision(previousRevision: string): void {
@@ -324,23 +425,6 @@ export function assertPortfolioRevision(previousRevision: string): void {
     current.content.revision !== previousRevision
   ) {
     throw new RevisionConflictError();
-  }
-}
-
-export function getWatermarkConfig(): WatermarkConfig {
-  const portfolio = getPortfolioContent();
-  return portfolio.watermark;
-}
-
-function checkSlugsUnique(projects: Project[], newProject: Project) {
-  for (const p of projects) {
-    if (p.id === newProject.id) continue;
-    if (p.slug.fr === newProject.slug.fr) {
-      throw new Error(`FR slug '${newProject.slug.fr}' is already used`);
-    }
-    if (p.slug.en === newProject.slug.en) {
-      throw new Error(`EN slug '${newProject.slug.en}' is already used`);
-    }
   }
 }
 
@@ -359,9 +443,14 @@ function savePortfolio(portfolio: Portfolio, previousRevision: string) {
     updatedAt: new Date().toISOString(),
   };
 
-  const parsed = portfolioSchema.parse(newContent);
+  const parsed = portfolioSchemaV2.parse(newContent);
   atomicWriteJson(getPortfolioContentPath(), parsed);
   return newContent.revision;
+}
+
+export function getWatermarkConfig(): WatermarkConfig {
+  const portfolio = getPortfolioContent();
+  return portfolio.watermark;
 }
 
 const WATERMARK_TEXT_MAX_LENGTH = 40;
@@ -389,12 +478,8 @@ export function validateWatermarkText(text: string): string {
 
 export function updateWatermarkText(text: string, previousPortfolioRevision: string): { portfolioRevision: string, watermarkRevision: string } {
   const validatedText = validateWatermarkText(text);
-
   const current = getRawPortfolioContent();
-  if (current.isCorrupted) {
-    throw new CorruptedContentError();
-  }
-
+  if (current.isCorrupted) throw new CorruptedContentError();
   if (current.content.revision !== previousPortfolioRevision && fs.existsSync(getPortfolioContentPath())) {
     throw new RevisionConflictError();
   }
@@ -434,7 +519,7 @@ export function generateSlug(text: string): string {
 }
 
 export function generateUniqueSlug(baseSlug: string, existingSlugs: string[]): string {
-  let slug = baseSlug || "project";
+  let slug = baseSlug || "category";
   if (slug.length < 3) {
     slug = slug.padEnd(3, "0");
   }
@@ -453,233 +538,292 @@ export function generateUniqueSlug(baseSlug: string, existingSlugs: string[]): s
   return uniqueSlug;
 }
 
-export function createProjectDraft(data: Omit<Project, "id" | "createdAt" | "updatedAt" | "photos" | "order" | "status" | "coverPhotoId" | "video"> & { video?: { provider: "youtube" | "vimeo"; videoId: string } | null }, previousRevision: string): string {
+export function createCategory(data: { name: { fr: string, en: string }, slug: string, active: boolean }, previousRevision: string): string {
+  if (isPortfolioLegacy()) throw new Error("Cannot mutate legacy portfolio");
   const portfolio = getPortfolioContent();
-  const nextOrder = portfolio.projects.length > 0 ? Math.max(...portfolio.projects.map(p => p.order)) + 1 : 0;
 
-  const existingFrSlugs = portfolio.projects.map(p => p.slug.fr);
-  const existingEnSlugs = portfolio.projects.map(p => p.slug.en);
+  const normFr = generateSlug(data.name.fr);
+  const normEn = generateSlug(data.name.en);
+  const newSlug = generateSlug(data.slug);
 
-  const slugFr = generateUniqueSlug(generateSlug(data.slug.fr && data.slug.fr.trim() ? data.slug.fr : data.title.fr), existingFrSlugs);
-  const slugEn = generateUniqueSlug(generateSlug(data.slug.en && data.slug.en.trim() ? data.slug.en : data.title.en), existingEnSlugs);
+  if (portfolio.categories.some(c => generateSlug(c.name.fr) === normFr)) {
+    throw new ValidationError("Category name (FR) already exists.");
+  }
+  if (portfolio.categories.some(c => generateSlug(c.name.en) === normEn)) {
+    throw new ValidationError("Category name (EN) already exists.");
+  }
+  if (portfolio.categories.some(c => c.slug === newSlug)) {
+    throw new ValidationError("A category with this slug already exists.");
+  }
 
-  const newProject: Project = {
-    ...data,
-    slug: { fr: slugFr, en: slugEn },
+  const nextOrder = portfolio.categories.length > 0 ? Math.max(...portfolio.categories.map(c => c.order)) + 1 : 0;
+
+  const newCategory: Category = {
     id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    photos: [],
+    name: {
+      fr: textSchema.parse(data.name.fr),
+      en: textSchema.parse(data.name.en),
+    },
+    slug: newSlug,
     order: nextOrder,
-    status: "draft",
-    coverPhotoId: null,
-    video: data.video ?? null,
+    active: data.active,
   };
 
-  checkSlugsUnique(portfolio.projects, newProject);
-
-  portfolio.projects.push(newProject);
+  portfolio.categories.push(newCategory);
   return savePortfolio(portfolio, previousRevision);
 }
 
-export function updateProjectMetadata(projectId: string, data: Omit<Project, "id" | "createdAt" | "updatedAt" | "photos" | "order" | "status" | "coverPhotoId" | "video"> & { video?: { provider: "youtube" | "vimeo"; videoId: string } | null }, previousRevision: string): string {
+export function updateCategory(categoryId: string, data: { name?: { fr: string, en: string }, slug?: string, active?: boolean }, previousRevision: string): string {
+  if (isPortfolioLegacy()) throw new Error("Cannot mutate legacy portfolio");
   const portfolio = getPortfolioContent();
-  const index = portfolio.projects.findIndex(p => p.id === projectId);
-  if (index === -1) throw new Error("Project not found");
-  if (portfolio.projects[index].status === "published") throw new ValidationError("Cannot modify a published project");
+  const index = portfolio.categories.findIndex(c => c.id === categoryId);
+  if (index === -1) throw new Error("Category not found");
 
-  const existingFrSlugs = portfolio.projects.filter(p => p.id !== projectId).map(p => p.slug.fr);
-  const existingEnSlugs = portfolio.projects.filter(p => p.id !== projectId).map(p => p.slug.en);
+  if (data.name) {
+    const normFr = generateSlug(data.name.fr);
+    const normEn = generateSlug(data.name.en);
+    if (portfolio.categories.some(c => c.id !== categoryId && generateSlug(c.name.fr) === normFr)) {
+      throw new ValidationError("Category name (FR) already exists.");
+    }
+    if (portfolio.categories.some(c => c.id !== categoryId && generateSlug(c.name.en) === normEn)) {
+      throw new ValidationError("Category name (EN) already exists.");
+    }
+    portfolio.categories[index].name = {
+      fr: textSchema.parse(data.name.fr),
+      en: textSchema.parse(data.name.en),
+    };
+  }
 
-  const slugFr = generateUniqueSlug(generateSlug(data.slug.fr && data.slug.fr.trim() ? data.slug.fr : data.title.fr), existingFrSlugs);
-  const slugEn = generateUniqueSlug(generateSlug(data.slug.en && data.slug.en.trim() ? data.slug.en : data.title.en), existingEnSlugs);
+  if (data.slug !== undefined) {
+    const newSlug = generateSlug(data.slug);
+    if (portfolio.categories.some(c => c.id !== categoryId && c.slug === newSlug)) {
+      throw new ValidationError("A category with this slug already exists.");
+    }
+    portfolio.categories[index].slug = newSlug;
+  }
 
-  const updatedProject: Project = {
-    ...portfolio.projects[index],
-    ...data,
-    video: data.video !== undefined ? data.video : portfolio.projects[index].video,
-    slug: { fr: slugFr, en: slugEn },
-    updatedAt: new Date().toISOString(),
+  if (data.active !== undefined) {
+    if (data.active === false) {
+      const isUsedByVisiblePhotos = portfolio.photos.some(p => p.categoryId === categoryId && p.visible);
+      if (isUsedByVisiblePhotos) {
+        throw new ValidationError("Cannot deactivate a category that is currently used by visible photos.");
+      }
+    }
+    portfolio.categories[index].active = data.active;
+  }
+
+  return savePortfolio(portfolio, previousRevision);
+}
+
+export function deleteCategory(categoryId: string, previousRevision: string): string {
+  if (isPortfolioLegacy()) throw new Error("Cannot mutate legacy portfolio");
+  const portfolio = getPortfolioContent();
+  const isUsed = portfolio.photos.some(p => p.categoryId === categoryId);
+  if (isUsed) {
+    throw new ValidationError("Cannot delete category in use by photos");
+  }
+  portfolio.categories = portfolio.categories.filter(c => c.id !== categoryId);
+  return savePortfolio(portfolio, previousRevision);
+}
+
+export function reorderCategories(categoryIds: string[], previousRevision: string): string {
+  if (isPortfolioLegacy()) throw new Error("Cannot mutate legacy portfolio");
+  const portfolio = getPortfolioContent();
+  if (categoryIds.length !== portfolio.categories.length) throw new ValidationError("Invalid number of category IDs");
+  const uniqueIds = new Set(categoryIds);
+  if (uniqueIds.size !== categoryIds.length) throw new ValidationError("Duplicate category IDs");
+
+  const newCategories: Category[] = [];
+  for (let i = 0; i < categoryIds.length; i++) {
+    const id = categoryIds[i];
+    const cat = portfolio.categories.find(c => c.id === id);
+    if (!cat) throw new ValidationError(`Category ${id} not found`);
+    newCategories.push({ ...cat, order: i });
+  }
+  portfolio.categories = newCategories;
+  return savePortfolio(portfolio, previousRevision);
+}
+
+// Photos CRUD
+export function addPhotoToPortfolio(photo: Omit<Photo, "id" | "categoryId" | "alt" | "visible" | "order">, previousRevision: string, predefinedPhotoId?: string): { newRevision: string, newPhotoId: string } {
+  if (isPortfolioLegacy()) throw new Error("Cannot mutate legacy portfolio");
+  const portfolio = getPortfolioContent();
+  const newPhotoId = predefinedPhotoId || crypto.randomUUID();
+  const nextOrder = portfolio.photos.length > 0 ? Math.max(...portfolio.photos.map(p => p.order)) + 1 : 0;
+
+  const newPhoto: Photo = {
+    ...photo,
+    id: newPhotoId,
+    categoryId: null,
+    alt: { fr: null, en: null },
+    visible: false,
+    order: nextOrder,
   };
 
-  checkSlugsUnique(portfolio.projects, updatedProject);
-
-  portfolio.projects[index] = updatedProject;
-  return savePortfolio(portfolio, previousRevision);
-}
-
-export function reorderProjects(projectIds: string[], previousRevision: string): string {
-  const portfolio = getPortfolioContent();
-  if (projectIds.length !== portfolio.projects.length) {
-    throw new Error("Invalid number of project IDs");
-  }
-
-  const uniqueIds = new Set(projectIds);
-  if (uniqueIds.size !== projectIds.length) {
-    throw new Error("Duplicate project IDs found");
-  }
-
-  const existingIds = new Set(portfolio.projects.map(p => p.id));
-  for (const id of projectIds) {
-    if (!existingIds.has(id)) {
-      throw new Error(`Project ${id} not found in portfolio`);
-    }
-  }
-
-  const newProjects: Project[] = [];
-  for (let i = 0; i < projectIds.length; i++) {
-    const id = projectIds[i];
-    const project = portfolio.projects.find(p => p.id === id)!;
-    if (project.order !== i && project.status === "published") {
-      throw new ValidationError("Cannot reorder a published project");
-    }
-    newProjects.push({ ...project, order: i, updatedAt: new Date().toISOString() });
-  }
-
-  portfolio.projects = newProjects;
-  return savePortfolio(portfolio, previousRevision);
-}
-
-export function deleteEmptyProject(projectId: string, previousRevision: string): string {
-  const portfolio = getPortfolioContent();
-  const project = portfolio.projects.find(p => p.id === projectId);
-  if (!project) throw new Error("Project not found");
-  if (project.status === "published") throw new ValidationError("Cannot delete a published project");
-
-  if (project.photos.length > 0) {
-    throw new Error("Cannot delete a project that contains photos");
-  }
-
-  portfolio.projects = portfolio.projects.filter(p => p.id !== projectId);
-  return savePortfolio(portfolio, previousRevision);
-}
-
-
-export function publishProject(projectId: string, previousRevision: string): string {
-  const portfolio = getPortfolioContent();
-  const project = portfolio.projects.find(p => p.id === projectId);
-  if (!project) throw new Error("Project not found");
-
-  if (!project.title.fr || !project.title.en) throw new ValidationError("Missing titles");
-  if (!project.description.fr || !project.description.en) throw new ValidationError("Missing descriptions");
-  if (!project.slug.fr || !project.slug.en) throw new ValidationError("Missing slugs");
-  if (project.photos.length === 0) throw new ValidationError("Project must have at least one photo");
-  if (!project.coverPhotoId) throw new ValidationError("Cover photo is missing");
-
-  const coverExists = project.photos.some(p => p.id === project.coverPhotoId);
-  if (!coverExists) throw new ValidationError("Cover photo is invalid");
-
-  for (const photo of project.photos) {
-    if (!photo.category) throw new ValidationError("Category missing on photo");
-    if (!photo.alt.fr || !photo.alt.en) throw new ValidationError("Alt text missing on photo");
-  }
-
-  project.status = "published";
-  project.updatedAt = new Date().toISOString();
-  return savePortfolio(portfolio, previousRevision);
-}
-
-export function unpublishProject(projectId: string, previousRevision: string): string {
-  const portfolio = getPortfolioContent();
-  const project = portfolio.projects.find(p => p.id === projectId);
-  if (!project) throw new Error("Project not found");
-
-  project.status = "draft";
-  project.updatedAt = new Date().toISOString();
-  return savePortfolio(portfolio, previousRevision);
-}
-
-export function addPhotoToProject(projectId: string, photo: Omit<Photo, "id">, previousRevision: string): { newRevision: string, newPhotoId: string } {
-  const portfolio = getPortfolioContent();
-  const project = portfolio.projects.find(p => p.id === projectId);
-  if (!project) throw new Error("Project not found");
-  if (project.status === "published") throw new ValidationError("Cannot add a photo to a published project");
-
-  const newPhoto: Photo = { ...photo, id: crypto.randomUUID() };
-  project.photos.push(newPhoto);
-
-  if (!project.coverPhotoId) {
-    project.coverPhotoId = newPhoto.id;
-  }
-
-  project.updatedAt = new Date().toISOString();
+  portfolio.photos.push(newPhoto);
   const newRevision = savePortfolio(portfolio, previousRevision);
-  return { newRevision, newPhotoId: newPhoto.id };
+  return { newRevision, newPhotoId };
 }
 
-export function updatePhotoMetadata(projectId: string, photoId: string, metadata: { category?: "ceremony"|"portraits"|"reception", alt?: {fr: string, en: string} }, previousRevision: string): string {
+export function updatePhotoMetadata(photoId: string, metadata: { categoryId?: string | null, alt?: { fr: string, en: string } }, previousRevision: string): string {
+  if (isPortfolioLegacy()) throw new Error("Cannot mutate legacy portfolio");
   const portfolio = getPortfolioContent();
-  const project = portfolio.projects.find(p => p.id === projectId);
-  if (!project) throw new Error("Project not found");
-  if (project.status === "published") throw new ValidationError("Cannot modify photos of a published project");
-
-  const photo = project.photos.find(p => p.id === photoId);
+  const photo = portfolio.photos.find(p => p.id === photoId);
   if (!photo) throw new Error("Photo not found");
 
-  if (metadata.category) photo.category = metadata.category;
-  if (metadata.alt) photo.alt = metadata.alt;
+  if (metadata.categoryId !== undefined) {
+    if (metadata.categoryId !== null) {
+      if (!portfolio.categories.some(c => c.id === metadata.categoryId)) {
+        throw new ValidationError("Category not found");
+      }
+    }
+    photo.categoryId = metadata.categoryId;
+  }
 
-  project.updatedAt = new Date().toISOString();
+  if (metadata.alt !== undefined) {
+    photo.alt = {
+      fr: textSchema.parse(metadata.alt.fr),
+      en: textSchema.parse(metadata.alt.en),
+    };
+  }
+
+  // If a photo becomes invalid (e.g. category deleted later, but category deletion is blocked if used), it's fine.
+  // But if it lacks category or alt, it should not be visible.
+  if (photo.visible) {
+    if (!photo.categoryId || !photo.alt.fr || !photo.alt.en) {
+      photo.visible = false;
+    }
+  }
+
   return savePortfolio(portfolio, previousRevision);
 }
 
-export function setProjectCover(projectId: string, photoId: string, previousRevision: string): string {
+export function setPhotoVisibility(photoId: string, visible: boolean, previousRevision: string): string {
+  if (isPortfolioLegacy()) throw new Error("Cannot mutate legacy portfolio");
   const portfolio = getPortfolioContent();
-  const project = portfolio.projects.find(p => p.id === projectId);
-  if (!project) throw new Error("Project not found");
-  if (project.status === "published") throw new ValidationError("Cannot change cover photo of a published project");
-
-  const photo = project.photos.find(p => p.id === photoId);
+  const photo = portfolio.photos.find(p => p.id === photoId);
   if (!photo) throw new Error("Photo not found");
 
-  project.coverPhotoId = photo.id;
-  project.updatedAt = new Date().toISOString();
+  if (visible) {
+    if (!photo.categoryId) throw new ValidationError("Cannot make visible: Category is missing");
+    if (!photo.alt.fr || !photo.alt.en) throw new ValidationError("Cannot make visible: Alt texts are missing");
+    const cat = portfolio.categories.find(c => c.id === photo.categoryId);
+    if (!cat || !cat.active) throw new ValidationError("Cannot make visible: Category is inactive");
+  }
+
+  photo.visible = visible;
   return savePortfolio(portfolio, previousRevision);
 }
 
-export function trashPhoto(projectId: string, photoId: string, previousRevision: string): { newRevision: string, trashedPhoto: Photo } {
+export function reorderPhotos(photoIds: string[], previousRevision: string): string {
+  if (isPortfolioLegacy()) throw new Error("Cannot mutate legacy portfolio");
   const portfolio = getPortfolioContent();
-  const project = portfolio.projects.find(p => p.id === projectId);
-  if (!project) throw new Error("Project not found");
-  if (project.status === "published") throw new ValidationError("Cannot delete photos from a published project");
+  if (photoIds.length !== portfolio.photos.length) throw new ValidationError("Invalid number of photo IDs");
+  const uniqueIds = new Set(photoIds);
+  if (uniqueIds.size !== photoIds.length) throw new ValidationError("Duplicate photo IDs");
 
-  const photoIndex = project.photos.findIndex(p => p.id === photoId);
+  const newPhotos: Photo[] = [];
+  for (let i = 0; i < photoIds.length; i++) {
+    const id = photoIds[i];
+    const photo = portfolio.photos.find(p => p.id === id);
+    if (!photo) throw new ValidationError(`Photo ${id} not found`);
+    newPhotos.push({ ...photo, order: i });
+  }
+  portfolio.photos = newPhotos;
+  return savePortfolio(portfolio, previousRevision);
+}
+
+export function trashPhoto(photoId: string, previousRevision: string): { newRevision: string, trashedPhoto: Photo } {
+  if (isPortfolioLegacy()) throw new Error("Cannot mutate legacy portfolio");
+  const portfolio = getPortfolioContent();
+  const photoIndex = portfolio.photos.findIndex(p => p.id === photoId);
   if (photoIndex === -1) throw new Error("Photo not found");
 
-  if (project.coverPhotoId === photoId) {
-    throw new ValidationError("Cannot delete cover photo. Set another cover first.");
-  }
-
-  const [trashedPhoto] = project.photos.splice(photoIndex, 1);
-  if (project.coverPhotoId === photoId) {
-    project.coverPhotoId = null;
-  }
-
-  project.updatedAt = new Date().toISOString();
+  const [trashedPhoto] = portfolio.photos.splice(photoIndex, 1);
   const newRevision = savePortfolio(portfolio, previousRevision);
-
-  // Real deletion from disk or moving to .trash will be handled by the caller route.
   return { newRevision, trashedPhoto };
 }
 
-export function reorderProjectPhotos(projectId: string, photoIds: string[], previousRevision: string): string {
-  const portfolio = getPortfolioContent();
-  const project = portfolio.projects.find(p => p.id === projectId);
-  if (!project) throw new Error("Project not found");
-  if (project.status === "published") throw new ValidationError("Cannot reorder photos of a published project");
+// Global Video
+export function updateGlobalVideo(videoUrl: string | null, previousRevision: string): string {
+  const raw = getRawPortfolioContent();
+  if (raw.isLegacy) {
+    throw new ValidationError("Cannot update video on legacy portfolio. Please migrate first.");
+  }
+  const portfolio = raw.content;
+  if (videoUrl !== null) {
+    const video = parseVideoUrl(videoUrl);
+    if (!video) throw new ValidationError("Invalid videoUrl format");
+    portfolio.video = video;
+  } else {
+    portfolio.video = null;
+  }
+  return savePortfolio(portfolio, previousRevision);
+}
 
-  if (photoIds.length !== project.photos.length) throw new Error("Invalid number of photo IDs");
-  const uniqueIds = new Set(photoIds);
-  if (uniqueIds.size !== photoIds.length) throw new Error("Duplicate photo IDs found");
+export interface PublicPortfolioPhoto {
+  id: string;
+  categorySlug: string;
+  alt: { fr: string, en: string };
+  width: number;
+  height: number;
+  variants: Array<Pick<Photo["variants"][number], "name" | "width" | "height">>;
+}
 
-  const newPhotos: Photo[] = [];
-  for (const id of photoIds) {
-    const photo = project.photos.find(p => p.id === id);
-    if (!photo) throw new Error(`Photo ${id} not found`);
-    newPhotos.push(photo);
+export interface PublicCategory {
+  id: string;
+  name: { fr: string, en: string };
+  slug: string;
+}
+
+export type PublicPortfolio = {
+  categories: PublicCategory[];
+  photos: PublicPortfolioPhoto[];
+  video: { provider: "youtube" | "vimeo"; videoId: string } | null;
+};
+
+export function getPublicPortfolio(): PublicPortfolio {
+  const raw = getRawPortfolioContent();
+  if (raw.isCorrupted || raw.isLegacy) {
+    return { categories: [], photos: [], video: null };
   }
 
-  project.photos = newPhotos;
-  project.updatedAt = new Date().toISOString();
-  return savePortfolio(portfolio, previousRevision);
+  const portfolio = getPortfolioContent();
+  const activeCategoriesMap = new Map<string, Category>();
+  portfolio.categories.filter(c => c.active).forEach(c => activeCategoriesMap.set(c.id, c));
+
+  const publicPhotos: PublicPortfolioPhoto[] = portfolio.photos
+    .filter((p): p is Photo & { categoryId: string; alt: { fr: string, en: string } } => {
+      return p.visible && p.categoryId !== null && activeCategoriesMap.has(p.categoryId) && typeof p.alt.fr === "string" && typeof p.alt.en === "string";
+    })
+    .sort((a, b) => a.order - b.order)
+    .map(p => {
+      const cat = activeCategoriesMap.get(p.categoryId);
+      if (!cat) throw new Error("Unreachable");
+      return {
+        id: p.id,
+        categorySlug: cat.slug,
+        alt: { fr: p.alt.fr, en: p.alt.en },
+        width: p.originalWidth,
+        height: p.originalHeight,
+        variants: p.variants.map(({ name, width, height }) => ({ name, width, height })),
+      };
+    });
+
+  const categoriesWithPhotos = new Set(publicPhotos.map(p => p.categorySlug));
+
+  const publicCategories: PublicCategory[] = Array.from(activeCategoriesMap.values())
+    .filter(c => categoriesWithPhotos.has(c.slug))
+    .sort((a, b) => a.order - b.order)
+    .map(c => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+    }));
+
+  return {
+    categories: publicCategories,
+    photos: publicPhotos,
+    video: portfolio.video,
+  };
 }

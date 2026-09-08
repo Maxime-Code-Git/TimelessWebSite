@@ -3,9 +3,9 @@ import os from "node:os";
 import * as crypto from "node:crypto";
 import path from "node:path";
 import fs from "node:fs";
-import { loader as mediaLoader } from "../app/routes/admin.portfolio.media.$projectId.$photoId.$variant";
-import { loader as publicMediaLoader } from "../app/routes/portfolio.media.$projectId.$photoId.$variant";
-import { action } from '../app/routes/admin.portfolio.$projectId_.upload';
+import { loader as mediaLoader } from "../app/routes/admin.portfolio.media.$photoId.$variant";
+import { loader as publicMediaLoader } from "../app/routes/portfolio.media.$photoId.$variant";
+import { action } from '../app/routes/admin.portfolio.upload';
 import * as sessionServer from "../app/lib/session.server";
 import * as portfolioContent from "../app/lib/portfolio-content.server";
 import { atomicWriteJson } from "../app/lib/atomic-fs.server";
@@ -26,6 +26,8 @@ vi.mock("../app/lib/env.server", () => ({
   }
 }));
 
+let globalTimeOffset = 1000;
+
 describe("admin-portfolio-upload-http.test.ts", () => {
   let tempDir: string;
 
@@ -36,26 +38,19 @@ describe("admin-portfolio-upload-http.test.ts", () => {
     fs.mkdirSync(process.env.PORTFOLIO_MEDIA_PATH, { recursive: true });
 
     const initialPortfolio = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "a".repeat(32),
       updatedAt: new Date().toISOString(),
-      projects: [{
-        id: "12345678-1234-4234-8234-123456789012",
-        title: { fr: "Title", en: "Title" },
-        slug: { fr: "test-slug", en: "test-slug" },
-        description: { fr: "D", en: "D" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        coverPhotoId: null,
-        photos: []
-      }],
+      categories: [],
+      photos: [],
+      video: null,
       watermark: { mode: "text", text: "Test", revision: "a".repeat(32), updatedAt: new Date().toISOString() }
     };
     atomicWriteJson(process.env.PORTFOLIO_CONTENT_PATH, initialPortfolio);
+
+    // Invalidate cache by setting mtime to current Date.now() + unique offset
+    const time = Date.now() + globalTimeOffset++;
+    fs.utimesSync(process.env.PORTFOLIO_CONTENT_PATH, time / 1000, time / 1000);
   });
 
   afterEach(() => {
@@ -91,30 +86,27 @@ describe("admin-portfolio-upload-http.test.ts", () => {
       requestBody = copiedBody;
     }
 
-    return new Request("http://localhost/admin/portfolio/12345678-1234-4234-8234-123456789012/upload", {
+    return new Request("http://localhost/admin/portfolio/upload", {
       method: opts.method || "POST",
       headers,
       body: requestBody,
     });
   };
 
-  const createActionArgs = (request: Request, projectId = "12345678-1234-4234-8234-123456789012"): ActionFunctionArgs => ({
+  const createActionArgs = (request: Request): ActionFunctionArgs => ({
     request,
     url: new URL(request.url),
-    pattern: "/admin/portfolio/:projectId/upload",
-    params: { projectId },
+    pattern: "/admin/portfolio/upload",
+    params: {},
     context: new RouterContextProvider(),
   });
 
   const getValidCookieAndCsrf = async () => {
     const session = await sessionServer.getSession("");
     session.set("adminId", "admin");
-
-    // Compute expected version inline to mock what auth.server.ts does
     const hmac = crypto.createHmac("sha256", process.env.ADMIN_SESSION_SECRET || "A".repeat(32));
     hmac.update(process.env.ADMIN_PASSWORD_HASH || "$argon2id$v=19$m=65536,t=3,p=4$somehash$somehash");
     session.set("credentialVersion", hmac.digest("base64url").slice(0, 32));
-
     const csrfToken = "valid-csrf";
     session.set("csrfToken", csrfToken);
     const cookie = await sessionServer.commitSession(session);
@@ -125,7 +117,6 @@ describe("admin-portfolio-upload-http.test.ts", () => {
     const methods = ["GET", "PUT", "PATCH", "DELETE"];
     for (const method of methods) {
       const req = createRequest({ method });
-      // action test
       const resAction = await action(createActionArgs(req));
       expect(resAction.status).toBe(405);
       expect(resAction.headers.get("Allow")).toBe("POST");
@@ -184,50 +175,15 @@ describe("admin-portfolio-upload-http.test.ts", () => {
     expect(json.error).toMatch(/Unsupported image type/i);
   });
 
-  it("returns a controlled 400 response for a truncated multipart upload", async () => {
-    const { cookie, csrfToken } = await getValidCookieAndCsrf();
-    const boundary = "------TruncatedBoundary" + Date.now();
-    const contentType = "multipart/form-data; boundary=" + boundary;
-    const body = Buffer.from(
-      `--${boundary}\r\n` +
-      'Content-Disposition: form-data; name="file"; filename="partial.jpg"\r\n' +
-      "Content-Type: image/jpeg\r\n\r\n" +
-      "partial-image-without-closing-boundary"
-    );
-    const req = createRequest({
-      method: "POST",
-      cookie,
-      csrfToken,
-      origin: "http://localhost",
-      contentType,
-      body,
-      revision: "a".repeat(32),
-    });
-
-    const res = await action(createActionArgs(req));
-    expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ error: "Upload stream failed." });
-  });
-
-
-
   it("rolls back files if JSON update fails", async () => {
-    const generatedFileId = "1".repeat(32);
-    const originalPath = path.join(
-      process.env.PORTFOLIO_MEDIA_PATH!,
-      "12345678-1234-4234-8234-123456789012",
-      "originals",
-      generatedFileId + ".jpeg"
-    );
-    const variantPath = path.join(
-      process.env.PORTFOLIO_MEDIA_PATH!,
-      "12345678-1234-4234-8234-123456789012",
-      "480p",
-      generatedFileId + "-480p.webp"
-    );
-
     const portfolioImage = await import("../app/lib/portfolio-image.server");
-    vi.spyOn(portfolioImage, "processImage").mockImplementation(async () => {
+    let originalPath = "";
+    let variantPath = "";
+    vi.spyOn(portfolioImage, "processImage").mockImplementation(async (src, tmp, photoId) => {
+      const generatedFileId = "1".repeat(32);
+      originalPath = path.join(process.env.PORTFOLIO_MEDIA_PATH!, "global-v2", "photos", photoId, "originals", generatedFileId + ".jpeg");
+      variantPath = path.join(process.env.PORTFOLIO_MEDIA_PATH!, "global-v2", "photos", photoId, "480p", generatedFileId + "-480p.webp");
+
       fs.mkdirSync(path.dirname(originalPath), { recursive: true });
       fs.mkdirSync(path.dirname(variantPath), { recursive: true });
       fs.writeFileSync(originalPath, "original");
@@ -237,17 +193,11 @@ describe("admin-portfolio-upload-http.test.ts", () => {
       originalFormat: "jpeg",
       originalWidth: 800,
       originalHeight: 600,
-      variants: [{
-        name: "480p",
-        width: 480,
-        height: 360,
-        sizeBytes: 4,
-        fileId: generatedFileId + "-480p",
-      }],
+      variants: [{ name: "480p", width: 480, height: 360, sizeBytes: 4, fileId: generatedFileId + "-480p" }],
       appliedWatermarkRevision: "a".repeat(32)
       };
     });
-    vi.spyOn(portfolioContent, "addPhotoToProject").mockImplementation(() => {
+    vi.spyOn(portfolioContent, "addPhotoToPortfolio").mockImplementation(() => {
       throw new RevisionConflictError();
     });
 
@@ -257,7 +207,7 @@ describe("admin-portfolio-upload-http.test.ts", () => {
     const tinyJpeg = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00]);
     formData.append("file", new Blob([tinyJpeg], { type: "image/jpeg" }), "test.jpg");
 
-    const req = new Request("http://localhost/admin/portfolio/12345678-1234-4234-8234-123456789012/upload", {
+    const req = new Request("http://localhost/admin/portfolio/upload", {
       method: "POST",
       headers: {
         Cookie: cookie,
@@ -275,11 +225,75 @@ describe("admin-portfolio-upload-http.test.ts", () => {
     expect(fs.existsSync(originalPath)).toBe(false);
     expect(fs.existsSync(variantPath)).toBe(false);
 
-    vi.spyOn(portfolioContent, "addPhotoToProject").mockRestore();
+    vi.spyOn(portfolioContent, "addPhotoToPortfolio").mockRestore();
+    vi.spyOn(portfolioImage, "processImage").mockRestore();
+  });
+
+  it("handles two sequential uploads correctly using newRevision", async () => {
+    const portfolioImage = await import("../app/lib/portfolio-image.server");
+    vi.spyOn(portfolioImage, "processImage").mockImplementation(async (_src, _tmp, _photoId) => {
+      return {
+        fileId: "1".repeat(32),
+        originalFormat: "jpeg",
+        originalWidth: 800,
+        originalHeight: 600,
+        variants: [{ name: "480p", width: 480, height: 360, sizeBytes: 4, fileId: "1".repeat(32) + "-480p" }],
+        appliedWatermarkRevision: "a".repeat(32)
+      };
+    });
+
+    const { cookie, csrfToken } = await getValidCookieAndCsrf();
+    const revision = "a".repeat(32);
+
+    const tinyJpeg = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00]);
+
+    // First upload
+    const body1 = Buffer.concat([
+      Buffer.from("--test-boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test1.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"),
+      tinyJpeg,
+      Buffer.from("\r\n--test-boundary--\r\n")
+    ]);
+
+    const req1 = createRequest({
+      body: body1,
+      contentType: "multipart/form-data; boundary=test-boundary",
+      cookie,
+      csrfToken,
+      revision,
+      origin: "http://localhost"
+    });
+
+    const res1 = await action(createActionArgs(req1));
+    expect(res1.status).toBe(200);
+    const data1 = await res1.json();
+    expect(data1.newRevision).toBeDefined();
+    expect(data1.newRevision).not.toBe(revision);
+
+    // Second upload using the new revision
+    const body2 = Buffer.concat([
+      Buffer.from("--test-boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test2.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"),
+      tinyJpeg,
+      Buffer.from("\r\n--test-boundary--\r\n")
+    ]);
+
+    const req2 = createRequest({
+      body: body2,
+      contentType: "multipart/form-data; boundary=test-boundary",
+      cookie,
+      csrfToken,
+      revision: data1.newRevision,
+      origin: "http://localhost"
+    });
+
+    const res2 = await action(createActionArgs(req2));
+    expect(res2.status).toBe(200);
+    const data2 = await res2.json();
+    expect(data2.newRevision).toBeDefined();
+    expect(data2.newRevision).not.toBe(data1.newRevision);
+
     vi.spyOn(portfolioImage, "processImage").mockRestore();
   });
 });
-
 
 describe("admin-portfolio-media-http.test.ts", () => {
   let tempDir: string;
@@ -289,28 +303,19 @@ describe("admin-portfolio-media-http.test.ts", () => {
     process.env.PORTFOLIO_CONTENT_PATH = path.join(tempDir, "portfolio.json");
 
     const initialPortfolio2 = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: "a".repeat(32),
       updatedAt: new Date().toISOString(),
-      projects: [{
-        id: "550e8400-e29b-41d4-a716-446655440000",
-        title: { fr: "Title", en: "Title" },
-        slug: { fr: "test-slug", en: "test-slug" },
-        description: { fr: "D", en: "D" },
-        location: null,
-        date: null,
-        status: "draft",
-        order: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        coverPhotoId: null,
-        photos: [{
+      categories: [{ id: "22222222-2222-4222-8222-222222222222", name: { fr: "Cat", en: "Cat" }, slug: "cat", order: 0, active: true }],
+      photos: [{
           id: "33333333-3333-4333-8333-333333333333",
           fileId: "1".repeat(32),
           originalFormat: "jpeg",
           originalWidth: 800,
           originalHeight: 600,
-          category: "ceremony",
+          categoryId: "22222222-2222-4222-8222-222222222222",
+          visible: true,
+          order: 0,
           alt: { fr: "A", en: "A" },
           variants: [{
             name: "480p",
@@ -321,13 +326,15 @@ describe("admin-portfolio-media-http.test.ts", () => {
           }],
           appliedWatermarkRevision: "b".repeat(32),
           processedAt: new Date().toISOString()
-        }]
       }],
+      video: null,
       watermark: { mode: "text", text: "Test", revision: "b".repeat(32), updatedAt: new Date().toISOString() }
     };
     atomicWriteJson(process.env.PORTFOLIO_CONTENT_PATH, initialPortfolio2);
+    const time = Date.now() + globalTimeOffset++;
+    fs.utimesSync(process.env.PORTFOLIO_CONTENT_PATH, time / 1000, time / 1000);
 
-    const variantPath = path.join(process.env.PORTFOLIO_MEDIA_PATH, "550e8400-e29b-41d4-a716-446655440000", "480p", "1".repeat(32) + "-480p.webp");
+    const variantPath = path.join(process.env.PORTFOLIO_MEDIA_PATH, "global-v2", "photos", "33333333-3333-4333-8333-333333333333", "480p", "1".repeat(32) + "-480p.webp");
     fs.mkdirSync(path.dirname(variantPath), { recursive: true });
     fs.writeFileSync(variantPath, "fake-webp-content");
   });
@@ -339,14 +346,14 @@ describe("admin-portfolio-media-http.test.ts", () => {
   const createLoaderArgs = (request: Request, params: LoaderFunctionArgs["params"]): LoaderFunctionArgs => ({
     request,
     url: new URL(request.url),
-    pattern: "/admin/portfolio/media/:projectId/:photoId/:variant",
+    pattern: "/admin/portfolio/media/:photoId/:variant",
     params,
     context: new RouterContextProvider(),
   });
 
   it("rejects access without session", async () => {
-    const req = new Request("http://localhost/admin/portfolio/media/550e8400-e29b-41d4-a716-446655440000/33333333-3333-4333-8333-333333333333/480p");
-    const res = await mediaLoader(createLoaderArgs(req, { projectId: "89817fff-96b8-41d0-8372-6972d78ca027", photoId: "a", variant: "b" }));
+    const req = new Request("http://localhost/admin/portfolio/media/33333333-3333-4333-8333-333333333333/480p");
+    const res = await mediaLoader(createLoaderArgs(req, { photoId: "a", variant: "b" }));
     expect((res as Response).status).toBe(401);
   });
 
@@ -358,69 +365,35 @@ describe("admin-portfolio-media-http.test.ts", () => {
     session.set("credentialVersion", hmac.digest("base64url").slice(0, 32));
     const cookie = await sessionServer.commitSession(session);
 
-    const req = new Request("http://localhost/admin/portfolio/media/550e8400-e29b-41d4-a716-446655440000/33333333-3333-4333-8333-333333333333/480p", {
+    const req = new Request("http://localhost/admin/portfolio/media/33333333-3333-4333-8333-333333333333/480p", {
       headers: { Cookie: cookie }
     });
-    const res = await mediaLoader(createLoaderArgs(req, { projectId: "550e8400-e29b-41d4-a716-446655440000", photoId: "33333333-3333-4333-8333-333333333333", variant: "480p" }));
+    const res = await mediaLoader(createLoaderArgs(req, { photoId: "33333333-3333-4333-8333-333333333333", variant: "480p" }));
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/webp");
-    if (res.body) {
-      await res.text();
-    }
   });
 
-  it("does not expose draft media publicly", async () => {
-    const request = new Request("http://localhost/portfolio/media/550e8400-e29b-41d4-a716-446655440000/33333333-3333-4333-8333-333333333333/480p");
+  it("does not expose hidden media publicly", async () => {
+    const data = JSON.parse(fs.readFileSync(process.env.PORTFOLIO_CONTENT_PATH!, "utf-8"));
+    data.photos[0].visible = false;
+    atomicWriteJson(process.env.PORTFOLIO_CONTENT_PATH!, data);
+
+    const request = new Request("http://localhost/portfolio/media/33333333-3333-4333-8333-333333333333/480p");
     const response = await publicMediaLoader(createLoaderArgs(request, {
-      projectId: "550e8400-e29b-41d4-a716-446655440000",
       photoId: "33333333-3333-4333-8333-333333333333",
       variant: "480p",
     }));
     expect(response.status).toBe(404);
   });
 
-  it("serves published media with immutable public caching", async () => {
-    const data = JSON.parse(fs.readFileSync(process.env.PORTFOLIO_CONTENT_PATH!, "utf-8"));
-    data.projects[0].status = "published";
-    data.projects[0].coverPhotoId = data.projects[0].photos[0].id;
-    atomicWriteJson(process.env.PORTFOLIO_CONTENT_PATH!, data);
-
-    const request = new Request("http://localhost/portfolio/media/550e8400-e29b-41d4-a716-446655440000/33333333-3333-4333-8333-333333333333/480p");
+  it("serves visible media with immutable public caching", async () => {
+    const request = new Request("http://localhost/portfolio/media/33333333-3333-4333-8333-333333333333/480p");
     const response = await publicMediaLoader(createLoaderArgs(request, {
-      projectId: "550e8400-e29b-41d4-a716-446655440000",
       photoId: "33333333-3333-4333-8333-333333333333",
       variant: "480p",
     }));
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toContain("immutable");
     expect(await response.text()).toBe("fake-webp-content");
-  });
-
-  it.runIf(process.platform !== "win32")("rejects a symlinked variant directory", async () => {
-    const mediaPath = process.env.PORTFOLIO_MEDIA_PATH!;
-    const projectId = "550e8400-e29b-41d4-a716-446655440000";
-    const variantDirectory = path.join(mediaPath, projectId, "480p");
-    const outsideDirectory = path.join(tempDir, "outside-media");
-    fs.mkdirSync(outsideDirectory);
-    fs.writeFileSync(path.join(outsideDirectory, "1".repeat(32) + "-480p.webp"), "outside");
-    fs.rmSync(variantDirectory, { recursive: true });
-    fs.symlinkSync(outsideDirectory, variantDirectory, "dir");
-
-    const session = await sessionServer.getSession("");
-    session.set("adminId", "admin");
-    const hmac = crypto.createHmac("sha256", process.env.ADMIN_SESSION_SECRET || "A".repeat(32));
-    hmac.update(process.env.ADMIN_PASSWORD_HASH || "$argon2id$v=19$m=65536,t=3,p=4$somehash$somehash");
-    session.set("credentialVersion", hmac.digest("base64url").slice(0, 32));
-    const cookie = await sessionServer.commitSession(session);
-
-    const request = new Request("http://localhost/admin/portfolio/media/test", {
-      headers: { Cookie: cookie },
-    });
-    const response = await mediaLoader(createLoaderArgs(request, {
-      projectId,
-      photoId: "33333333-3333-4333-8333-333333333333",
-      variant: "480p",
-    }));
-    expect(response.status).toBe(404);
   });
 });

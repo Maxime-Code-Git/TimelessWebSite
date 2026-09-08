@@ -368,14 +368,14 @@ function atomicWriteFile(targetPath: string, content: Buffer, mode: number): voi
 export async function processImage(
   tempFilePath: string,
   allowedTempDir: string,
-  projectId: string,
+  photoId: string,
   mediaBasePath: string,
   watermarkText: string,
   watermarkRevision: string
 ): Promise<ImageProcessingResult> {
   // Validate UUID
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
-    throw new SafeImageError("Invalid project ID.");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(photoId)) {
+    throw new SafeImageError("Invalid photo ID.");
   }
 
   const { format, width, height } = await validateImageFile(tempFilePath, allowedTempDir);
@@ -388,10 +388,12 @@ export async function processImage(
     const resolvedMediaBasePath = path.resolve(mediaBasePath);
     ensureStrictDirectoryCreated(resolvedMediaBasePath, path.resolve(resolvedMediaBasePath, ".."));
 
-    const projectDir = path.resolve(resolvedMediaBasePath, projectId);
+    const globalV2Dir = path.resolve(resolvedMediaBasePath, "global-v2");
+    const photosDir = path.resolve(globalV2Dir, "photos");
+    const projectDir = path.resolve(photosDir, photoId);
     const originalsDir = path.resolve(projectDir, "originals");
 
-    for (const dir of [projectDir, originalsDir]) {
+    for (const dir of [globalV2Dir, photosDir, projectDir, originalsDir]) {
       if (!fs.existsSync(dir)) {
         ensureStrictDirectoryCreated(dir, resolvedMediaBasePath);
         createdDirs.push(dir);
@@ -495,12 +497,12 @@ export async function processImage(
 }
 
 export function removeProcessedImage(
-  projectId: string,
+  photoId: string,
   mediaBasePath: string,
   image: ImageProcessingResult
 ): void {
   const resolvedMediaBasePath = path.resolve(mediaBasePath);
-  const projectDir = path.resolve(resolvedMediaBasePath, projectId);
+  const projectDir = path.resolve(resolvedMediaBasePath, "global-v2", "photos", photoId);
   const filePaths = [
     path.resolve(projectDir, "originals", image.fileId + "." + image.originalFormat),
     ...image.variants.map(variant => (
@@ -567,13 +569,14 @@ function assertPathMissing(filePath: string, basePath: string): void {
 }
 
 export function trashPhotoMedia(
-  projectId: string,
+  photoId: string,
   mediaBasePath: string,
-  photo: { id: string; fileId: string; originalFormat: string; variants: { name: string; fileId: string }[] }
+  photo: { id: string; fileId: string; originalFormat: string; variants: { name: string; fileId: string }[] },
+  renameSyncFn = fs.renameSync
 ): void {
   const resolvedMediaBasePath = path.resolve(mediaBasePath);
-  const projectDir = path.resolve(resolvedMediaBasePath, projectId);
-  const trashProjectDir = path.resolve(resolvedMediaBasePath, ".trash", projectId);
+  const projectDir = path.resolve(resolvedMediaBasePath, "global-v2", "photos", photoId);
+  const trashProjectDir = path.resolve(resolvedMediaBasePath, "global-v2", ".trash");
   const trashPhotoDir = path.resolve(trashProjectDir, photo.id);
 
   validateConfinement(projectDir, resolvedMediaBasePath);
@@ -585,14 +588,9 @@ export function trashPhotoMedia(
   const origFrom = path.resolve(projectDir, "originals", `${photo.fileId}.${photo.originalFormat}`);
   assertRegularFile(origFrom, resolvedMediaBasePath);
 
-  const variantsToMove: { from: string; to: string }[] = [];
   for (const variant of photo.variants) {
     const varFrom = path.resolve(projectDir, variant.name, `${variant.fileId}.webp`);
     assertRegularFile(varFrom, resolvedMediaBasePath);
-
-    const varTo = path.resolve(trashPhotoDir, `${variant.name}-${variant.fileId}.webp`);
-    assertPathMissing(varTo, resolvedMediaBasePath);
-    variantsToMove.push({ from: varFrom, to: varTo });
   }
 
   let createdTrashProjectDir = false;
@@ -601,44 +599,26 @@ export function trashPhotoMedia(
     ensureStrictDirectoryCreated(trashProjectDir, resolvedMediaBasePath);
     createdTrashProjectDir = true;
   }
-  ensureStrictDirectoryCreated(trashPhotoDir, resolvedMediaBasePath);
 
-  const movedPaths: { from: string; to: string }[] = [];
   const manifestPath = path.resolve(trashPhotoDir, "manifest.json");
-  assertPathMissing(manifestPath, resolvedMediaBasePath);
 
   try {
-    const origTo = path.resolve(trashPhotoDir, `original.${photo.fileId}.${photo.originalFormat}`);
-    validateConfinement(origTo, resolvedMediaBasePath);
-
-    fs.renameSync(origFrom, origTo);
-    movedPaths.push({ from: origFrom, to: origTo });
-
-    for (const { from, to } of variantsToMove) {
-      fs.renameSync(from, to);
-      movedPaths.push({ from, to });
-    }
-
+    renameSyncFn(projectDir, trashPhotoDir);
     atomicWriteFile(manifestPath, Buffer.from(JSON.stringify({
       trashedAt: new Date().toISOString(),
       photo
     }, null, 2)), 0o600);
-
   } catch {
     let rollbackFailed = false;
-
-    for (const { from, to } of movedPaths.reverse()) {
-      if (fs.existsSync(to)) {
-        try { fs.renameSync(to, from); } catch { rollbackFailed = true; }
-      }
-    }
 
     if (fs.existsSync(manifestPath)) {
       try { fs.unlinkSync(manifestPath); } catch { rollbackFailed = true; }
     }
+
     if (fs.existsSync(trashPhotoDir)) {
-      try { fs.rmdirSync(trashPhotoDir); } catch { rollbackFailed = true; }
+      try { fs.renameSync(trashPhotoDir, projectDir); } catch { rollbackFailed = true; }
     }
+
     if (createdTrashProjectDir && fs.existsSync(trashProjectDir)) {
       try { fs.rmdirSync(trashProjectDir); } catch { rollbackFailed = true; }
     }
@@ -649,60 +629,46 @@ export function trashPhotoMedia(
 }
 
 export function restorePhotoMedia(
-  projectId: string,
+  photoId: string,
   mediaBasePath: string,
   photo: { id: string; fileId: string; originalFormat: string; variants: { name: string; fileId: string }[] }
 ): void {
   const resolvedMediaBasePath = path.resolve(mediaBasePath);
-  const projectDir = path.resolve(resolvedMediaBasePath, projectId);
-  const trashProjectDir = path.resolve(resolvedMediaBasePath, ".trash", projectId);
+  const projectDir = path.resolve(resolvedMediaBasePath, "global-v2", "photos", photoId);
+  const trashProjectDir = path.resolve(resolvedMediaBasePath, "global-v2", ".trash");
   const trashPhotoDir = path.resolve(trashProjectDir, photo.id);
 
   validateConfinement(projectDir, resolvedMediaBasePath);
   validateConfinement(trashProjectDir, resolvedMediaBasePath);
   validateConfinement(trashPhotoDir, resolvedMediaBasePath);
-  ensureStrictDirectory(projectDir, resolvedMediaBasePath, false);
+
   ensureStrictDirectory(trashProjectDir, resolvedMediaBasePath, false);
   ensureStrictDirectory(trashPhotoDir, resolvedMediaBasePath, false);
 
-  const movedPaths: { from: string; to: string }[] = [];
+  assertPathMissing(projectDir, resolvedMediaBasePath);
+
   const manifestPath = path.resolve(trashPhotoDir, "manifest.json");
-  const moves: { from: string; to: string }[] = [];
-
-  moves.push({
-    from: path.resolve(trashPhotoDir, `original.${photo.fileId}.${photo.originalFormat}`),
-    to: path.resolve(projectDir, "originals", `${photo.fileId}.${photo.originalFormat}`),
-  });
-  for (const variant of photo.variants) {
-    moves.push({
-      from: path.resolve(trashPhotoDir, `${variant.name}-${variant.fileId}.webp`),
-      to: path.resolve(projectDir, variant.name, `${variant.fileId}.webp`),
-    });
-  }
-
   assertRegularFile(manifestPath, resolvedMediaBasePath);
-  for (const move of moves) {
-    assertRegularFile(move.from, resolvedMediaBasePath);
-    assertPathMissing(move.to, resolvedMediaBasePath);
+
+  const origFrom = path.resolve(trashPhotoDir, "originals", `${photo.fileId}.${photo.originalFormat}`);
+  assertRegularFile(origFrom, resolvedMediaBasePath);
+
+  for (const variant of photo.variants) {
+    const varFrom = path.resolve(trashPhotoDir, variant.name, `${variant.fileId}.webp`);
+    assertRegularFile(varFrom, resolvedMediaBasePath);
   }
 
   try {
-    for (const move of moves) {
-      fs.renameSync(move.from, move.to);
-      movedPaths.push(move);
-    }
+    fs.renameSync(trashPhotoDir, projectDir);
   } catch {
-    let rollbackFailed = false;
-    for (const { from, to } of movedPaths.reverse()) {
-      if (fs.existsSync(to)) {
-        try { fs.renameSync(to, from); } catch { rollbackFailed = true; }
-      }
-    }
-    if (rollbackFailed) throw new SafeImageError("Photo media recovery failed.");
-    throw new SafeImageError("Failed to restore photo media, rollback successful.");
+    throw new SafeImageError("Photo media recovery failed.");
   }
 
-  try { fs.unlinkSync(manifestPath); } catch { /* best-effort after complete restore */ }
-  try { fs.rmdirSync(trashPhotoDir); } catch { /* best-effort */ }
-  try { fs.rmdirSync(trashProjectDir); } catch { /* best-effort */ }
+  const restoredManifestPath = path.resolve(projectDir, "manifest.json");
+  try {
+    fs.unlinkSync(restoredManifestPath);
+  } catch {
+    throw new SafeImageError("Incomplete rollback: failed to remove manifest.json");
+  }
+  try { fs.rmdirSync(trashProjectDir); } catch { /* Ignore if not empty */ }
 }
