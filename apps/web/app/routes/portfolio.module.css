@@ -318,7 +318,8 @@
 }
 
 .videoPlayerWrap {
-  max-width: 760px;
+  width: 100%;
+  max-width: 1100px;
   margin: 0 auto;
   position: relative;
   aspect-ratio: 16/9;
@@ -401,5 +402,9 @@
 
   .projectPhotoLandscape {
     grid-column: 1;
+  }
+
+  .videoSection {
+    padding: 60px 16px;
   }
 }

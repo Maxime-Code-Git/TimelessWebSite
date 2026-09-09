@@ -72,6 +72,22 @@ test.describe('Portfolio Video Player', () => {
     expect(btnClass).not.toContain('undefined');
     expect(btnClass).toContain('videoPlayBtn');
 
+    const playerWrap = videoSection.locator('[class*="videoPlayerWrap"]');
+    const wrapBox = await playerWrap.boundingBox();
+    expect(wrapBox).not.toBeNull();
+    if (wrapBox) {
+      const ratio = wrapBox.width / wrapBox.height;
+      expect(Math.abs(ratio - (16/9))).toBeLessThan(0.05); // Close to 16:9
+
+      const viewport = page.viewportSize();
+      if (viewport && viewport.width > 1000) {
+        expect(wrapBox.width).toBeGreaterThan(760); // Much larger on desktop
+      }
+      if (viewport) {
+        expect(wrapBox.width).toBeLessThanOrEqual(viewport.width); // No overflow
+      }
+    }
+
     let iframe = videoSection.locator('iframe');
     await expect(iframe).toHaveCount(0);
 
