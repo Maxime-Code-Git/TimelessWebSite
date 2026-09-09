@@ -63,7 +63,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'npm run start',
+    command: 'node ../../node_modules/@react-router/serve/bin.cjs ./build/server/index.js',
     url: 'http://localhost:4174',
     reuseExistingServer: false,
     timeout: 120 * 1000,

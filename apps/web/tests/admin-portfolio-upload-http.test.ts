@@ -371,6 +371,7 @@ describe("admin-portfolio-media-http.test.ts", () => {
     const res = await mediaLoader(createLoaderArgs(req, { photoId: "33333333-3333-4333-8333-333333333333", variant: "480p" }));
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/webp");
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
   });
 
   it("does not expose hidden media publicly", async () => {

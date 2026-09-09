@@ -164,4 +164,168 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     expect(setCookie.toLowerCase()).toMatch(/max-age=0|expires=thu, 01 jan 1970/);
   });
 
+  async function login(): Promise<{ cookie: string; csrfToken: string }> {
+    const getRes = await fetch(`${BASE_URL}/admin`);
+    const anonCookie = getRes.headers.get("Set-Cookie") || "";
+    const text = await getRes.text();
+    const csrfMatch = text.match(/name="csrfToken"[^>]*value="([^"]+)"/);
+    const csrfToken = csrfMatch ? csrfMatch[1] : "";
+
+    const loginRes = await fetch(`${BASE_URL}/admin`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": anonCookie,
+        "Origin": BASE_URL,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: new URLSearchParams({ intent: "login", password: "test", csrfToken }),
+      redirect: "manual",
+    });
+
+    return { cookie: loginRes.headers.get("Set-Cookie") || anonCookie, csrfToken };
+  }
+
+  function getRevision(): string {
+    return JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8")).revision;
+  }
+
+  async function getValidCsrfToken(cookie: string): Promise<string> {
+    const resGet = await fetch(`${BASE_URL}/admin/portfolio`, { headers: { Cookie: cookie } });
+    const html = await resGet.text();
+    const csrfMatch = html.match(/csrfToken[\\",: ]+([a-f0-9-]{36})/i);
+    return csrfMatch ? csrfMatch[1] : "";
+  }
+
+  it("active='true' est accepté pour createCategory", async () => {
+    const { cookie } = await login();
+    const csrfToken = await getValidCsrfToken(cookie);
+
+    const params = new URLSearchParams({
+      intent: "createCategory",
+      csrfToken,
+      revision: getRevision(),
+      nameFr: "Cat1",
+      nameEn: "Cat1EN",
+      slug: "cat-true",
+      active: "true"
+    });
+
+    const res = await fetch(`${BASE_URL}/admin/portfolio`, {
+      method: "POST",
+      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL },
+      body: params
+    });
+
+    expect(res.status).toBe(200);
+
+    const content = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
+    const category = content.categories.find((c: { slug: string; id: string; active: boolean }) => c.slug === "cat-true");
+    expect(category).toBeDefined();
+    expect(category.active).toBe(true);
+  });
+
+  it("active='false' est accepté pour updateCategory", async () => {
+    const { cookie } = await login();
+    const csrfToken = await getValidCsrfToken(cookie);
+
+    const createParams = new URLSearchParams({
+      intent: "createCategory",
+      csrfToken,
+      revision: getRevision(),
+      nameFr: "CatFalse",
+      nameEn: "CatFalseEN",
+      slug: "cat-false",
+      active: "true"
+    });
+    const createRes = await fetch(`${BASE_URL}/admin/portfolio`, {
+      method: "POST",
+      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL },
+      body: createParams
+    });
+    expect(createRes.status).toBe(200);
+
+    const content = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
+    const categoryId = content.categories.find((c: { slug: string; id: string }) => c.slug === "cat-false").id;
+
+    const params = new URLSearchParams({
+      intent: "updateCategory",
+      csrfToken,
+      revision: getRevision(),
+      categoryId,
+      nameFr: "CatFalse",
+      nameEn: "CatFalseEN",
+      slug: "cat-false",
+      active: "false"
+    });
+
+    const res = await fetch(`${BASE_URL}/admin/portfolio`, {
+      method: "POST",
+      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL },
+      body: params
+    });
+
+    expect(res.status).toBe(200);
+
+    const afterContent = JSON.parse(fs.readFileSync(portfolioContentPath, "utf-8"));
+    const updatedCategory = afterContent.categories.find((c: { id: string; active: boolean }) => c.id === categoryId);
+    expect(updatedCategory.active).toBe(false);
+  });
+
+  it("active absent est rejeté", async () => {
+    const { cookie } = await login();
+    const csrfToken = await getValidCsrfToken(cookie);
+
+    const beforeContent = fs.readFileSync(portfolioContentPath, "utf-8");
+
+    const params = new URLSearchParams({
+      intent: "createCategory",
+      csrfToken,
+      revision: getRevision(),
+      nameFr: "Cat2",
+      nameEn: "Cat2EN",
+      slug: "cat-2",
+      // active missing
+    });
+
+    const res = await fetch(`${BASE_URL}/admin/portfolio`, {
+      method: "POST",
+      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL },
+      body: params
+    });
+
+    expect(res.status).toBe(422);
+
+    const afterContent = fs.readFileSync(portfolioContentPath, "utf-8");
+    expect(afterContent).toBe(beforeContent);
+  });
+
+  it("valeur arbitraire pour active est rejetée", async () => {
+    const { cookie } = await login();
+    const csrfToken = await getValidCsrfToken(cookie);
+
+    const beforeContent = fs.readFileSync(portfolioContentPath, "utf-8");
+
+    const params = new URLSearchParams({
+      intent: "createCategory",
+      csrfToken,
+      revision: getRevision(),
+      nameFr: "Cat3",
+      nameEn: "Cat3EN",
+      slug: "cat-3",
+      active: "yes" // invalid
+    });
+
+    const res = await fetch(`${BASE_URL}/admin/portfolio`, {
+      method: "POST",
+      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL },
+      body: params
+    });
+
+    expect(res.status).toBe(422);
+
+    const afterContent = fs.readFileSync(portfolioContentPath, "utf-8");
+    expect(afterContent).toBe(beforeContent);
+  });
+
 });

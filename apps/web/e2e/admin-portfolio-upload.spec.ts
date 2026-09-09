@@ -95,13 +95,25 @@ test.describe("Admin portfolio upload and publication V2", () => {
     // Wait for uploads to complete
     await expect(page.locator('h2:has-text("Photos (2)")')).toBeVisible({ timeout: 30_000 });
 
-    const adminImages = page.locator('img[src*="/admin/portfolio/media/"]');
+    const adminImages = page.locator('img[src*="/admin/portfolio/media/"][src$="/480p"]');
     await expect(adminImages).toHaveCount(2);
+    const adminThumbImages = page.locator('img[src*="admin-thumb"]');
+    await expect(adminThumbImages).toHaveCount(0);
+
+    for (let i = 0; i < 2; i++) {
+      const img = adminImages.nth(i);
+      await expect(img).toBeVisible();
+      await expect(async () => {
+        const size = await img.evaluate((el: HTMLImageElement) => ({ width: el.naturalWidth, height: el.naturalHeight }));
+        expect(size.width).toBeGreaterThan(0);
+        expect(size.height).toBeGreaterThan(0);
+      }).toPass();
+    }
 
     const firstPhotoEdit = page.locator('div[class*="photoItem"]').first();
     await firstPhotoEdit.getByRole("button", { name: "Edit" }).click();
-    await firstPhotoEdit.getByPlaceholder("Alt (FR)").fill("Alt FR 1");
-    await firstPhotoEdit.getByPlaceholder("Alt (EN)").fill("Alt EN 1");
+    await firstPhotoEdit.getByPlaceholder("Ex. Les mariés").fill("Alt FR 1");
+    await firstPhotoEdit.getByPlaceholder("E.g. The couple").fill("Alt EN 1");
 
     await page.fill('input[placeholder="Nom FR"]', 'Test Cat FR');
     await page.fill('input[placeholder="Nom EN"]', 'Test Cat EN');

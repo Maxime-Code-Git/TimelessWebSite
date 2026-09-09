@@ -15,6 +15,9 @@ test.describe('Security Headers', () => {
     expect(csp).toContain('default-src \'self\'');
     expect(csp).toContain('script-src \'self\' \'nonce-');
     expect(csp).toContain('frame-ancestors \'none\'');
+    expect(csp).toContain('frame-src https://www.youtube-nocookie.com https://player.vimeo.com');
+    expect(csp).not.toContain('https://youtube.com');
+    expect(csp).not.toContain('https://www.youtube.com');
     
     // HSTS should be omitted (per instructions)
     expect(headers['strict-transport-security']).toBeUndefined();

@@ -3,6 +3,7 @@ import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
 import { getStrings } from "~/lib/i18n";
+import { getCanonicalVideoUrl } from "~/lib/video";
 import type { PublicPortfolio, PublicPortfolioPhoto } from "~/lib/portfolio-content.server";
 import styles from "./portfolio.module.css";
 
@@ -137,7 +138,7 @@ export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
                 {!videoPlaying ? (
                   <button
                     type="button"
-                    className={styles.playButton}
+                    className={styles.videoPlayBtn}
                     onClick={() => setVideoPlaying(true)}
                     aria-label={lang === "fr" ? "Lire la vidéo" : "Play video"}
                   >
@@ -156,6 +157,13 @@ export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
                   ></iframe>
                 )}
               </div>
+              {videoPlaying && (
+                <div className={styles.videoFallback}>
+                  <a href={getCanonicalVideoUrl(portfolio.video)} target="_blank" rel="noopener noreferrer" className={styles.videoFallbackLink}>
+                    {lang === "fr" ? `Ouvrir la vidéo sur ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}` : `Open video on ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}`}
+                  </a>
+                </div>
+              )}
             </div>
           </section>
         )}

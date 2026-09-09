@@ -277,12 +277,21 @@
   margin-bottom: 20px;
 }
 
-.videoIframe {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+/* videoIframe is defined with grid layout below in videoPlayerWrap section */
+
+.videoFallback {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.videoFallbackLink {
+  color: var(--gold-light);
+  font-size: 14px;
+  text-decoration: underline;
+}
+
+.videoFallbackLink:hover {
+  color: var(--gold);
 }
 
 .videoEyebrow {
@@ -317,6 +326,7 @@
   overflow: hidden;
   border: 0.5px solid var(--gold-light);
   background: #000;
+  display: grid;
 }
 
 .videoPoster {
@@ -332,21 +342,29 @@
 }
 
 .videoPlayBtn {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  border: 1px solid var(--gold);
-  background: rgba(7, 36, 33, 0.55);
+  grid-area: 1 / 1;
+  border: none;
+  background: rgba(0, 0, 0, 0.25);
   color: var(--ivory);
-  font-size: 18px;
+  font-size: 14px;
+  font-family: var(--font-sans);
   display: flex;
+  flex-direction: column;
+  gap: 10px;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.videoPlayBtn:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.videoIframe {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
 }
 
 .videoSeeAll {

@@ -62,8 +62,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 const intentSchema = z.discriminatedUnion("intent", [
   z.object({ intent: z.literal("migrateLegacyPortfolio"), revision: z.string().regex(/^[0-9a-f]{32}$/) }).strict(),
-  z.object({ intent: z.literal("createCategory"), revision: z.string().regex(/^[0-9a-f]{32}$/), nameFr: z.string().min(1), nameEn: z.string().min(1), slug: z.string().min(1), active: z.enum(["true", "false"]) }).strict(),
-  z.object({ intent: z.literal("updateCategory"), revision: z.string().regex(/^[0-9a-f]{32}$/), categoryId: z.string().uuid(), nameFr: z.string().min(1), nameEn: z.string().min(1), slug: z.string().min(1), active: z.enum(["true", "false"]) }).strict(),
+  z.object({ intent: z.literal("createCategory"), revision: z.string().regex(/^[0-9a-f]{32}$/), nameFr: z.string().min(1, "Le nom (FR) est requis."), nameEn: z.string().min(1, "Le nom (EN) est requis."), slug: z.string().min(1, "L'identifiant URL (slug) est requis."), active: z.enum(["true", "false"], { message: "Le statut (actif/inactif) est requis et doit être valide." }) }).strict(),
+  z.object({ intent: z.literal("updateCategory"), revision: z.string().regex(/^[0-9a-f]{32}$/), categoryId: z.string().uuid(), nameFr: z.string().min(1, "Le nom (FR) est requis."), nameEn: z.string().min(1, "Le nom (EN) est requis."), slug: z.string().min(1, "L'identifiant URL (slug) est requis."), active: z.enum(["true", "false"], { message: "Le statut (actif/inactif) est requis et doit être valide." }) }).strict(),
   z.object({ intent: z.literal("deleteCategory"), revision: z.string().regex(/^[0-9a-f]{32}$/), categoryId: z.string().uuid() }).strict(),
   z.object({
     intent: z.literal("reorderCategories"),
@@ -98,7 +98,7 @@ const intentSchema = z.discriminatedUnion("intent", [
     })
   }).strict(),
   z.object({ intent: z.literal("trashPhoto"), revision: z.string().regex(/^[0-9a-f]{32}$/), photoId: z.string().uuid() }).strict(),
-  z.object({ intent: z.literal("updateGlobalVideo"), revision: z.string().regex(/^[0-9a-f]{32}$/), videoUrl: z.string().url().or(z.literal("")) }).strict(),
+  z.object({ intent: z.literal("updateGlobalVideo"), revision: z.string().regex(/^[0-9a-f]{32}$/), videoUrl: z.string().url("L'URL de la vidéo est invalide.").or(z.literal("")) }).strict(),
 ]);
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -129,7 +129,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsed = intentSchema.safeParse(formObject);
 
   if (!parsed.success) {
-    return data({ error: "Validation failed" }, { status: 422, headers });
+    const errorMessages = parsed.error.issues.map(i => i.message).filter(m => m !== "Invalid input").join(", ");
+    return data({ error: errorMessages || "Erreur de validation" }, { status: 422, headers });
   }
 
   const actionPayload = parsed.data;
@@ -273,6 +274,7 @@ function PhotoItem({ photo, portfolio, csrfToken, getRevision, onRevision, onMov
   const [altFr, setAltFr] = useState(photo.alt.fr || "");
   const [altEn, setAltEn] = useState(photo.alt.en || "");
   const [categoryId, setCategoryId] = useState(photo.categoryId || "");
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -281,6 +283,7 @@ function PhotoItem({ photo, portfolio, csrfToken, getRevision, onRevision, onMov
       onRevision(fetcher.data.newRevision);
       setEditing(false);
       setConfirmDelete(false);
+      setLocalError(null);
     }
   }, [fetcher.state, fetcher.data, onRevision]);
 
@@ -289,6 +292,17 @@ function PhotoItem({ photo, portfolio, csrfToken, getRevision, onRevision, onMov
   };
 
   const handleToggleVisible = () => {
+    if (!photo.visible) {
+      if (!photo.categoryId) {
+        setLocalError("Choisis une catégorie avant d’afficher cette photo.");
+        return;
+      }
+      if (!photo.alt.fr || !photo.alt.en) {
+        setLocalError("Ajoute les descriptions FR et EN avant d’afficher cette photo.");
+        return;
+      }
+    }
+    setLocalError(null);
     fetcher.submit({ intent: "setPhotoVisibility", csrfToken, revision: getRevision(), photoId: photo.id, visible: (!photo.visible).toString() }, { method: "post" });
   };
 
@@ -296,7 +310,8 @@ function PhotoItem({ photo, portfolio, csrfToken, getRevision, onRevision, onMov
     fetcher.submit({ intent: "trashPhoto", csrfToken, revision: getRevision(), photoId: photo.id }, { method: "post" });
   };
 
-  const imgUrl = `/admin/portfolio/media/${photo.id}/admin-thumb`;
+  const thumbVariant = photo.variants.find(v => v.name === "480p")?.name ?? photo.variants[0]?.name;
+  const imgUrl = `/admin/portfolio/media/${photo.id}/${thumbVariant}`;
 
   return (
     <div className={styles.photoItem}>
@@ -304,16 +319,23 @@ function PhotoItem({ photo, portfolio, csrfToken, getRevision, onRevision, onMov
         <button type="button" onClick={onMoveLeft} disabled={isFirst || isSubmitting} className={styles.arrowBtnBg}>◀</button>
         <button type="button" onClick={onMoveRight} disabled={isLast || isSubmitting} className={styles.arrowBtnBg}>▶</button>
       </div>
-      <img src={imgUrl} alt="" className={styles.photoImgCover} />
+      <img src={imgUrl} alt={photo.alt.fr || "Aperçu de la photo à décrire"} className={styles.photoImgCover} />
       <div className={styles.photoContent}>
         {editing ? (
           <>
+            <div className={styles.helpText}>Décris brièvement ce que l’on voit. Cette description est utilisée par les lecteurs d’écran et lorsque l’image ne peut pas être affichée.</div>
             <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={styles.input} disabled={isSubmitting}>
               <option value="">Sélectionner Catégorie</option>
               {portfolio.categories.map(c => <option key={c.id} value={c.id}>{c.name.fr}</option>)}
             </select>
-            <input value={altFr} onChange={e => setAltFr(e.target.value)} placeholder="Alt (FR)" className={styles.input} disabled={isSubmitting} />
-            <input value={altEn} onChange={e => setAltEn(e.target.value)} placeholder="Alt (EN)" className={styles.input} disabled={isSubmitting} />
+            <div className={styles.flexColGap2}>
+              <label htmlFor={`altFr-${photo.id}`} className={styles.helpText}>Description de la photo (FR)</label>
+              <input id={`altFr-${photo.id}`} value={altFr} onChange={e => setAltFr(e.target.value)} placeholder="Ex. Les mariés échangent leurs alliances pendant la cérémonie" aria-label="Description de la photo (FR)" className={styles.input} disabled={isSubmitting} />
+            </div>
+            <div className={styles.flexColGap2}>
+              <label htmlFor={`altEn-${photo.id}`} className={styles.helpText}>Description de la photo (EN)</label>
+              <input id={`altEn-${photo.id}`} value={altEn} onChange={e => setAltEn(e.target.value)} placeholder="E.g. The couple exchanging rings during the ceremony" aria-label="Description de la photo (EN)" className={styles.input} disabled={isSubmitting} />
+            </div>
             <button type="button" onClick={handleSave} disabled={isSubmitting} className={styles.actionButton}>OK</button>
             <button type="button" onClick={() => { setEditing(false); setAltFr(photo.alt.fr || ""); setAltEn(photo.alt.en || ""); setCategoryId(photo.categoryId || ""); }} disabled={isSubmitting} className={styles.actionButtonSecondary}>Annuler</button>
           </>
@@ -326,7 +348,7 @@ function PhotoItem({ photo, portfolio, csrfToken, getRevision, onRevision, onMov
         ) : (
           <>
             <div className={styles.photoCategoryText}>Cat: {portfolio.categories.find(c => c.id === photo.categoryId)?.name.fr || "Aucune"}</div>
-            <div className={styles.photoAltText}>Alt FR: {photo.alt.fr}</div>
+            <div className={styles.photoAltText}>Description FR : {photo.alt.fr}</div>
             <div className={styles.photoActionsRow}>
               <button type="button" onClick={() => setEditing(true)} disabled={isSubmitting} className={`${styles.actionButtonSecondary} ${styles.photoActionButton}`}>Edit</button>
               <button type="button" onClick={handleToggleVisible} disabled={isSubmitting} className={`${styles.actionButtonSecondary} ${styles.photoActionButton}`}>
@@ -338,7 +360,12 @@ function PhotoItem({ photo, portfolio, csrfToken, getRevision, onRevision, onMov
           </>
         )}
       </div>
-      {fetcher.data && "error" in fetcher.data && fetcher.data.error && (
+      {localError && (
+        <div className={styles.errorMessage}>
+          {localError}
+        </div>
+      )}
+      {fetcher.data && "error" in fetcher.data && fetcher.data.error && !localError && (
         <div className={styles.errorMessage}>
           {String(fetcher.data.error)}
         </div>

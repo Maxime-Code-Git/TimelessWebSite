@@ -753,7 +753,7 @@ export function updateGlobalVideo(videoUrl: string | null, previousRevision: str
   const portfolio = raw.content;
   if (videoUrl !== null) {
     const video = parseVideoUrl(videoUrl);
-    if (!video) throw new ValidationError("Invalid videoUrl format");
+    if (!video) throw new ValidationError("L'URL doit être un lien valide vers une vidéo YouTube ou Vimeo.");
     portfolio.video = video;
   } else {
     portfolio.video = null;
