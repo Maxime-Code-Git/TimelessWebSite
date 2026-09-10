@@ -67,6 +67,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
           PUBLIC_SITE_URL: BASE_URL,
           CONTACT_RATE_LIMIT_SECRET: "test-secret",
           RATE_LIMIT_DB_PATH: dbPath,
+          BOOKING_DB_PATH: path.join(tempDir, "booking.db"),
           SMTP_HOST: "localhost",
           SMTP_PORT: "2525",
           SMTP_USER: "test",

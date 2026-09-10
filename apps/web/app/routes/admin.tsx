@@ -268,6 +268,10 @@ export default function AdminPage() {
                 <h3>Textes et informations</h3>
                 <p>Gérer les coordonnées et informations légales</p>
               </Link>
+              <Link to="/admin/bookings" className={styles.card}>
+                <h3>Rendez-vous visio</h3>
+                <p>Gérer les disponibilités et les demandes de rendez-vous</p>
+              </Link>
             </div>
           </div>
         </main>

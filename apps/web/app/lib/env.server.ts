@@ -121,6 +121,17 @@ export const ENV = {
     if (isTest) return validateTestPath(val, "PORTFOLIO_MEDIA_PATH");
     return path.resolve(val || "./data/media/portfolio");
   },
+  get BOOKING_DB_PATH() {
+    const isProd = process.env.NODE_ENV === "production";
+    const isTest = process.env.NODE_ENV === "test";
+    const val = process.env.BOOKING_DB_PATH;
+    if (isProd) {
+      if (!val) throw new Error("CRITICAL: Environment variable BOOKING_DB_PATH is missing. Please check your .env files.");
+      return validateProductionPath(val, "BOOKING_DB_PATH", false);
+    }
+    if (isTest) return validateTestPath(val, "BOOKING_DB_PATH");
+    return path.resolve(val || "./data/db/bookings.sqlite");
+  },
   get PUBLIC_SITE_URL() {
     const url = requireEnvVar("PUBLIC_SITE_URL");
     try {
@@ -212,3 +223,4 @@ void ENV.CONTACT_RATE_LIMIT_MAX;
 void ENV.TRUST_PROXY;
 void ENV.PORTFOLIO_CONTENT_PATH;
 void ENV.PORTFOLIO_MEDIA_PATH;
+void ENV.BOOKING_DB_PATH;

@@ -9,6 +9,7 @@ export default [
   route("robots.txt", "routes/robots[.txt].tsx"),
   route("sitemap.xml", "routes/sitemap[.xml].tsx"),
   route("maintenance", "routes/maintenance.tsx"),
+  route("api/booking", "routes/api.booking.ts"),
   route("portfolio/media/:photoId/:variant", "routes/portfolio.media.$photoId.$variant.tsx"),
 
   // ── French routes ─────────────────────────────────────────
@@ -50,6 +51,7 @@ export default [
   route("admin", "routes/admin.tsx"),
   route("admin/pricing", "routes/admin.pricing.tsx"),
   route("admin/settings", "routes/admin.settings.tsx"),
+  route("admin/bookings", "routes/admin.bookings.tsx"),
   route("admin/portfolio", "routes/admin.portfolio.tsx"),
   route("admin/portfolio/watermark", "routes/admin.portfolio.watermark.tsx"),
   route("admin/portfolio/upload", "routes/admin.portfolio.upload.tsx"),

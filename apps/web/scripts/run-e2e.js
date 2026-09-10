@@ -57,6 +57,7 @@ try {
   process.env.PORTFOLIO_CONTENT_PATH = path.join(e2eTempDir, 'portfolio.json');
   process.env.PORTFOLIO_MEDIA_PATH = path.join(e2eTempDir, 'portfolio-media');
   process.env.RATE_LIMIT_DB_PATH = path.join(e2eTempDir, 'rate-limit.sqlite');
+  process.env.BOOKING_DB_PATH = path.join(e2eTempDir, 'bookings.sqlite');
   process.env.NODE_ENV = 'test';
 
   const args = process.argv.slice(2);

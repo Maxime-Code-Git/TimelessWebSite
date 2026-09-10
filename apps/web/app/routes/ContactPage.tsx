@@ -5,6 +5,7 @@ import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
 import { getStrings } from "~/lib/i18n";
 import type { loader as rootLoader } from "../root";
+import { VisioBooking } from "~/components/booking/VisioBooking";
 import styles from "./contact.module.css";
 
 interface ContactPageProps {
@@ -71,18 +72,7 @@ export function ContactPage({ lang }: ContactPageProps) {
               <p className={styles.bookingNote}>{t.bookingNote}</p>
             </div>
             
-            <div className={styles.calendarCard}>
-              <div className={styles.calendarHeader}>
-                <span className={styles.calendarMonth}>
-                  {lang === "fr" ? "Réservation en ligne" : "Online booking"}
-                </span>
-              </div>
-              <div className={styles.slotsEmpty}>
-                {lang === "fr"
-                  ? "La réservation en ligne est temporairement indisponible. Veuillez nous écrire directement via le formulaire ou par e-mail."
-                  : "Online booking is temporarily unavailable. Please contact us directly via the form or by email."}
-              </div>
-            </div>
+            <VisioBooking language={lang} />
           </div>
           
           <div role="alert" className={styles.unavailableAlert}>

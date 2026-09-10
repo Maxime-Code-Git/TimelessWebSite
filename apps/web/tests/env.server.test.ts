@@ -33,7 +33,8 @@ describe("Environment Validation — fail-fast on import", () => {
       ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$...",
       ADMIN_SESSION_SECRET: "admin_secret",
       PORTFOLIO_CONTENT_PATH: path.join(os.tmpdir(), "portfolio.json"),
-      PORTFOLIO_MEDIA_PATH: path.join(os.tmpdir(), "media")
+      PORTFOLIO_MEDIA_PATH: path.join(os.tmpdir(), "media"),
+      BOOKING_DB_PATH: path.join(os.tmpdir(), "booking.db")
     };
   }
 
@@ -85,7 +86,8 @@ describe("Environment Validation — fail-fast on import", () => {
     "RATE_LIMIT_DB_PATH",
     "PUBLIC_SITE_URL",
     "PORTFOLIO_CONTENT_PATH",
-    "PORTFOLIO_MEDIA_PATH"
+    "PORTFOLIO_MEDIA_PATH",
+    "BOOKING_DB_PATH"
   ];
 
   for (const varName of requiredVars) {
@@ -96,7 +98,7 @@ describe("Environment Validation — fail-fast on import", () => {
 
       const err = await captureImportError();
       expect(err).not.toBeNull();
-      if (varName.startsWith("PORTFOLIO_")) {
+      if (varName.startsWith("PORTFOLIO_") || varName === "BOOKING_DB_PATH") {
         expect(err!.message).toContain(`${varName} is required in test`);
       } else {
         expect(err!.message).toContain(`${varName} is missing`);
