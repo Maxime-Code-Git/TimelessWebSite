@@ -12,7 +12,7 @@ import { sendBookingConfirmedEmail, sendBookingStatusEmail } from "../lib/mailer
 import styles from "./admin.module.css";
 import * as crypto from "node:crypto";
 import { commitSession } from "../lib/session.server";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await requireValidAdminSession(request);
@@ -125,11 +125,73 @@ export default function AdminBookings() {
   const [confirmModalData, setConfirmModalData] = useState<{id: string} | null>(null);
   const [rejectModalData, setRejectModalData] = useState<{id: string, action: 'reject'|'cancel'} | null>(null);
 
+  const confirmModalRef = useRef<HTMLDivElement>(null);
+  const rejectModalRef = useRef<HTMLDivElement>(null);
+  const triggerBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    const activeModal = confirmModalData ? confirmModalRef.current : rejectModalData ? rejectModalRef.current : null;
+    if (activeModal) {
+      const focusable = activeModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (focusable.length) {
+        (focusable[0] as HTMLElement).focus();
+      } else {
+        activeModal.focus();
+      }
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          setConfirmModalData(null);
+          setRejectModalData(null);
+          triggerBtnRef.current?.focus();
+        }
+        if (e.key === 'Tab') {
+          const firstElement = focusable[0] as HTMLElement;
+          const lastElement = focusable[focusable.length - 1] as HTMLElement;
+
+          if (e.shiftKey) {
+            if (document.activeElement === firstElement) {
+              lastElement.focus();
+              e.preventDefault();
+            }
+          } else {
+            if (document.activeElement === lastElement) {
+              firstElement.focus();
+              e.preventDefault();
+            }
+          }
+        }
+      };
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    } else {
+      triggerBtnRef.current?.focus();
+    }
+  }, [confirmModalData, rejectModalData]);
+
   const confirmSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     submit(e.currentTarget);
     setConfirmModalData(null);
     setRejectModalData(null);
+  };
+
+  const openConfirmModal = (id: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    triggerBtnRef.current = e.currentTarget;
+    setConfirmModalData({ id });
+  };
+
+  const openRejectModal = (id: string, action: 'reject'|'cancel', e: React.MouseEvent<HTMLButtonElement>) => {
+    triggerBtnRef.current = e.currentTarget;
+    setRejectModalData({ id, action });
+  };
+
+  const closeModal = () => {
+    setConfirmModalData(null);
+    setRejectModalData(null);
+    triggerBtnRef.current?.focus();
   };
 
   return (
@@ -142,11 +204,11 @@ export default function AdminBookings() {
       </header>
 
       <main className={styles.mainContent}>
-        <div className={styles.dashboardCard} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-          <button onClick={() => setActiveTab('pending')} style={{ fontWeight: activeTab === 'pending' ? 'bold' : 'normal' }}>En attente ({pendingBookings.length})</button>
-          <button onClick={() => setActiveTab('confirmed')} style={{ fontWeight: activeTab === 'confirmed' ? 'bold' : 'normal' }}>Confirmés ({confirmedBookings.length})</button>
-          <button onClick={() => setActiveTab('past_rejected')} style={{ fontWeight: activeTab === 'past_rejected' ? 'bold' : 'normal' }}>Historique ({pastBookings.length})</button>
-          <button onClick={() => setActiveTab('settings')} style={{ fontWeight: activeTab === 'settings' ? 'bold' : 'normal' }}>Paramètres & Dates bloquées</button>
+        <div className={`${styles.dashboardCard} ${styles.tabsContainer}`}>
+          <button onClick={() => setActiveTab('pending')} className={activeTab === 'pending' ? styles.activeTabBtn : styles.tabBtn}>En attente ({pendingBookings.length})</button>
+          <button onClick={() => setActiveTab('confirmed')} className={activeTab === 'confirmed' ? styles.activeTabBtn : styles.tabBtn}>Confirmés ({confirmedBookings.length})</button>
+          <button onClick={() => setActiveTab('past_rejected')} className={activeTab === 'past_rejected' ? styles.activeTabBtn : styles.tabBtn}>Historique ({pastBookings.length})</button>
+          <button onClick={() => setActiveTab('settings')} className={activeTab === 'settings' ? styles.activeTabBtn : styles.tabBtn}>Paramètres & Dates bloquées</button>
         </div>
 
         {activeTab === 'pending' && (
@@ -154,13 +216,13 @@ export default function AdminBookings() {
             <h2>Demandes en attente</h2>
             {pendingBookings.length === 0 && <p>Aucune demande en attente.</p>}
             {pendingBookings.map(b => (
-              <div key={b.id} style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '10px', borderRadius: '5px' }}>
+              <div key={b.id} className={styles.bookingCard}>
                 <p><strong>{b.local_date} {b.local_time}</strong> - {b.names} ({b.email})</p>
                 <p>Formule: {b.formula} | Langue: {b.language} | Mariage: {b.wedding_date}</p>
                 <p>Message: {b.message}</p>
-                <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
-                  <button onClick={() => setConfirmModalData({ id: b.id })} className={styles.submitButton}>Accepter & Ajouter lien visio</button>
-                  <button onClick={() => setRejectModalData({ id: b.id, action: 'reject' })} className={styles.logoutButton}>Refuser</button>
+                <div className={styles.bookingActions}>
+                  <button data-testid={`accept-${b.id}`} onClick={(e) => openConfirmModal(b.id, e)} className={styles.submitButton}>Accepter & Ajouter lien visio</button>
+                  <button data-testid={`reject-${b.id}`} onClick={(e) => openRejectModal(b.id, 'reject', e)} className={styles.logoutButton}>Refuser</button>
                 </div>
               </div>
             ))}
@@ -172,10 +234,12 @@ export default function AdminBookings() {
             <h2>Rendez-vous confirmés</h2>
             {confirmedBookings.length === 0 && <p>Aucun rendez-vous confirmé à venir.</p>}
             {confirmedBookings.map(b => (
-              <div key={b.id} style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '10px', borderRadius: '5px' }}>
+              <div key={b.id} className={styles.bookingCard}>
                 <p><strong>{b.local_date} {b.local_time}</strong> - {b.names} ({b.email})</p>
                 <p>Lien: <a href={b.meeting_url || ''} target="_blank" rel="noreferrer">{b.meeting_url}</a></p>
-                <button onClick={() => setRejectModalData({ id: b.id, action: 'cancel' })} className={styles.logoutButton} style={{ marginTop: '10px' }}>Annuler le rendez-vous</button>
+                <div className={styles.bookingActions}>
+                  <button onClick={(e) => openRejectModal(b.id, 'cancel', e)} className={styles.logoutButton}>Annuler le rendez-vous</button>
+                </div>
               </div>
             ))}
           </div>
@@ -186,7 +250,7 @@ export default function AdminBookings() {
             <h2>Historique</h2>
             {pastBookings.length === 0 && <p>Aucun historique.</p>}
             {pastBookings.map(b => (
-              <div key={b.id} style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '10px', borderRadius: '5px' }}>
+              <div key={b.id} className={styles.bookingCard}>
                 <p><strong>{b.local_date} {b.local_time}</strong> - {b.names} ({b.status})</p>
               </div>
             ))}
@@ -194,16 +258,16 @@ export default function AdminBookings() {
         )}
 
         {activeTab === 'settings' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className={styles.settingsContainer}>
             <div className={styles.dashboardCard}>
               <h2>Horaires récurrents</h2>
               <ul>
                 {weeklySlots.map(s => {
                   const dayNames = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
                   return (
-                    <li key={s.id} style={{ marginBottom: '10px' }}>
+                    <li key={s.id} className={styles.liMargin}>
                       {dayNames[s.weekday - 1]} {s.local_time} - {s.active ? 'Actif' : 'Désactivé'}
-                      <Form method="post" style={{ display: 'inline-block', marginLeft: '10px' }}>
+                      <Form method="post" className={styles.inlineForm}>
                         <input type="hidden" name="csrfToken" value={csrfToken} />
                         <input type="hidden" name="intent" value="toggle_weekly_slot" />
                         <input type="hidden" name="id" value={s.id} />
@@ -217,7 +281,7 @@ export default function AdminBookings() {
 
             <div className={styles.dashboardCard}>
               <h2>Dates bloquées exceptionnelles</h2>
-              <Form method="post" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <Form method="post" className={styles.dateForm}>
                 <input type="hidden" name="csrfToken" value={csrfToken} />
                 <input type="hidden" name="intent" value="add_blocked_date" />
                 <input type="date" name="date" required className={styles.input} />
@@ -227,9 +291,9 @@ export default function AdminBookings() {
 
               <ul>
                 {blockedDates.map(bd => (
-                  <li key={bd.id} style={{ marginBottom: '10px' }}>
+                  <li key={bd.id} className={styles.liMargin}>
                     {bd.local_date} {bd.reason ? `(${bd.reason})` : ''}
-                    <Form method="post" style={{ display: 'inline-block', marginLeft: '10px' }}>
+                    <Form method="post" className={styles.inlineForm}>
                       <input type="hidden" name="csrfToken" value={csrfToken} />
                       <input type="hidden" name="intent" value="remove_blocked_date" />
                       <input type="hidden" name="id" value={bd.id} />
@@ -246,22 +310,22 @@ export default function AdminBookings() {
 
       {/* Confirmation Modal */}
       {confirmModalData && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className={styles.dashboardCard} style={{ width: '500px', background: '#1c1c1c' }}>
-            <h3>Confirmer le rendez-vous</h3>
+        <div role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" className={styles.modalOverlay}>
+          <div ref={confirmModalRef} className={`${styles.dashboardCard} ${styles.modalContent}`} tabIndex={-1}>
+            <h3 id="confirm-dialog-title">Confirmer le rendez-vous</h3>
             <Form method="post" onSubmit={confirmSubmit}>
               <input type="hidden" name="csrfToken" value={csrfToken} />
               <input type="hidden" name="intent" value="confirm_booking" />
               <input type="hidden" name="id" value={confirmModalData.id} />
               
               <label className={styles.label}>Lien visio (Google Meet, Zoom, Teams)</label>
-              <input type="url" name="meeting_url" required className={styles.input} style={{ marginBottom: '10px' }} />
+              <input type="url" name="meeting_url" required className={`${styles.input} ${styles.inputMargin}`} />
 
               <label className={styles.label}>Note (optionnel - sera envoyée au client)</label>
-              <textarea name="admin_note" className={styles.input} style={{ marginBottom: '20px' }}></textarea>
+              <textarea name="admin_note" className={`${styles.input} ${styles.textareaMargin}`}></textarea>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button type="button" onClick={() => setConfirmModalData(null)} className={styles.logoutButton}>Annuler</button>
+              <div className={styles.modalActions}>
+                <button type="button" onClick={closeModal} className={styles.logoutButton}>Annuler</button>
                 <button type="submit" className={styles.submitButton}>Envoyer la confirmation</button>
               </div>
             </Form>
@@ -271,19 +335,19 @@ export default function AdminBookings() {
 
       {/* Reject Modal */}
       {rejectModalData && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className={styles.dashboardCard} style={{ width: '500px', background: '#1c1c1c' }}>
-            <h3>{rejectModalData.action === 'reject' ? 'Refuser la demande' : 'Annuler le rendez-vous'}</h3>
+        <div role="dialog" aria-modal="true" aria-labelledby="reject-dialog-title" className={styles.modalOverlay}>
+          <div ref={rejectModalRef} className={`${styles.dashboardCard} ${styles.modalContent}`} tabIndex={-1}>
+            <h3 id="reject-dialog-title">{rejectModalData.action === 'reject' ? 'Refuser la demande' : 'Annuler le rendez-vous'}</h3>
             <Form method="post" onSubmit={confirmSubmit}>
               <input type="hidden" name="csrfToken" value={csrfToken} />
               <input type="hidden" name="intent" value={rejectModalData.action === 'reject' ? "reject_booking" : "cancel_booking"} />
               <input type="hidden" name="id" value={rejectModalData.id} />
 
               <label className={styles.label}>Motif (optionnel - sera envoyé au client)</label>
-              <textarea name="admin_note" className={styles.input} style={{ marginBottom: '20px' }}></textarea>
+              <textarea name="admin_note" className={`${styles.input} ${styles.textareaMargin}`}></textarea>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button type="button" onClick={() => setRejectModalData(null)} className={styles.submitButton}>Fermer</button>
+              <div className={styles.modalActions}>
+                <button type="button" onClick={closeModal} className={styles.submitButton}>Fermer</button>
                 <button type="submit" className={styles.logoutButton}>Confirmer l'action</button>
               </div>
             </Form>

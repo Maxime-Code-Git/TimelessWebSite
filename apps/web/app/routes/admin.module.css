@@ -617,3 +617,19 @@
 .photoActionsRow { display: flex; gap: 5px; flex-wrap: wrap; margin-top: auto; }
 .photoActionButton { padding: 2px 5px; font-size: 12px; }
 .hiddenText { color: red; font-size: 12px; font-weight: bold; }
+
+/* Booking Admin Styles */
+.tabsContainer { display: flex; gap: 10px; margin-bottom: 20px; }
+.tabBtn { font-weight: normal; }
+.activeTabBtn { font-weight: bold; }
+.bookingCard { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+.bookingActions { margin-top: 10px; display: flex; gap: 10px; }
+.settingsContainer { display: flex; flex-direction: column; gap: 20px; }
+.liMargin { margin-bottom: 10px; }
+.inlineForm { display: inline-block; margin-left: 10px; }
+.dateForm { display: flex; gap: 10px; margin-bottom: 20px; }
+.modalOverlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modalContent { width: 500px; background: #1c1c1c; }
+.inputMargin { margin-bottom: 10px; }
+.textareaMargin { margin-bottom: 20px; }
+.modalActions { display: flex; gap: 10px; }
