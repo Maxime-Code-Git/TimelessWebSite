@@ -291,3 +291,12 @@
     transform: none;
   }
 }
+
+.cardAction {
+  margin-top: 1.5rem;
+}
+.cardActionBtn {
+  width: 100%;
+  display: block;
+  text-align: center;
+}

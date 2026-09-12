@@ -87,8 +87,8 @@ export function FormulesPage({ lang }: FormulesPageProps) {
                       </li>
                     ))}
                   </ul>
-                  <div style={{marginTop: '1.5rem'}}>
-                    <Link to={`${contactHref}?formula=${selectedCat}-${tier.id}`} className="btn btn--primary" style={{width: '100%', display: 'block', textAlign: 'center'}}>
+                  <div className={styles.cardAction}>
+                    <Link to={`${contactHref}?formula=${selectedCat}-${tier.id}`} className={`btn btn--primary ${styles.cardActionBtn}`}>
                       {tier.buttonText[lang]}
                     </Link>
                   </div>

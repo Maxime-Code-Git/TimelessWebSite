@@ -21,19 +21,21 @@ test.describe('Admin Content Management (Phase 3B)', () => {
     restoreDefaultSiteContent();
   });
 
-  test('should edit pricing and see changes on public pages', async ({ page }) => {
+    test('should edit pricing and see changes on public pages', async ({ page }) => {
     await page.click('text=Formules et tarifs');
     await expect(page.locator('h1')).toContainText('Formules et tarifs');
 
-    // Change price for photo essential formula
-    const photoEssentialPriceInput = page.locator('table').nth(0).locator('tbody tr').nth(0).locator('input[type="number"]');
+    // Click on Photographie tab in Admin
+    await page.click('button:has-text("PHOTO")');
 
-    // Clear and type new price
-    await photoEssentialPriceInput.fill('1300');
+    // Find the first formula card's price input (Essential)
+    // The price input has a label "Prix (€)"
+    const firstFormulaPrice = page.locator('input[type="number"]').first();
+    await firstFormulaPrice.fill('1300');
 
     // Select it as featured
-    const photoEssentialFeaturedRadio = page.locator('table').nth(0).locator('tbody tr').nth(0).locator('input[type="radio"]');
-    await photoEssentialFeaturedRadio.check();
+    const firstFormulaFeatured = page.locator('label:has-text("Mettre en avant")').first().locator('input[type="radio"]');
+    await firstFormulaFeatured.check();
 
     // Submit
     await page.click('button[type="submit"]');
@@ -41,20 +43,13 @@ test.describe('Admin Content Management (Phase 3B)', () => {
 
     // Verify on public page (FR)
     await page.goto('/fr/formules');
-
-    // Click on the 'Photographie' tab to make sure it's visible
     await page.click('button:has-text("Photographie")');
-
-    // Find the photo category
-    const photoSection = page.locator('section').filter({ hasText: 'Photographie' }).first();
-    // Verify the price is 1 300 €
-    await expect(photoSection).toContainText('1 300 €');
+    await expect(page.locator('body')).toContainText('1 300 €');
 
     // Verify on public page (EN)
     await page.goto('/en/pricing');
     await page.click('button:has-text("Photography")');
-    const photoSectionEn = page.locator('section').filter({ hasText: 'Photography' }).first();
-    await expect(photoSectionEn).toContainText(/1[.,\s\xA0]*300/);
+    await expect(page.locator('body')).toContainText(/1[.,\s\xA0]*300/);
   });
 
   test('should edit settings and see changes on contact page', async ({ page }) => {

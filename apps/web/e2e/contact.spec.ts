@@ -87,7 +87,7 @@ test.describe('Contact Form (Phase 3 Backend)', () => {
     await page.fill('#email', 'first@example.com');
     await page.fill('#date', '2027-08-15');
     await page.fill('#location', 'Bruxelles');
-    await page.selectOption('#formula', 'photo');
+    await page.selectOption('#formula', 'photo-signature');
     await page.fill('#message', 'Un message de test.');
     await page.click('button[type="submit"]');
 
@@ -104,7 +104,7 @@ test.describe('Contact Form (Phase 3 Backend)', () => {
     await page.fill('#email', 'second@example.com');
     await page.fill('#date', '2027-09-20');
     await page.fill('#location', 'Paris');
-    await page.selectOption('#formula', 'film');
+    await page.selectOption('#formula', 'film-signature');
     await page.fill('#message', 'Un deuxième message.');
     await page.click('button[type="submit"]');
 
@@ -126,7 +126,7 @@ test.describe('Contact Form (Phase 3 Backend)', () => {
     await page.fill('#email', 'jane@example.com');
     await page.fill('#date', '2027-08-15');
     await page.fill('#location', 'London');
-    await page.selectOption('#formula', 'film');
+    await page.selectOption('#formula', 'film-signature');
     await page.fill('#message', 'Error test.');
 
     await page.click('button[type="submit"]');

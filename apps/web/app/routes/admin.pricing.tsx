@@ -274,7 +274,7 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting,
               </div>
               <div className={styles.formGroup}>
                 <label>Texte bouton (FR/EN)</label>
-                <div style={{display: "flex", gap: "10px"}}>
+                <div className={styles.flexGap}>
                   <input type="text" value={formula.buttonText.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "buttonText", "fr", e.target.value)} className={styles.input} placeholder="FR" />
                   <input type="text" value={formula.buttonText.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "buttonText", "en", e.target.value)} className={styles.input} placeholder="EN" />
                 </div>

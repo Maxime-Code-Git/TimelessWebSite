@@ -791,3 +791,8 @@
 .addBtn:hover {
   background: var(--color-bg-hover);
 }
+
+.flexGap {
+  display: flex;
+  gap: 10px;
+}

@@ -117,8 +117,9 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
   }
 
   // Allowed formulas
-  const allowedFormulas = ["photo", "film", "duo", "custom", "unknown"];
-  if (!allowedFormulas.includes(formula)) {
+  const isLegacy = ["photo", "film", "duo", "custom", "unknown"].includes(formula);
+  const isDynamic = ["photo-", "film-", "duo-"].some(p => formula.startsWith(p));
+  if (!isLegacy && !isDynamic) {
     return { error: lang === "fr" ? "Formule invalide." : "Invalid formula." };
   }
 
