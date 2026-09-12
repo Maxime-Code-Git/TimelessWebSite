@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Form,
   Link,
@@ -117,7 +118,9 @@ export default function AdminPricingPage() {
 }
 
 // Client-side React logic to edit pricing
-import { useState } from "react";
+
+
+import type { Formula } from "../lib/site-content.server";
 
 function PricingEditor({ initialPricing, revision, error, success, isSubmitting, csrfToken, storageWarning }: {
   initialPricing: PricingCategory,
@@ -128,26 +131,72 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting,
   csrfToken: string,
   storageWarning: boolean
 }) {
-
   const [pricing, setPricing] = useState<PricingCategory>(initialPricing);
+  const [activeTab, setActiveTab] = useState<keyof PricingCategory>("photo");
 
-  const handleChange = (cat: keyof PricingCategory, index: number, field: "priceEuros" | "featured", value: number | boolean) => {
+  const handleChange = (cat: keyof PricingCategory, index: number, field: keyof Formula | "priceEuros", value: unknown) => {
     setPricing((prev) => {
-      // Immutable update
       const newPricing = {
         ...prev,
         [cat]: prev[cat].map((f, i) => {
           if (field === "featured") {
-            // Uncheck all other featured items in this category if checking this one
             return { ...f, featured: value ? (i === index) : f.featured };
           }
-          if (i === index && field === "priceEuros") {
-            return { ...f, priceCents: Math.round(Number(value) * 100) };
+          if (i === index) {
+            if (field === "priceEuros") {
+              return { ...f, priceCents: Math.round(Number(value) * 100) };
+            }
+            return { ...f, [field]: value };
           }
           return f;
         })
       };
       return newPricing;
+    });
+  };
+
+  const handleLocalizedChange = (cat: keyof PricingCategory, index: number, field: "name" | "summary" | "description" | "buttonText", lang: "fr" | "en", value: string) => {
+    setPricing((prev) => {
+      return {
+        ...prev,
+        [cat]: prev[cat].map((f, i) => {
+          if (i === index) {
+            return { ...f, [field]: { ...f[field], [lang]: value } };
+          }
+          return f;
+        })
+      };
+    });
+  };
+
+  const handleItemChange = (cat: keyof PricingCategory, formulaIndex: number, itemIndex: number, lang: "fr"|"en", value: string) => {
+    setPricing((prev) => {
+      const newItems = [...prev[cat][formulaIndex].includedItems];
+      newItems[itemIndex] = { ...newItems[itemIndex], text: { ...newItems[itemIndex].text, [lang]: value } };
+      return {
+        ...prev,
+        [cat]: prev[cat].map((f, i) => i === formulaIndex ? { ...f, includedItems: newItems } : f)
+      };
+    });
+  };
+
+  const addItem = (cat: keyof PricingCategory, formulaIndex: number) => {
+    setPricing((prev) => {
+      const newItems = [...prev[cat][formulaIndex].includedItems, { id: Date.now().toString(), text: { fr: "", en: "" } }];
+      return {
+        ...prev,
+        [cat]: prev[cat].map((f, i) => i === formulaIndex ? { ...f, includedItems: newItems } : f)
+      };
+    });
+  };
+
+  const removeItem = (cat: keyof PricingCategory, formulaIndex: number, itemIndex: number) => {
+    setPricing((prev) => {
+      const newItems = prev[cat][formulaIndex].includedItems.filter((_, i) => i !== itemIndex);
+      return {
+        ...prev,
+        [cat]: prev[cat].map((f, i) => i === formulaIndex ? { ...f, includedItems: newItems } : f)
+      };
     });
   };
 
@@ -163,48 +212,86 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting,
       {error && <div className={styles.error} role="alert">{error}</div>}
       {success && !error && <div className={styles.success} role="status">Tarifs mis à jour avec succès.</div>}
 
-      <div className={styles.grid}>
-        {(Object.keys(pricing) as Array<keyof PricingCategory>).map(cat => (
-          <div key={cat} className={styles.catBox}>
-            <h3 className={styles.catTitle}>{cat.toUpperCase()}</h3>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Formule</th>
-                  <th>Prix (€)</th>
-                  <th>Mise en avant</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pricing[cat].map((formula, idx) => (
-                  <tr key={formula.id}>
-                    <td>{formula.id}</td>
-                    <td>
-                      <label htmlFor={`price_${cat}_${idx}`} className="sr-only">Prix pour {formula.id}</label>
-                      <input
-                        id={`price_${cat}_${idx}`}
-                        type="number"
-                        min="1"
-                        max="100000"
-                        value={formula.priceCents / 100}
-                        onChange={(e) => handleChange(cat, idx, "priceEuros", Number(e.target.value))}
-                        className={styles.tableInput}
-                      />
-                    </td>
-                    <td>
-                      <label htmlFor={`feat_${cat}_${idx}`} className="sr-only">Mettre en avant {formula.id}</label>
-                      <input
-                        id={`feat_${cat}_${idx}`}
-                        type="radio"
-                        name={`featured_${cat}`}
-                        checked={formula.featured}
-                        onChange={() => handleChange(cat, idx, "featured", true)}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className={styles.tabs}>
+        {(["photo", "film", "duo"] as Array<keyof PricingCategory>).map(cat => (
+          <button
+            key={cat}
+            type="button"
+            className={`${styles.tabButton} ${activeTab === cat ? styles.tabButtonActive : ""}`}
+            onClick={() => setActiveTab(cat)}
+          >
+            {cat.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
+      <div className={styles.tabContent}>
+        {pricing[activeTab].map((formula, idx) => (
+          <div key={formula.id} className={styles.formulaEditorCard}>
+            <div className={styles.formulaEditorHeader}>
+              <h3 className={styles.formulaIdTitle}>Formule: {formula.id.toUpperCase()}</h3>
+              <label className={styles.checkboxLabel}>
+                <input type="checkbox" checked={formula.enabled} onChange={(e) => handleChange(activeTab, idx, "enabled", e.target.checked)} />
+                Activer cette formule
+              </label>
+              <label className={styles.checkboxLabel}>
+                <input type="radio" name={`featured_${activeTab}`} checked={formula.featured} onChange={() => handleChange(activeTab, idx, "featured", true)} />
+                Mettre en avant
+              </label>
+            </div>
+
+            <div className={styles.formulaEditorGrid}>
+              <div className={styles.formGroup}>
+                <label>Nom (FR)</label>
+                <input type="text" value={formula.name.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "name", "fr", e.target.value)} className={styles.input} />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Nom (EN)</label>
+                <input type="text" value={formula.name.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "name", "en", e.target.value)} className={styles.input} />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Résumé (FR) - affiché sur l'accueil</label>
+                <input type="text" value={formula.summary.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "summary", "fr", e.target.value)} className={styles.input} />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Résumé (EN) - affiché sur l'accueil</label>
+                <input type="text" value={formula.summary.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "summary", "en", e.target.value)} className={styles.input} />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Description complète (FR)</label>
+                <textarea value={formula.description.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "description", "fr", e.target.value)} className={styles.textarea} rows={3} />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Description complète (EN)</label>
+                <textarea value={formula.description.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "description", "en", e.target.value)} className={styles.textarea} rows={3} />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Prix (€)</label>
+                <input type="number" min="0" max="100000" value={formula.priceCents / 100} onChange={(e) => handleChange(activeTab, idx, "priceEuros", e.target.value)} className={styles.input} />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Texte bouton (FR/EN)</label>
+                <div style={{display: "flex", gap: "10px"}}>
+                  <input type="text" value={formula.buttonText.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "buttonText", "fr", e.target.value)} className={styles.input} placeholder="FR" />
+                  <input type="text" value={formula.buttonText.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "buttonText", "en", e.target.value)} className={styles.input} placeholder="EN" />
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.itemsSection}>
+              <h4>Éléments inclus</h4>
+              {formula.includedItems.map((item, itemIdx) => (
+                <div key={itemIdx} className={styles.itemRow}>
+                  <input type="text" value={item.text.fr} onChange={(e) => handleItemChange(activeTab, idx, itemIdx, "fr", e.target.value)} className={styles.input} placeholder="Élément (FR)" />
+                  <input type="text" value={item.text.en} onChange={(e) => handleItemChange(activeTab, idx, itemIdx, "en", e.target.value)} className={styles.input} placeholder="Élément (EN)" />
+                  <button type="button" onClick={() => removeItem(activeTab, idx, itemIdx)} className={styles.deleteBtn}>X</button>
+                </div>
+              ))}
+              <button type="button" onClick={() => addItem(activeTab, idx)} className={styles.addBtn}>+ Ajouter un élément</button>
+            </div>
           </div>
         ))}
       </div>

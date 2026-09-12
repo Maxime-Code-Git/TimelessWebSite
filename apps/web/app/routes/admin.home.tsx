@@ -533,98 +533,17 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                 />
               </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor={`pricingPreview-photoEssentialDescription-${lang}`}>Photo - Essential ({lang})</label>
-                <input id={`pricingPreview-photoEssentialDescription-${lang}`}
-                  type="text"
-                  value={content.pricingPreview.photoEssentialDescription[lang]}
-                  onChange={(e) => updatePricingPreview({ photoEssentialDescription: { ...content.pricingPreview.photoEssentialDescription, [lang]: e.target.value } })}
-                  className={styles.input}
-                  disabled={disabled}
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label htmlFor={`pricingPreview-photoSignatureDescription-${lang}`}>Photo - Signature ({lang})</label>
-                <input id={`pricingPreview-photoSignatureDescription-${lang}`}
-                  type="text"
-                  value={content.pricingPreview.photoSignatureDescription[lang]}
-                  onChange={(e) => updatePricingPreview({ photoSignatureDescription: { ...content.pricingPreview.photoSignatureDescription, [lang]: e.target.value } })}
-                  className={styles.input}
-                  disabled={disabled}
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label htmlFor={`pricingPreview-photoPrestigeDescription-${lang}`}>Photo - Prestige ({lang})</label>
-                <input id={`pricingPreview-photoPrestigeDescription-${lang}`}
-                  type="text"
-                  value={content.pricingPreview.photoPrestigeDescription[lang]}
-                  onChange={(e) => updatePricingPreview({ photoPrestigeDescription: { ...content.pricingPreview.photoPrestigeDescription, [lang]: e.target.value } })}
-                  className={styles.input}
-                  disabled={disabled}
-                />
-              </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor={`pricingPreview-filmEssentialDescription-${lang}`}>Film - Essential ({lang})</label>
-                <input id={`pricingPreview-filmEssentialDescription-${lang}`}
-                  type="text"
-                  value={content.pricingPreview.filmEssentialDescription[lang]}
-                  onChange={(e) => updatePricingPreview({ filmEssentialDescription: { ...content.pricingPreview.filmEssentialDescription, [lang]: e.target.value } })}
-                  className={styles.input}
-                  disabled={disabled}
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label htmlFor={`pricingPreview-filmSignatureDescription-${lang}`}>Film - Signature ({lang})</label>
-                <input id={`pricingPreview-filmSignatureDescription-${lang}`}
-                  type="text"
-                  value={content.pricingPreview.filmSignatureDescription[lang]}
-                  onChange={(e) => updatePricingPreview({ filmSignatureDescription: { ...content.pricingPreview.filmSignatureDescription, [lang]: e.target.value } })}
-                  className={styles.input}
-                  disabled={disabled}
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label htmlFor={`pricingPreview-filmPrestigeDescription-${lang}`}>Film - Prestige ({lang})</label>
-                <input id={`pricingPreview-filmPrestigeDescription-${lang}`}
-                  type="text"
-                  value={content.pricingPreview.filmPrestigeDescription[lang]}
-                  onChange={(e) => updatePricingPreview({ filmPrestigeDescription: { ...content.pricingPreview.filmPrestigeDescription, [lang]: e.target.value } })}
-                  className={styles.input}
-                  disabled={disabled}
-                />
-              </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor={`pricingPreview-duoEssentialDescription-${lang}`}>Duo - Essential ({lang})</label>
-                <input id={`pricingPreview-duoEssentialDescription-${lang}`}
-                  type="text"
-                  value={content.pricingPreview.duoEssentialDescription[lang]}
-                  onChange={(e) => updatePricingPreview({ duoEssentialDescription: { ...content.pricingPreview.duoEssentialDescription, [lang]: e.target.value } })}
-                  className={styles.input}
-                  disabled={disabled}
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label htmlFor={`pricingPreview-duoSignatureDescription-${lang}`}>Duo - Signature ({lang})</label>
-                <input id={`pricingPreview-duoSignatureDescription-${lang}`}
-                  type="text"
-                  value={content.pricingPreview.duoSignatureDescription[lang]}
-                  onChange={(e) => updatePricingPreview({ duoSignatureDescription: { ...content.pricingPreview.duoSignatureDescription, [lang]: e.target.value } })}
-                  className={styles.input}
-                  disabled={disabled}
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label htmlFor={`pricingPreview-duoPrestigeDescription-${lang}`}>Duo - Prestige ({lang})</label>
-                <input id={`pricingPreview-duoPrestigeDescription-${lang}`}
-                  type="text"
-                  value={content.pricingPreview.duoPrestigeDescription[lang]}
-                  onChange={(e) => updatePricingPreview({ duoPrestigeDescription: { ...content.pricingPreview.duoPrestigeDescription, [lang]: e.target.value } })}
-                  className={styles.input}
-                  disabled={disabled}
-                />
-              </div>
+
+
+
+
+
+
+
+
+
 
               <div className={styles.formGroup}>
                 <label htmlFor={`pricingPreview-customFormulaText-${lang}`}>Formule Sur-Mesure ({lang})</label>

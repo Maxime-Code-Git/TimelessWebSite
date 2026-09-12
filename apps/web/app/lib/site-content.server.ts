@@ -3,10 +3,21 @@ import path from "node:path";
 import crypto from "node:crypto";
 import defaultContent from "../content/default-site-content.json";
 
+export interface FormulaIncludedItem {
+  id: string;
+  text: LocalizedString;
+}
+
 export interface Formula {
   id: "essential" | "signature" | "prestige";
   priceCents: number;
   featured: boolean;
+  enabled: boolean;
+  name: LocalizedString;
+  summary: LocalizedString;
+  description: LocalizedString;
+  includedItems: FormulaIncludedItem[];
+  buttonText: LocalizedString;
 }
 
 export interface PricingCategory {
@@ -80,15 +91,6 @@ export interface HomeContent {
   };
   pricingPreview: {
     sectionTitle: LocalizedString;
-    photoEssentialDescription: LocalizedString;
-    photoSignatureDescription: LocalizedString;
-    photoPrestigeDescription: LocalizedString;
-    filmEssentialDescription: LocalizedString;
-    filmSignatureDescription: LocalizedString;
-    filmPrestigeDescription: LocalizedString;
-    duoEssentialDescription: LocalizedString;
-    duoSignatureDescription: LocalizedString;
-    duoPrestigeDescription: LocalizedString;
     promoText: LocalizedString;
     promoTextBold: LocalizedString;
     caveat: LocalizedString;
@@ -108,7 +110,7 @@ export interface HomeContent {
 }
 
 export interface SiteContent {
-  schemaVersion: 2;
+  schemaVersion: 3;
   revision: string;
   updatedAt: string;
   business: BusinessContent;
@@ -156,8 +158,22 @@ function assertExactKeys(obj: unknown, allowedKeys: string[], context: string) {
   }
 }
 
+function validateFormulaIncludedItem(data: unknown, context: string): FormulaIncludedItem {
+  assertExactKeys(data, ["id", "text"], context);
+  const obj = data as Record<string, unknown>;
+
+  if (typeof obj.id !== "string" || obj.id.trim() === "") {
+    throw new ValidationError(`Invalid id in ${context}`);
+  }
+
+  return {
+    id: obj.id,
+    text: validateLocalizedString(obj.text, `${context}.text`, 1000)
+  };
+}
+
 function validateFormula(data: unknown, expectedId: string, context: string): Formula {
-  assertExactKeys(data, ["id", "priceCents", "featured"], context);
+  assertExactKeys(data, ["id", "priceCents", "featured", "enabled", "name", "summary", "description", "includedItems", "buttonText"], context);
 
   const obj = data as Record<string, unknown>;
 
@@ -175,7 +191,26 @@ function validateFormula(data: unknown, expectedId: string, context: string): Fo
     throw new ValidationError(`Invalid featured boolean in ${context}`);
   }
 
-  return { id: expectedId as Formula["id"], priceCents, featured };
+  const enabled = obj.enabled;
+  if (typeof enabled !== "boolean") {
+    throw new ValidationError(`Invalid enabled boolean in ${context}`);
+  }
+
+  if (!Array.isArray(obj.includedItems)) {
+    throw new ValidationError(`includedItems must be an array in ${context}`);
+  }
+
+  return {
+    id: expectedId as Formula["id"],
+    priceCents,
+    featured,
+    enabled,
+    name: validateLocalizedString(obj.name, `${context}.name`, 255),
+    summary: validateLocalizedString(obj.summary, `${context}.summary`, 1000),
+    description: validateLocalizedString(obj.description, `${context}.description`, 5000),
+    includedItems: obj.includedItems.map((item, index) => validateFormulaIncludedItem(item, `${context}.includedItems[${index}]`)),
+    buttonText: validateLocalizedString(obj.buttonText, `${context}.buttonText`, 255)
+  };
 }
 
 function validateCategory(data: unknown, categoryName: string): Formula[] {
@@ -461,9 +496,6 @@ function validateHomeContent(data: unknown): HomeContent {
   // Validate pricingPreview
   assertExactKeys(obj.pricingPreview, [
     "sectionTitle",
-    "photoEssentialDescription", "photoSignatureDescription", "photoPrestigeDescription",
-    "filmEssentialDescription", "filmSignatureDescription", "filmPrestigeDescription",
-    "duoEssentialDescription", "duoSignatureDescription", "duoPrestigeDescription",
     "promoText", "promoTextBold", "caveat", "buttonText", "customFormulaText", "customFormulaTextEm"
   ], "home.pricingPreview");
   const pricingObj = obj.pricingPreview as Record<string, unknown>;
@@ -538,15 +570,6 @@ function validateHomeContent(data: unknown): HomeContent {
     },
     pricingPreview: {
       sectionTitle: validateLocalizedString(pricingObj.sectionTitle, "home.pricingPreview.sectionTitle", 255),
-      photoEssentialDescription: validateLocalizedString(pricingObj.photoEssentialDescription, "home.pricingPreview.photoEssentialDescription", 1000),
-      photoSignatureDescription: validateLocalizedString(pricingObj.photoSignatureDescription, "home.pricingPreview.photoSignatureDescription", 1000),
-      photoPrestigeDescription: validateLocalizedString(pricingObj.photoPrestigeDescription, "home.pricingPreview.photoPrestigeDescription", 1000),
-      filmEssentialDescription: validateLocalizedString(pricingObj.filmEssentialDescription, "home.pricingPreview.filmEssentialDescription", 1000),
-      filmSignatureDescription: validateLocalizedString(pricingObj.filmSignatureDescription, "home.pricingPreview.filmSignatureDescription", 1000),
-      filmPrestigeDescription: validateLocalizedString(pricingObj.filmPrestigeDescription, "home.pricingPreview.filmPrestigeDescription", 1000),
-      duoEssentialDescription: validateLocalizedString(pricingObj.duoEssentialDescription, "home.pricingPreview.duoEssentialDescription", 1000),
-      duoSignatureDescription: validateLocalizedString(pricingObj.duoSignatureDescription, "home.pricingPreview.duoSignatureDescription", 1000),
-      duoPrestigeDescription: validateLocalizedString(pricingObj.duoPrestigeDescription, "home.pricingPreview.duoPrestigeDescription", 1000),
       promoText: validateLocalizedString(pricingObj.promoText, "home.pricingPreview.promoText", 255),
       promoTextBold: validateLocalizedString(pricingObj.promoTextBold, "home.pricingPreview.promoTextBold", 255),
       caveat: validateLocalizedString(pricingObj.caveat, "home.pricingPreview.caveat", 255),
@@ -572,7 +595,7 @@ export function validateSiteContent(data: unknown): SiteContent {
   }
   const obj = data as Record<string, unknown>;
 
-  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2) {
+  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3) {
     throw new ValidationError("Unsupported schemaVersion");
   }
 
@@ -587,28 +610,13 @@ export function validateSiteContent(data: unknown): SiteContent {
   }
 
   const business = validateBusiness(obj.business);
-  const pricing = validatePricing(obj.pricing);
 
-  if (obj.schemaVersion === 1) {
-    // Migration en mémoire
-    return {
-      schemaVersion: 2,
-      revision: obj.revision,
-      updatedAt: updatedAtStr,
-      business,
-      pricing,
-      home: validateHomeContent(defaultContent.home),
-    };
-  }
-
-  // INTERMEDIATE V2 MIGRATION
   let objRef = obj;
-  const homeData = obj.home as Record<string, unknown>;
+  const homeData = obj.home !== undefined ? obj.home : defaultContent.home;
+  const migratedHomeData = homeData && typeof homeData === "object" ? { ...(homeData as Record<string, unknown>) } : {};
+  let needsHomeMigration = false;
 
   if (homeData && typeof homeData === "object") {
-    let needsMigration = false;
-    let migratedHomeData = { ...homeData };
-
     // Add missing fallback alts for older version
     if (migratedHomeData.hero && Array.isArray((migratedHomeData.hero as Record<string, unknown>).images)) {
       migratedHomeData.hero = {
@@ -620,7 +628,7 @@ export function validateSiteContent(data: unknown): SiteContent {
           return updated;
         })
       };
-      needsMigration = true;
+      needsHomeMigration = true;
     }
 
     if (migratedHomeData.portfolioCards) {
@@ -636,7 +644,7 @@ export function validateSiteContent(data: unknown): SiteContent {
         if ((cards.video as Record<string, unknown>).imageId === null && !(cards.video as Record<string, unknown>).variants) (cards.video as Record<string, unknown>).variants = [];
       }
       migratedHomeData.portfolioCards = { ...cards };
-      needsMigration = true;
+      needsHomeMigration = true;
     }
 
     if (migratedHomeData.studio) {
@@ -644,50 +652,98 @@ export function validateSiteContent(data: unknown): SiteContent {
       migratedHomeData.studio = { ...studio };
       if (!(migratedHomeData.studio as Record<string, unknown>).alt) {
         (migratedHomeData.studio as Record<string, unknown>).alt = { fr: "Image", en: "Image" };
-        needsMigration = true;
+        needsHomeMigration = true;
       }
       if ((migratedHomeData.studio as Record<string, unknown>).imageId === null && !(migratedHomeData.studio as Record<string, unknown>).variants) {
         (migratedHomeData.studio as Record<string, unknown>).variants = [];
-        needsMigration = true;
+        needsHomeMigration = true;
       }
-    }
-
-    if (migratedHomeData.pricingPreview) {
-      const preview = migratedHomeData.pricingPreview as Record<string, unknown>;
-      if ("essentialDescription" in preview && !("photoEssentialDescription" in preview)) {
-        const migratedPreview = { ...preview };
-
-        migratedPreview.photoEssentialDescription = migratedPreview.essentialDescription;
-        migratedPreview.photoSignatureDescription = migratedPreview.signatureDescription;
-        migratedPreview.photoPrestigeDescription = migratedPreview.prestigeDescription;
-
-        delete migratedPreview.essentialDescription;
-        delete migratedPreview.signatureDescription;
-        delete migratedPreview.prestigeDescription;
-
-        migratedPreview.filmEssentialDescription = migratedPreview.filmEssentialDescription || defaultContent.home.pricingPreview.filmEssentialDescription;
-        migratedPreview.filmSignatureDescription = migratedPreview.filmSignatureDescription || defaultContent.home.pricingPreview.filmSignatureDescription;
-        migratedPreview.filmPrestigeDescription = migratedPreview.filmPrestigeDescription || defaultContent.home.pricingPreview.filmPrestigeDescription;
-
-        migratedPreview.duoEssentialDescription = migratedPreview.duoEssentialDescription || defaultContent.home.pricingPreview.duoEssentialDescription;
-        migratedPreview.duoSignatureDescription = migratedPreview.duoSignatureDescription || defaultContent.home.pricingPreview.duoSignatureDescription;
-        migratedPreview.duoPrestigeDescription = migratedPreview.duoPrestigeDescription || defaultContent.home.pricingPreview.duoPrestigeDescription;
-
-        migratedHomeData = { ...migratedHomeData, pricingPreview: migratedPreview };
-        needsMigration = true;
-      }
-    }
-
-    if (needsMigration) {
-      objRef = { ...obj, home: migratedHomeData };
     }
   }
 
+  let rawPricing = obj.pricing as Record<string, unknown>;
+
+  if (obj.schemaVersion === 1 || obj.schemaVersion === 2) {
+    const pp = (migratedHomeData.pricingPreview || {}) as Record<string, unknown>;
+
+    // Resolve V1 -> V2 intermediate fields
+    if ("essentialDescription" in pp && !("photoEssentialDescription" in pp)) {
+      pp.photoEssentialDescription = pp.essentialDescription;
+      pp.photoSignatureDescription = pp.signatureDescription;
+      pp.photoPrestigeDescription = pp.prestigeDescription;
+      pp.filmEssentialDescription = pp.filmEssentialDescription || { fr: "Description", en: "Description" };
+      pp.filmSignatureDescription = pp.filmSignatureDescription || { fr: "Description", en: "Description" };
+      pp.filmPrestigeDescription = pp.filmPrestigeDescription || { fr: "Description", en: "Description" };
+      pp.duoEssentialDescription = pp.duoEssentialDescription || { fr: "Description", en: "Description" };
+      pp.duoSignatureDescription = pp.duoSignatureDescription || { fr: "Description", en: "Description" };
+      pp.duoPrestigeDescription = pp.duoPrestigeDescription || { fr: "Description", en: "Description" };
+    }
+
+    const getDesc = (key: string) => {
+      const val = pp[key] as { fr?: string, en?: string } | undefined;
+      return val ? { fr: val.fr || "Description", en: val.en || "Description" } : { fr: "Description", en: "Description" };
+    };
+
+
+    const migrateCategory = (catData: unknown, prefix: string): unknown[] => {
+      if (!Array.isArray(catData)) return [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return catData.map((f: any) => {
+        if (typeof f !== "object" || f === null) return f;
+        const id = typeof f.id === "string" ? f.id : "";
+        let descKey = "";
+        if (id === "essential") descKey = prefix + "EssentialDescription";
+        if (id === "signature") descKey = prefix + "SignatureDescription";
+        if (id === "prestige") descKey = prefix + "PrestigeDescription";
+
+        return {
+          ...f,
+          enabled: true,
+          name: { fr: "Formule", en: "Package" },
+          summary: getDesc(descKey),
+          description: { fr: "Description détaillée de la formule", en: "Detailed description of the package" },
+          includedItems: [],
+          buttonText: { fr: "Contact", en: "Contact" }
+        };
+      });
+    };
+
+    rawPricing = {
+      photo: migrateCategory(rawPricing.photo, "photo"),
+      film: migrateCategory(rawPricing.film, "film"),
+      duo: migrateCategory(rawPricing.duo, "duo")
+    };
+
+    // Cleanup V2 pricingPreview from home
+    const cleanedPp = { ...pp };
+    delete cleanedPp.essentialDescription;
+    delete cleanedPp.signatureDescription;
+    delete cleanedPp.prestigeDescription;
+    delete cleanedPp.photoEssentialDescription;
+    delete cleanedPp.photoSignatureDescription;
+    delete cleanedPp.photoPrestigeDescription;
+    delete cleanedPp.filmEssentialDescription;
+    delete cleanedPp.filmSignatureDescription;
+    delete cleanedPp.filmPrestigeDescription;
+    delete cleanedPp.duoEssentialDescription;
+    delete cleanedPp.duoSignatureDescription;
+    delete cleanedPp.duoPrestigeDescription;
+
+    migratedHomeData.pricingPreview = cleanedPp;
+    needsHomeMigration = true;
+  }
+
+  if (needsHomeMigration) {
+    objRef = { ...obj, home: migratedHomeData };
+  }
+
   assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home"], "root");
+
+  const pricing = validatePricing(rawPricing);
   const home = validateHomeContent(objRef.home);
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     revision: obj.revision,
     updatedAt: updatedAtStr,
     business,

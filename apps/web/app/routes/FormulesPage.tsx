@@ -16,7 +16,6 @@ interface FormulesPageProps {
 export function FormulesPage({ lang }: FormulesPageProps) {
   const i18n = getStrings(lang);
   const t = i18n.formules;
-  const fFeat = i18n.formuleFeatures;
   const [selectedCat, setSelectedCat] = useState<FormulaCategory>("duo");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
@@ -29,8 +28,7 @@ export function FormulesPage({ lang }: FormulesPageProps) {
   const categories: FormulaCategory[] = ["photo", "film", "duo"];
 
   // Fallback to empty array if not found
-  const currentPricing = siteContent?.pricing[selectedCat] || [];
-  const currentFeatures = fFeat[selectedCat];
+  const currentPricing = (siteContent?.pricing[selectedCat] || []).filter(f => f.enabled);
 
   return (
     <>
@@ -63,8 +61,7 @@ export function FormulesPage({ lang }: FormulesPageProps) {
           </div>
 
           <div className={styles.cards}>
-            {currentPricing.map((tier, index) => {
-              const features = currentFeatures[index] || [];
+            {currentPricing.map((tier) => {
               return (
                 <div
                   key={tier.id}
@@ -83,13 +80,18 @@ export function FormulesPage({ lang }: FormulesPageProps) {
                   </div>
                   <div className={styles.cardDivider} />
                   <ul className={styles.featuresList}>
-                    {features.map((feat, i) => (
+                    {tier.includedItems.map((item, i) => (
                       <li key={i} className={styles.featureItem}>
                         <span className={styles.featureDash}>—</span>
-                        <span>{feat}</span>
+                        <span>{item.text[lang]}</span>
                       </li>
                     ))}
                   </ul>
+                  <div style={{marginTop: '1.5rem'}}>
+                    <Link to={`${contactHref}?formula=${selectedCat}-${tier.id}`} className="btn btn--primary" style={{width: '100%', display: 'block', textAlign: 'center'}}>
+                      {tier.buttonText[lang]}
+                    </Link>
+                  </div>
                 </div>
               );
             })}

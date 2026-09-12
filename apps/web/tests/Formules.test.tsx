@@ -2,13 +2,22 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import FormulesFr from "../app/routes/fr.formules";
-import defaultContent from "../app/content/default-site-content.json";
+
+
+const { mockedContent } = vi.hoisted(() => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const defContent = require("../app/content/default-site-content.json");
+  const content = JSON.parse(JSON.stringify(defContent));
+  content.pricing.duo[0].includedItems = [{ id: "1", text: { fr: "200 photos + film court", en: "200 photos + short film" } }];
+  content.pricing.photo[0].includedItems = [{ id: "2", text: { fr: "200 photos livrées", en: "200 photos delivered" } }];
+  return { mockedContent: content };
+});
 
 vi.mock("react-router", async (importOriginal) => {
   const mod = await importOriginal<typeof import("react-router")>();
   return {
     ...mod,
-    useRouteLoaderData: () => ({ siteContent: defaultContent })
+    useRouteLoaderData: () => ({ siteContent: mockedContent })
   };
 });
 

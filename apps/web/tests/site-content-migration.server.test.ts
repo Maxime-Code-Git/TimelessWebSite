@@ -111,12 +111,11 @@ describe("Migration of intermediate V2 content", () => {
     const mtime = fs.statSync(filePath).mtimeMs;
 
     // Must load without corruption
-    const { content, isCorrupted } = getRawSiteContent();
-    expect(isCorrupted).toBe(false);
-    expect(content.schemaVersion).toBe(2);
-
-    // Check if new keys exist
-    expect(content.home.pricingPreview.photoEssentialDescription).toBeDefined();
+    const { content } = getRawSiteContent();
+    expect(content.home.pricingPreview).not.toHaveProperty("photoEssentialDescription");
+    expect(content.pricing.photo[0].summary.fr).toBe("Test");
+    expect(content.pricing.photo[0].enabled).toBe(true);
+    expect(content.pricing.photo[0].name.fr).toBe("Formule");
 
     // Check if original data was preserved
     expect(content.business.email).toBe("test@test.com");

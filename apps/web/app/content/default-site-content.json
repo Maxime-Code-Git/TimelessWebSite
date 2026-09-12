@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "revision": "00000000000000000000000000000000",
   "updatedAt": "1970-01-01T00:00:00.000Z",
   "business": {
@@ -22,19 +22,109 @@
   },
   "pricing": {
     "photo": [
-      { "id": "essential", "priceCents": 129000, "featured": false },
-      { "id": "signature", "priceCents": 179000, "featured": true },
-      { "id": "prestige", "priceCents": 239000, "featured": false }
+      {
+        "id": "essential",
+        "priceCents": 129000,
+        "featured": false,
+        "enabled": true,
+        "name": { "fr": "Formule", "en": "Package" },
+        "summary": { "fr": "Les moments clés, en images.", "en": "Key moments, in images." },
+        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
+        "includedItems": [],
+        "buttonText": { "fr": "Contact", "en": "Contact" }
+      },
+      {
+        "id": "signature",
+        "priceCents": 179000,
+        "featured": true,
+        "enabled": true,
+        "name": { "fr": "Formule", "en": "Package" },
+        "summary": { "fr": "Couverture photo complète du jour.", "en": "Complete photo coverage of the day." },
+        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
+        "includedItems": [],
+        "buttonText": { "fr": "Contact", "en": "Contact" }
+      },
+      {
+        "id": "prestige",
+        "priceCents": 239000,
+        "featured": false,
+        "enabled": true,
+        "name": { "fr": "Formule", "en": "Package" },
+        "summary": { "fr": "Reportage intégral + album d'art.", "en": "Full reportage + fine-art album." },
+        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
+        "includedItems": [],
+        "buttonText": { "fr": "Contact", "en": "Contact" }
+      }
     ],
     "film": [
-      { "id": "essential", "priceCents": 149000, "featured": false },
-      { "id": "signature", "priceCents": 219000, "featured": true },
-      { "id": "prestige", "priceCents": 299000, "featured": false }
+      {
+        "id": "essential",
+        "priceCents": 149000,
+        "featured": false,
+        "enabled": true,
+        "name": { "fr": "Formule", "en": "Package" },
+        "summary": { "fr": "Un film court, l'émotion condensée.", "en": "A short film, condensed emotion." },
+        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
+        "includedItems": [],
+        "buttonText": { "fr": "Contact", "en": "Contact" }
+      },
+      {
+        "id": "signature",
+        "priceCents": 219000,
+        "featured": true,
+        "enabled": true,
+        "name": { "fr": "Formule", "en": "Package" },
+        "summary": { "fr": "Le film complet de votre journée.", "en": "The complete film of your day." },
+        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
+        "includedItems": [],
+        "buttonText": { "fr": "Contact", "en": "Contact" }
+      },
+      {
+        "id": "prestige",
+        "priceCents": 299000,
+        "featured": false,
+        "enabled": true,
+        "name": { "fr": "Formule", "en": "Package" },
+        "summary": { "fr": "Long métrage + teaser + rushes.", "en": "Feature film + teaser + raw footage." },
+        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
+        "includedItems": [],
+        "buttonText": { "fr": "Contact", "en": "Contact" }
+      }
     ],
     "duo": [
-      { "id": "essential", "priceCents": 249000, "featured": false },
-      { "id": "signature", "priceCents": 349000, "featured": true },
-      { "id": "prestige", "priceCents": 469000, "featured": false }
+      {
+        "id": "essential",
+        "priceCents": 249000,
+        "featured": false,
+        "enabled": true,
+        "name": { "fr": "Formule", "en": "Package" },
+        "summary": { "fr": "Photo et film, l'essentiel réuni.", "en": "Photo & film, the essentials combined." },
+        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
+        "includedItems": [],
+        "buttonText": { "fr": "Contact", "en": "Contact" }
+      },
+      {
+        "id": "signature",
+        "priceCents": 349000,
+        "featured": true,
+        "enabled": true,
+        "name": { "fr": "Formule", "en": "Package" },
+        "summary": { "fr": "Photo + film, couverture complète.", "en": "Photo + film, complete coverage." },
+        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
+        "includedItems": [],
+        "buttonText": { "fr": "Contact", "en": "Contact" }
+      },
+      {
+        "id": "prestige",
+        "priceCents": 469000,
+        "featured": false,
+        "enabled": true,
+        "name": { "fr": "Formule", "en": "Package" },
+        "summary": { "fr": "L'expérience intégrale, sans compromis.", "en": "The ultimate experience without compromise." },
+        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
+        "includedItems": [],
+        "buttonText": { "fr": "Contact", "en": "Contact" }
+      }
     ]
   },
   "home": {
@@ -87,42 +177,6 @@
       "sectionTitle": {
         "fr": "Des formules adaptées à vos envies",
         "en": "Packages tailored to your desires"
-      },
-      "photoEssentialDescription": {
-        "fr": "Les moments clés, en images.",
-        "en": "Key moments, in images."
-      },
-      "photoSignatureDescription": {
-        "fr": "Couverture photo complète du jour.",
-        "en": "Complete photo coverage of the day."
-      },
-      "photoPrestigeDescription": {
-        "fr": "Reportage intégral + album d'art.",
-        "en": "Full reportage + fine-art album."
-      },
-      "filmEssentialDescription": {
-        "fr": "Un film court, l'émotion condensée.",
-        "en": "A short film, condensed emotion."
-      },
-      "filmSignatureDescription": {
-        "fr": "Le film complet de votre journée.",
-        "en": "The complete film of your day."
-      },
-      "filmPrestigeDescription": {
-        "fr": "Long métrage + teaser + rushes.",
-        "en": "Feature film + teaser + raw footage."
-      },
-      "duoEssentialDescription": {
-        "fr": "Photo et film, l'essentiel réuni.",
-        "en": "Photo & film, the essentials combined."
-      },
-      "duoSignatureDescription": {
-        "fr": "Photo + film, couverture complète.",
-        "en": "Photo + film, complete coverage."
-      },
-      "duoPrestigeDescription": {
-        "fr": "L'expérience intégrale, sans compromis.",
-        "en": "The ultimate experience without compromise."
       },
       "promoText": {
         "fr": "Bénéficiez de ",

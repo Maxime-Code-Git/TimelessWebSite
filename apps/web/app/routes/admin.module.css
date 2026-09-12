@@ -669,3 +669,125 @@
   pointer-events: none;
   opacity: 0.5;
 }
+
+/* Editor additions */
+.tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.5rem;
+}
+.tabButton {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--color-text-light);
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+}
+.tabButton:hover {
+  background: var(--color-bg-hover);
+}
+.tabButtonActive {
+  color: var(--color-primary);
+  background: var(--color-bg-hover);
+}
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+.formulaEditorCard {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  background: var(--color-bg-alt);
+}
+.formulaEditorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.formulaIdTitle {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin: 0;
+}
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.formulaEditorGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.formGroup label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-light);
+}
+.input, .textarea {
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: inherit;
+  width: 100%;
+}
+.textarea {
+  resize: vertical;
+}
+.itemsSection {
+  margin-top: 1.5rem;
+  border-top: 1px dashed var(--color-border);
+  padding-top: 1rem;
+}
+.itemsSection h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+.itemRow {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.deleteBtn {
+  background: #ff4d4f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0 0.5rem;
+  cursor: pointer;
+  font-weight: bold;
+}
+.deleteBtn:hover {
+  background: #ff7875;
+}
+.addBtn {
+  margin-top: 0.5rem;
+  background: none;
+  border: 1px dashed var(--color-primary);
+  color: var(--color-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+}
+.addBtn:hover {
+  background: var(--color-bg-hover);
+}

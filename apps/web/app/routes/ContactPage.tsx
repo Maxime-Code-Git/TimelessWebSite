@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useFetcher, useRouteLoaderData, Link } from "react-router";
+import { useFetcher, useRouteLoaderData, Link, useSearchParams } from "react-router";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
@@ -17,6 +17,8 @@ export function ContactPage({ lang }: ContactPageProps) {
   const alternateLangHref = lang === "fr" ? "/en/contact" : "/fr/contact";
   const rootData = useRouteLoaderData<typeof rootLoader>("root");
   const BUSINESS = rootData?.siteContent?.business;
+  const [searchParams] = useSearchParams();
+  const initialFormula = searchParams.get("formula") || "";
 
   const fetcher = useFetcher();
   const isSubmitting = fetcher.state === "submitting";
@@ -140,11 +142,17 @@ export function ContactPage({ lang }: ContactPageProps) {
             
             <div className={styles.formGroup}>
               <label htmlFor="formula" className={styles.label}>{t.formLabels.formula}</label>
-              <select id="formula" name="formula" required className={styles.select} defaultValue="">
+              <select id="formula" name="formula" required className={styles.select} defaultValue={initialFormula}>
                 <option value="" disabled>{t.formPlaceholders.formulaDefault}</option>
-                <option value="photo">{lang === "fr" ? "Photographie" : "Photography"}</option>
-                <option value="film">Film</option>
-                <option value="duo">Duo (Photo + Film)</option>
+                {rootData?.siteContent?.pricing && Object.entries(rootData.siteContent.pricing).map(([cat, formulas]) => (
+                  <optgroup key={cat} label={cat === 'photo' ? (lang === 'fr' ? 'Photographie' : 'Photography') : cat === 'film' ? 'Film' : 'Duo (Photo + Film)'}>
+                    {formulas.map(f => f.enabled && (
+                      <option key={`${cat}-${f.id}`} value={`${cat}-${f.id}`}>
+                        {f.name[lang]}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
                 <option value="custom">{t.formPlaceholders.formulaSurMesure}</option>
                 <option value="unknown">{t.formPlaceholders.formulaDontKnow}</option>
               </select>
