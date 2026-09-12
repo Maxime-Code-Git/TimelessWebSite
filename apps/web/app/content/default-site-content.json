@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "revision": "00000000000000000000000000000000",
   "updatedAt": "1970-01-01T00:00:00.000Z",
   "business": {
@@ -36,5 +36,131 @@
       { "id": "signature", "priceCents": 349000, "featured": true },
       { "id": "prestige", "priceCents": 469000, "featured": false }
     ]
+  },
+  "home": {
+    "hero": {
+      "smallTitle": {
+        "fr": "Sempra Studio",
+        "en": "Sempra Studio"
+      },
+      "largeTitle": {
+        "fr": "Arrêter le temps",
+        "en": "Stop time"
+      },
+      "subtitle": {
+        "fr": "Immortalisez votre histoire d'amour",
+        "en": "Immortalize your love story"
+      },
+      "images": [
+        { "imageId": null, "variants": [], "alt": { "fr": "Image hero 1", "en": "Hero image 1" }, "width": 960, "height": 1440 },
+        { "imageId": null, "variants": [], "alt": { "fr": "Image hero 2", "en": "Hero image 2" }, "width": 960, "height": 1440 },
+        { "imageId": null, "variants": [], "alt": { "fr": "Image hero 3", "en": "Hero image 3" }, "width": 960, "height": 1440 }
+      ]
+    },
+    "editorial": {
+      "paragraph": {
+        "fr": "Au-delà des tendances, nous capturons l'essence de vos instants précieux. Notre approche allie discrétion, élégance et authenticité pour créer",
+        "en": "Beyond trends, we capture the essence of your precious moments. Our approach combines discretion, elegance, and authenticity to create"
+      },
+      "highlight": {
+        "fr": "un héritage visuel intemporel",
+        "en": "a timeless visual legacy"
+      }
+    },
+    "portfolioCards": {
+      "photo": {
+        "imageId": null,
+        "variants": [],
+        "alt": { "fr": "Photographie", "en": "Photography" },
+        "title": { "fr": "Photographie", "en": "Photography" },
+        "subtitle": { "fr": "Lumière naturelle & moments volés", "en": "Natural light & candid moments" }
+      },
+      "video": {
+        "imageId": null,
+        "variants": [],
+        "alt": { "fr": "Film de mariage", "en": "Wedding Film" },
+        "title": { "fr": "Film de mariage", "en": "Wedding Film" },
+        "subtitle": { "fr": "Émotions en mouvement", "en": "Emotions in motion" }
+      }
+    },
+    "pricingPreview": {
+      "sectionTitle": {
+        "fr": "Des formules adaptées à vos envies",
+        "en": "Packages tailored to your desires"
+      },
+      "photoEssentialDescription": {
+        "fr": "Les moments clés, en images.",
+        "en": "Key moments, in images."
+      },
+      "photoSignatureDescription": {
+        "fr": "Couverture photo complète du jour.",
+        "en": "Complete photo coverage of the day."
+      },
+      "photoPrestigeDescription": {
+        "fr": "Reportage intégral + album d'art.",
+        "en": "Full reportage + fine-art album."
+      },
+      "filmEssentialDescription": {
+        "fr": "Un film court, l'émotion condensée.",
+        "en": "A short film, condensed emotion."
+      },
+      "filmSignatureDescription": {
+        "fr": "Le film complet de votre journée.",
+        "en": "The complete film of your day."
+      },
+      "filmPrestigeDescription": {
+        "fr": "Long métrage + teaser + rushes.",
+        "en": "Feature film + teaser + raw footage."
+      },
+      "duoEssentialDescription": {
+        "fr": "Photo et film, l'essentiel réuni.",
+        "en": "Photo & film, the essentials combined."
+      },
+      "duoSignatureDescription": {
+        "fr": "Photo + film, couverture complète.",
+        "en": "Photo + film, complete coverage."
+      },
+      "duoPrestigeDescription": {
+        "fr": "L'expérience intégrale, sans compromis.",
+        "en": "The ultimate experience without compromise."
+      },
+      "promoText": {
+        "fr": "Bénéficiez de ",
+        "en": "Enjoy a "
+      },
+      "promoTextBold": {
+        "fr": "10% de réduction",
+        "en": "10% discount"
+      },
+      "caveat": {
+        "fr": "pour toute réservation Duo (Photo + Film).",
+        "en": "for any Duo booking (Photo + Film)."
+      },
+      "buttonText": {
+        "fr": "Voir toutes les formules",
+        "en": "See all packages"
+      },
+      "customFormulaText": {
+        "fr": "Vous avez un projet atypique ?",
+        "en": "Do you have a unique project?"
+      },
+      "customFormulaTextEm": {
+        "fr": "Créons une formule sur-mesure.",
+        "en": "Let's create a custom package."
+      }
+    },
+    "studio": {
+      "imageId": null,
+      "variants": [],
+      "alt": { "fr": "Sempra Studio", "en": "Sempra Studio" },
+      "title": {
+        "fr": "Sempra",
+        "en": "Sempra"
+      },
+      "description": {
+        "fr": "L & M",
+        "en": "L & M"
+      }
+    }
   }
 }

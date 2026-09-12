@@ -8,6 +8,7 @@ import { formatPrice } from "~/lib/pricing";
 import type { FormulaCategory } from "~/lib/pricing";
 import styles from "./home.module.css";
 import type { loader as rootLoader } from "../root";
+import type { HomeContent, HomeImageMetadata } from "../lib/site-content.server";
 
 interface HomePageProps {
   lang: Lang;
@@ -19,6 +20,7 @@ export function HomePage({ lang }: HomePageProps) {
 
   const rootData = useRouteLoaderData<typeof rootLoader>("root");
   const siteContent = rootData?.siteContent;
+  const homeContent = siteContent?.home as HomeContent | undefined;
 
   // Determine alternate language link
   const alternateLangHref = lang === "fr" ? "/en/" : "/fr/";
@@ -28,9 +30,9 @@ export function HomePage({ lang }: HomePageProps) {
   };
 
   const categories: FormulaCategory[] = ["photo", "film", "duo"];
-
-  // Fallback if root loader data is somehow missing
   const currentPricing = siteContent?.pricing[selectedCat] || [];
+
+  if (!homeContent) return null; // Wait for loader
 
   return (
     <>
@@ -40,22 +42,31 @@ export function HomePage({ lang }: HomePageProps) {
       <main id="main-content">
       {/* 2. Hero */}
       <section className={styles.hero}>
+        <div className={styles.heroImagesWrapper}>
+          {homeContent.hero.images.map((img, i) => (
+             <HomeMediaPicture
+               key={i}
+               section="hero"
+               image={img}
+               lang={lang}
+               fetchPriority={i === 0 ? "high" : "auto"}
+               className={styles.heroImage}
+               sizes="33vw"
+             />
+          ))}
+        </div>
         <div className={styles.heroOverlay} />
         <div className={styles.heroContent}>
-          <p className={styles.heroEyebrow}>{t.heroEyebrow}</p>
+          <p className={styles.heroEyebrow}>{homeContent.hero.smallTitle[lang]}</p>
           <h1 className={styles.heroTitle}>
-            {t.heroTitle.split("\n").map((line, i) => (
+            {homeContent.hero.largeTitle[lang].split("\n").map((line, i) => (
               <span key={i}>
                 {line}
                 {i === 0 && <br />}
               </span>
             ))}
           </h1>
-          <p className={styles.heroSubtitle}>{t.heroSubtitle}</p>
-          <button className={styles.filmBtn}>
-            <span className={styles.filmBtnIcon}>►</span>
-            {t.heroFilmBtn}
-          </button>
+          <p className={styles.heroSubtitle}>{homeContent.hero.subtitle[lang]}</p>
         </div>
       </section>
 
@@ -64,11 +75,8 @@ export function HomePage({ lang }: HomePageProps) {
         <div className={styles.editorialInner}>
           <div className={styles.editorialDivider} />
           <p className={styles.editorialText}>
-            {t.editorialText}{" "}
-            <em className={styles.editorialEm}>{t.editorialEmphasis}</em> —{" "}
-            {lang === "fr"
-              ? "un film et des images qui, dans trente ans, vous feront ressentir exactement ce que vous vivez aujourd'hui."
-              : "a film and images that, in thirty years, will make you feel exactly what you are living today."}
+            {homeContent.editorial.paragraph[lang]}{" "}
+            <em className={styles.editorialEm}>{homeContent.editorial.highlight[lang]}</em>
           </p>
         </div>
       </section>
@@ -82,18 +90,38 @@ export function HomePage({ lang }: HomePageProps) {
               to={lang === "fr" ? "/fr/portfolio" : "/en/portfolio"}
               className={`${styles.portfolioCard} ${styles.portfolioCardPhoto}`}
             >
-              <div>
-                <h3 className={styles.portfolioCardTitle}>{t.portfolioPhoto}</h3>
-                <small className={styles.portfolioCardSub}>{t.portfolioPhotoSub}</small>
+              <div className={styles.portfolioCardBg}>
+                <HomeMediaPicture
+                  section="portfolio-photo"
+                  image={{ ...homeContent.portfolioCards.photo, alt: { fr: "", en: "" } }}
+                  lang={lang}
+                  className={styles.heroImage}
+                  sizes="(max-width: 720px) 100vw, 50vw"
+                />
+              </div>
+              <div className={styles.portfolioCardOverlay} />
+              <div className={styles.portfolioCardContent}>
+                <h3 className={styles.portfolioCardTitle}>{homeContent.portfolioCards.photo.title[lang]}</h3>
+                <small className={styles.portfolioCardSub}>{homeContent.portfolioCards.photo.subtitle[lang]}</small>
               </div>
             </Link>
             <Link
               to={lang === "fr" ? "/fr/portfolio" : "/en/portfolio"}
               className={`${styles.portfolioCard} ${styles.portfolioCardFilm}`}
             >
-              <div>
-                <h3 className={styles.portfolioCardTitle}>{t.portfolioFilm}</h3>
-                <small className={styles.portfolioCardSub}>{t.portfolioFilmSub}</small>
+              <div className={styles.portfolioCardBg}>
+                <HomeMediaPicture
+                  section="portfolio-video"
+                  image={{ ...homeContent.portfolioCards.video, alt: { fr: "", en: "" } }}
+                  lang={lang}
+                  className={styles.heroImage}
+                  sizes="(max-width: 720px) 100vw, 50vw"
+                />
+              </div>
+              <div className={styles.portfolioCardOverlay} />
+              <div className={styles.portfolioCardContent}>
+                <h3 className={styles.portfolioCardTitle}>{homeContent.portfolioCards.video.title[lang]}</h3>
+                <small className={styles.portfolioCardSub}>{homeContent.portfolioCards.video.subtitle[lang]}</small>
               </div>
             </Link>
           </div>
@@ -103,7 +131,7 @@ export function HomePage({ lang }: HomePageProps) {
       {/* 5. Formules preview */}
       <section className={styles.formulesSection}>
         <div className={styles.formulesInner}>
-          <p className={styles.formulesTitle}>{t.formulesTitle}</p>
+          <p className={styles.formulesTitle}>{homeContent.pricingPreview.sectionTitle[lang]}</p>
 
           <div className={styles.formuleTabs}>
             {categories.map((cat) => (
@@ -135,30 +163,30 @@ export function HomePage({ lang }: HomePageProps) {
                   {formatPrice(tier.priceCents, lang)}
                 </div>
                 <div className={styles.formuleNote}>
-                  {getFormulaNote(selectedCat, tier.id, lang)}
+                  {getFormulaNoteConfigured(homeContent.pricingPreview, selectedCat, tier.id, lang)}
                 </div>
               </div>
             ))}
           </div>
 
           <p className={styles.formulesPromo}>
-            {t.formulesPromo}
-            <b className={styles.formulesPromoHighlight}>{t.formulesPromoBold}</b>
+            {homeContent.pricingPreview.promoText[lang]}
+            <b className={styles.formulesPromoHighlight}>{homeContent.pricingPreview.promoTextBold[lang]}</b>
           </p>
-          <p className={styles.formulesCaveat}>{t.formulesCaveat}</p>
+          <p className={styles.formulesCaveat}>{homeContent.pricingPreview.caveat[lang]}</p>
 
           <div className={styles.formulesContactWrap}>
             <Link
               to={lang === "fr" ? "/fr/contact" : "/en/contact"}
               className="btn btn--outline"
             >
-              {t.formulesContact}
+              {homeContent.pricingPreview.buttonText[lang]}
             </Link>
           </div>
 
           <p className={styles.formulesCustom}>
-            {t.formulesCustom}{" "}
-            <em className={styles.formulesCustomEm}>{t.formulesCustomEm}</em>
+            {homeContent.pricingPreview.customFormulaText[lang]}{" "}
+            <em className={styles.formulesCustomEm}>{homeContent.pricingPreview.customFormulaTextEm[lang]}</em>
           </p>
         </div>
       </section>
@@ -167,10 +195,18 @@ export function HomePage({ lang }: HomePageProps) {
       <section className={styles.studioSection}>
         <div className={styles.studioInner}>
           <div className={styles.studioGrid}>
-            <div className={styles.studioImagePlaceholder} />
+            <div className={`${styles.studioImagePlaceholder} ${styles.studioImageWrapper}`}>
+              <HomeMediaPicture
+                section="studio"
+                image={{ ...homeContent.studio, alt: homeContent.studio.title }}
+                lang={lang}
+                className={styles.heroImage}
+                sizes="(max-width: 720px) 100vw, 50vw"
+              />
+            </div>
             <div className={styles.studioTitle}>
-              {t.studioTitle}
-              <small className={styles.studioText}>{t.studioText}</small>
+              {homeContent.studio.title[lang]}
+              <small className={`${styles.studioText} ${styles.studioTextFormatted}`}>{homeContent.studio.description[lang]}</small>
             </div>
           </div>
         </div>
@@ -183,41 +219,43 @@ export function HomePage({ lang }: HomePageProps) {
   );
 }
 
-// Helper pour les notes (taglines) des cartes sur l'accueil
-function getFormulaNote(cat: string, tierId: string, lang: Lang): string {
-  if (lang === "fr") {
-    if (cat === "photo") {
-      if (tierId === "essential") return "Les moments clés,\nen images.";
-      if (tierId === "signature") return "Couverture photo\ncomplète du jour.";
-      if (tierId === "prestige") return "Reportage intégral\n+ album d'art.";
-    }
-    if (cat === "film") {
-      if (tierId === "essential") return "Un film court,\nl'émotion condensée.";
-      if (tierId === "signature") return "Le film complet\nde votre journée.";
-      if (tierId === "prestige") return "Long métrage\n+ teaser + rushes.";
-    }
-    if (cat === "duo") {
-      if (tierId === "essential") return "Photo et film,\nl'essentiel réuni.";
-      if (tierId === "signature") return "Photo + film,\ncouverture complète.";
-      if (tierId === "prestige") return "L'expérience intégrale,\nsans compromis.";
-    }
-  } else {
-    // English
-    if (cat === "photo") {
-      if (tierId === "essential") return "Key moments,\nin images.";
-      if (tierId === "signature") return "Complete photo coverage\nof the day.";
-      if (tierId === "prestige") return "Full reportage\n+ fine-art album.";
-    }
-    if (cat === "film") {
-      if (tierId === "essential") return "A short film,\ncondensed emotion.";
-      if (tierId === "signature") return "The complete film\nof your day.";
-      if (tierId === "prestige") return "Feature film\n+ teaser + raw footage.";
-    }
-    if (cat === "duo") {
-      if (tierId === "essential") return "Photo & film,\nthe essentials combined.";
-      if (tierId === "signature") return "Photo + film,\ncomplete coverage.";
-      if (tierId === "prestige") return "The ultimate experience,\nwithout compromise.";
-    }
+function HomeMediaPicture({ section, image, fetchPriority, className, sizes, lang }: { section: string, image: HomeImageMetadata, fetchPriority?: "high" | "auto" | "low", className?: string, sizes: string, lang: Lang }) {
+  if (!image || !image.imageId || !image.variants || image.variants.length === 0) return null;
+  const avifSrcSet = image.variants.map(v => `/media/home/${section}/${image.imageId}/${v.name}/avif ${v.width}w`).join(', ');
+  const webpSrcSet = image.variants.map(v => `/media/home/${section}/${image.imageId}/${v.name}/webp ${v.width}w`).join(', ');
+  const fallbackVariant = image.variants.find(v => v.name === "960p") || image.variants[0];
+
+  return (
+    <picture>
+      <source type="image/avif" srcSet={avifSrcSet} sizes={sizes} />
+      <source type="image/webp" srcSet={webpSrcSet} sizes={sizes} />
+      <img
+        src={`/media/home/${section}/${image.imageId}/${fallbackVariant.name}/webp`}
+        alt={image.alt[lang] || ""}
+        width={image.width || 960}
+        height={image.height || 1440}
+        loading={fetchPriority === "high" ? "eager" : "lazy"}
+        fetchPriority={fetchPriority}
+        className={className}
+      />
+    </picture>
+  );
+}
+
+// Helper pour les notes (taglines) des cartes sur l'accueil basé sur le nouveau schéma
+function getFormulaNoteConfigured(pricingPreview: HomeContent["pricingPreview"], cat: string, tierId: string, lang: Lang): string {
+  if (cat === "photo") {
+    if (tierId === "essential") return pricingPreview.photoEssentialDescription[lang];
+    if (tierId === "signature") return pricingPreview.photoSignatureDescription[lang];
+    if (tierId === "prestige") return pricingPreview.photoPrestigeDescription[lang];
+  } else if (cat === "film") {
+    if (tierId === "essential") return pricingPreview.filmEssentialDescription[lang];
+    if (tierId === "signature") return pricingPreview.filmSignatureDescription[lang];
+    if (tierId === "prestige") return pricingPreview.filmPrestigeDescription[lang];
+  } else if (cat === "duo") {
+    if (tierId === "essential") return pricingPreview.duoEssentialDescription[lang];
+    if (tierId === "signature") return pricingPreview.duoSignatureDescription[lang];
+    if (tierId === "prestige") return pricingPreview.duoPrestigeDescription[lang];
   }
   return "";
 }

@@ -10,7 +10,9 @@ export default [
   route("sitemap.xml", "routes/sitemap[.xml].tsx"),
   route("maintenance", "routes/maintenance.tsx"),
   route("api/booking", "routes/api.booking.ts"),
+  route("api/admin/home-image", "routes/api.admin.home-image.ts"),
   route("portfolio/media/:photoId/:variant", "routes/portfolio.media.$photoId.$variant.tsx"),
+  route("media/home/:section/:imageId/:variant/:ext", "routes/media.home.$section.$imageId.$variant.$ext.tsx"),
 
   // ── French routes ─────────────────────────────────────────
   ...prefix("fr", [
@@ -56,6 +58,7 @@ export default [
   route("admin/portfolio/watermark", "routes/admin.portfolio.watermark.tsx"),
   route("admin/portfolio/upload", "routes/admin.portfolio.upload.tsx"),
   route("admin/portfolio/media/:photoId/:variant", "routes/admin.portfolio.media.$photoId.$variant.tsx"),
+  route("admin/home", "routes/admin.home.tsx"),
 
   // ── Catch-all (404) ───────────────────────────────────────
   route("*", "routes/404.tsx"),

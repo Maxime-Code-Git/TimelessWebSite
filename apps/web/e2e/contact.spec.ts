@@ -92,10 +92,7 @@ test.describe('Contact Form (Phase 3 Backend)', () => {
     await page.click('button[type="submit"]');
 
     // Check if there is an error displayed
-    const errorAlert = page.locator('[role="alert"]').last();
-    if (await errorAlert.isVisible()) {
-      console.error("Test failed because of form error:", await errorAlert.textContent());
-    }
+    page.locator('[role="alert"]').last();
 
     // Expect success message and form cleared
     await expect(page.getByRole('status')).toContainText('Votre message a bien été envoyé');

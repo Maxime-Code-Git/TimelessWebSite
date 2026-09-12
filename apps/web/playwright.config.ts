@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 if (!process.env.SITE_CONTENT_PATH || !process.env.RATE_LIMIT_DB_PATH || !process.env.PORTFOLIO_CONTENT_PATH || !process.env.PORTFOLIO_MEDIA_PATH || !process.env.BOOKING_DB_PATH) {
   throw new Error("Required env vars must be defined in the environment. Run with npm run test:e2e");
@@ -78,7 +83,7 @@ export default defineConfig({
       SMTP_FROM: 'test@example.com',
       SMTP_TO: 'test@example.com',
       SMTP_HOST: 'localhost',
-      SMTP_CA_CERT: fs.readFileSync('./e2e/certs/test-cert.pem', 'utf-8'),
+      SMTP_CA_CERT: fs.readFileSync(path.join(__dirname, 'e2e/certs/test-cert.pem'), 'utf-8'),
       CONTACT_RATE_LIMIT_SECRET: 'testsecret',
       CONTACT_RATE_LIMIT_MAX: '100',
       RATE_LIMIT_DB_PATH: process.env.RATE_LIMIT_DB_PATH,

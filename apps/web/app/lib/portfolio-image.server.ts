@@ -155,7 +155,7 @@ export async function renderTextWatermark(options: WatermarkRenderOptions): Prom
   return Buffer.from(svgText);
 }
 
-function validateConfinement(filePath: string, allowedDir: string): void {
+export function validateConfinement(filePath: string, allowedDir: string): void {
   const resolvedAllowed = path.resolve(allowedDir);
   const resolvedFile = path.resolve(filePath);
 
@@ -265,7 +265,7 @@ export async function validateImageFile(
   }
 }
 
-function ensureStrictDirectory(dirPath: string, basePath: string, allowMissing: boolean = true): void {
+export function ensureStrictDirectory(dirPath: string, basePath: string, allowMissing: boolean = true): void {
   try {
     const stat = fs.lstatSync(dirPath);
     if (stat.isSymbolicLink()) {
@@ -291,7 +291,7 @@ function ensureStrictDirectory(dirPath: string, basePath: string, allowMissing: 
   }
 }
 
-function ensureStrictDirectoryCreated(dirPath: string, basePath: string): void {
+export function ensureStrictDirectoryCreated(dirPath: string, allowedBasePath: string): void {
   if (!fs.existsSync(dirPath)) {
     try {
       fs.mkdirSync(dirPath, { recursive: true, mode: 0o700 });
@@ -309,7 +309,7 @@ function ensureStrictDirectoryCreated(dirPath: string, basePath: string): void {
     if (stat.isSymbolicLink() || !stat.isDirectory()) {
       throw new Error("Invalid directory");
     }
-    const realBase = fs.realpathSync(basePath);
+    const realBase = fs.realpathSync(allowedBasePath);
     const realDir = fs.realpathSync(dirPath);
     const rel = path.relative(realBase, realDir);
     if (rel.startsWith("..") || path.isAbsolute(rel)) {
@@ -320,11 +320,11 @@ function ensureStrictDirectoryCreated(dirPath: string, basePath: string): void {
   }
 }
 
-function generateFileId(): string {
+export function generateFileId(): string {
   return crypto.randomBytes(16).toString("hex");
 }
 
-function atomicWriteFile(targetPath: string, content: Buffer, mode: number): void {
+export function atomicWriteFile(targetPath: string, content: Buffer, mode: number): void {
   const dir = path.dirname(targetPath);
   const tmpName = path.join(dir, `.tmp.${crypto.randomBytes(8).toString("hex")}`);
   let fd: number | null = null;

@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { restoreDefaultSiteContent } from './test-helpers';
 
 test.describe('Homepage', () => {
+  test.beforeEach(() => {
+    restoreDefaultSiteContent();
+  });
+
   test('should load the homepage in French by default', async ({ page }) => {
     await page.goto('/fr/');
     

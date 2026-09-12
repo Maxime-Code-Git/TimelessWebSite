@@ -272,6 +272,10 @@ export default function AdminPage() {
                 <h3>Rendez-vous visio</h3>
                 <p>Gérer les disponibilités et les demandes de rendez-vous</p>
               </Link>
+              <Link to="/admin/home" className={styles.card}>
+                <h3>Page d'accueil</h3>
+                <p>Gérer le contenu et les photos de l'accueil</p>
+              </Link>
             </div>
           </div>
         </main>

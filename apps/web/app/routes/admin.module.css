@@ -633,3 +633,39 @@
 .inputMargin { margin-bottom: 10px; }
 .textareaMargin { margin-bottom: 20px; }
 .modalActions { display: flex; gap: 10px; }
+.aspectHero {
+  aspect-ratio: 2 / 3;
+}
+.aspect16_9 {
+  aspect-ratio: 16 / 9;
+}
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modalContent {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 100%;
+}
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.backLink[data-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.5;
+}

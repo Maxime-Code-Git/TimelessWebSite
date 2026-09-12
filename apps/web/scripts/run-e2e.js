@@ -56,6 +56,7 @@ try {
   process.env.SITE_CONTENT_PATH = path.join(e2eTempDir, 'site-content.json');
   process.env.PORTFOLIO_CONTENT_PATH = path.join(e2eTempDir, 'portfolio.json');
   process.env.PORTFOLIO_MEDIA_PATH = path.join(e2eTempDir, 'portfolio-media');
+  process.env.SITE_MEDIA_PATH = path.join(e2eTempDir, 'site-media');
   process.env.RATE_LIMIT_DB_PATH = path.join(e2eTempDir, 'rate-limit.sqlite');
   process.env.BOOKING_DB_PATH = path.join(e2eTempDir, 'bookings.sqlite');
   process.env.NODE_ENV = 'test';
@@ -70,6 +71,13 @@ try {
 } finally {
   cleanupCerts();
   if (e2eTempDir && fs.existsSync(e2eTempDir)) {
-    fs.rmSync(e2eTempDir, { recursive: true, force: true });
+    const resolvedRoot = path.resolve(os.tmpdir());
+    const resolvedCandidate = path.resolve(e2eTempDir);
+    const relative = path.relative(resolvedRoot, resolvedCandidate);
+    if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative) || !path.basename(resolvedCandidate).startsWith('timeless-e2e-')) {
+      console.error("Refusing to delete unsafe temporary directory:", e2eTempDir);
+    } else {
+      fs.rmSync(e2eTempDir, { recursive: true, force: true });
+    }
   }
 }
