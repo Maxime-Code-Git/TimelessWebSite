@@ -13,18 +13,21 @@ interface HomePageProps {
   lang: Lang;
 }
 export function HomePage({ lang }: HomePageProps) {
-  const t = getStrings(lang).home;
-  const [selectedCat, setSelectedCat] = useState<FormulaCategory>("duo");
   const rootData = useRouteLoaderData<typeof rootLoader>("root");
   const siteContent = rootData?.siteContent;
+  const categories: FormulaCategory[] = ["photo", "film", "duo"];
+  const activeCategories = categories.filter(cat => (siteContent?.pricing[cat] || []).some(f => f.enabled));
+  const defaultCat = activeCategories.includes("duo") ? "duo" : activeCategories.length > 0 ? activeCategories[0] : "photo";
+
+  const [selectedCat, setSelectedCat] = useState<FormulaCategory>(defaultCat);
+  const t = getStrings(lang).home;
   const homeContent = siteContent?.home as HomeContent | undefined;
   // Determine alternate language link
   const alternateLangHref = lang === "fr" ? "/en/" : "/fr/";
   const handleCategoryClick = (cat: FormulaCategory) => {
     setSelectedCat(cat);
   };
-  const categories: FormulaCategory[] = ["photo", "film", "duo"];
-  const currentPricing = siteContent?.pricing[selectedCat] || [];
+  const currentPricing = (siteContent?.pricing[selectedCat] || []).filter(f => f.enabled);
   if (!homeContent) return null; // Wait for loader
   return (
     <>
@@ -121,7 +124,7 @@ export function HomePage({ lang }: HomePageProps) {
         <div className={styles.formulesInner}>
           <p className={styles.formulesTitle}>{homeContent.pricingPreview.sectionTitle[lang]}</p>
           <div className={styles.formuleTabs}>
-            {categories.map((cat) => (
+            {activeCategories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => handleCategoryClick(cat)}
@@ -144,7 +147,7 @@ export function HomePage({ lang }: HomePageProps) {
                 {tier.featured && (
                   <span className={styles.featuredBadge}>{t.featuredBadge}</span>
                 )}
-                <div className={styles.formuleName}>{getStrings(lang).tierNames[tier.id]}</div>
+                <div className={styles.formuleName}>{tier.name[lang]}</div>
                 <div className={styles.formulePrice}>
                   {formatPrice(tier.priceCents, lang)}
                 </div>

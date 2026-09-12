@@ -75,12 +75,7 @@ export interface FormulesStrings {
   featuredBadge: string;
 }
 
-/* ── Formules features per category per tier ─────────────── */
-export interface FormuleFeaturesMap {
-  photo: string[][];
-  film: string[][];
-  duo: string[][];
-}
+
 
 /* ── About page ─────────────────────────────────────────── */
 export interface AboutStrings {
@@ -184,8 +179,7 @@ export interface I18nStrings {
   home: HomeStrings;
   portfolio: PortfolioStrings;
   formules: FormulesStrings;
-  tierNames: Record<string, string>;
-  formuleFeatures: FormuleFeaturesMap;
+
   about: AboutStrings;
   contact: ContactStrings;
   clients: ClientsStrings;
@@ -302,28 +296,6 @@ const FR: I18nStrings = {
       },
     ],
     featuredBadge: "Le plus choisi",
-  },
-  tierNames: {
-    essential: "Essentiel",
-    signature: "Signature",
-    prestige: "Prestige",
-  },
-  formuleFeatures: {
-    photo: [
-      ["6h de couverture", "200 photos livrées", "Galerie en ligne privée", "Livraison sous 6 semaines"],
-      ["8h de couverture", "400 photos livrées", "Galerie en ligne privée", "Livraison sous 4 semaines", "20 tirages d'art inclus"],
-      ["Journée complète (12h)", "600+ photos livrées", "Galerie en ligne privée", "Livraison sous 2 semaines", "Album photo relié inclus", "Séance couple offerte"],
-    ],
-    film: [
-      ["Film court (3-4 min)", "Captation cérémonie", "Musique libre de droits", "Livraison sous 6 semaines"],
-      ["Film complet (8-10 min)", "Captation cérémonie + réception", "Teaser réseaux sociaux inclus", "Livraison sous 4 semaines"],
-      ["Long métrage (15-20 min)", "Captation intégrale de la journée", "Teaser + rushes bruts fournis", "Drone inclus (selon lieu)", "Livraison sous 2 semaines"],
-    ],
-    duo: [
-      ["6h de couverture", "200 photos + film court", "Galerie en ligne privée", "Livraison sous 6 semaines"],
-      ["8h de couverture", "400 photos + film complet", "Galerie en ligne privée", "Teaser réseaux sociaux inclus", "Livraison sous 4 semaines"],
-      ["Journée complète", "600+ photos + long métrage", "Album photo relié inclus", "Drone inclus (selon lieu)", "Livraison sous 2 semaines"],
-    ],
   },
   about: {
     heroTitle: "Arrêter le temps, rendre le jour éternel.",
@@ -549,28 +521,6 @@ const EN: I18nStrings = {
       },
     ],
     featuredBadge: "Most popular",
-  },
-  tierNames: {
-    essential: "Essential",
-    signature: "Signature",
-    prestige: "Prestige",
-  },
-  formuleFeatures: {
-    photo: [
-      ["6h coverage", "200 photos delivered", "Private online gallery", "Delivery within 6 weeks"],
-      ["8h coverage", "400 photos delivered", "Private online gallery", "Delivery within 4 weeks", "20 fine-art prints included"],
-      ["Full day (12h)", "600+ photos delivered", "Private online gallery", "Delivery within 2 weeks", "Bound photo album included", "Complimentary couple session"],
-    ],
-    film: [
-      ["Short film (3-4 min)", "Ceremony capture", "Royalty-free music", "Delivery within 6 weeks"],
-      ["Full film (8-10 min)", "Ceremony + reception capture", "Social media teaser included", "Delivery within 4 weeks"],
-      ["Feature film (15-20 min)", "Full day capture", "Teaser + raw footage provided", "Drone included (venue permitting)", "Delivery within 2 weeks"],
-    ],
-    duo: [
-      ["6h coverage", "200 photos + short film", "Private online gallery", "Delivery within 6 weeks"],
-      ["8h coverage", "400 photos + full film", "Private online gallery", "Social media teaser included", "Delivery within 4 weeks"],
-      ["Full day", "600+ photos + feature film", "Bound photo album included", "Drone included (venue permitting)", "Delivery within 2 weeks"],
-    ],
   },
   about: {
     heroTitle: "Stop time, make the day eternal.",

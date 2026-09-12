@@ -611,8 +611,9 @@ export function validateSiteContent(data: unknown): SiteContent {
 
   const business = validateBusiness(obj.business);
 
-  let objRef = obj;
-  const homeData = obj.home !== undefined ? obj.home : defaultContent.home;
+  const objCopy = JSON.parse(JSON.stringify(obj));
+  let objRef = objCopy;
+  const homeData = objCopy.home !== undefined ? obj.home : defaultContent.home;
   const migratedHomeData = homeData && typeof homeData === "object" ? { ...(homeData as Record<string, unknown>) } : {};
   let needsHomeMigration = false;
 
@@ -687,22 +688,96 @@ export function validateSiteContent(data: unknown): SiteContent {
 
     const migrateCategory = (catData: unknown, prefix: string): unknown[] => {
       if (!Array.isArray(catData)) return [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return catData.map((f: any) => {
+
+      const featuresFR: Record<string, string[][]> = {
+        photo: [
+          ["6h de couverture", "200 photos livrées", "Galerie en ligne privée", "Livraison sous 6 semaines"],
+          ["8h de couverture", "400 photos livrées", "Galerie en ligne privée", "Livraison sous 4 semaines", "20 tirages d'art inclus"],
+          ["Journée complète (12h)", "600+ photos livrées", "Galerie en ligne privée", "Livraison sous 2 semaines", "Album photo relié inclus", "Séance couple offerte"],
+        ],
+        film: [
+          ["Film court (3-4 min)", "Captation cérémonie", "Musique libre de droits", "Livraison sous 6 semaines"],
+          ["Film complet (8-10 min)", "Captation cérémonie + réception", "Teaser réseaux sociaux inclus", "Livraison sous 4 semaines"],
+          ["Long métrage (15-20 min)", "Captation intégrale de la journée", "Teaser + rushes bruts fournis", "Drone inclus (selon lieu)", "Livraison sous 2 semaines"],
+        ],
+        duo: [
+          ["6h de couverture", "200 photos + film court", "Galerie en ligne privée", "Livraison sous 6 semaines"],
+          ["8h de couverture", "400 photos + film complet", "Galerie en ligne privée", "Teaser réseaux sociaux inclus", "Livraison sous 4 semaines"],
+          ["Journée complète", "600+ photos + long métrage", "Album photo relié inclus", "Drone inclus (selon lieu)", "Livraison sous 2 semaines"],
+        ],
+      };
+
+      const featuresEN: Record<string, string[][]> = {
+        photo: [
+          ["6h coverage", "200 photos delivered", "Private online gallery", "Delivery within 6 weeks"],
+          ["8h coverage", "400 photos delivered", "Private online gallery", "Delivery within 4 weeks", "20 fine-art prints included"],
+          ["Full day (12h)", "600+ photos delivered", "Private online gallery", "Delivery within 2 weeks", "Bound photo album included", "Complimentary couple session"],
+        ],
+        film: [
+          ["Short film (3-4 min)", "Ceremony capture", "Royalty-free music", "Delivery within 6 weeks"],
+          ["Full film (8-10 min)", "Ceremony + reception capture", "Social media teaser included", "Delivery within 4 weeks"],
+          ["Feature film (15-20 min)", "Full day capture", "Teaser + raw footage provided", "Drone included (venue permitting)", "Delivery within 2 weeks"],
+        ],
+        duo: [
+          ["6h coverage", "200 photos + short film", "Private online gallery", "Delivery within 6 weeks"],
+          ["8h coverage", "400 photos + full film", "Private online gallery", "Social media teaser included", "Delivery within 4 weeks"],
+          ["Full day", "600+ photos + feature film", "Bound photo album included", "Drone included (venue permitting)", "Delivery within 2 weeks"],
+        ],
+      };
+
+      const names: Record<string, { fr: string, en: string }> = {
+        essential: { fr: "Essentiel", en: "Essential" },
+        signature: { fr: "Signature", en: "Signature" },
+        prestige: { fr: "Prestige", en: "Prestige" }
+      };
+
+      const descriptions: Record<string, Record<string, { fr: string, en: string }>> = {
+        photo: {
+          essential: { fr: "Une présence discrète pour capturer l'essentiel de votre mariage. Idéal pour les mariages intimes.", en: "Discreet presence to capture the essence of your wedding. Ideal for intimate weddings." },
+          signature: { fr: "Une couverture étendue pour ne rien manquer, des préparatifs jusqu'à la première danse.", en: "Extended coverage to miss nothing, from preparations to the first dance." },
+          prestige: { fr: "L'accompagnement le plus complet avec un album premium pour sublimer vos souvenirs.", en: "The most complete accompaniment with a premium album to sublimate your memories." }
+        },
+        film: {
+          essential: { fr: "Un souvenir rythmé et intense des moments forts de votre journée.", en: "A rhythmic and intense memory of the highlights of your day." },
+          signature: { fr: "Un documentaire élégant de votre mariage, capturant chaque émotion en mouvement.", en: "An elegant documentary of your wedding, capturing every emotion in motion." },
+          prestige: { fr: "Une œuvre cinématographique complète, incluant un teaser pour partager l'émotion.", en: "A complete cinematic work, including a teaser to share the emotion." }
+        },
+        duo: {
+          essential: { fr: "La combinaison parfaite de la photo et de la vidéo pour les moments clés.", en: "The perfect combination of photo and video for key moments." },
+          signature: { fr: "L'équipe complète à vos côtés pour raconter votre histoire sous toutes ses formes.", en: "The complete team by your side to tell your story in all its forms." },
+          prestige: { fr: "Une prestation sans compromis. L'excellence de notre studio dédiée à votre mariage.", en: "A compromise-free service. The excellence of our studio dedicated to your wedding." }
+        }
+      };
+
+      return catData.map((f, idx) => {
         if (typeof f !== "object" || f === null) return f;
-        const id = typeof f.id === "string" ? f.id : "";
+        const fRecord = f as Record<string, unknown>;
+        const id = typeof fRecord.id === "string" ? fRecord.id : "";
         let descKey = "";
         if (id === "essential") descKey = prefix + "EssentialDescription";
         if (id === "signature") descKey = prefix + "SignatureDescription";
         if (id === "prestige") descKey = prefix + "PrestigeDescription";
 
+        // Generate deterministic IDs for included items
+        const itemsFr = featuresFR[prefix]?.[idx] || [];
+        const itemsEn = featuresEN[prefix]?.[idx] || [];
+        const includedItems = itemsFr.map((frText, itemIdx) => {
+          return {
+            id: `${prefix}-${id}-${itemIdx}`,
+            text: { fr: frText, en: itemsEn[itemIdx] || frText }
+          };
+        });
+
+        const nameObj = names[id] || { fr: "Formule", en: "Package" };
+        const descObj = descriptions[prefix]?.[id] || { fr: "Description", en: "Description" };
+
         return {
-          ...f,
+          ...fRecord,
           enabled: true,
-          name: { fr: "Formule", en: "Package" },
+          name: { ...nameObj },
           summary: getDesc(descKey),
-          description: { fr: "Description détaillée de la formule", en: "Detailed description of the package" },
-          includedItems: [],
+          description: { ...descObj },
+          includedItems,
           buttonText: { fr: "Contact", en: "Contact" }
         };
       });

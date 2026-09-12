@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFetcher, useRouteLoaderData, Link, useSearchParams } from "react-router";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
@@ -14,17 +14,33 @@ interface ContactPageProps {
 
 export function ContactPage({ lang }: ContactPageProps) {
   const t = getStrings(lang).contact;
-  const alternateLangHref = lang === "fr" ? "/en/contact" : "/fr/contact";
   const rootData = useRouteLoaderData<typeof rootLoader>("root");
   const BUSINESS = rootData?.siteContent?.business;
   const [searchParams] = useSearchParams();
-  const initialFormula = searchParams.get("formula") || "";
+  const rawInitialFormula = searchParams.get("formula") || "";
+
+  // Validate initial formula
+  let initialFormula = "";
+  if (rawInitialFormula === "custom" || rawInitialFormula === "unknown") {
+    initialFormula = rawInitialFormula;
+  } else if (rootData?.siteContent?.pricing) {
+    const [cat, id] = rawInitialFormula.split("-");
+    const formulas = rootData.siteContent.pricing[cat as keyof typeof rootData.siteContent.pricing] || [];
+    if (formulas.some(f => f.id === id && f.enabled)) {
+      initialFormula = rawInitialFormula;
+    }
+  }
+
+  const [selectedFormula, setSelectedFormula] = useState<string>(initialFormula);
+
+  const baseAltHref = lang === "fr" ? "/en/contact" : "/fr/contact";
+  const alternateLangHref = selectedFormula ? `${baseAltHref}?formula=${selectedFormula}` : baseAltHref;
 
   const fetcher = useFetcher();
   const isSubmitting = fetcher.state === "submitting";
   const success = fetcher.data?.success;
   const errorMsg = fetcher.data?.error;
-  
+
   const formRef = useRef<HTMLFormElement>(null);
   const successRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -73,10 +89,10 @@ export function ContactPage({ lang }: ContactPageProps) {
               <p className={styles.bookingDesc}>{t.bookingDescription}</p>
               <p className={styles.bookingNote}>{t.bookingNote}</p>
             </div>
-            
+
             <VisioBooking language={lang} />
           </div>
-          
+
           <div role="alert" className={styles.unavailableAlert}>
             {t.submitUnavailable}
           </div>
@@ -86,7 +102,7 @@ export function ContactPage({ lang }: ContactPageProps) {
         {/* Main Form */}
       <section className={styles.formSection}>
         <h3 className={styles.formPrompt}>{t.formPrompt}</h3>
-        
+
         <div className={styles.formGrid}>
           <fetcher.Form method="post" ref={formRef} action={lang === "fr" ? "/fr/contact" : "/en/contact"}>
             {/* Honeypot field - must be hidden to humans */}
@@ -100,16 +116,16 @@ export function ContactPage({ lang }: ContactPageProps) {
                 {errorMsg}
               </div>
             )}
-            
+
             {success && (
-              <div 
-                className={styles.formSuccess} 
-                role="status" 
-                tabIndex={-1} 
+              <div
+                className={styles.formSuccess}
+                role="status"
+                tabIndex={-1}
                 ref={successRef}
               >
-                {lang === "fr" 
-                  ? "Votre message a bien été envoyé. Nous vous répondrons sous 48 h." 
+                {lang === "fr"
+                  ? "Votre message a bien été envoyé. Nous vous répondrons sous 48 h."
                   : "Your message has been sent successfully. We will reply within 48 hours."}
               </div>
             )}
@@ -117,7 +133,7 @@ export function ContactPage({ lang }: ContactPageProps) {
               <label htmlFor="names" className={styles.label}>{t.formLabels.names}</label>
               <input type="text" id="names" name="names" required className={styles.input} placeholder={t.formPlaceholders.names} />
             </div>
-            
+
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
                 <label htmlFor="email" className={styles.label}>{t.formLabels.email}</label>
@@ -128,7 +144,7 @@ export function ContactPage({ lang }: ContactPageProps) {
                 <input type="tel" id="phone" name="phone" className={styles.input} placeholder={t.formPlaceholders.phone} />
               </div>
             </div>
-            
+
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
                 <label htmlFor="date" className={styles.label}>{t.formLabels.date}</label>
@@ -139,10 +155,17 @@ export function ContactPage({ lang }: ContactPageProps) {
                 <input type="text" id="location" name="location" required className={styles.input} placeholder={t.formPlaceholders.location} />
               </div>
             </div>
-            
+
             <div className={styles.formGroup}>
               <label htmlFor="formula" className={styles.label}>{t.formLabels.formula}</label>
-              <select id="formula" name="formula" required className={styles.select} defaultValue={initialFormula}>
+              <select
+                id="formula"
+                name="formula"
+                required
+                className={styles.select}
+                value={selectedFormula}
+                onChange={e => setSelectedFormula(e.target.value)}
+              >
                 <option value="" disabled>{t.formPlaceholders.formulaDefault}</option>
                 {rootData?.siteContent?.pricing && Object.entries(rootData.siteContent.pricing).map(([cat, formulas]) => (
                   <optgroup key={cat} label={cat === 'photo' ? (lang === 'fr' ? 'Photographie' : 'Photography') : cat === 'film' ? 'Film' : 'Duo (Photo + Film)'}>
@@ -157,21 +180,21 @@ export function ContactPage({ lang }: ContactPageProps) {
                 <option value="unknown">{t.formPlaceholders.formulaDontKnow}</option>
               </select>
             </div>
-            
+
             <div className={styles.formGroup}>
               <label htmlFor="message" className={styles.label}>{t.formLabels.message}</label>
               <textarea id="message" name="message" required className={styles.textarea} placeholder={t.formPlaceholders.message} />
             </div>
-            
+
             <button type="submit" className={`btn btn--primary ${styles.submitBtn}`} disabled={isSubmitting}>
               {isSubmitting ? (lang === "fr" ? "Envoi..." : "Sending...") : t.formLabels.submit}
             </button>
           </fetcher.Form>
-          
+
           {/* Info Card with Real Config */}
           <div className={styles.infoCard}>
             <h4 className={styles.infoTitle}>{t.coordTitle}</h4>
-            
+
             {BUSINESS?.email && (
               <div className={styles.infoBlock}>
                 <p className={styles.infoLabel}>{t.coordLabels.email}</p>
@@ -180,7 +203,7 @@ export function ContactPage({ lang }: ContactPageProps) {
                 </p>
               </div>
             )}
-            
+
             {BUSINESS?.phoneDisplay && BUSINESS?.phoneE164 && (
               <div className={styles.infoBlock}>
                 <p className={styles.infoLabel}>{t.coordLabels.phone}</p>
@@ -189,14 +212,14 @@ export function ContactPage({ lang }: ContactPageProps) {
                 </p>
               </div>
             )}
-            
+
             {BUSINESS?.serviceArea && (
               <div className={styles.infoBlock}>
                 <p className={styles.infoLabel}>{t.coordLabels.area}</p>
                 <p className={styles.infoValue}>{BUSINESS.serviceArea[lang]}</p>
               </div>
             )}
-            
+
             {(BUSINESS?.instagramUrl || BUSINESS?.linkedinUrl) && (
               <div className={styles.infoBlock}>
                 <p className={styles.infoLabel}>{t.coordLabels.social}</p>
@@ -211,7 +234,7 @@ export function ContactPage({ lang }: ContactPageProps) {
                 </p>
               </div>
             )}
-            
+
             <p className={styles.responseTime}>{t.coordResponseTime}</p>
           </div>
         </div>

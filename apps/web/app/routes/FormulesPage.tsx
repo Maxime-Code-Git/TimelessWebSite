@@ -8,6 +8,7 @@ import { formatPrice } from "~/lib/pricing";
 import type { FormulaCategory } from "~/lib/pricing";
 import styles from "./formules.module.css";
 import type { loader as rootLoader } from "../root";
+import type { Formula, FormulaIncludedItem } from "~/lib/site-content.server";
 
 interface FormulesPageProps {
   lang: Lang;
@@ -61,7 +62,9 @@ export function FormulesPage({ lang }: FormulesPageProps) {
           </div>
 
           <div className={styles.cards}>
-            {currentPricing.map((tier) => {
+            {currentPricing.map((tier: Formula) => {
+              if (!tier.enabled) return null;
+
               return (
                 <div
                   key={tier.id}
@@ -73,15 +76,18 @@ export function FormulesPage({ lang }: FormulesPageProps) {
                     <span className={styles.featuredBadge}>{t.featuredBadge}</span>
                   )}
                   <div className={styles.cardHeader}>
-                    <div className={styles.cardName}>{getStrings(lang).tierNames[tier.id]}</div>
+                    <div className={styles.cardName}>{tier.name[lang]}</div>
                     <div className={styles.cardPrice}>
                       {formatPrice(tier.priceCents, lang)}
                     </div>
                   </div>
+                  {tier.description[lang] && (
+                    <p className={styles.cardDesc}>{tier.description[lang]}</p>
+                  )}
                   <div className={styles.cardDivider} />
                   <ul className={styles.featuresList}>
-                    {tier.includedItems.map((item, i) => (
-                      <li key={i} className={styles.featureItem}>
+                    {tier.includedItems.map((item: FormulaIncludedItem) => (
+                      <li key={item.id} className={styles.featureItem}>
                         <span className={styles.featureDash}>—</span>
                         <span>{item.text[lang]}</span>
                       </li>

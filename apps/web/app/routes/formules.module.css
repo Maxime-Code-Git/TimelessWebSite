@@ -134,6 +134,14 @@
   margin-bottom: 18px;
 }
 
+.cardDesc {
+  font-size: 15px;
+  color: var(--green);
+  opacity: 0.9;
+  line-height: 1.4;
+  margin-bottom: 20px;
+}
+
 .cardDivider {
   height: 1px;
   background: var(--gold-light);

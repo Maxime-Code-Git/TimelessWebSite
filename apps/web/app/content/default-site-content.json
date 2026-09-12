@@ -27,33 +27,177 @@
         "priceCents": 129000,
         "featured": false,
         "enabled": true,
-        "name": { "fr": "Formule", "en": "Package" },
-        "summary": { "fr": "Les moments clés, en images.", "en": "Key moments, in images." },
-        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
-        "includedItems": [],
-        "buttonText": { "fr": "Contact", "en": "Contact" }
+        "name": {
+          "fr": "Essentiel",
+          "en": "Essential"
+        },
+        "summary": {
+          "fr": "Les moments clés, en images.",
+          "en": "Key moments, in images."
+        },
+        "description": {
+          "fr": "Une présence discrète pour capturer l'essentiel de votre mariage. Idéal pour les mariages intimes.",
+          "en": "Discreet presence to capture the essence of your wedding. Ideal for intimate weddings."
+        },
+        "includedItems": [
+          {
+            "id": "04d6a450-059c-4dbc-bdf7-aa439a1df1e3",
+            "text": {
+              "fr": "6h de couverture",
+              "en": "6h coverage"
+            }
+          },
+          {
+            "id": "6164d174-7e00-4139-b980-c8325e0042b4",
+            "text": {
+              "fr": "200 photos livrées",
+              "en": "200 photos delivered"
+            }
+          },
+          {
+            "id": "e9d76f6f-f9e0-4b71-8ae6-076131195e94",
+            "text": {
+              "fr": "Galerie en ligne privée",
+              "en": "Private online gallery"
+            }
+          },
+          {
+            "id": "c0413b36-5400-48ad-bd3d-b32433fb3a1d",
+            "text": {
+              "fr": "Livraison sous 6 semaines",
+              "en": "Delivery within 6 weeks"
+            }
+          }
+        ],
+        "buttonText": {
+          "fr": "Contact",
+          "en": "Contact"
+        }
       },
       {
         "id": "signature",
         "priceCents": 179000,
         "featured": true,
         "enabled": true,
-        "name": { "fr": "Formule", "en": "Package" },
-        "summary": { "fr": "Couverture photo complète du jour.", "en": "Complete photo coverage of the day." },
-        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
-        "includedItems": [],
-        "buttonText": { "fr": "Contact", "en": "Contact" }
+        "name": {
+          "fr": "Signature",
+          "en": "Signature"
+        },
+        "summary": {
+          "fr": "L'histoire complète de votre journée.",
+          "en": "The full story of your day."
+        },
+        "description": {
+          "fr": "Une couverture étendue pour ne rien manquer, des préparatifs jusqu'à la première danse.",
+          "en": "Extended coverage to miss nothing, from preparations to the first dance."
+        },
+        "includedItems": [
+          {
+            "id": "d1e7d7f4-5e06-4e06-90a8-49944eaad265",
+            "text": {
+              "fr": "8h de couverture",
+              "en": "8h coverage"
+            }
+          },
+          {
+            "id": "7390b093-2170-443b-9f6d-58ccb6fe7c29",
+            "text": {
+              "fr": "400 photos livrées",
+              "en": "400 photos delivered"
+            }
+          },
+          {
+            "id": "b325f996-a29a-4488-97aa-931ed1158c1c",
+            "text": {
+              "fr": "Galerie en ligne privée",
+              "en": "Private online gallery"
+            }
+          },
+          {
+            "id": "569c9d00-2ef7-46c2-ad10-26261ccae8f4",
+            "text": {
+              "fr": "Livraison sous 4 semaines",
+              "en": "Delivery within 4 weeks"
+            }
+          },
+          {
+            "id": "aa9b7786-d873-4c0f-ad17-7dc6d8557dc4",
+            "text": {
+              "fr": "20 tirages d'art inclus",
+              "en": "20 fine-art prints included"
+            }
+          }
+        ],
+        "buttonText": {
+          "fr": "Contact",
+          "en": "Contact"
+        }
       },
       {
         "id": "prestige",
         "priceCents": 239000,
         "featured": false,
         "enabled": true,
-        "name": { "fr": "Formule", "en": "Package" },
-        "summary": { "fr": "Reportage intégral + album d'art.", "en": "Full reportage + fine-art album." },
-        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
-        "includedItems": [],
-        "buttonText": { "fr": "Contact", "en": "Contact" }
+        "name": {
+          "fr": "Prestige",
+          "en": "Prestige"
+        },
+        "summary": {
+          "fr": "L'expérience absolue.",
+          "en": "The ultimate experience."
+        },
+        "description": {
+          "fr": "L'accompagnement le plus complet avec un album premium pour sublimer vos souvenirs.",
+          "en": "The most complete accompaniment with a premium album to sublimate your memories."
+        },
+        "includedItems": [
+          {
+            "id": "201f63f9-4aeb-4726-8710-d22d9672e4c4",
+            "text": {
+              "fr": "Journée complète (12h)",
+              "en": "Full day (12h)"
+            }
+          },
+          {
+            "id": "410830fa-ab32-485b-837e-cbff77bbe199",
+            "text": {
+              "fr": "600+ photos livrées",
+              "en": "600+ photos delivered"
+            }
+          },
+          {
+            "id": "6d6701ff-7382-48c0-861c-1415ed7b7211",
+            "text": {
+              "fr": "Galerie en ligne privée",
+              "en": "Private online gallery"
+            }
+          },
+          {
+            "id": "a35ff6db-5ac5-4bdb-a815-51aba5017cde",
+            "text": {
+              "fr": "Livraison sous 2 semaines",
+              "en": "Delivery within 2 weeks"
+            }
+          },
+          {
+            "id": "6bf854d0-9a9b-4dfc-802c-01ce7b3379b3",
+            "text": {
+              "fr": "Album photo relié inclus",
+              "en": "Bound photo album included"
+            }
+          },
+          {
+            "id": "42e1ea5e-a874-4ec2-b549-5c0a365fe814",
+            "text": {
+              "fr": "Séance couple offerte",
+              "en": "Complimentary couple session"
+            }
+          }
+        ],
+        "buttonText": {
+          "fr": "Contact",
+          "en": "Contact"
+        }
       }
     ],
     "film": [
@@ -62,33 +206,163 @@
         "priceCents": 149000,
         "featured": false,
         "enabled": true,
-        "name": { "fr": "Formule", "en": "Package" },
-        "summary": { "fr": "Un film court, l'émotion condensée.", "en": "A short film, condensed emotion." },
-        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
-        "includedItems": [],
-        "buttonText": { "fr": "Contact", "en": "Contact" }
+        "name": {
+          "fr": "Essentiel",
+          "en": "Essential"
+        },
+        "summary": {
+          "fr": "L'essence de votre union.",
+          "en": "The essence of your union."
+        },
+        "description": {
+          "fr": "Un souvenir rythmé et intense des moments forts de votre journée.",
+          "en": "A rhythmic and intense memory of the highlights of your day."
+        },
+        "includedItems": [
+          {
+            "id": "402ca475-ad32-4a50-95f2-51a24d2d678b",
+            "text": {
+              "fr": "Film court (3-4 min)",
+              "en": "Short film (3-4 min)"
+            }
+          },
+          {
+            "id": "b44fc1ed-9d76-44da-864d-482110119773",
+            "text": {
+              "fr": "Captation cérémonie",
+              "en": "Ceremony capture"
+            }
+          },
+          {
+            "id": "fd692f9f-1d1a-48b6-967f-d59b98cecc63",
+            "text": {
+              "fr": "Musique libre de droits",
+              "en": "Royalty-free music"
+            }
+          },
+          {
+            "id": "f8d8b94f-ce54-4de8-b03f-e0b74ab890ec",
+            "text": {
+              "fr": "Livraison sous 6 semaines",
+              "en": "Delivery within 6 weeks"
+            }
+          }
+        ],
+        "buttonText": {
+          "fr": "Contact",
+          "en": "Contact"
+        }
       },
       {
         "id": "signature",
         "priceCents": 219000,
         "featured": true,
         "enabled": true,
-        "name": { "fr": "Formule", "en": "Package" },
-        "summary": { "fr": "Le film complet de votre journée.", "en": "The complete film of your day." },
-        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
-        "includedItems": [],
-        "buttonText": { "fr": "Contact", "en": "Contact" }
+        "name": {
+          "fr": "Signature",
+          "en": "Signature"
+        },
+        "summary": {
+          "fr": "Le récit cinématographique.",
+          "en": "The cinematic narrative."
+        },
+        "description": {
+          "fr": "Un documentaire élégant de votre mariage, capturant chaque émotion en mouvement.",
+          "en": "An elegant documentary of your wedding, capturing every emotion in motion."
+        },
+        "includedItems": [
+          {
+            "id": "c0e11b42-89b2-4228-86a8-768bf61ca633",
+            "text": {
+              "fr": "Film complet (8-10 min)",
+              "en": "Full film (8-10 min)"
+            }
+          },
+          {
+            "id": "c06d5cb1-5fd8-4319-b1d6-c7af042d04d7",
+            "text": {
+              "fr": "Captation cérémonie + réception",
+              "en": "Ceremony + reception capture"
+            }
+          },
+          {
+            "id": "1d354171-cc32-45da-b4d8-c33771feaaf7",
+            "text": {
+              "fr": "Teaser réseaux sociaux inclus",
+              "en": "Social media teaser included"
+            }
+          },
+          {
+            "id": "b495f4b4-2740-4cde-9ed0-808122894629",
+            "text": {
+              "fr": "Livraison sous 4 semaines",
+              "en": "Delivery within 4 weeks"
+            }
+          }
+        ],
+        "buttonText": {
+          "fr": "Contact",
+          "en": "Contact"
+        }
       },
       {
         "id": "prestige",
         "priceCents": 299000,
         "featured": false,
         "enabled": true,
-        "name": { "fr": "Formule", "en": "Package" },
-        "summary": { "fr": "Long métrage + teaser + rushes.", "en": "Feature film + teaser + raw footage." },
-        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
-        "includedItems": [],
-        "buttonText": { "fr": "Contact", "en": "Contact" }
+        "name": {
+          "fr": "Prestige",
+          "en": "Prestige"
+        },
+        "summary": {
+          "fr": "Votre histoire, en grand.",
+          "en": "Your story, writ large."
+        },
+        "description": {
+          "fr": "Une œuvre cinématographique complète, incluant un teaser pour partager l'émotion.",
+          "en": "A complete cinematic work, including a teaser to share the emotion."
+        },
+        "includedItems": [
+          {
+            "id": "24d2203b-967d-4317-a96c-57656215c4e2",
+            "text": {
+              "fr": "Long métrage (15-20 min)",
+              "en": "Feature film (15-20 min)"
+            }
+          },
+          {
+            "id": "051078ab-ad32-458e-859c-48caa63bea41",
+            "text": {
+              "fr": "Captation intégrale de la journée",
+              "en": "Full day capture"
+            }
+          },
+          {
+            "id": "285cc3bf-083f-431c-a415-c05a36b148de",
+            "text": {
+              "fr": "Teaser + rushes bruts fournis",
+              "en": "Teaser + raw footage provided"
+            }
+          },
+          {
+            "id": "978b1eb2-f6be-42dc-a883-990599e0690b",
+            "text": {
+              "fr": "Drone inclus (selon lieu)",
+              "en": "Drone included (venue permitting)"
+            }
+          },
+          {
+            "id": "621f3d3a-1364-4b72-ad6b-5d5dc71526a4",
+            "text": {
+              "fr": "Livraison sous 2 semaines",
+              "en": "Delivery within 2 weeks"
+            }
+          }
+        ],
+        "buttonText": {
+          "fr": "Contact",
+          "en": "Contact"
+        }
       }
     ],
     "duo": [
@@ -97,33 +371,170 @@
         "priceCents": 249000,
         "featured": false,
         "enabled": true,
-        "name": { "fr": "Formule", "en": "Package" },
-        "summary": { "fr": "Photo et film, l'essentiel réuni.", "en": "Photo & film, the essentials combined." },
-        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
-        "includedItems": [],
-        "buttonText": { "fr": "Contact", "en": "Contact" }
+        "name": {
+          "fr": "Essentiel",
+          "en": "Essential"
+        },
+        "summary": {
+          "fr": "Le meilleur des deux mondes.",
+          "en": "The best of both worlds."
+        },
+        "description": {
+          "fr": "La combinaison parfaite de la photo et de la vidéo pour les moments clés.",
+          "en": "The perfect combination of photo and video for key moments."
+        },
+        "includedItems": [
+          {
+            "id": "137fdb25-f708-4552-80ab-250ba74ff249",
+            "text": {
+              "fr": "6h de couverture",
+              "en": "6h coverage"
+            }
+          },
+          {
+            "id": "5bc472d0-b14d-4a96-b306-2f364b6f282c",
+            "text": {
+              "fr": "200 photos + film court",
+              "en": "200 photos + short film"
+            }
+          },
+          {
+            "id": "aa9243d7-7118-4858-8ffb-c125d4ee1c36",
+            "text": {
+              "fr": "Galerie en ligne privée",
+              "en": "Private online gallery"
+            }
+          },
+          {
+            "id": "3b009df7-a820-4da6-b49a-c708f693ad06",
+            "text": {
+              "fr": "Livraison sous 6 semaines",
+              "en": "Delivery within 6 weeks"
+            }
+          }
+        ],
+        "buttonText": {
+          "fr": "Contact",
+          "en": "Contact"
+        }
       },
       {
         "id": "signature",
         "priceCents": 349000,
         "featured": true,
         "enabled": true,
-        "name": { "fr": "Formule", "en": "Package" },
-        "summary": { "fr": "Photo + film, couverture complète.", "en": "Photo + film, complete coverage." },
-        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
-        "includedItems": [],
-        "buttonText": { "fr": "Contact", "en": "Contact" }
+        "name": {
+          "fr": "Signature",
+          "en": "Signature"
+        },
+        "summary": {
+          "fr": "Couverture totale.",
+          "en": "Complete coverage."
+        },
+        "description": {
+          "fr": "L'équipe complète à vos côtés pour raconter votre histoire sous toutes ses formes.",
+          "en": "The complete team by your side to tell your story in all its forms."
+        },
+        "includedItems": [
+          {
+            "id": "9af2c4f5-b7de-42b5-a641-3847157648e5",
+            "text": {
+              "fr": "8h de couverture",
+              "en": "8h coverage"
+            }
+          },
+          {
+            "id": "60fcc637-0c8b-4ca6-8f16-9d06fd87edc6",
+            "text": {
+              "fr": "400 photos + film complet",
+              "en": "400 photos + full film"
+            }
+          },
+          {
+            "id": "fb034496-60fa-4ecf-b08d-1d7b62e17268",
+            "text": {
+              "fr": "Galerie en ligne privée",
+              "en": "Private online gallery"
+            }
+          },
+          {
+            "id": "4260b20e-f396-4254-ab54-051b9b674ea4",
+            "text": {
+              "fr": "Teaser réseaux sociaux inclus",
+              "en": "Social media teaser included"
+            }
+          },
+          {
+            "id": "58c80151-5709-475f-ab8f-99bcf904bacf",
+            "text": {
+              "fr": "Livraison sous 4 semaines",
+              "en": "Delivery within 4 weeks"
+            }
+          }
+        ],
+        "buttonText": {
+          "fr": "Contact",
+          "en": "Contact"
+        }
       },
       {
         "id": "prestige",
         "priceCents": 469000,
         "featured": false,
         "enabled": true,
-        "name": { "fr": "Formule", "en": "Package" },
-        "summary": { "fr": "L'expérience intégrale, sans compromis.", "en": "The ultimate experience without compromise." },
-        "description": { "fr": "Description détaillée de la formule", "en": "Detailed description of the package" },
-        "includedItems": [],
-        "buttonText": { "fr": "Contact", "en": "Contact" }
+        "name": {
+          "fr": "Prestige",
+          "en": "Prestige"
+        },
+        "summary": {
+          "fr": "L'héritage visuel parfait.",
+          "en": "The perfect visual legacy."
+        },
+        "description": {
+          "fr": "Une prestation sans compromis. L'excellence de notre studio dédiée à votre mariage.",
+          "en": "A compromise-free service. The excellence of our studio dedicated to your wedding."
+        },
+        "includedItems": [
+          {
+            "id": "2c14026b-9a1e-4bec-8395-e6c151cdad36",
+            "text": {
+              "fr": "Journée complète",
+              "en": "Full day"
+            }
+          },
+          {
+            "id": "6d7b7991-c90a-473c-a674-8f3dbb634f54",
+            "text": {
+              "fr": "600+ photos + long métrage",
+              "en": "600+ photos + feature film"
+            }
+          },
+          {
+            "id": "8c7b32fd-2cab-43b5-a297-37f73fc4ac56",
+            "text": {
+              "fr": "Album photo relié inclus",
+              "en": "Bound photo album included"
+            }
+          },
+          {
+            "id": "a8b59815-cca7-4b27-b5b7-e67cf08d7d50",
+            "text": {
+              "fr": "Drone inclus (selon lieu)",
+              "en": "Drone included (venue permitting)"
+            }
+          },
+          {
+            "id": "78b5f803-d44d-497f-9446-f59ce7d1c8b6",
+            "text": {
+              "fr": "Livraison sous 2 semaines",
+              "en": "Delivery within 2 weeks"
+            }
+          }
+        ],
+        "buttonText": {
+          "fr": "Contact",
+          "en": "Contact"
+        }
       }
     ]
   },
@@ -142,9 +553,36 @@
         "en": "Immortalize your love story"
       },
       "images": [
-        { "imageId": null, "variants": [], "alt": { "fr": "Image hero 1", "en": "Hero image 1" }, "width": 960, "height": 1440 },
-        { "imageId": null, "variants": [], "alt": { "fr": "Image hero 2", "en": "Hero image 2" }, "width": 960, "height": 1440 },
-        { "imageId": null, "variants": [], "alt": { "fr": "Image hero 3", "en": "Hero image 3" }, "width": 960, "height": 1440 }
+        {
+          "imageId": null,
+          "variants": [],
+          "alt": {
+            "fr": "Image hero 1",
+            "en": "Hero image 1"
+          },
+          "width": 960,
+          "height": 1440
+        },
+        {
+          "imageId": null,
+          "variants": [],
+          "alt": {
+            "fr": "Image hero 2",
+            "en": "Hero image 2"
+          },
+          "width": 960,
+          "height": 1440
+        },
+        {
+          "imageId": null,
+          "variants": [],
+          "alt": {
+            "fr": "Image hero 3",
+            "en": "Hero image 3"
+          },
+          "width": 960,
+          "height": 1440
+        }
       ]
     },
     "editorial": {
@@ -161,16 +599,34 @@
       "photo": {
         "imageId": null,
         "variants": [],
-        "alt": { "fr": "Photographie", "en": "Photography" },
-        "title": { "fr": "Photographie", "en": "Photography" },
-        "subtitle": { "fr": "Lumière naturelle & moments volés", "en": "Natural light & candid moments" }
+        "alt": {
+          "fr": "Photographie",
+          "en": "Photography"
+        },
+        "title": {
+          "fr": "Photographie",
+          "en": "Photography"
+        },
+        "subtitle": {
+          "fr": "Lumière naturelle & moments volés",
+          "en": "Natural light & candid moments"
+        }
       },
       "video": {
         "imageId": null,
         "variants": [],
-        "alt": { "fr": "Film de mariage", "en": "Wedding Film" },
-        "title": { "fr": "Film de mariage", "en": "Wedding Film" },
-        "subtitle": { "fr": "Émotions en mouvement", "en": "Emotions in motion" }
+        "alt": {
+          "fr": "Film de mariage",
+          "en": "Wedding Film"
+        },
+        "title": {
+          "fr": "Film de mariage",
+          "en": "Wedding Film"
+        },
+        "subtitle": {
+          "fr": "Émotions en mouvement",
+          "en": "Emotions in motion"
+        }
       }
     },
     "pricingPreview": {
@@ -206,7 +662,10 @@
     "studio": {
       "imageId": null,
       "variants": [],
-      "alt": { "fr": "Sempra Studio", "en": "Sempra Studio" },
+      "alt": {
+        "fr": "Sempra Studio",
+        "en": "Sempra Studio"
+      },
       "title": {
         "fr": "Sempra",
         "en": "Sempra"

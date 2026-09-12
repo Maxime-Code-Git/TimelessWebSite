@@ -37,6 +37,6 @@ test.describe('Homepage', () => {
     // Click "Photo" tab
     await page.getByRole('button', { name: 'Photographie' }).click();
     await expect(page.getByRole('button', { name: 'Photographie' })).toHaveClass(/active/);
-    await expect(page.getByText(/Couverture photo/i).first()).toBeVisible();
+    await expect(page.getByText(/Les moments clés/i).first()).toBeVisible();
   });
 });

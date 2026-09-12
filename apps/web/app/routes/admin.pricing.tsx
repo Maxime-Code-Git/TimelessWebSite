@@ -180,9 +180,25 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting,
     });
   };
 
+
+  const moveItem = (cat: keyof PricingCategory, formulaIndex: number, itemIndex: number, direction: -1 | 1) => {
+    setPricing((prev) => {
+      const newItems = [...prev[cat][formulaIndex].includedItems];
+      if (itemIndex + direction >= 0 && itemIndex + direction < newItems.length) {
+        const temp = newItems[itemIndex];
+        newItems[itemIndex] = newItems[itemIndex + direction];
+        newItems[itemIndex + direction] = temp;
+      }
+      return {
+        ...prev,
+        [cat]: prev[cat].map((f, i) => i === formulaIndex ? { ...f, includedItems: newItems } : f)
+      };
+    });
+  };
+
   const addItem = (cat: keyof PricingCategory, formulaIndex: number) => {
     setPricing((prev) => {
-      const newItems = [...prev[cat][formulaIndex].includedItems, { id: Date.now().toString(), text: { fr: "", en: "" } }];
+      const newItems = [...prev[cat][formulaIndex].includedItems, { id: crypto.randomUUID(), text: { fr: "", en: "" } }];
       return {
         ...prev,
         [cat]: prev[cat].map((f, i) => i === formulaIndex ? { ...f, includedItems: newItems } : f)
@@ -242,38 +258,38 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting,
 
             <div className={styles.formulaEditorGrid}>
               <div className={styles.formGroup}>
-                <label>Nom (FR)</label>
-                <input type="text" value={formula.name.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "name", "fr", e.target.value)} className={styles.input} />
+                <label htmlFor={`name-fr-${idx}`}>Nom (FR)</label>
+                <input id={`name-fr-${idx}`} type="text" value={formula.name.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "name", "fr", e.target.value)} className={styles.input} />
               </div>
               <div className={styles.formGroup}>
-                <label>Nom (EN)</label>
-                <input type="text" value={formula.name.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "name", "en", e.target.value)} className={styles.input} />
-              </div>
-
-              <div className={styles.formGroup}>
-                <label>Résumé (FR) - affiché sur l'accueil</label>
-                <input type="text" value={formula.summary.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "summary", "fr", e.target.value)} className={styles.input} />
-              </div>
-              <div className={styles.formGroup}>
-                <label>Résumé (EN) - affiché sur l'accueil</label>
-                <input type="text" value={formula.summary.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "summary", "en", e.target.value)} className={styles.input} />
+                <label htmlFor={`name-en-${idx}`}>Nom (EN)</label>
+                <input id={`name-en-${idx}`} type="text" value={formula.name.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "name", "en", e.target.value)} className={styles.input} />
               </div>
 
               <div className={styles.formGroup}>
-                <label>Description complète (FR)</label>
-                <textarea value={formula.description.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "description", "fr", e.target.value)} className={styles.textarea} rows={3} />
+                <label htmlFor={`summary-fr-${idx}`}>Résumé (FR) - affiché sur l'accueil</label>
+                <input id={`summary-fr-${idx}`} type="text" value={formula.summary.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "summary", "fr", e.target.value)} className={styles.input} />
               </div>
               <div className={styles.formGroup}>
-                <label>Description complète (EN)</label>
-                <textarea value={formula.description.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "description", "en", e.target.value)} className={styles.textarea} rows={3} />
+                <label htmlFor={`summary-en-${idx}`}>Résumé (EN) - affiché sur l'accueil</label>
+                <input id={`summary-en-${idx}`} type="text" value={formula.summary.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "summary", "en", e.target.value)} className={styles.input} />
               </div>
 
               <div className={styles.formGroup}>
-                <label>Prix (€)</label>
-                <input type="number" min="0" max="100000" value={formula.priceCents / 100} onChange={(e) => handleChange(activeTab, idx, "priceEuros", e.target.value)} className={styles.input} />
+                <label htmlFor={`desc-fr-${idx}`}>Description complète (FR)</label>
+                <textarea id={`desc-fr-${idx}`} value={formula.description.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "description", "fr", e.target.value)} className={styles.textarea} rows={3} />
               </div>
               <div className={styles.formGroup}>
-                <label>Texte bouton (FR/EN)</label>
+                <label htmlFor={`desc-en-${idx}`}>Description complète (EN)</label>
+                <textarea id={`desc-en-${idx}`} value={formula.description.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "description", "en", e.target.value)} className={styles.textarea} rows={3} />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor={`price-${idx}`}>Prix (€)</label>
+                <input id={`price-${idx}`} type="number" min="0" max="100000" value={formula.priceCents / 100} onChange={(e) => handleChange(activeTab, idx, "priceEuros", e.target.value)} className={styles.input} />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Texte bouton (FR/EN) (Champs requis)</label>
                 <div className={styles.flexGap}>
                   <input type="text" value={formula.buttonText.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "buttonText", "fr", e.target.value)} className={styles.input} placeholder="FR" />
                   <input type="text" value={formula.buttonText.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "buttonText", "en", e.target.value)} className={styles.input} placeholder="EN" />
@@ -284,10 +300,12 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting,
             <div className={styles.itemsSection}>
               <h4>Éléments inclus</h4>
               {formula.includedItems.map((item, itemIdx) => (
-                <div key={itemIdx} className={styles.itemRow}>
-                  <input type="text" value={item.text.fr} onChange={(e) => handleItemChange(activeTab, idx, itemIdx, "fr", e.target.value)} className={styles.input} placeholder="Élément (FR)" />
-                  <input type="text" value={item.text.en} onChange={(e) => handleItemChange(activeTab, idx, itemIdx, "en", e.target.value)} className={styles.input} placeholder="Élément (EN)" />
-                  <button type="button" onClick={() => removeItem(activeTab, idx, itemIdx)} className={styles.deleteBtn}>X</button>
+                <div key={item.id} className={styles.itemRow}>
+                  <input type="text" value={item.text.fr} aria-label={`Élément en français ${itemIdx + 1}`} onChange={(e) => handleItemChange(activeTab, idx, itemIdx, "fr", e.target.value)} className={styles.input} placeholder="Élément (FR)" />
+                  <input type="text" value={item.text.en} aria-label={`Élément en anglais ${itemIdx + 1}`} onChange={(e) => handleItemChange(activeTab, idx, itemIdx, "en", e.target.value)} className={styles.input} placeholder="Élément (EN)" />
+                  <button type="button" onClick={() => moveItem(activeTab, idx, itemIdx, -1)} disabled={itemIdx === 0} aria-label="Monter l'élément" className={styles.iconBtn}>↑</button>
+                  <button type="button" onClick={() => moveItem(activeTab, idx, itemIdx, 1)} disabled={itemIdx === formula.includedItems.length - 1} aria-label="Descendre l'élément" className={styles.iconBtn}>↓</button>
+                  <button type="button" onClick={() => removeItem(activeTab, idx, itemIdx)} aria-label="Supprimer cet élément" className={styles.deleteBtn}>X</button>
                 </div>
               ))}
               <button type="button" onClick={() => addItem(activeTab, idx)} className={styles.addBtn}>+ Ajouter un élément</button>

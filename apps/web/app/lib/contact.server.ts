@@ -2,6 +2,7 @@ import { checkRateLimit } from "./rate-limit.server";
 import { sendContactEmail } from "./mailer.server";
 
 import { validateOrigin, getClientIp } from "./security.server";
+import { getSiteContent } from "./site-content.server";
 
 const MAX_BODY_SIZE = 100 * 1024; // 100 KB
 
@@ -102,7 +103,7 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
   }
 
   // Strict Max Lengths
-  if (names.length > 100 || email.length > 150 || date.length > 50 || location.length > 100 || message.length > 5000 || phone.length > 50) {
+  if (names.length > 100 || email.length > 150 || formula.length > 50 || date.length > 50 || location.length > 100 || message.length > 5000 || phone.length > 50) {
     return { error: lang === "fr" ? "Un ou plusieurs champs dépassent la taille maximale autorisée." : "One or more fields exceed the maximum allowed length." };
   }
 
@@ -117,10 +118,21 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
   }
 
   // Allowed formulas
-  const isLegacy = ["photo", "film", "duo", "custom", "unknown"].includes(formula);
-  const isDynamic = ["photo-", "film-", "duo-"].some(p => formula.startsWith(p));
-  if (!isLegacy && !isDynamic) {
-    return { error: lang === "fr" ? "Formule invalide." : "Invalid formula." };
+  const siteContent = getSiteContent();
+  let readableFormulaLabel;
+  if (formula === "custom") {
+    readableFormulaLabel = "Sur-mesure (custom)";
+  } else if (formula === "unknown") {
+    readableFormulaLabel = "Ne sait pas encore (unknown)";
+  } else {
+    const [cat, id] = formula.split("-");
+    const formulas = siteContent.pricing[cat as keyof typeof siteContent.pricing] || [];
+    const matched = formulas.find(f => f.id === id && f.enabled);
+    if (!matched) {
+      return { error: lang === "fr" ? "Formule invalide." : "Invalid formula." };
+    }
+    const catLabel = cat === "photo" ? "Photographie" : cat === "film" ? "Film" : "Duo";
+    readableFormulaLabel = `[${catLabel}] ${matched.name[lang]} (${formula})`;
   }
 
   // Validate Date
@@ -156,7 +168,7 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
       email,
       date,
       location,
-      formula,
+      formula: readableFormulaLabel,
       message,
       phone
     });
