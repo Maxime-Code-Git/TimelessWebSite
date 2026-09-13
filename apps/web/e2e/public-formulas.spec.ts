@@ -42,7 +42,7 @@ test.describe('Public Formulas & Admin Propagation', () => {
 
     // 4. Submit changes
     await page.locator('button', { hasText: 'Enregistrer les modifications' }).first().click();
-    await expect(page.locator('text=Tarifs mis à jour avec succès.')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("status")).toContainText("Formules et questions fréquentes mises à jour avec succès.", { timeout: 10_000 });
 
     // 5. Check Home Page (FR) for summary and name
     await page.goto('/fr');

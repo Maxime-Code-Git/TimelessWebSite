@@ -39,7 +39,7 @@ test.describe('Admin Content Management (Phase 3B)', () => {
 
     // Submit
     await page.click('button[type="submit"]');
-    await expect(page.locator('div[role="status"]')).toContainText('Tarifs mis à jour avec succès.');
+    await expect(page.getByRole("status")).toContainText("Formules et questions fréquentes mises à jour avec succès.");
 
     // Verify on public page (FR)
     await page.goto('/fr/formules');
