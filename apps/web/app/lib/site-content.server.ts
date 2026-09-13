@@ -680,10 +680,7 @@ export function validateSiteContent(data: unknown): SiteContent {
       pp.duoPrestigeDescription = pp.duoPrestigeDescription || { fr: "Description", en: "Description" };
     }
 
-    const getDesc = (key: string) => {
-      const val = pp[key] as { fr?: string, en?: string } | undefined;
-      return val ? { fr: val.fr || "Description", en: val.en || "Description" } : { fr: "Description", en: "Description" };
-    };
+
 
 
     const migrateCategory = (catData: unknown, prefix: keyof typeof defaultContent.pricing): unknown[] => {
@@ -700,9 +697,13 @@ export function validateSiteContent(data: unknown): SiteContent {
 
         const defaultCat = defaultContent.pricing[prefix] || [];
         const fallback = defaultCat.find(d => d.id === id) || {
+          priceCents: 0,
+          featured: false,
           name: { fr: "Formule", en: "Package" },
+          summary: { fr: "Résumé", en: "Summary" },
           description: { fr: "Description", en: "Description" },
           includedItems: [],
+          buttonText: { fr: "Contact", en: "Contact" }
         };
 
         const includedItems = fallback.includedItems.map((item, itemIdx) => ({
@@ -710,14 +711,23 @@ export function validateSiteContent(data: unknown): SiteContent {
           id: `${prefix}-${id}-${itemIdx}`
         }));
 
+        const val = pp[descKey] as { fr?: string, en?: string } | undefined;
+        const summaryFr = val?.fr || fallback.summary.fr;
+        const summaryEn = val?.en || fallback.summary.en;
+
+        const priceCents = typeof fRecord.priceCents === "number" ? fRecord.priceCents : fallback.priceCents;
+        const featured = typeof fRecord.featured === "boolean" ? fRecord.featured : fallback.featured;
+
         return {
-          ...fRecord,
+          id,
+          priceCents,
+          featured,
           enabled: true,
           name: JSON.parse(JSON.stringify(fallback.name)),
-          summary: getDesc(descKey),
+          summary: { fr: summaryFr, en: summaryEn },
           description: JSON.parse(JSON.stringify(fallback.description)),
           includedItems,
-          buttonText: { fr: "Contact", en: "Contact" }
+          buttonText: JSON.parse(JSON.stringify(fallback.buttonText))
         };
       });
     };

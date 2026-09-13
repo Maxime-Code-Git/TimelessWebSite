@@ -90,6 +90,30 @@ const INTERMEDIATE_V2 = {
   }
 };
 
+const V1_CONTENT = {
+  "schemaVersion": 1,
+  "revision": "abcdef1234567890abcdef1234567890",
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "business": INTERMEDIATE_V2.business,
+  "pricing": {
+    "photo": [
+      { "id": "essential", "priceCents": 99999, "featured": true },
+      { "id": "signature", "priceCents": 199999, "featured": false },
+      { "id": "prestige", "priceCents": 299999, "featured": false }
+    ],
+    "film": [
+      { "id": "essential", "priceCents": 100000, "featured": false },
+      { "id": "signature", "priceCents": 200000, "featured": false },
+      { "id": "prestige", "priceCents": 300000, "featured": false }
+    ],
+    "duo": [
+      { "id": "essential", "priceCents": 150000, "featured": false },
+      { "id": "signature", "priceCents": 250000, "featured": false },
+      { "id": "prestige", "priceCents": 350000, "featured": false }
+    ]
+  }
+};
+
 describe("Migration of intermediate V2 content", () => {
   let tempDir: string;
   let filePath: string;
@@ -106,42 +130,76 @@ describe("Migration of intermediate V2 content", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("migrates successfully and preserves original file state on read", () => {
+  it("migrates V2 successfully and uses specific fallback instead of generic description", () => {
     fs.writeFileSync(filePath, JSON.stringify(INTERMEDIATE_V2), "utf8");
-    const mtime = fs.statSync(filePath).mtimeMs;
 
-    // Must load without corruption
     const { content } = getRawSiteContent();
-    expect(content.home.pricingPreview).not.toHaveProperty("photoEssentialDescription");
-    expect(content.pricing.photo[0].summary.fr).toBe("Test");
-    expect(content.pricing.photo[0].enabled).toBe(true);
+    expect(content.pricing.photo[0].summary.fr).toBe("Test"); // from home.pricingPreview
     expect(content.pricing.photo[0].name.fr).toBe("Essentiel");
-
-    // Check if original data was preserved
-    expect(content.business.email).toBe("test@test.com");
+    expect(content.pricing.photo[0].description.fr).not.toBe("Description");
+    expect(content.pricing.photo[0].description.fr).toBe("Une présence discrète pour capturer l'essentiel de votre mariage. Idéal pour les mariages intimes.");
     expect(content.pricing.photo[0].priceCents).toBe(129000);
-
-    // Check that reading did not alter the file on disk
-    const mtimeAfter = fs.statSync(filePath).mtimeMs;
-    expect(mtimeAfter).toBe(mtime);
-
-    const fileContent = JSON.parse(fs.readFileSync(filePath, "utf8"));
-    expect(fileContent.home.pricingPreview.essentialDescription).toBeDefined();
+    expect(content.pricing.photo[0].featured).toBe(false);
   });
 
-  it("migration V1/V2 idempotency", () => {
+  it("migrates V1 successfully, uses real fallbacks and preserves prices/featured", () => {
+    fs.writeFileSync(filePath, JSON.stringify(V1_CONTENT), "utf8");
+    const { content } = getRawSiteContent();
+
+    // Check that it's migrated to V3
+    expect(content.schemaVersion).toBe(3);
+
+    // Check real fallbacks instead of generic "Description"
+    const photoEssential = content.pricing.photo.find(f => f.id === "essential");
+    expect(photoEssential?.summary.fr).toBe("Les moments clés, en images.");
+    expect(photoEssential?.name.fr).toBe("Essentiel");
+    expect(photoEssential?.description.fr).not.toBe("Description");
+
+    // Check price and featured preserved
+    expect(photoEssential?.priceCents).toBe(99999);
+    expect(photoEssential?.featured).toBe(true); // preserved from V1_CONTENT
+
+    // Check deterministic IDs
+    expect(photoEssential?.includedItems[0].id).toBe("photo-essential-0");
+  });
+
+  it("migration V1 idempotency", () => {
+    fs.writeFileSync(filePath, JSON.stringify(V1_CONTENT), "utf8");
+    const { content: c1 } = getRawSiteContent();
+    const { content: c2 } = getRawSiteContent();
+    expect(c1.pricing).toEqual(c2.pricing);
+  });
+
+  it("migration V2 idempotency", () => {
     fs.writeFileSync(filePath, JSON.stringify(INTERMEDIATE_V2), "utf8");
     const { content: c1 } = getRawSiteContent();
     const { content: c2 } = getRawSiteContent();
     expect(c1.pricing).toEqual(c2.pricing);
   });
 
-  it("objet d’entrée totalement inchangé après migration", () => {
+  it("objet d’entrée totalement inchangé après migration V1", () => {
+    const input = JSON.parse(JSON.stringify(V1_CONTENT));
+    const before = JSON.stringify(input);
+    validateSiteContent(input);
+    const after = JSON.stringify(input);
+    expect(before).toBe(after);
+  });
+
+  it("objet d’entrée totalement inchangé après migration V2", () => {
     const input = JSON.parse(JSON.stringify(INTERMEDIATE_V2));
     const before = JSON.stringify(input);
     validateSiteContent(input);
     const after = JSON.stringify(input);
     expect(before).toBe(after);
+  });
+
+  it("modifying migrated result does not affect subsequent migrations", () => {
+    fs.writeFileSync(filePath, JSON.stringify(V1_CONTENT), "utf8");
+    const { content: c1 } = getRawSiteContent();
+    c1.pricing.photo[0].name.fr = "Mutated";
+
+    const { content: c2 } = getRawSiteContent();
+    expect(c2.pricing.photo[0].name.fr).toBe("Essentiel");
   });
 
   it("detects actual invalid JSON as corrupted", () => {

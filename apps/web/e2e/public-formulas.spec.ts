@@ -1,40 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { restoreDefaultSiteContent } from './test-helpers';
 
 test.describe('Public Formulas & Admin Propagation', () => {
-  test.afterEach(async ({ page }) => {
-    try {
-      // Clean up: Delete added item, re-enable photo-signature, restore text
-      await page.goto('/admin');
-      await page.goto('/admin/pricing');
+  test.beforeEach(() => {
+    restoreDefaultSiteContent();
+  });
 
-      const essentialFormula = page.getByTestId('formula-card-photo-essential');
-
-      // Delete "Test Propagation FR" if exists
-      const testInputs = essentialFormula.locator('input[value="Test Propagation FR"]');
-      if (await testInputs.count() > 0) {
-        const row = testInputs.first().locator('..');
-        await row.locator('button[aria-label="Supprimer cet élément"]').click();
-      }
-
-      // Restore Name
-      await essentialFormula.locator('label', { hasText: 'Nom (FR)' }).locator('..').locator('input').fill('Essentiel');
-      // Restore Summary
-      await essentialFormula.locator('label', { hasText: 'Résumé (FR)' }).locator('..').locator('input').fill('Les moments clés, en images.');
-      // Restore Description
-      await essentialFormula.locator('label', { hasText: 'Description complète (FR)' }).locator('..').locator('textarea').fill('Une présence discrète pour capturer l\'essentiel de votre mariage. Idéal pour les mariages intimes.');
-
-      // Re-enable photo-signature
-      const signatureFormula = page.getByTestId('formula-card-photo-signature');
-      const checkbox = signatureFormula.locator('input[type="checkbox"]');
-      if (!(await checkbox.isChecked())) {
-        await checkbox.check();
-      }
-
-      await page.locator('button', { hasText: 'Enregistrer les modifications' }).first().click();
-      await expect(page.locator('text=Tarifs mis à jour avec succès.')).toBeVisible({ timeout: 10000 });
-    } catch {
-      // Ignore cleanup errors
-    }
+  test.afterEach(() => {
+    restoreDefaultSiteContent();
   });
 
   test('admin changes propagate to Home, Formules, and Contact, keeping ?formula= in URL across languages', async ({ page }) => {
@@ -73,6 +46,7 @@ test.describe('Public Formulas & Admin Propagation', () => {
 
     // 5. Check Home Page (FR) for summary and name
     await page.goto('/fr');
+    await page.getByRole('button', { name: 'Photographie' }).click();
     await expect(page.getByText('Essentiel Modifié').first()).toBeVisible();
     await expect(page.getByText('Résumé Modifié').first()).toBeVisible();
     await expect(page.getByText('Signature').first()).not.toBeVisible();
@@ -88,6 +62,13 @@ test.describe('Public Formulas & Admin Propagation', () => {
     // 7. Check Contact Page with URL Param (FR)
     await page.goto('/fr/contact?formula=photo-essential');
     await expect(page.locator('select[name="formula"]')).toHaveValue('photo-essential');
+
+    // Check that the option text contains the customized name
+    const selectedOption = page.locator('select[name="formula"] option[value="photo-essential"]');
+    await expect(selectedOption).toContainText('Essentiel Modifié');
+
+    // Ensure signature formula is missing
+    await expect(page.locator('select[name="formula"] option[value="photo-signature"]')).not.toBeAttached();
 
     // Switch to English and ensure ?formula= is kept
     await page.getByRole('link', { name: 'Switch to EN' }).click();
