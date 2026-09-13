@@ -8,11 +8,59 @@ import {
   saveSettings,
   RevisionConflictError,
   ValidationError,
-  CorruptedContentError
+  CorruptedContentError,
+  validateSiteContent,
+  savePricingAndFaq
 } from "../app/lib/site-content.server";
 import defaultContent from "../app/content/default-site-content.json";
 
 describe("site-content.server.ts", () => {
+  describe("FAQ Validation", () => {
+    it("rejects duplicate IDs", () => {
+      const data = JSON.parse(JSON.stringify(defaultContent));
+      data.pricingPage.faqs.push(data.pricingPage.faqs[0]);
+      expect(() => validateSiteContent(data)).toThrow(/unique ids/i);
+    });
+
+    it("rejects invalid enabled", () => {
+      const data = JSON.parse(JSON.stringify(defaultContent));
+      data.pricingPage.faqs[0].enabled = "yes";
+      expect(() => validateSiteContent(data)).toThrow(/Invalid enabled boolean/i);
+    });
+
+    it("rejects empty questions/answers", () => {
+      const data = JSON.parse(JSON.stringify(defaultContent));
+      data.pricingPage.faqs[0].question.fr = "   ";
+      expect(() => validateSiteContent(data)).toThrow(/required/i);
+    });
+
+    it("rejects more than 20 FAQs", () => {
+      const data = JSON.parse(JSON.stringify(defaultContent));
+      const faq = data.pricingPage.faqs[0];
+      data.pricingPage.faqs = Array.from({ length: 21 }).map((_, i) => ({ ...faq, id: `id-${i}` }));
+      expect(() => validateSiteContent(data)).toThrow(/cannot exceed 20 items/i);
+    });
+
+    it("respects length limits", () => {
+      const data = JSON.parse(JSON.stringify(defaultContent));
+      data.pricingPage.faqs[0].question.fr = "A".repeat(501);
+      expect(() => validateSiteContent(data)).toThrow(/too long/i);
+    });
+  });
+
+  describe("Admin Save", () => {
+    it("savePricingAndFaq saves atomically and handles revision conflict", () => {
+      const data = JSON.parse(JSON.stringify(defaultContent));
+      expect(() => savePricingAndFaq(data.pricing, data.pricingPage, "wrong-rev")).toThrow(/Revision conflict/i);
+    });
+    
+    it("savePricingAndFaq aborts if data is invalid", () => {
+      const data = JSON.parse(JSON.stringify(defaultContent));
+      data.pricingPage.faqs.push(data.pricingPage.faqs[0]); // invalid
+      expect(() => savePricingAndFaq(data.pricing, data.pricingPage, data.revision)).toThrow(/unique/i);
+    });
+  });
+
   const tempDir = path.join(__dirname, "temp-data");
   const tempFile = path.join(tempDir, "site-content.json");
 

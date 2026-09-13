@@ -78,4 +78,54 @@ describe("Formules Component", () => {
     expect(questionBtn).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText(/Un acompte de réservation est demandé à la signature/i)).not.toBeInTheDocument();
   });
+
+  describe("FAQ Visibility", () => {
+    let originalFaqs: any;
+
+    beforeEach(() => {
+      originalFaqs = JSON.parse(JSON.stringify(mockedContent.pricingPage.faqs));
+    });
+
+    afterEach(() => {
+      mockedContent.pricingPage.faqs = originalFaqs;
+    });
+
+    it("hides FAQ section if all questions are disabled", () => {
+      mockedContent.pricingPage.faqs = [
+        { id: "1", enabled: false, question: { fr: "Q1", en: "Q1" }, answer: { fr: "A1", en: "A1" } }
+      ];
+
+      render(
+        <MemoryRouter>
+          <FormulesFr />
+        </MemoryRouter>
+      );
+      
+      expect(screen.queryByTestId("pricing-faq-section")).not.toBeInTheDocument();
+    });
+
+    it("hides only disabled questions and opens the first visible one by default", () => {
+      mockedContent.pricingPage.faqs = [
+        { id: "1", enabled: false, question: { fr: "Q1", en: "Q1" }, answer: { fr: "A1", en: "A1" } },
+        { id: "2", enabled: true, question: { fr: "Q2", en: "Q2" }, answer: { fr: "A2", en: "A2" } },
+        { id: "3", enabled: true, question: { fr: "Q3", en: "Q3" }, answer: { fr: "A3", en: "A3" } }
+      ];
+
+      render(
+        <MemoryRouter>
+          <FormulesFr />
+        </MemoryRouter>
+      );
+
+      expect(screen.getByTestId("pricing-faq-section")).toBeInTheDocument();
+      expect(screen.queryByText("Q1")).not.toBeInTheDocument();
+      expect(screen.getByText("Q2")).toBeInTheDocument();
+      expect(screen.getByText("Q3")).toBeInTheDocument();
+
+      const btn2 = screen.getByRole("button", { name: /Q2/i });
+      const btn3 = screen.getByRole("button", { name: /Q3/i });
+      expect(btn2).toHaveAttribute("aria-expanded", "true");
+      expect(btn3).toHaveAttribute("aria-expanded", "false");
+    });
+  });
 });

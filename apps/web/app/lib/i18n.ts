@@ -62,7 +62,11 @@ export interface PortfolioStrings {
 export interface FormulesStrings {
   title: string;
   subtitle: string;
-  categoryLabels: Record<string, string>;
+  categoryLabels: {
+    photo: string;
+    film: string;
+    duo: string;
+  };
   promo: string;
   promoBold: string;
   caveat: string;
@@ -72,6 +76,8 @@ export interface FormulesStrings {
   customCta: string;
   featuredBadge: string;
 }
+
+
 
 /* ── About page ─────────────────────────────────────────── */
 export interface AboutStrings {
@@ -205,7 +211,8 @@ const FR: I18nStrings = {
     heroTitle: "Arrêter le temps,\ngarder l'émotion.",
     heroSubtitle: "Un seul studio pour votre film et vos photographies.",
     heroFilmBtn: "Voir le film",
-    editorialText: "Le jour passe en un souffle. Notre métier est de le rendre",
+    editorialText:
+      "Le jour passe en un souffle. Notre métier est de le rendre",
     editorialEmphasis: "éternel",
     portfolioTitle: "Portfolio",
     portfolioPhoto: "Photographie",
@@ -213,7 +220,8 @@ const FR: I18nStrings = {
     portfolioFilm: "Film",
     portfolioFilmSub: "Voir les extraits",
     formulesTitle: "Nos formules",
-    formulesPromo: "Photo et film réunis sous un même studio\u00a0: ",
+    formulesPromo:
+      "Photo et film réunis sous un même studio\u00a0: ",
     formulesPromoBold:
       "une cohérence — et un tarif — impossibles à obtenir avec deux prestataires séparés.",
     formulesCaveat:
@@ -254,10 +262,12 @@ const FR: I18nStrings = {
       film: "Film",
       duo: "Photo & Film",
     },
-    promo: "Photo et film réunis sous un même studio\u00a0: ",
+    promo:
+      "Photo et film réunis sous un même studio\u00a0: ",
     promoBold:
       "une cohérence — et un tarif — impossibles à obtenir avec deux prestataires séparés.",
-    caveat: "* Photos et vidéos conservées et disponibles pendant 24 mois",
+    caveat:
+      "* Photos et vidéos conservées et disponibles pendant 24 mois",
     customEyebrow: "Sur-mesure",
     customTitle:
       "Un très grand projet, un mariage sur plusieurs jours, des envies particulières\u00a0?",
@@ -309,7 +319,8 @@ const FR: I18nStrings = {
       "Sélectionnez le jour et l'heure qui vous conviennent pour un appel de 30 minutes.",
     bookingNote: "Appels disponibles les mardis et jeudis.",
     slotsTitle: "Créneaux disponibles",
-    slotsEmpty: "Sélectionnez d'abord un mardi ou un jeudi dans le calendrier.",
+    slotsEmpty:
+      "Sélectionnez d'abord un mardi ou un jeudi dans le calendrier.",
     confirmBtn: "Confirmer le rendez-vous",
     recapPrefix: "Votre appel\u00a0: ",
     recapNone: "aucun créneau sélectionné",
@@ -334,7 +345,8 @@ const FR: I18nStrings = {
       formulaDefault: "Sélectionner…",
       formulaSurMesure: "Sur-mesure",
       formulaDontKnow: "Je ne sais pas encore",
-      message: "Racontez-nous votre projet, vos envies, votre journée…",
+      message:
+        "Racontez-nous votre projet, vos envies, votre journée…",
     },
     coordTitle: "Coordonnées",
     coordLabels: {
@@ -346,22 +358,11 @@ const FR: I18nStrings = {
     coordResponseTime: "Nous répondons sous 48h.",
     bannerText: "Envie d'en savoir plus sur nos formules\u00a0?",
     bannerLink: "Voir nos formules",
-    submitUnavailable:
-      "La réservation en ligne est temporairement indisponible. Veuillez nous écrire directement via le formulaire ou par e-mail.",
+    submitUnavailable: "La réservation en ligne est temporairement indisponible. Veuillez nous écrire directement via le formulaire ou par e-mail.",
     weekdays: ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"],
     months: [
-      "Janvier",
-      "Février",
-      "Mars",
-      "Avril",
-      "Mai",
-      "Juin",
-      "Juillet",
-      "Août",
-      "Septembre",
-      "Octobre",
-      "Novembre",
-      "Décembre",
+      "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
     ],
   },
   clients: {
@@ -412,7 +413,8 @@ const EN: I18nStrings = {
     heroTitle: "Stop time,\nkeep the emotion.",
     heroSubtitle: "One studio for your film and your photographs.",
     heroFilmBtn: "Watch the film",
-    editorialText: "The day passes in a heartbeat. Our craft is to make it",
+    editorialText:
+      "The day passes in a heartbeat. Our craft is to make it",
     editorialEmphasis: "eternal",
     portfolioTitle: "Portfolio",
     portfolioPhoto: "Photography",
@@ -420,10 +422,12 @@ const EN: I18nStrings = {
     portfolioFilm: "Film",
     portfolioFilmSub: "Watch highlights",
     formulesTitle: "Our packages",
-    formulesPromo: "Photo and film united under one studio: ",
+    formulesPromo:
+      "Photo and film united under one studio: ",
     formulesPromoBold:
       "a consistency — and a price — impossible to achieve with two separate providers.",
-    formulesCaveat: "* Photos and videos stored and available for 24 months",
+    formulesCaveat:
+      "* Photos and videos stored and available for 24 months",
     formulesContact: "Contact us",
     formulesCustom: "Special requirements?",
     formulesCustomEm: "A bespoke package is possible.",
@@ -439,7 +443,8 @@ const EN: I18nStrings = {
   },
   portfolio: {
     title: "Photography",
-    subtitle: "An honest look at your moments, captured as they are lived.",
+    subtitle:
+      "An honest look at your moments, captured as they are lived.",
     tabPhoto: "Photo",
     tabVideo: "Video",
     filterAll: "All",
@@ -459,13 +464,17 @@ const EN: I18nStrings = {
       film: "Film",
       duo: "Photo & Film",
     },
-    promo: "Photo and film united under one studio: ",
+    promo:
+      "Photo and film united under one studio: ",
     promoBold:
       "a consistency — and a price — impossible to achieve with two separate providers.",
-    caveat: "* Photos and videos stored and available for 24 months",
+    caveat:
+      "* Photos and videos stored and available for 24 months",
     customEyebrow: "Bespoke",
-    customTitle: "A grand project, a multi-day wedding, or unique wishes?",
-    customText: "Let's create a package tailored to your event together.",
+    customTitle:
+      "A grand project, a multi-day wedding, or unique wishes?",
+    customText:
+      "Let's create a package tailored to your event together.",
     customCta: "Request a bespoke quote",
     featuredBadge: "Most popular",
   },
@@ -500,7 +509,8 @@ const EN: I18nStrings = {
   },
   contact: {
     heroTitle: "Let's tell your day.",
-    heroSubtitle: "Write to us, no commitment — we'll take the time to reply.",
+    heroSubtitle:
+      "Write to us, no commitment — we'll take the time to reply.",
     callTitle: "Want to speak in person?",
     callSubtitle:
       "A free discovery call, no commitment, to get to know each other and discuss your wedding.",
@@ -511,12 +521,14 @@ const EN: I18nStrings = {
       "Select the day and time that suit you for a 30-minute call.",
     bookingNote: "Calls available on Tuesdays and Thursdays.",
     slotsTitle: "Available slots",
-    slotsEmpty: "First select a Tuesday or Thursday in the calendar.",
+    slotsEmpty:
+      "First select a Tuesday or Thursday in the calendar.",
     confirmBtn: "Confirm appointment",
     recapPrefix: "Your call: ",
     recapNone: "no slot selected",
     recapChooseTime: "— choose a time",
-    formPrompt: "Prefer to write? Fill out the form below.",
+    formPrompt:
+      "Prefer to write? Fill out the form below.",
     formLabels: {
       names: "Names of the couple",
       email: "Email address",
@@ -535,7 +547,8 @@ const EN: I18nStrings = {
       formulaDefault: "Select…",
       formulaSurMesure: "Bespoke",
       formulaDontKnow: "I don't know yet",
-      message: "Tell us about your project, your wishes, your day…",
+      message:
+        "Tell us about your project, your wishes, your day…",
     },
     coordTitle: "Contact details",
     coordLabels: {
@@ -547,27 +560,17 @@ const EN: I18nStrings = {
     coordResponseTime: "We reply within 48h.",
     bannerText: "Want to learn more about our packages?",
     bannerLink: "View our packages",
-    submitUnavailable:
-      "Online booking is temporarily unavailable. Please contact us directly via the form or by email.",
+    submitUnavailable: "Online booking is temporarily unavailable. Please contact us directly via the form or by email.",
     weekdays: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
     months: [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
     ],
   },
   clients: {
     title: "Your private gallery",
-    subtitle: "Access your photos and film here, with the code from your card.",
+    subtitle:
+      "Access your photos and film here, with the code from your card.",
     accessLabel: "Your access code",
     accessPlaceholder: "E.g. TM-2026-XXXX",
     submitBtn: "Access my gallery",

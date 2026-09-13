@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { getRawSiteContent, validateSiteContent } from "../app/lib/site-content.server";
+import defaultContent from "../app/content/default-site-content.json";
 
 const INTERMEDIATE_V2 = {
   "schemaVersion": 2,
@@ -234,5 +235,36 @@ describe("Migration of intermediate V2 content", () => {
 
     const { isCorrupted } = getRawSiteContent();
     expect(isCorrupted).toBe(true);
+  });
+
+  describe("Migration V3 to V4 (FAQ Admin)", () => {
+    it("adds pricingPage with defaults and preserves all old data", () => {
+      const v3Data = JSON.parse(JSON.stringify(defaultContent));
+      v3Data.schemaVersion = 3;
+      delete v3Data.pricingPage;
+      v3Data.business.email = "v3@test.com";
+
+      const originalJson = JSON.stringify(v3Data);
+
+      const migrated = validateSiteContent(v3Data);
+      expect(migrated.schemaVersion).toBe(4);
+      expect(migrated.business.email).toBe("v3@test.com");
+      expect(migrated.pricingPage).toBeDefined();
+      expect(migrated.pricingPage.faqs).toHaveLength(defaultContent.pricingPage.faqs.length);
+      
+      // No mutation
+      expect(JSON.stringify(v3Data)).toBe(originalJson);
+      
+      // No shared references
+      migrated.pricingPage.faqs[0].id = "mutated";
+      expect(defaultContent.pricingPage.faqs[0].id).not.toBe("mutated");
+    });
+
+    it("is idempotent for V4", () => {
+      const v4Data = JSON.parse(JSON.stringify(defaultContent));
+      const migrated1 = validateSiteContent(v4Data);
+      const migrated2 = validateSiteContent(migrated1);
+      expect(migrated1).toEqual(migrated2);
+    });
   });
 });

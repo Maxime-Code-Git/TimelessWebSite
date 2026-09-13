@@ -125,7 +125,7 @@ export function FormulesPage({ lang }: FormulesPageProps) {
 
       {/* FAQ Section */}
       {visibleFaqs.length > 0 && (
-        <section className={styles.faqSection}>
+        <section className={styles.faqSection} data-testid="pricing-faq-section">
           <div className={styles.faqInner}>
             <p className={styles.faqTitle}>{siteContent?.pricingPage?.faqTitle[lang]}</p>
             <div className={styles.faqList}>

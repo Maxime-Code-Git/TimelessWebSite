@@ -74,6 +74,7 @@ export interface PortfolioCardContent {
   height?: number;
 }
 
+
 export interface PricingFaqItem {
   id: string;
   enabled: boolean;
@@ -171,10 +172,7 @@ function assertExactKeys(obj: unknown, allowedKeys: string[], context: string) {
   }
 }
 
-function validateFormulaIncludedItem(
-  data: unknown,
-  context: string,
-): FormulaIncludedItem {
+function validateFormulaIncludedItem(data: unknown, context: string): FormulaIncludedItem {
   assertExactKeys(data, ["id", "text"], context);
   const obj = data as Record<string, unknown>;
 
@@ -184,46 +182,21 @@ function validateFormulaIncludedItem(
 
   return {
     id: obj.id,
-    text: validateLocalizedString(obj.text, `${context}.text`, 1000),
+    text: validateLocalizedString(obj.text, `${context}.text`, 1000)
   };
 }
 
-function validateFormula(
-  data: unknown,
-  expectedId: string,
-  context: string,
-): Formula {
-  assertExactKeys(
-    data,
-    [
-      "id",
-      "priceCents",
-      "featured",
-      "enabled",
-      "name",
-      "summary",
-      "description",
-      "includedItems",
-      "buttonText",
-    ],
-    context,
-  );
+function validateFormula(data: unknown, expectedId: string, context: string): Formula {
+  assertExactKeys(data, ["id", "priceCents", "featured", "enabled", "name", "summary", "description", "includedItems", "buttonText"], context);
 
   const obj = data as Record<string, unknown>;
 
   if (obj.id !== expectedId) {
-    throw new ValidationError(
-      `Invalid id in ${context}, expected ${expectedId}`,
-    );
+    throw new ValidationError(`Invalid id in ${context}, expected ${expectedId}`);
   }
 
   const priceCents = obj.priceCents;
-  if (
-    typeof priceCents !== "number" ||
-    !Number.isInteger(priceCents) ||
-    priceCents <= 0 ||
-    priceCents > 10000000
-  ) {
+  if (typeof priceCents !== "number" || !Number.isInteger(priceCents) || priceCents <= 0 || priceCents > 10000000) {
     throw new ValidationError(`Invalid priceCents in ${context}`);
   }
 
@@ -248,19 +221,9 @@ function validateFormula(
     enabled,
     name: validateLocalizedString(obj.name, `${context}.name`, 255),
     summary: validateLocalizedString(obj.summary, `${context}.summary`, 1000),
-    description: validateLocalizedString(
-      obj.description,
-      `${context}.description`,
-      5000,
-    ),
-    includedItems: obj.includedItems.map((item, index) =>
-      validateFormulaIncludedItem(item, `${context}.includedItems[${index}]`),
-    ),
-    buttonText: validateLocalizedString(
-      obj.buttonText,
-      `${context}.buttonText`,
-      255,
-    ),
+    description: validateLocalizedString(obj.description, `${context}.description`, 5000),
+    includedItems: obj.includedItems.map((item, index) => validateFormulaIncludedItem(item, `${context}.includedItems[${index}]`)),
+    buttonText: validateLocalizedString(obj.buttonText, `${context}.buttonText`, 255)
   };
 }
 
@@ -269,52 +232,18 @@ function validateCategory(data: unknown, categoryName: string): Formula[] {
     throw new ValidationError(`Category ${categoryName} must be an array`);
   }
   if (data.length !== 3) {
-    throw new ValidationError(
-      `Category ${categoryName} must have exactly 3 formulas`,
-    );
+    throw new ValidationError(`Category ${categoryName} must have exactly 3 formulas`);
   }
 
   const formulas = [
-    validateFormula(
-      data.find(
-        (f) =>
-          typeof f === "object" &&
-          f !== null &&
-          "id" in f &&
-          f.id === "essential",
-      ),
-      "essential",
-      `${categoryName} > essential`,
-    ),
-    validateFormula(
-      data.find(
-        (f) =>
-          typeof f === "object" &&
-          f !== null &&
-          "id" in f &&
-          f.id === "signature",
-      ),
-      "signature",
-      `${categoryName} > signature`,
-    ),
-    validateFormula(
-      data.find(
-        (f) =>
-          typeof f === "object" &&
-          f !== null &&
-          "id" in f &&
-          f.id === "prestige",
-      ),
-      "prestige",
-      `${categoryName} > prestige`,
-    ),
+    validateFormula(data.find(f => typeof f === "object" && f !== null && "id" in f && f.id === "essential"), "essential", `${categoryName} > essential`),
+    validateFormula(data.find(f => typeof f === "object" && f !== null && "id" in f && f.id === "signature"), "signature", `${categoryName} > signature`),
+    validateFormula(data.find(f => typeof f === "object" && f !== null && "id" in f && f.id === "prestige"), "prestige", `${categoryName} > prestige`),
   ];
 
-  const featuredCount = formulas.filter((f) => f.featured).length;
+  const featuredCount = formulas.filter(f => f.featured).length;
   if (featuredCount > 1) {
-    throw new ValidationError(
-      `Category ${categoryName} can have at most 1 featured formula`,
-    );
+    throw new ValidationError(`Category ${categoryName} can have at most 1 featured formula`);
   }
 
   return formulas;
@@ -331,20 +260,13 @@ function validatePricing(data: unknown): PricingCategory {
   };
 }
 
-function validateStringOrNull(
-  value: unknown,
-  name: string,
-  maxLength = 255,
-): string | null {
+function validateStringOrNull(value: unknown, name: string, maxLength = 255): string | null {
   if (value === undefined || value === null || value === "") return null;
-  if (typeof value !== "string")
-    throw new ValidationError(`${name} must be a string or null`);
+  if (typeof value !== "string") throw new ValidationError(`${name} must be a string or null`);
   const trimmed = value.trim();
   if (trimmed === "") return null;
-  if (trimmed.length > maxLength)
-    throw new ValidationError(`${name} is too long (max ${maxLength})`);
-  if (trimmed.includes("<") || trimmed.includes(">"))
-    throw new ValidationError(`${name} contains forbidden HTML characters`);
+  if (trimmed.length > maxLength) throw new ValidationError(`${name} is too long (max ${maxLength})`);
+  if (trimmed.includes("<") || trimmed.includes(">")) throw new ValidationError(`${name} contains forbidden HTML characters`);
   return trimmed;
 }
 
@@ -359,9 +281,7 @@ function validateEmail(value: unknown): string | null {
 function validatePhoneE164(value: unknown): string | null {
   const phone = validateStringOrNull(value, "phoneE164", 20);
   if (phone && !/^\+\d{10,15}$/.test(phone)) {
-    throw new ValidationError(
-      "phoneE164 must start with + and contain only digits",
-    );
+    throw new ValidationError("phoneE164 must start with + and contain only digits");
   }
   return phone;
 }
@@ -390,39 +310,18 @@ function validateHttpsUrl(value: unknown, name: string): string | null {
 
 function validateDepositPercent(value: unknown): number | null {
   if (value === undefined || value === null || value === "") return null;
-  if (
-    typeof value !== "number" ||
-    !Number.isInteger(value) ||
-    value < 0 ||
-    value > 100
-  ) {
-    throw new ValidationError(
-      "depositPercent must be an integer between 0 and 100",
-    );
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 100) {
+    throw new ValidationError("depositPercent must be an integer between 0 and 100");
   }
   return value;
 }
 
 function validateBusiness(data: unknown): BusinessContent {
-  assertExactKeys(
-    data,
-    [
-      "email",
-      "phoneDisplay",
-      "phoneE164",
-      "address",
-      "enterpriseNumber",
-      "legalForm",
-      "legalRepresentative",
-      "hostingProvider",
-      "hostingAddress",
-      "depositPercent",
-      "instagramUrl",
-      "linkedinUrl",
-      "serviceArea",
-    ],
-    "business",
-  );
+  assertExactKeys(data, [
+    "email", "phoneDisplay", "phoneE164", "address", "enterpriseNumber",
+    "legalForm", "legalRepresentative", "hostingProvider", "hostingAddress",
+    "depositPercent", "instagramUrl", "linkedinUrl", "serviceArea"
+  ], "business");
 
   const obj = data as Record<string, unknown>;
   assertExactKeys(obj.serviceArea, ["fr", "en"], "serviceArea");
@@ -440,42 +339,22 @@ function validateBusiness(data: unknown): BusinessContent {
     phoneDisplay: validateStringOrNull(obj.phoneDisplay, "phoneDisplay", 50),
     phoneE164: validatePhoneE164(obj.phoneE164),
     address: validateStringOrNull(obj.address, "address", 255),
-    enterpriseNumber: validateStringOrNull(
-      obj.enterpriseNumber,
-      "enterpriseNumber",
-      50,
-    ),
+    enterpriseNumber: validateStringOrNull(obj.enterpriseNumber, "enterpriseNumber", 50),
     legalForm: validateStringOrNull(obj.legalForm, "legalForm", 100),
-    legalRepresentative: validateStringOrNull(
-      obj.legalRepresentative,
-      "legalRepresentative",
-      100,
-    ),
-    hostingProvider: validateStringOrNull(
-      obj.hostingProvider,
-      "hostingProvider",
-      100,
-    ),
-    hostingAddress: validateStringOrNull(
-      obj.hostingAddress,
-      "hostingAddress",
-      255,
-    ),
+    legalRepresentative: validateStringOrNull(obj.legalRepresentative, "legalRepresentative", 100),
+    hostingProvider: validateStringOrNull(obj.hostingProvider, "hostingProvider", 100),
+    hostingAddress: validateStringOrNull(obj.hostingAddress, "hostingAddress", 255),
     depositPercent: validateDepositPercent(obj.depositPercent),
     instagramUrl: validateHttpsUrl(obj.instagramUrl, "instagramUrl"),
     linkedinUrl: validateHttpsUrl(obj.linkedinUrl, "linkedinUrl"),
     serviceArea: {
       fr: frArea,
       en: enArea,
-    },
+    }
   };
 }
 
-function validateLocalizedString(
-  data: unknown,
-  context: string,
-  maxLength = 2000,
-): LocalizedString {
+function validateLocalizedString(data: unknown, context: string, maxLength = 2000): LocalizedString {
   assertExactKeys(data, ["fr", "en"], context);
   const obj = data as Record<string, unknown>;
   const fr = validateStringOrNull(obj.fr, `${context}.fr`, maxLength);
@@ -486,62 +365,34 @@ function validateLocalizedString(
   return { fr, en };
 }
 
-function validateHomeVariantInfo(
-  data: unknown,
-  context: string,
-): HomeVariantInfo {
+function validateHomeVariantInfo(data: unknown, context: string): HomeVariantInfo {
   if (typeof data !== "object" || data === null) {
     throw new ValidationError(`${context} must be an object`);
   }
   const obj = data as Record<string, unknown>;
-  if (
-    typeof obj.name !== "string" ||
-    !["640p", "960p", "1440p", "1920p"].includes(obj.name)
-  ) {
+  if (typeof obj.name !== "string" || !["640p", "960p", "1440p", "1920p"].includes(obj.name)) {
     throw new ValidationError(`${context}.name is invalid`);
   }
-  if (
-    typeof obj.width !== "number" ||
-    !Number.isInteger(obj.width) ||
-    obj.width <= 0
-  ) {
+  if (typeof obj.width !== "number" || !Number.isInteger(obj.width) || obj.width <= 0) {
     throw new ValidationError(`${context}.width must be a positive integer`);
   }
-  if (
-    typeof obj.height !== "number" ||
-    !Number.isInteger(obj.height) ||
-    obj.height <= 0
-  ) {
+  if (typeof obj.height !== "number" || !Number.isInteger(obj.height) || obj.height <= 0) {
     throw new ValidationError(`${context}.height must be a positive integer`);
   }
   return { name: obj.name, width: obj.width, height: obj.height };
 }
 
-function validateHomeImageMetadata(
-  data: unknown,
-  context: string,
-): HomeImageMetadata {
+function validateHomeImageMetadata(data: unknown, context: string): HomeImageMetadata {
   if (typeof data !== "object" || data === null) {
     throw new ValidationError(`${context} must be an object`);
   }
   const obj = data as Record<string, unknown>;
-  assertExactKeys(
-    obj,
-    ["imageId", "alt", "variants", "width", "height"],
-    context,
-  );
+  assertExactKeys(obj, ["imageId", "alt", "variants", "width", "height"], context);
 
   let imageId: string | null = null;
   if (obj.imageId !== null) {
-    if (
-      typeof obj.imageId !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        obj.imageId,
-      )
-    ) {
-      throw new ValidationError(
-        `${context}.imageId must be a valid UUID or null`,
-      );
+    if (typeof obj.imageId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(obj.imageId)) {
+      throw new ValidationError(`${context}.imageId must be a valid UUID or null`);
     }
     imageId = obj.imageId;
   }
@@ -553,47 +404,31 @@ function validateHomeImageMetadata(
       throw new ValidationError(`${context}.alt must not be empty`);
     }
     if (!Array.isArray(obj.variants) || obj.variants.length > 0) {
-      throw new ValidationError(
-        `${context}.variants must be empty when imageId is null`,
-      );
+      throw new ValidationError(`${context}.variants must be empty when imageId is null`);
     }
     return { imageId, alt, variants: [] };
   }
 
   if (alt.fr.trim() === "" || alt.en.trim() === "") {
-    throw new ValidationError(
-      `${context}.alt must not be empty when imageId is present`,
-    );
+    throw new ValidationError(`${context}.alt must not be empty when imageId is present`);
   }
 
   if (!Array.isArray(obj.variants) || obj.variants.length === 0) {
-    throw new ValidationError(
-      `${context}.variants must contain at least one variant when imageId is present`,
-    );
+    throw new ValidationError(`${context}.variants must contain at least one variant when imageId is present`);
   }
 
-  const variants = obj.variants.map((v, i) =>
-    validateHomeVariantInfo(v, `${context}.variants[${i}]`),
-  );
-  const variantNames = new Set(variants.map((v) => v.name));
+  const variants = obj.variants.map((v, i) => validateHomeVariantInfo(v, `${context}.variants[${i}]`));
+  const variantNames = new Set(variants.map(v => v.name));
   if (variantNames.size !== variants.length) {
     throw new ValidationError(`${context}.variants must have unique names`);
   }
 
-  if (
-    typeof obj.width !== "number" ||
-    !Number.isInteger(obj.width) ||
-    obj.width <= 0
-  ) {
+  if (typeof obj.width !== "number" || !Number.isInteger(obj.width) || obj.width <= 0) {
     throw new ValidationError(`${context}.width must be a positive integer`);
   }
   const width = obj.width;
 
-  if (
-    typeof obj.height !== "number" ||
-    !Number.isInteger(obj.height) ||
-    obj.height <= 0
-  ) {
+  if (typeof obj.height !== "number" || !Number.isInteger(obj.height) || obj.height <= 0) {
     throw new ValidationError(`${context}.height must be a positive integer`);
   }
   const height = obj.height;
@@ -601,85 +436,51 @@ function validateHomeImageMetadata(
   return { imageId, alt, variants, width, height };
 }
 
-function validatePortfolioCard(
-  data: unknown,
-  context: string,
-): PortfolioCardContent {
-  assertExactKeys(
-    data,
-    ["imageId", "variants", "alt", "title", "subtitle", "width", "height"],
-    context,
-  );
+function validatePortfolioCard(data: unknown, context: string): PortfolioCardContent {
+  assertExactKeys(data, ["imageId", "variants", "alt", "title", "subtitle", "width", "height"], context);
   const obj = data as Record<string, unknown>;
 
   let imageId: string | null = null;
   if (obj.imageId !== null) {
-    if (
-      typeof obj.imageId !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        obj.imageId,
-      )
-    ) {
-      throw new ValidationError(
-        `${context}.imageId must be a valid UUID or null`,
-      );
+    if (typeof obj.imageId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(obj.imageId)) {
+      throw new ValidationError(`${context}.imageId must be a valid UUID or null`);
     }
     imageId = obj.imageId;
   }
 
   const alt = validateLocalizedString(obj.alt, `${context}.alt`, 255);
   const title = validateLocalizedString(obj.title, `${context}.title`, 255);
-  const subtitle = validateLocalizedString(
-    obj.subtitle,
-    `${context}.subtitle`,
-    255,
-  );
+  const subtitle = validateLocalizedString(obj.subtitle, `${context}.subtitle`, 255);
 
   if (imageId === null) {
     if (alt.fr.trim() === "" || alt.en.trim() === "") {
       throw new ValidationError(`${context}.alt must not be empty`);
     }
     if (!Array.isArray(obj.variants) || obj.variants.length > 0) {
-      throw new ValidationError(
-        `${context}.variants must be empty when imageId is null`,
-      );
+      throw new ValidationError(`${context}.variants must be empty when imageId is null`);
     }
     return { imageId, variants: [], alt, title, subtitle };
   }
 
   if (alt.fr.trim() === "" || alt.en.trim() === "") {
-    throw new ValidationError(
-      `${context}.alt must not be empty when imageId is present`,
-    );
+    throw new ValidationError(`${context}.alt must not be empty when imageId is present`);
   }
 
   if (!Array.isArray(obj.variants) || obj.variants.length === 0) {
-    throw new ValidationError(
-      `${context}.variants must contain at least one variant when imageId is present`,
-    );
+    throw new ValidationError(`${context}.variants must contain at least one variant when imageId is present`);
   }
-  const variants = obj.variants.map((v, i) =>
-    validateHomeVariantInfo(v, `${context}.variants[${i}]`),
-  );
-  const variantNames = new Set(variants.map((v) => v.name));
+  const variants = obj.variants.map((v, i) => validateHomeVariantInfo(v, `${context}.variants[${i}]`));
+  const variantNames = new Set(variants.map(v => v.name));
   if (variantNames.size !== variants.length) {
     throw new ValidationError(`${context}.variants must have unique names`);
   }
 
-  if (
-    typeof obj.width !== "number" ||
-    !Number.isInteger(obj.width) ||
-    obj.width <= 0
-  ) {
+  if (typeof obj.width !== "number" || !Number.isInteger(obj.width) || obj.width <= 0) {
     throw new ValidationError(`${context}.width must be a positive integer`);
   }
   const width = obj.width;
 
-  if (
-    typeof obj.height !== "number" ||
-    !Number.isInteger(obj.height) ||
-    obj.height <= 0
-  ) {
+  if (typeof obj.height !== "number" || !Number.isInteger(obj.height) || obj.height <= 0) {
     throw new ValidationError(`${context}.height must be a positive integer`);
   }
   const height = obj.height;
@@ -688,24 +489,14 @@ function validatePortfolioCard(
 }
 
 function validateHomeContent(data: unknown): HomeContent {
-  assertExactKeys(
-    data,
-    ["hero", "editorial", "portfolioCards", "pricingPreview", "studio"],
-    "home",
-  );
+  assertExactKeys(data, ["hero", "editorial", "portfolioCards", "pricingPreview", "studio"], "home");
   const obj = data as Record<string, unknown>;
 
   // Validate hero
-  assertExactKeys(
-    obj.hero,
-    ["smallTitle", "largeTitle", "subtitle", "images"],
-    "home.hero",
-  );
+  assertExactKeys(obj.hero, ["smallTitle", "largeTitle", "subtitle", "images"], "home.hero");
   const heroObj = obj.hero as Record<string, unknown>;
   if (!Array.isArray(heroObj.images) || heroObj.images.length !== 3) {
-    throw new ValidationError(
-      "home.hero.images must be an array of exactly 3 slots",
-    );
+    throw new ValidationError("home.hero.images must be an array of exactly 3 slots");
   }
 
   // Validate editorial
@@ -713,57 +504,29 @@ function validateHomeContent(data: unknown): HomeContent {
   const editorialObj = obj.editorial as Record<string, unknown>;
 
   // Validate portfolioCards
-  assertExactKeys(
-    obj.portfolioCards,
-    ["photo", "video"],
-    "home.portfolioCards",
-  );
+  assertExactKeys(obj.portfolioCards, ["photo", "video"], "home.portfolioCards");
   const cardsObj = obj.portfolioCards as Record<string, unknown>;
 
   // Validate pricingPreview
-  assertExactKeys(
-    obj.pricingPreview,
-    [
-      "sectionTitle",
-      "promoText",
-      "promoTextBold",
-      "caveat",
-      "buttonText",
-      "customFormulaText",
-      "customFormulaTextEm",
-    ],
-    "home.pricingPreview",
-  );
+  assertExactKeys(obj.pricingPreview, [
+    "sectionTitle",
+    "promoText", "promoTextBold", "caveat", "buttonText", "customFormulaText", "customFormulaTextEm"
+  ], "home.pricingPreview");
   const pricingObj = obj.pricingPreview as Record<string, unknown>;
 
   // Validate studio
-  assertExactKeys(
-    obj.studio,
-    ["imageId", "variants", "alt", "title", "description", "width", "height"],
-    "home.studio",
-  );
+  assertExactKeys(obj.studio, ["imageId", "variants", "alt", "title", "description", "width", "height"], "home.studio");
   const studioObj = obj.studio as Record<string, unknown>;
 
   let studioImageId: string | null = null;
   if (studioObj.imageId !== null) {
-    if (
-      typeof studioObj.imageId !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        studioObj.imageId,
-      )
-    ) {
-      throw new ValidationError(
-        `home.studio.imageId must be a valid UUID or null`,
-      );
+    if (typeof studioObj.imageId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(studioObj.imageId)) {
+      throw new ValidationError(`home.studio.imageId must be a valid UUID or null`);
     }
     studioImageId = studioObj.imageId;
   }
 
-  const studioAlt = validateLocalizedString(
-    studioObj.alt,
-    `home.studio.alt`,
-    255,
-  );
+  const studioAlt = validateLocalizedString(studioObj.alt, `home.studio.alt`, 255);
 
   let studioVariants: HomeVariantInfo[] = [];
   let studioWidth: number | undefined;
@@ -774,144 +537,74 @@ function validateHomeContent(data: unknown): HomeContent {
       throw new ValidationError(`home.studio.alt must not be empty`);
     }
     if (!Array.isArray(studioObj.variants) || studioObj.variants.length > 0) {
-      throw new ValidationError(
-        `home.studio.variants must be empty when imageId is null`,
-      );
+      throw new ValidationError(`home.studio.variants must be empty when imageId is null`);
     }
   } else {
     if (studioAlt.fr.trim() === "" || studioAlt.en.trim() === "") {
-      throw new ValidationError(
-        `home.studio.alt must not be empty when imageId is present`,
-      );
+      throw new ValidationError(`home.studio.alt must not be empty when imageId is present`);
     }
     if (!Array.isArray(studioObj.variants) || studioObj.variants.length === 0) {
-      throw new ValidationError(
-        `home.studio.variants must contain at least one variant when imageId is present`,
-      );
+      throw new ValidationError(`home.studio.variants must contain at least one variant when imageId is present`);
     }
-    studioVariants = studioObj.variants.map((v, i) =>
-      validateHomeVariantInfo(v, `home.studio.variants[${i}]`),
-    );
-    const variantNames = new Set(studioVariants.map((v) => v.name));
+    studioVariants = studioObj.variants.map((v, i) => validateHomeVariantInfo(v, `home.studio.variants[${i}]`));
+    const variantNames = new Set(studioVariants.map(v => v.name));
     if (variantNames.size !== studioVariants.length) {
       throw new ValidationError(`home.studio.variants must have unique names`);
     }
 
-    if (
-      typeof studioObj.width !== "number" ||
-      !Number.isInteger(studioObj.width) ||
-      studioObj.width <= 0
-    ) {
+    if (typeof studioObj.width !== "number" || !Number.isInteger(studioObj.width) || studioObj.width <= 0) {
       throw new ValidationError(`home.studio.width must be a positive integer`);
     }
     studioWidth = studioObj.width;
 
-    if (
-      typeof studioObj.height !== "number" ||
-      !Number.isInteger(studioObj.height) ||
-      studioObj.height <= 0
-    ) {
-      throw new ValidationError(
-        `home.studio.height must be a positive integer`,
-      );
+    if (typeof studioObj.height !== "number" || !Number.isInteger(studioObj.height) || studioObj.height <= 0) {
+      throw new ValidationError(`home.studio.height must be a positive integer`);
     }
     studioHeight = studioObj.height;
   }
 
   return {
     hero: {
-      smallTitle: validateLocalizedString(
-        heroObj.smallTitle,
-        "home.hero.smallTitle",
-        255,
-      ),
-      largeTitle: validateLocalizedString(
-        heroObj.largeTitle,
-        "home.hero.largeTitle",
-        255,
-      ),
-      subtitle: validateLocalizedString(
-        heroObj.subtitle,
-        "home.hero.subtitle",
-        255,
-      ),
+      smallTitle: validateLocalizedString(heroObj.smallTitle, "home.hero.smallTitle", 255),
+      largeTitle: validateLocalizedString(heroObj.largeTitle, "home.hero.largeTitle", 255),
+      subtitle: validateLocalizedString(heroObj.subtitle, "home.hero.subtitle", 255),
       images: [
         validateHomeImageMetadata(heroObj.images[0], "home.hero.images[0]"),
         validateHomeImageMetadata(heroObj.images[1], "home.hero.images[1]"),
         validateHomeImageMetadata(heroObj.images[2], "home.hero.images[2]"),
-      ],
+      ]
     },
     editorial: {
-      paragraph: validateLocalizedString(
-        editorialObj.paragraph,
-        "home.editorial.paragraph",
-      ),
-      highlight: validateLocalizedString(
-        editorialObj.highlight,
-        "home.editorial.highlight",
-      ),
+      paragraph: validateLocalizedString(editorialObj.paragraph, "home.editorial.paragraph"),
+      highlight: validateLocalizedString(editorialObj.highlight, "home.editorial.highlight")
     },
     portfolioCards: {
       photo: validatePortfolioCard(cardsObj.photo, "home.portfolioCards.photo"),
-      video: validatePortfolioCard(cardsObj.video, "home.portfolioCards.video"),
+      video: validatePortfolioCard(cardsObj.video, "home.portfolioCards.video")
     },
     pricingPreview: {
-      sectionTitle: validateLocalizedString(
-        pricingObj.sectionTitle,
-        "home.pricingPreview.sectionTitle",
-        255,
-      ),
-      promoText: validateLocalizedString(
-        pricingObj.promoText,
-        "home.pricingPreview.promoText",
-        255,
-      ),
-      promoTextBold: validateLocalizedString(
-        pricingObj.promoTextBold,
-        "home.pricingPreview.promoTextBold",
-        255,
-      ),
-      caveat: validateLocalizedString(
-        pricingObj.caveat,
-        "home.pricingPreview.caveat",
-        255,
-      ),
-      buttonText: validateLocalizedString(
-        pricingObj.buttonText,
-        "home.pricingPreview.buttonText",
-        255,
-      ),
-      customFormulaText: validateLocalizedString(
-        pricingObj.customFormulaText,
-        "home.pricingPreview.customFormulaText",
-        255,
-      ),
-      customFormulaTextEm: validateLocalizedString(
-        pricingObj.customFormulaTextEm,
-        "home.pricingPreview.customFormulaTextEm",
-        255,
-      ),
+      sectionTitle: validateLocalizedString(pricingObj.sectionTitle, "home.pricingPreview.sectionTitle", 255),
+      promoText: validateLocalizedString(pricingObj.promoText, "home.pricingPreview.promoText", 255),
+      promoTextBold: validateLocalizedString(pricingObj.promoTextBold, "home.pricingPreview.promoTextBold", 255),
+      caveat: validateLocalizedString(pricingObj.caveat, "home.pricingPreview.caveat", 255),
+      buttonText: validateLocalizedString(pricingObj.buttonText, "home.pricingPreview.buttonText", 255),
+      customFormulaText: validateLocalizedString(pricingObj.customFormulaText, "home.pricingPreview.customFormulaText", 255),
+      customFormulaTextEm: validateLocalizedString(pricingObj.customFormulaTextEm, "home.pricingPreview.customFormulaTextEm", 255)
     },
     studio: {
       imageId: studioImageId,
       variants: studioVariants,
       alt: studioAlt,
       title: validateLocalizedString(studioObj.title, "home.studio.title", 255),
-      description: validateLocalizedString(
-        studioObj.description,
-        "home.studio.description",
-        2000,
-      ),
+      description: validateLocalizedString(studioObj.description, "home.studio.description", 2000),
       width: studioWidth,
-      height: studioHeight,
-    },
+      height: studioHeight
+    }
   };
 }
 
-function validatePricingFaqItem(
-  data: unknown,
-  context: string,
-): PricingFaqItem {
+
+function validatePricingFaqItem(data: unknown, context: string): PricingFaqItem {
   assertExactKeys(data, ["id", "enabled", "question", "answer"], context);
   const obj = data as Record<string, unknown>;
 
@@ -926,7 +619,7 @@ function validatePricingFaqItem(
     id: obj.id,
     enabled: obj.enabled,
     question: validateLocalizedString(obj.question, `${context}.question`, 500),
-    answer: validateLocalizedString(obj.answer, `${context}.answer`, 3000),
+    answer: validateLocalizedString(obj.answer, `${context}.answer`, 3000)
   };
 }
 
@@ -941,21 +634,15 @@ function validatePricingPageContent(data: unknown): PricingPageContent {
     throw new ValidationError("pricingPage.faqs cannot exceed 20 items");
   }
 
-  const faqs = obj.faqs.map((f, i) =>
-    validatePricingFaqItem(f, `pricingPage.faqs[${i}]`),
-  );
-  const ids = new Set(faqs.map((f) => f.id));
+  const faqs = obj.faqs.map((f, i) => validatePricingFaqItem(f, `pricingPage.faqs[${i}]`));
+  const ids = new Set(faqs.map(f => f.id));
   if (ids.size !== faqs.length) {
     throw new ValidationError("pricingPage.faqs must have unique ids");
   }
 
   return {
-    faqTitle: validateLocalizedString(
-      obj.faqTitle,
-      "pricingPage.faqTitle",
-      255,
-    ),
-    faqs,
+    faqTitle: validateLocalizedString(obj.faqTitle, "pricingPage.faqTitle", 255),
+    faqs
   };
 }
 
@@ -965,26 +652,15 @@ export function validateSiteContent(data: unknown): SiteContent {
   }
   const obj = data as Record<string, unknown>;
 
-  if (
-    obj.schemaVersion !== 1 &&
-    obj.schemaVersion !== 2 &&
-    obj.schemaVersion !== 3 &&
-    obj.schemaVersion !== 4
-  ) {
+  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4) {
     throw new ValidationError("Unsupported schemaVersion");
   }
 
-  if (
-    typeof obj.revision !== "string" ||
-    !/^[a-f0-9]{32}$/.test(obj.revision)
-  ) {
+  if (typeof obj.revision !== "string" || !/^[a-f0-9]{32}$/.test(obj.revision)) {
     throw new ValidationError("Invalid revision format");
   }
 
-  const updatedAtStr =
-    typeof obj.updatedAt === "string"
-      ? obj.updatedAt
-      : new Date().toISOString();
+  const updatedAtStr = typeof obj.updatedAt === "string" ? obj.updatedAt : new Date().toISOString();
   const d = new Date(updatedAtStr);
   if (isNaN(d.getTime()) || d.toISOString() !== updatedAtStr) {
     throw new ValidationError("updatedAt must be a valid ISO Date string");
@@ -994,36 +670,21 @@ export function validateSiteContent(data: unknown): SiteContent {
 
   const objCopy = JSON.parse(JSON.stringify(obj));
   let objRef = objCopy;
-  const homeData =
-    objCopy.home !== undefined
-      ? objCopy.home
-      : JSON.parse(JSON.stringify(defaultContent.home));
-  const migratedHomeData =
-    homeData && typeof homeData === "object"
-      ? { ...(homeData as Record<string, unknown>) }
-      : {};
+  const homeData = objCopy.home !== undefined ? objCopy.home : JSON.parse(JSON.stringify(defaultContent.home));
+  const migratedHomeData = homeData && typeof homeData === "object" ? { ...(homeData as Record<string, unknown>) } : {};
   let needsHomeMigration = false;
 
   if (homeData && typeof homeData === "object") {
     // Add missing fallback alts for older version
-    if (
-      migratedHomeData.hero &&
-      Array.isArray((migratedHomeData.hero as Record<string, unknown>).images)
-    ) {
+    if (migratedHomeData.hero && Array.isArray((migratedHomeData.hero as Record<string, unknown>).images)) {
       migratedHomeData.hero = {
-        ...(migratedHomeData.hero as Record<string, unknown>),
-        images: (
-          (migratedHomeData.hero as Record<string, unknown>).images as Record<
-            string,
-            unknown
-          >[]
-        ).map((img) => {
+        ...migratedHomeData.hero as Record<string, unknown>,
+        images: ((migratedHomeData.hero as Record<string, unknown>).images as Record<string, unknown>[]).map((img) => {
           const updated = { ...img };
           if (!updated.alt) updated.alt = { fr: "Image", en: "Image" };
-          if (updated.imageId === null && !updated.variants)
-            updated.variants = [];
+          if (updated.imageId === null && !updated.variants) updated.variants = [];
           return updated;
-        }),
+        })
       };
       needsHomeMigration = true;
     }
@@ -1032,29 +693,13 @@ export function validateSiteContent(data: unknown): SiteContent {
       const cards = migratedHomeData.portfolioCards as Record<string, unknown>;
       if (cards.photo) {
         cards.photo = { ...(cards.photo as Record<string, unknown>) };
-        if (!(cards.photo as Record<string, unknown>).alt)
-          (cards.photo as Record<string, unknown>).alt = {
-            fr: "Image",
-            en: "Image",
-          };
-        if (
-          (cards.photo as Record<string, unknown>).imageId === null &&
-          !(cards.photo as Record<string, unknown>).variants
-        )
-          (cards.photo as Record<string, unknown>).variants = [];
+        if (!(cards.photo as Record<string, unknown>).alt) (cards.photo as Record<string, unknown>).alt = { fr: "Image", en: "Image" };
+        if ((cards.photo as Record<string, unknown>).imageId === null && !(cards.photo as Record<string, unknown>).variants) (cards.photo as Record<string, unknown>).variants = [];
       }
       if (cards.video) {
         cards.video = { ...(cards.video as Record<string, unknown>) };
-        if (!(cards.video as Record<string, unknown>).alt)
-          (cards.video as Record<string, unknown>).alt = {
-            fr: "Image",
-            en: "Image",
-          };
-        if (
-          (cards.video as Record<string, unknown>).imageId === null &&
-          !(cards.video as Record<string, unknown>).variants
-        )
-          (cards.video as Record<string, unknown>).variants = [];
+        if (!(cards.video as Record<string, unknown>).alt) (cards.video as Record<string, unknown>).alt = { fr: "Image", en: "Image" };
+        if ((cards.video as Record<string, unknown>).imageId === null && !(cards.video as Record<string, unknown>).variants) (cards.video as Record<string, unknown>).variants = [];
       }
       migratedHomeData.portfolioCards = { ...cards };
       needsHomeMigration = true;
@@ -1064,16 +709,10 @@ export function validateSiteContent(data: unknown): SiteContent {
       const studio = migratedHomeData.studio as Record<string, unknown>;
       migratedHomeData.studio = { ...studio };
       if (!(migratedHomeData.studio as Record<string, unknown>).alt) {
-        (migratedHomeData.studio as Record<string, unknown>).alt = {
-          fr: "Image",
-          en: "Image",
-        };
+        (migratedHomeData.studio as Record<string, unknown>).alt = { fr: "Image", en: "Image" };
         needsHomeMigration = true;
       }
-      if (
-        (migratedHomeData.studio as Record<string, unknown>).imageId === null &&
-        !(migratedHomeData.studio as Record<string, unknown>).variants
-      ) {
+      if ((migratedHomeData.studio as Record<string, unknown>).imageId === null && !(migratedHomeData.studio as Record<string, unknown>).variants) {
         (migratedHomeData.studio as Record<string, unknown>).variants = [];
         needsHomeMigration = true;
       }
@@ -1083,22 +722,20 @@ export function validateSiteContent(data: unknown): SiteContent {
   let rawPricing = obj.pricing as Record<string, unknown>;
 
   if (obj.schemaVersion === 1 || obj.schemaVersion === 2) {
-    const pp = (migratedHomeData.pricingPreview || {}) as Record<
-      string,
-      unknown
-    >;
+    const pp = (migratedHomeData.pricingPreview || {}) as Record<string, unknown>;
 
     // Resolve V1 -> V2 intermediate fields
     if ("essentialDescription" in pp && !("photoEssentialDescription" in pp)) {
       pp.photoEssentialDescription = pp.essentialDescription;
       pp.photoSignatureDescription = pp.signatureDescription;
       pp.photoPrestigeDescription = pp.prestigeDescription;
+
     }
 
-    const migrateCategory = (
-      catData: unknown,
-      prefix: keyof typeof defaultContent.pricing,
-    ): unknown[] => {
+
+
+
+    const migrateCategory = (catData: unknown, prefix: keyof typeof defaultContent.pricing): unknown[] => {
       if (!Array.isArray(catData)) return [];
 
       return catData.map((f) => {
@@ -1111,31 +748,23 @@ export function validateSiteContent(data: unknown): SiteContent {
         if (id === "prestige") descKey = prefix + "PrestigeDescription";
 
         const defaultCat = defaultContent.pricing[prefix] || [];
-        const fallback = defaultCat.find((d) => d.id === id);
+        const fallback = defaultCat.find(d => d.id === id);
 
         if (!fallback) {
-          throw new ValidationError(
-            `Unknown formula id '${id}' in category '${prefix}'`,
-          );
+          throw new ValidationError(`Unknown formula id '${id}' in category '${prefix}'`);
         }
 
         const includedItems = fallback.includedItems.map((item, itemIdx) => ({
           ...item,
-          id: `${prefix}-${id}-${itemIdx}`,
+          id: `${prefix}-${id}-${itemIdx}`
         }));
 
-        const val = pp[descKey] as { fr?: string; en?: string } | undefined;
+        const val = pp[descKey] as { fr?: string, en?: string } | undefined;
         const summaryFr = val?.fr || fallback.summary.fr;
         const summaryEn = val?.en || fallback.summary.en;
 
-        const priceCents =
-          typeof fRecord.priceCents === "number"
-            ? fRecord.priceCents
-            : fallback.priceCents;
-        const featured =
-          typeof fRecord.featured === "boolean"
-            ? fRecord.featured
-            : fallback.featured;
+        const priceCents = typeof fRecord.priceCents === "number" ? fRecord.priceCents : fallback.priceCents;
+        const featured = typeof fRecord.featured === "boolean" ? fRecord.featured : fallback.featured;
 
         return {
           id,
@@ -1146,7 +775,7 @@ export function validateSiteContent(data: unknown): SiteContent {
           summary: { fr: summaryFr, en: summaryEn },
           description: JSON.parse(JSON.stringify(fallback.description)),
           includedItems,
-          buttonText: JSON.parse(JSON.stringify(fallback.buttonText)),
+          buttonText: JSON.parse(JSON.stringify(fallback.buttonText))
         };
       });
     };
@@ -1154,7 +783,7 @@ export function validateSiteContent(data: unknown): SiteContent {
     rawPricing = {
       photo: migrateCategory(rawPricing.photo, "photo"),
       film: migrateCategory(rawPricing.film, "film"),
-      duo: migrateCategory(rawPricing.duo, "duo"),
+      duo: migrateCategory(rawPricing.duo, "duo")
     };
 
     // Cleanup V2 pricingPreview from home
@@ -1180,24 +809,13 @@ export function validateSiteContent(data: unknown): SiteContent {
     objRef = { ...obj, home: migratedHomeData };
   }
 
-  assertExactKeys(
-    objRef,
-    [
-      "schemaVersion",
-      "revision",
-      "updatedAt",
-      "business",
-      "pricing",
-      "home",
-      "pricingPage",
-    ],
-    "root",
-  );
 
   if (obj.schemaVersion === 1 || obj.schemaVersion === 2 || obj.schemaVersion === 3) {
     const pricingPageData = JSON.parse(JSON.stringify(defaultContent.pricingPage));
     objRef = { ...objRef, pricingPage: pricingPageData };
   }
+
+  assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage"], "root");
 
   const pricing = validatePricing(rawPricing);
   const home = validateHomeContent(objRef.home);
@@ -1227,10 +845,7 @@ export function getSiteContent(): SiteContent {
   return validateSiteContent(defaultContent);
 }
 
-export function getRawSiteContent(): {
-  content: SiteContent;
-  isCorrupted: boolean;
-} {
+export function getRawSiteContent(): { content: SiteContent, isCorrupted: boolean } {
   const filePath = getFilePath();
   try {
     if (fs.existsSync(filePath)) {
@@ -1246,10 +861,29 @@ export function getRawSiteContent(): {
 
 import { atomicWriteJson } from "./atomic-fs.server";
 
-export function savePricing(
-  pricing: PricingCategory,
-  previousRevision: string,
-) {
+
+export function savePricingAndFaq(pricing: PricingCategory, pricingPage: PricingPageContent, previousRevision: string) {
+  const current = getRawSiteContent();
+  if (current.isCorrupted) {
+    throw new CorruptedContentError();
+  }
+  if (current.content.revision !== previousRevision) {
+    throw new RevisionConflictError();
+  }
+
+  const newContent: SiteContent = {
+    ...current.content,
+    revision: crypto.randomBytes(16).toString("hex"),
+    updatedAt: new Date().toISOString(),
+    pricing: validatePricing(pricing),
+    pricingPage: validatePricingPageContent(pricingPage),
+  };
+
+  atomicWriteJson(getFilePath(), newContent);
+  return newContent.revision;
+}
+
+export function savePricing(pricing: PricingCategory, previousRevision: string) {
   const current = getRawSiteContent();
   if (current.isCorrupted) {
     throw new CorruptedContentError();
@@ -1269,10 +903,7 @@ export function savePricing(
   return newContent.revision;
 }
 
-export function saveSettings(
-  business: BusinessContent,
-  previousRevision: string,
-) {
+export function saveSettings(business: BusinessContent, previousRevision: string) {
   const current = getRawSiteContent();
   if (current.isCorrupted) {
     throw new CorruptedContentError();
@@ -1306,31 +937,6 @@ export function saveHomeSettings(home: HomeContent, previousRevision: string) {
     revision: crypto.randomBytes(16).toString("hex"),
     updatedAt: new Date().toISOString(),
     home: validateHomeContent(home),
-  };
-
-  atomicWriteJson(getFilePath(), newContent);
-  return newContent.revision;
-}
-
-export function savePricingAndFaq(
-  pricing: PricingCategory,
-  pricingPage: PricingPageContent,
-  previousRevision: string,
-) {
-  const current = getRawSiteContent();
-  if (current.isCorrupted) {
-    throw new CorruptedContentError();
-  }
-  if (current.content.revision !== previousRevision) {
-    throw new RevisionConflictError();
-  }
-
-  const newContent: SiteContent = {
-    ...current.content,
-    revision: crypto.randomBytes(16).toString("hex"),
-    updatedAt: new Date().toISOString(),
-    pricing: validatePricing(pricing),
-    pricingPage: validatePricingPageContent(pricingPage),
   };
 
   atomicWriteJson(getFilePath(), newContent);
