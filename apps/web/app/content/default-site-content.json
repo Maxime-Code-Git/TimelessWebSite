@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "revision": "00000000000000000000000000000000",
   "updatedAt": "1970-01-01T00:00:00.000Z",
   "business": {
@@ -675,5 +675,61 @@
         "en": "L & M"
       }
     }
+  },
+  "pricingPage": {
+    "faqTitle": {
+      "fr": "Questions fréquentes",
+      "en": "Frequently asked questions"
+    },
+    "faqs": [
+      {
+        "id": "travel",
+        "enabled": true,
+        "question": {
+          "fr": "Les déplacements sont-ils inclus\u00a0?",
+          "en": "Is travel included?"
+        },
+        "answer": {
+          "fr": "Les déplacements sont inclus dans un rayon de référence autour de notre studio\u00a0; au-delà, un forfait déplacement est ajouté au devis.",
+          "en": "Travel is included within a reference radius from our studio; beyond that, a travel fee is added to the quote."
+        }
+      },
+      {
+        "id": "deposit",
+        "enabled": true,
+        "question": {
+          "fr": "Quel acompte pour réserver la date\u00a0?",
+          "en": "What deposit is required to book the date?"
+        },
+        "answer": {
+          "fr": "Un acompte de réservation est demandé à la signature, le solde étant réglé avant l'événement selon un échéancier convenu ensemble.",
+          "en": "A booking deposit is required at signing, with the balance settled before the event according to an agreed schedule."
+        }
+      },
+      {
+        "id": "delivery",
+        "enabled": true,
+        "question": {
+          "fr": "Quels sont les délais de livraison\u00a0?",
+          "en": "What are the delivery times?"
+        },
+        "answer": {
+          "fr": "Les délais varient selon la formule choisie, indiqués dans chaque carte ci-dessus\u00a0; une première sélection d'images est partagée bien avant la livraison finale.",
+          "en": "Delivery times vary by package, as indicated in each card above; an initial selection of images is shared well before the final delivery."
+        }
+      },
+      {
+        "id": "custom-package",
+        "enabled": true,
+        "question": {
+          "fr": "Peut-on personnaliser une formule\u00a0?",
+          "en": "Can a package be customised?"
+        },
+        "answer": {
+          "fr": "Oui, chaque formule peut être ajustée — heures supplémentaires, second photographe, album additionnel — sur simple demande.",
+          "en": "Yes, each package can be adjusted — extra hours, second photographer, additional album — on request."
+        }
+      }
+    ]
   }
 }

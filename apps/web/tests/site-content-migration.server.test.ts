@@ -166,7 +166,7 @@ describe("Migration of intermediate V2 content", () => {
     const { content } = getRawSiteContent();
 
     // Check that it's migrated to V3
-    expect(content.schemaVersion).toBe(3);
+    expect(content.schemaVersion).toBe(4);
 
     // Check real fallbacks instead of generic "Description"
     const photoEssential = content.pricing.photo.find(f => f.id === "essential");

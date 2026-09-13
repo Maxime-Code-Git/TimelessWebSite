@@ -17,14 +17,16 @@ interface FormulesPageProps {
 export function FormulesPage({ lang }: FormulesPageProps) {
   const i18n = getStrings(lang);
   const t = i18n.formules;
+  const rootData = useRouteLoaderData<typeof rootLoader>("root");
+  const siteContent = rootData?.siteContent;
+
+  const visibleFaqs = siteContent?.pricingPage?.faqs.filter(f => f.enabled) || [];
+
   const [selectedCat, setSelectedCat] = useState<FormulaCategory>("duo");
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [openFaq, setOpenFaq] = useState<string | null>(visibleFaqs.length > 0 ? visibleFaqs[0].id : null);
 
   const alternateLangHref = lang === "fr" ? "/en/pricing" : "/fr/formules";
   const contactHref = lang === "fr" ? "/fr/contact" : "/en/contact";
-
-  const rootData = useRouteLoaderData<typeof rootLoader>("root");
-  const siteContent = rootData?.siteContent;
 
   const categories: FormulaCategory[] = ["photo", "film", "duo"];
 
@@ -122,31 +124,36 @@ export function FormulesPage({ lang }: FormulesPageProps) {
       </section>
 
       {/* FAQ Section */}
-      <section className={styles.faqSection}>
-        <div className={styles.faqInner}>
-          <p className={styles.faqTitle}>{t.faqTitle}</p>
-          <div className={styles.faqList}>
-            {t.faqs.map((faq, idx) => {
-              const isOpen = openFaq === idx;
-              return (
-                <div key={idx} className={styles.faqItem}>
-                  <button
-                    className={styles.faqBtn}
-                    onClick={() => setOpenFaq(isOpen ? null : idx)}
-                    aria-expanded={isOpen}
-                  >
-                    <span>{faq.question}</span>
-                    <span className={styles.faqIcon}>{isOpen ? "−" : "+"}</span>
-                  </button>
-                  {isOpen && (
-                    <p className={styles.faqAnswer}>{faq.answer}</p>
-                  )}
-                </div>
-              );
-            })}
+      {visibleFaqs.length > 0 && (
+        <section className={styles.faqSection}>
+          <div className={styles.faqInner}>
+            <p className={styles.faqTitle}>{siteContent?.pricingPage?.faqTitle[lang]}</p>
+            <div className={styles.faqList}>
+              {visibleFaqs.map((faq) => {
+                const isOpen = openFaq === faq.id;
+                const controlsId = `faq-answer-${faq.id}`;
+                return (
+                  <div key={faq.id} className={styles.faqItem}>
+                    <button
+                      type="button"
+                      className={styles.faqBtn}
+                      onClick={() => setOpenFaq(isOpen ? null : faq.id)}
+                      aria-expanded={isOpen}
+                      aria-controls={controlsId}
+                    >
+                      <span>{faq.question[lang]}</span>
+                      <span className={styles.faqIcon}>{isOpen ? "−" : "+"}</span>
+                    </button>
+                    {isOpen && (
+                      <p id={controlsId} className={styles.faqAnswer}>{faq.answer[lang]}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
       </main>
 
       <Footer lang={lang} />
