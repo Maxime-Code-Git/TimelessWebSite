@@ -59,6 +59,7 @@ export default [
   route("admin/portfolio/upload", "routes/admin.portfolio.upload.tsx"),
   route("admin/portfolio/media/:photoId/:variant", "routes/admin.portfolio.media.$photoId.$variant.tsx"),
   route("admin/home", "routes/admin.home.tsx"),
+  route("admin/about", "routes/admin.about.tsx"),
 
   // ── Catch-all (404) ───────────────────────────────────────
   route("*", "routes/404.tsx"),

@@ -87,6 +87,36 @@ export interface PricingPageContent {
   faqs: PricingFaqItem[];
 }
 
+export interface AboutPageContent {
+  seo: {
+    title: LocalizedString;
+    description: LocalizedString;
+  };
+  hero: {
+    title: LocalizedString;
+    subtitle: LocalizedString;
+  };
+  team: {
+    name: LocalizedString;
+    role: LocalizedString;
+    bio: LocalizedString;
+    image: HomeImageMetadata;
+  };
+  approach: {
+    title: LocalizedString;
+    principles: Array<{
+      id: string;
+      title: LocalizedString;
+      text: LocalizedString;
+    }>;
+  };
+  difference: {
+    title: LocalizedString;
+    text: LocalizedString;
+  };
+}
+
+
 export interface HomeContent {
   hero: {
     smallTitle: LocalizedString;
@@ -123,13 +153,14 @@ export interface HomeContent {
 }
 
 export interface SiteContent {
-  schemaVersion: 4;
+  schemaVersion: 5;
   revision: string;
   updatedAt: string;
   business: BusinessContent;
   pricing: PricingCategory;
   home: HomeContent;
   pricingPage: PricingPageContent;
+  aboutPage: AboutPageContent;
 }
 
 export class RevisionConflictError extends Error {
@@ -646,13 +677,89 @@ function validatePricingPageContent(data: unknown): PricingPageContent {
   };
 }
 
+
+function validateAboutPageContent(data: unknown): AboutPageContent {
+  assertExactKeys(data, ["seo", "hero", "team", "approach", "difference"], "aboutPage");
+  const obj = data as Record<string, unknown>;
+
+  // SEO
+  assertExactKeys(obj.seo, ["title", "description"], "aboutPage.seo");
+  const seo = obj.seo as Record<string, unknown>;
+  const validSeo = {
+    title: validateLocalizedString(seo.title, "aboutPage.seo.title", 255),
+    description: validateLocalizedString(seo.description, "aboutPage.seo.description", 1000)
+  };
+
+  // Hero
+  assertExactKeys(obj.hero, ["title", "subtitle"], "aboutPage.hero");
+  const hero = obj.hero as Record<string, unknown>;
+  const validHero = {
+    title: validateLocalizedString(hero.title, "aboutPage.hero.title", 255),
+    subtitle: validateLocalizedString(hero.subtitle, "aboutPage.hero.subtitle", 1000)
+  };
+
+  // Team
+  assertExactKeys(obj.team, ["name", "role", "bio", "image"], "aboutPage.team");
+  const team = obj.team as Record<string, unknown>;
+  const validTeam = {
+    name: validateLocalizedString(team.name, "aboutPage.team.name", 255),
+    role: validateLocalizedString(team.role, "aboutPage.team.role", 255),
+    bio: validateLocalizedString(team.bio, "aboutPage.team.bio", 3000),
+    image: validateHomeImageMetadata(team.image, "aboutPage.team.image")
+  };
+
+  // Approach
+  assertExactKeys(obj.approach, ["title", "principles"], "aboutPage.approach");
+  const approach = obj.approach as Record<string, unknown>;
+  if (!Array.isArray(approach.principles)) {
+    throw new ValidationError("aboutPage.approach.principles must be an array");
+  }
+  if (approach.principles.length !== 3) {
+    throw new ValidationError("aboutPage.approach.principles must contain exactly 3 items");
+  }
+  const validPrinciples = approach.principles.map((p, i) => {
+    assertExactKeys(p, ["id", "title", "text"], `aboutPage.approach.principles[${i}]`);
+    const pObj = p as Record<string, unknown>;
+    if (typeof pObj.id !== "string" || !["discretion", "single-studio", "timeless"].includes(pObj.id)) {
+      throw new ValidationError(`aboutPage.approach.principles[${i}].id is invalid`);
+    }
+    return {
+      id: pObj.id,
+      title: validateLocalizedString(pObj.title, `aboutPage.approach.principles[${i}].title`, 255),
+      text: validateLocalizedString(pObj.text, `aboutPage.approach.principles[${i}].text`, 2000)
+    };
+  });
+  
+  // Verify that all 3 expected IDs are present and unique
+  const ids = new Set(validPrinciples.map(p => p.id));
+  if (ids.size !== 3 || !ids.has("discretion") || !ids.has("single-studio") || !ids.has("timeless")) {
+     throw new ValidationError("aboutPage.approach.principles must contain exactly 'discretion', 'single-studio', and 'timeless'");
+  }
+
+  // Difference
+  assertExactKeys(obj.difference, ["title", "text"], "aboutPage.difference");
+  const diff = obj.difference as Record<string, unknown>;
+  const validDiff = {
+    title: validateLocalizedString(diff.title, "aboutPage.difference.title", 255),
+    text: validateLocalizedString(diff.text, "aboutPage.difference.text", 3000)
+  };
+
+  return {
+    seo: validSeo,
+    hero: validHero,
+    team: validTeam,
+    approach: { title: validateLocalizedString(approach.title, "aboutPage.approach.title", 255), principles: validPrinciples },
+    difference: validDiff
+  };
+}
+
 export function validateSiteContent(data: unknown): SiteContent {
   if (typeof data !== "object" || data === null) {
     throw new ValidationError("root must be an object");
   }
   const obj = data as Record<string, unknown>;
 
-  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4) {
+  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5) {
     throw new ValidationError("Unsupported schemaVersion");
   }
 
@@ -815,19 +922,26 @@ export function validateSiteContent(data: unknown): SiteContent {
     objRef = { ...objRef, pricingPage: pricingPageData };
   }
 
-  assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage"], "root");
+  
+  if (obj.schemaVersion === 1 || obj.schemaVersion === 2 || obj.schemaVersion === 3 || obj.schemaVersion === 4) {
+    const aboutPageData = JSON.parse(JSON.stringify(defaultContent.aboutPage));
+    objRef = { ...objRef, aboutPage: aboutPageData };
+  }
+
+  assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage", "aboutPage"], "root");
 
   const pricing = validatePricing(rawPricing);
   const home = validateHomeContent(objRef.home);
 
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     revision: obj.revision,
     updatedAt: updatedAtStr,
     business,
     pricing,
     home,
     pricingPage: validatePricingPageContent(objRef.pricingPage),
+    aboutPage: validateAboutPageContent(objRef.aboutPage),
   };
 }
 
@@ -937,6 +1051,27 @@ export function saveHomeSettings(home: HomeContent, previousRevision: string) {
     revision: crypto.randomBytes(16).toString("hex"),
     updatedAt: new Date().toISOString(),
     home: validateHomeContent(home),
+  };
+
+  atomicWriteJson(getFilePath(), newContent);
+  return newContent.revision;
+}
+
+
+export function saveAboutPageSettings(aboutPage: AboutPageContent, previousRevision: string) {
+  const current = getRawSiteContent();
+  if (current.isCorrupted) {
+    throw new CorruptedContentError();
+  }
+  if (current.content.revision !== previousRevision) {
+    throw new RevisionConflictError();
+  }
+
+  const newContent: SiteContent = {
+    ...current.content,
+    revision: crypto.randomBytes(16).toString("hex"),
+    updatedAt: new Date().toISOString(),
+    aboutPage: validateAboutPageContent(aboutPage),
   };
 
   atomicWriteJson(getFilePath(), newContent);

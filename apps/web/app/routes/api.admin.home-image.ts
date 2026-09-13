@@ -14,7 +14,9 @@ import {
   ValidationError,
   getRawSiteContent,
   saveHomeSettings,
+  saveAboutPageSettings,
   type HomeContent,
+  type AboutPageContent
 } from "../lib/site-content.server";
 import { processHomeImage, prepareHomeImageDeletion, MediaTransactionError } from "../lib/home-media.server";
 import { SafeImageError } from "../lib/portfolio-image.server";
@@ -199,7 +201,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const section = request.headers.get("x-home-section");
-  if (!section || !["hero", "portfolio-photo", "portfolio-video", "studio"].includes(section)) {
+  if (!section || !["hero", "portfolio-photo", "portfolio-video", "studio", "about-team"].includes(section)) {
     return jsonError("Invalid section", 400);
   }
 
@@ -231,7 +233,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const processed = await processHomeImage(
       uploadedFilePath,
       tempDirectory,
-      section as "hero" | "portfolio-photo" | "portfolio-video" | "studio",
+      section as "hero" | "portfolio-photo" | "portfolio-video" | "studio" | "about-team",
       watermark.text,
       watermark.revision
     );
@@ -264,6 +266,32 @@ export async function action({ request }: ActionFunctionArgs) {
       newHome.studio.width = processed.originalWidth;
       newHome.studio.height = processed.originalHeight;
       newHome.studio.variants = processed.variants;
+    } else if (section === "about-team") {
+      const newAbout: AboutPageContent = structuredClone(current.content.aboutPage);
+      oldImageId = newAbout.team.image.imageId;
+      newAbout.team.image.imageId = processed.imageId;
+      newAbout.team.image.width = processed.originalWidth;
+      newAbout.team.image.height = processed.originalHeight;
+      newAbout.team.image.variants = processed.variants;
+      
+      const transaction = oldImageId ? prepareHomeImageDeletion(section, oldImageId) : null;
+      try {
+        const newRevision = saveAboutPageSettings(newAbout, previousRevision);
+        if (transaction) transaction.commit();
+        return Response.json({
+          success: true,
+          newRevision,
+          imageId: processed.imageId,
+          variants: processed.variants,
+          width: processed.originalWidth,
+          height: processed.originalHeight
+        }, { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'" } });
+      } catch (error: unknown) {
+        if (transaction) transaction.rollback();
+        const newImageCleanup = prepareHomeImageDeletion(section, processed.imageId);
+        newImageCleanup.commit();
+        throw error;
+      }
     }
 
     const transaction = oldImageId ? prepareHomeImageDeletion(section, oldImageId) : null;

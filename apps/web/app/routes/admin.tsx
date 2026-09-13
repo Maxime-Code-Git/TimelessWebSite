@@ -276,6 +276,10 @@ export default function AdminPage() {
                 <h3>Page d'accueil</h3>
                 <p>Gérer le contenu et les photos de l'accueil</p>
               </Link>
+              <Link to="/admin/about" className={styles.card}>
+                <h3>Page À propos</h3>
+                <p>Gérer les textes et la photo de la page À propos</p>
+              </Link>
             </div>
           </div>
         </main>

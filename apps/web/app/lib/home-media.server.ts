@@ -56,7 +56,7 @@ export class MediaRollbackError extends Error {
 export async function processHomeImage(
   tempFilePath: string,
   allowedTempDir: string,
-  section: "hero" | "portfolio-photo" | "portfolio-video" | "studio",
+  section: "hero" | "portfolio-photo" | "portfolio-video" | "studio" | "about-team",
   watermarkText: string,
   watermarkRevision: string,
   injectedUnlink: typeof fs.unlinkSync = fs.unlinkSync,
@@ -210,7 +210,7 @@ export function prepareHomeImageDeletion(
     return { commit: () => {}, rollback: () => {}, hasQuarantine: false };
   }
 
-  if (!["hero", "portfolio-photo", "portfolio-video", "studio"].includes(section)) {
+  if (!["hero", "portfolio-photo", "portfolio-video", "studio", "about-team"].includes(section)) {
     return { commit: () => {}, rollback: () => {}, hasQuarantine: false };
   }
 

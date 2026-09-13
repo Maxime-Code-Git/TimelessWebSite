@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "revision": "00000000000000000000000000000000",
   "updatedAt": "1970-01-01T00:00:00.000Z",
   "business": {
@@ -686,11 +686,11 @@
         "id": "travel",
         "enabled": true,
         "question": {
-          "fr": "Les déplacements sont-ils inclus\u00a0?",
+          "fr": "Les déplacements sont-ils inclus ?",
           "en": "Is travel included?"
         },
         "answer": {
-          "fr": "Les déplacements sont inclus dans un rayon de référence autour de notre studio\u00a0; au-delà, un forfait déplacement est ajouté au devis.",
+          "fr": "Les déplacements sont inclus dans un rayon de référence autour de notre studio ; au-delà, un forfait déplacement est ajouté au devis.",
           "en": "Travel is included within a reference radius from our studio; beyond that, a travel fee is added to the quote."
         }
       },
@@ -698,7 +698,7 @@
         "id": "deposit",
         "enabled": true,
         "question": {
-          "fr": "Quel acompte pour réserver la date\u00a0?",
+          "fr": "Quel acompte pour réserver la date ?",
           "en": "What deposit is required to book the date?"
         },
         "answer": {
@@ -710,11 +710,11 @@
         "id": "delivery",
         "enabled": true,
         "question": {
-          "fr": "Quels sont les délais de livraison\u00a0?",
+          "fr": "Quels sont les délais de livraison ?",
           "en": "What are the delivery times?"
         },
         "answer": {
-          "fr": "Les délais varient selon la formule choisie, indiqués dans chaque carte ci-dessus\u00a0; une première sélection d'images est partagée bien avant la livraison finale.",
+          "fr": "Les délais varient selon la formule choisie, indiqués dans chaque carte ci-dessus ; une première sélection d'images est partagée bien avant la livraison finale.",
           "en": "Delivery times vary by package, as indicated in each card above; an initial selection of images is shared well before the final delivery."
         }
       },
@@ -722,7 +722,7 @@
         "id": "custom-package",
         "enabled": true,
         "question": {
-          "fr": "Peut-on personnaliser une formule\u00a0?",
+          "fr": "Peut-on personnaliser une formule ?",
           "en": "Can a package be customised?"
         },
         "answer": {
@@ -731,5 +731,100 @@
         }
       }
     ]
+  },
+  "aboutPage": {
+    "seo": {
+      "title": {
+        "fr": "À propos — Sempra",
+        "en": "About us — Sempra"
+      },
+      "description": {
+        "fr": "Deux regards, une même exigence : capter votre journée avec justesse, pour qu'elle vous revienne intacte dans trente ans.",
+        "en": "Two perspectives, one standard: capturing your day with precision, so it comes back to you intact in thirty years."
+      }
+    },
+    "hero": {
+      "title": {
+        "fr": "Arrêter le temps, rendre le jour éternel.",
+        "en": "Stop time, make the day eternal."
+      },
+      "subtitle": {
+        "fr": "Deux regards, une même exigence : capter votre journée avec justesse, pour qu'elle vous revienne intacte dans trente ans.",
+        "en": "Two perspectives, one standard: capturing your day with precision, so it comes back to you intact in thirty years."
+      }
+    },
+    "team": {
+      "name": {
+        "fr": "L'équipe Sempra",
+        "en": "The Sempra Team"
+      },
+      "role": {
+        "fr": "Photographe & Vidéaste",
+        "en": "Photographer & Videographer"
+      },
+      "bio": {
+        "fr": "Nous sommes un studio spécialisé dans la photographie et la vidéo de mariage. Notre objectif est de capturer votre journée de manière authentique, avec deux regards complémentaires.",
+        "en": "We are a studio specialized in wedding photography and videography. Our goal is to capture your day authentically, with two complementary perspectives."
+      },
+      "image": {
+        "imageId": null,
+        "variants": [],
+        "alt": {
+          "fr": "L'équipe Sempra, studio de photographie et de vidéo",
+          "en": "The Sempra team, photography and videography studio"
+        }
+      }
+    },
+    "approach": {
+      "title": {
+        "fr": "Notre approche",
+        "en": "Our approach"
+      },
+      "principles": [
+        {
+          "id": "discretion",
+          "title": {
+            "fr": "Discrétion le jour J",
+            "en": "Discretion on the day"
+          },
+          "text": {
+            "fr": "Présents sans jamais s'imposer, pour que vous viviez votre journée pleinement.",
+            "en": "Present without ever imposing, so you can live your day fully."
+          }
+        },
+        {
+          "id": "single-studio",
+          "title": {
+            "fr": "Un seul studio",
+            "en": "One studio"
+          },
+          "text": {
+            "fr": "Photo et film pensés ensemble, pour une même sensibilité du début à la fin.",
+            "en": "Photo and film conceived together, for the same sensitivity from start to finish."
+          }
+        },
+        {
+          "id": "timeless",
+          "title": {
+            "fr": "Un rendu intemporel",
+            "en": "A timeless result"
+          },
+          "text": {
+            "fr": "Des choix sobres et durables, qui vieillissent bien — loin des effets de mode.",
+            "en": "Sober and lasting choices that age well — far from passing trends."
+          }
+        }
+      ]
+    },
+    "difference": {
+      "title": {
+        "fr": "Notre différence",
+        "en": "Our difference"
+      },
+      "text": {
+        "fr": "Réunir la photo et le film sous un même studio, c'est une cohérence de regard du premier au dernier plan — et une présence commune le jour J, pour ne rien manquer de votre histoire.",
+        "en": "Uniting photo and film under one studio means a coherent vision from the first to the last frame — and a shared presence on the day, to miss nothing of your story."
+      }
+    }
   }
 }

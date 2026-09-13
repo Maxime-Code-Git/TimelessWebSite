@@ -167,7 +167,7 @@ describe("Migration of intermediate V2 content", () => {
     const { content } = getRawSiteContent();
 
     // Check that it's migrated to V3
-    expect(content.schemaVersion).toBe(4);
+    expect(content.schemaVersion).toBe(5);
 
     // Check real fallbacks instead of generic "Description"
     const photoEssential = content.pricing.photo.find(f => f.id === "essential");
@@ -247,7 +247,7 @@ describe("Migration of intermediate V2 content", () => {
       const originalJson = JSON.stringify(v3Data);
 
       const migrated = validateSiteContent(v3Data);
-      expect(migrated.schemaVersion).toBe(4);
+      expect(migrated.schemaVersion).toBe(5);
       expect(migrated.business.email).toBe("v3@test.com");
       expect(migrated.pricingPage).toBeDefined();
       expect(migrated.pricingPage.faqs).toHaveLength(defaultContent.pricingPage.faqs.length);
@@ -260,11 +260,35 @@ describe("Migration of intermediate V2 content", () => {
       expect(defaultContent.pricingPage.faqs[0].id).not.toBe("mutated");
     });
 
-    it("is idempotent for V4", () => {
-      const v4Data = JSON.parse(JSON.stringify(defaultContent));
-      const migrated1 = validateSiteContent(v4Data);
+    it("is idempotent for V4/V5", () => {
+      const v5Data = JSON.parse(JSON.stringify(defaultContent));
+      const migrated1 = validateSiteContent(v5Data);
       const migrated2 = validateSiteContent(migrated1);
       expect(migrated1).toEqual(migrated2);
+    });
+  });
+
+  describe("Migration V4 to V5 (About Admin)", () => {
+    it("adds aboutPage with defaults and preserves all old data", () => {
+      const v4Data = JSON.parse(JSON.stringify(defaultContent));
+      v4Data.schemaVersion = 4;
+      delete v4Data.aboutPage;
+      v4Data.business.email = "v4@test.com";
+
+      const originalJson = JSON.stringify(v4Data);
+
+      const migrated = validateSiteContent(v4Data);
+      expect(migrated.schemaVersion).toBe(5);
+      expect(migrated.business.email).toBe("v4@test.com");
+      expect(migrated.aboutPage).toBeDefined();
+      expect(migrated.aboutPage.seo.title.fr).toBe(defaultContent.aboutPage.seo.title.fr);
+
+      // No mutation
+      expect(JSON.stringify(v4Data)).toBe(originalJson);
+
+      // No shared references
+      migrated.aboutPage.seo.title.fr = "mutated";
+      expect(defaultContent.aboutPage.seo.title.fr).not.toBe("mutated");
     });
   });
 });

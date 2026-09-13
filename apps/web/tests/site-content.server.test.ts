@@ -10,7 +10,8 @@ import {
   ValidationError,
   CorruptedContentError,
   validateSiteContent,
-  savePricingAndFaq
+  savePricingAndFaq,
+  saveAboutPageSettings
 } from "../app/lib/site-content.server";
 import defaultContent from "../app/content/default-site-content.json";
 
@@ -94,6 +95,43 @@ describe("site-content.server.ts", () => {
       const newPricingPage = JSON.parse(JSON.stringify(defaultContent.pricingPage));
 
       expect(() => savePricingAndFaq(newPricing, newPricingPage, defaultContent.revision)).toThrow(CorruptedContentError);
+
+      const afterFileContent = fs.readFileSync(tempFile, "utf8");
+      expect(afterFileContent).toBe(beforeFileContent);
+    });
+  });
+
+  describe("saveAboutPageSettings", () => {
+    it("sauvegarde réussie modifiant les textes about et changeant la révision", () => {
+      fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
+      const { content: before } = getRawSiteContent();
+      const newAbout = JSON.parse(JSON.stringify(before.aboutPage));
+
+      newAbout.seo.title.fr = "About Modifié";
+      newAbout.team.name.en = "Team Name";
+
+      const newRev = saveAboutPageSettings(newAbout, before.revision);
+      expect(newRev).not.toBe(before.revision);
+
+      const loaded = getSiteContent();
+      expect(loaded.aboutPage.seo.title.fr).toBe("About Modifié");
+      expect(loaded.aboutPage.team.name.en).toBe("Team Name");
+    });
+
+    it("gère le conflit de révision", () => {
+      const data = JSON.parse(JSON.stringify(defaultContent));
+      expect(() => saveAboutPageSettings(data.aboutPage, "wrong-rev")).toThrow(RevisionConflictError);
+    });
+
+    it("ne modifie pas le fichier si aboutPage est invalide (titre trop long)", () => {
+      fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
+      const { content: beforeData } = getRawSiteContent();
+      const beforeFileContent = fs.readFileSync(tempFile, "utf8");
+
+      const invalidAbout = JSON.parse(JSON.stringify(beforeData.aboutPage));
+      invalidAbout.seo.title.fr = "A".repeat(500); // Invalid length
+
+      expect(() => saveAboutPageSettings(invalidAbout, beforeData.revision)).toThrow(ValidationError);
 
       const afterFileContent = fs.readFileSync(tempFile, "utf8");
       expect(afterFileContent).toBe(beforeFileContent);

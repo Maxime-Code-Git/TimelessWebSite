@@ -14,7 +14,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const { section, imageId, variant, ext } = params;
 
-  if (!section || !["hero", "portfolio-photo", "portfolio-video", "studio"].includes(section)) {
+  if (!section || !["hero", "portfolio-photo", "portfolio-video", "studio", "about-team"].includes(section)) {
     return new Response("Not Found", { status: 404 });
   }
 
