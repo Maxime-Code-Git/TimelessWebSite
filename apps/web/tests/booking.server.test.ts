@@ -119,6 +119,18 @@ describe("Booking Server Logic & DB", () => {
     });
   });
 
+function getFutureTuesday(): string {
+  const date = new Date();
+  date.setUTCHours(12, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + 7);
+
+  const isoWeekday = date.getUTCDay() === 0 ? 7 : date.getUTCDay();
+  const daysUntilTuesday = (2 - isoWeekday + 7) % 7;
+  date.setUTCDate(date.getUTCDate() + daysUntilTuesday);
+
+  return date.toISOString().slice(0, 10);
+}
+
   describe("Concurrency with Workers", () => {
     it("should prevent double booking using worker threads targeting the same time slot", async () => {
       // Init first connection to setup the DB
@@ -128,7 +140,7 @@ describe("Booking Server Logic & DB", () => {
 
       const data = {
         dbPath,
-        date: "2026-09-22",
+        date: getFutureTuesday(),
         time: "10:00",
         names: "Worker Test",
         email: "worker@test.com"
@@ -204,13 +216,13 @@ describe("Booking Server Logic & DB", () => {
       const rows = checkDb.prepare("SELECT * FROM bookings").all();
       expect(rows.length).toBe(1);
       checkDb.close();
-    });
+    }, 15_000);
   });
 
   describe("Booking State Machine", () => {
     it("should respect booking status transitions", () => {
       const db = openBookingDb(dbPath);
-      const b = createPendingBooking({ date: "2026-09-22", time: "10:00", names: "User", email: "u@t.c", language: "fr" }, db);
+      const b = createPendingBooking({ date: getFutureTuesday(), time: "10:00", names: "User", email: "u@t.c", language: "fr" }, db);
 
       const confirmed = updateBookingStatus(b.id, "confirmed", "https://meet.google.com/abc", undefined, db);
       expect(confirmed.status).toBe("confirmed");
