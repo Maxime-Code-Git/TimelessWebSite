@@ -128,7 +128,7 @@ describe("Booking Server Logic & DB", () => {
 
       const data = {
         dbPath,
-        date: "2026-09-15",
+        date: "2026-09-22",
         time: "10:00",
         names: "Worker Test",
         email: "worker@test.com"
@@ -210,7 +210,7 @@ describe("Booking Server Logic & DB", () => {
   describe("Booking State Machine", () => {
     it("should respect booking status transitions", () => {
       const db = openBookingDb(dbPath);
-      const b = createPendingBooking({ date: "2026-09-15", time: "10:00", names: "User", email: "u@t.c", language: "fr" }, db);
+      const b = createPendingBooking({ date: "2026-09-22", time: "10:00", names: "User", email: "u@t.c", language: "fr" }, db);
 
       const confirmed = updateBookingStatus(b.id, "confirmed", "https://meet.google.com/abc", undefined, db);
       expect(confirmed.status).toBe("confirmed");

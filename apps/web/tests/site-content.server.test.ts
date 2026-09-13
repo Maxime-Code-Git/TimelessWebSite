@@ -48,16 +48,55 @@ describe("site-content.server.ts", () => {
     });
   });
 
-  describe("Admin Save", () => {
-    it("savePricingAndFaq saves atomically and handles revision conflict", () => {
-      const data = JSON.parse(JSON.stringify(defaultContent));
-      expect(() => savePricingAndFaq(data.pricing, data.pricingPage, "wrong-rev")).toThrow(/Revision conflict/i);
+  describe("savePricingAndFaq", () => {
+    it("sauvegarde réussie modifiant un prix et un texte FAQ avec changement de révision", () => {
+      fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
+      const { content: before } = getRawSiteContent();
+      const newPricing = JSON.parse(JSON.stringify(before.pricing));
+      const newPricingPage = JSON.parse(JSON.stringify(before.pricingPage));
+
+      newPricing.photo[0].priceCents = 88888;
+      newPricingPage.faqs[0].question.fr = "Question modifiée ?";
+
+      const newRev = savePricingAndFaq(newPricing, newPricingPage, before.revision);
+      expect(newRev).not.toBe(before.revision);
+
+      const loaded = getSiteContent();
+      expect(loaded.pricing.photo[0].priceCents).toBe(88888);
+      expect(loaded.pricingPage.faqs[0].question.fr).toBe("Question modifiée ?");
     });
-    
-    it("savePricingAndFaq aborts if data is invalid", () => {
+
+    it("gère le conflit de révision", () => {
       const data = JSON.parse(JSON.stringify(defaultContent));
-      data.pricingPage.faqs.push(data.pricingPage.faqs[0]); // invalid
-      expect(() => savePricingAndFaq(data.pricing, data.pricingPage, data.revision)).toThrow(/unique/i);
+      expect(() => savePricingAndFaq(data.pricing, data.pricingPage, "wrong-rev")).toThrow(RevisionConflictError);
+    });
+
+    it("ne modifie pas le fichier si la FAQ est invalide", () => {
+      fs.writeFileSync(tempFile, JSON.stringify(defaultContent));
+      const { content: beforeData } = getRawSiteContent();
+      const beforeFileContent = fs.readFileSync(tempFile, "utf8");
+
+      const invalidPricingPage = JSON.parse(JSON.stringify(beforeData.pricingPage));
+      invalidPricingPage.faqs.push(invalidPricingPage.faqs[0]); // Duplicate ID
+
+      expect(() => savePricingAndFaq(beforeData.pricing, invalidPricingPage, beforeData.revision)).toThrow(ValidationError);
+
+      const afterFileContent = fs.readFileSync(tempFile, "utf8");
+      expect(afterFileContent).toBe(beforeFileContent);
+    });
+
+    it("rejette un fichier corrompu (CorruptedContentError) et le laisse identique", () => {
+      fs.writeFileSync(tempFile, '{ "invalid": json }');
+
+      const beforeFileContent = fs.readFileSync(tempFile, "utf8");
+
+      const newPricing = JSON.parse(JSON.stringify(defaultContent.pricing));
+      const newPricingPage = JSON.parse(JSON.stringify(defaultContent.pricingPage));
+
+      expect(() => savePricingAndFaq(newPricing, newPricingPage, defaultContent.revision)).toThrow(CorruptedContentError);
+
+      const afterFileContent = fs.readFileSync(tempFile, "utf8");
+      expect(afterFileContent).toBe(beforeFileContent);
     });
   });
 

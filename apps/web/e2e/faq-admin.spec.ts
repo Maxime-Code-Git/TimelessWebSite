@@ -43,6 +43,12 @@ test.describe("FAQ Admin", () => {
     expect(firstBtnIdFr).toBeTruthy();
     await expect(faqSectionFr.locator(`#${firstBtnIdFr}`)).toBeVisible();
 
+    // Verify 2nd FAQ is absent
+    await expect(faqSectionFr.getByRole("button", { name: /Quel acompte pour réserver la date/i })).toHaveCount(0);
+    // Verify 3rd and 4th FAQ remain visible
+    await expect(faqSectionFr.getByRole("button", { name: /Quels sont les délais de livraison/i })).toBeVisible();
+    await expect(faqSectionFr.getByRole("button", { name: /Peut-on personnaliser une formule/i })).toBeVisible();
+
     await page.goto("/en/pricing");
     const faqSectionEn = page.getByTestId("pricing-faq-section");
     await expect(faqSectionEn.getByText("Very frequently asked questions")).toBeVisible();
@@ -58,5 +64,11 @@ test.describe("FAQ Admin", () => {
     const firstBtnIdEn = await firstBtnEn.getAttribute("aria-controls");
     expect(firstBtnIdEn).toBeTruthy();
     await expect(faqSectionEn.locator(`#${firstBtnIdEn}`)).toBeVisible();
+
+    // Verify 2nd FAQ is absent
+    await expect(faqSectionEn.getByRole("button", { name: /What deposit is required/i })).toHaveCount(0);
+    // Verify 3rd and 4th FAQ remain visible
+    await expect(faqSectionEn.getByRole("button", { name: /What are the delivery times/i })).toBeVisible();
+    await expect(faqSectionEn.getByRole("button", { name: /Can a package be customised/i })).toBeVisible();
   });
 });

@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter } from "react-router";
 import FormulesFr from "../app/routes/fr.formules";
 
@@ -80,7 +80,7 @@ describe("Formules Component", () => {
   });
 
   describe("FAQ Visibility", () => {
-    let originalFaqs: any;
+    let originalFaqs: typeof mockedContent.pricingPage.faqs;
 
     beforeEach(() => {
       originalFaqs = JSON.parse(JSON.stringify(mockedContent.pricingPage.faqs));
@@ -100,7 +100,7 @@ describe("Formules Component", () => {
           <FormulesFr />
         </MemoryRouter>
       );
-      
+
       expect(screen.queryByTestId("pricing-faq-section")).not.toBeInTheDocument();
     });
 

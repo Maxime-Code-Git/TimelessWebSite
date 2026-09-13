@@ -251,10 +251,10 @@ describe("Migration of intermediate V2 content", () => {
       expect(migrated.business.email).toBe("v3@test.com");
       expect(migrated.pricingPage).toBeDefined();
       expect(migrated.pricingPage.faqs).toHaveLength(defaultContent.pricingPage.faqs.length);
-      
+
       // No mutation
       expect(JSON.stringify(v3Data)).toBe(originalJson);
-      
+
       // No shared references
       migrated.pricingPage.faqs[0].id = "mutated";
       expect(defaultContent.pricingPage.faqs[0].id).not.toBe("mutated");
