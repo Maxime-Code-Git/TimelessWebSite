@@ -672,12 +672,7 @@ export function validateSiteContent(data: unknown): SiteContent {
       pp.photoEssentialDescription = pp.essentialDescription;
       pp.photoSignatureDescription = pp.signatureDescription;
       pp.photoPrestigeDescription = pp.prestigeDescription;
-      pp.filmEssentialDescription = pp.filmEssentialDescription || { fr: "Description", en: "Description" };
-      pp.filmSignatureDescription = pp.filmSignatureDescription || { fr: "Description", en: "Description" };
-      pp.filmPrestigeDescription = pp.filmPrestigeDescription || { fr: "Description", en: "Description" };
-      pp.duoEssentialDescription = pp.duoEssentialDescription || { fr: "Description", en: "Description" };
-      pp.duoSignatureDescription = pp.duoSignatureDescription || { fr: "Description", en: "Description" };
-      pp.duoPrestigeDescription = pp.duoPrestigeDescription || { fr: "Description", en: "Description" };
+
     }
 
 
@@ -696,15 +691,11 @@ export function validateSiteContent(data: unknown): SiteContent {
         if (id === "prestige") descKey = prefix + "PrestigeDescription";
 
         const defaultCat = defaultContent.pricing[prefix] || [];
-        const fallback = defaultCat.find(d => d.id === id) || {
-          priceCents: 0,
-          featured: false,
-          name: { fr: "Formule", en: "Package" },
-          summary: { fr: "Résumé", en: "Summary" },
-          description: { fr: "Description", en: "Description" },
-          includedItems: [],
-          buttonText: { fr: "Contact", en: "Contact" }
-        };
+        const fallback = defaultCat.find(d => d.id === id);
+
+        if (!fallback) {
+          throw new ValidationError(`Unknown formula id '${id}' in category '${prefix}'`);
+        }
 
         const includedItems = fallback.includedItems.map((item, itemIdx) => ({
           ...item,

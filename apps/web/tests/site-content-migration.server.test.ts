@@ -134,9 +134,28 @@ describe("Migration of intermediate V2 content", () => {
     fs.writeFileSync(filePath, JSON.stringify(INTERMEDIATE_V2), "utf8");
 
     const { content } = getRawSiteContent();
+
+    // Photo custom descriptions should be preserved
     expect(content.pricing.photo[0].summary.fr).toBe("Test"); // from home.pricingPreview
     expect(content.pricing.photo[0].name.fr).toBe("Essentiel");
-    expect(content.pricing.photo[0].description.fr).not.toBe("Description");
+
+    // Check real values for film and duo
+    expect(content.pricing.film[0].summary.fr).not.toBe("Description");
+    expect(content.pricing.film[0].summary.fr).not.toBe("Test");
+    expect(content.pricing.duo[0].summary.fr).not.toBe("Description");
+    expect(content.pricing.duo[0].summary.fr).not.toBe("Test");
+
+    // Verify all 9 formulas do not have generic texts
+    const categories = ["photo", "film", "duo"] as const;
+    for (const cat of categories) {
+      for (const formula of content.pricing[cat]) {
+        expect(formula.summary.fr).not.toBe("Description");
+        expect(formula.summary.en).not.toBe("Description");
+        expect(formula.description.fr).not.toBe("Description");
+        expect(formula.description.en).not.toBe("Description");
+      }
+    }
+
     expect(content.pricing.photo[0].description.fr).toBe("Une présence discrète pour capturer l'essentiel de votre mariage. Idéal pour les mariages intimes.");
     expect(content.pricing.photo[0].priceCents).toBe(129000);
     expect(content.pricing.photo[0].featured).toBe(false);
