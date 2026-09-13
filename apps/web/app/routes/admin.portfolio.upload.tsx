@@ -2,6 +2,7 @@ import { type ActionFunctionArgs } from "react-router";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import crypto from "node:crypto";
 import { once } from "node:events";
 import { finished } from "node:stream/promises";
 import busboy from "busboy";
@@ -98,7 +99,7 @@ async function parseSingleUpload(
       return;
     }
 
-    const tempPath = path.join(tempDirectory, globalThis.crypto.randomUUID());
+    const tempPath = path.join(tempDirectory, crypto.randomUUID());
     activeWriteStream = fs.createWriteStream(tempPath, {
       flags: "wx",
       mode: 0o600,
@@ -209,7 +210,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return jsonError("Internal Server Error", 500);
   }
 
-  const photoId = globalThis.crypto.randomUUID();
+  const photoId = crypto.randomUUID();
 
   let tempDirectory: string | null = null;
   try {

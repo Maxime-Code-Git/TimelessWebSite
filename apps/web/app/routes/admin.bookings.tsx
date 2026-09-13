@@ -10,7 +10,7 @@ import {
 } from "../lib/booking.server";
 import { sendBookingConfirmedEmail, sendBookingStatusEmail } from "../lib/mailer.server";
 import styles from "./admin.module.css";
-
+import * as crypto from "node:crypto";
 import { commitSession } from "../lib/session.server";
 import { useState, useEffect, useRef } from "react";
 
@@ -20,7 +20,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let csrfToken = session.get("csrfToken");
   const headers = new Headers();
   if (!csrfToken) {
-    csrfToken = globalThis.crypto.randomUUID();
+    csrfToken = crypto.randomUUID();
     session.set("csrfToken", csrfToken);
     headers.set("Set-Cookie", await commitSession(session));
   }

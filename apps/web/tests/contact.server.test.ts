@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
 import { processContactAction } from '../app/lib/contact.server';
+import * as siteContentServer from '../app/lib/site-content.server';
 import { closeRateLimitDatabase } from '../app/lib/rate-limit.server';
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
@@ -104,6 +105,35 @@ describe('Contact Server Logic', () => {
     const result = await processContactAction(req, "en");
     expect(result).toEqual({ success: true });
     expect(sendContactEmailMock).toHaveBeenCalled();
+  });
+
+  it('should reject photo-essential-extra', async () => {
+    const req = createRequest({ ...getValidBody(), formula: "photo-essential-extra" });
+    const result = await processContactAction(req, "fr");
+    expect(result.error).toContain("Formule invalide");
+    expect(sendContactEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('should reject unknown category without 500 error', async () => {
+    const req = createRequest({ ...getValidBody(), formula: "unknowncat-essential" });
+    const result = await processContactAction(req, "fr");
+    expect(result.error).toContain("Formule invalide");
+    expect(sendContactEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('should reject disabled formula', async () => {
+    const originalContent = siteContentServer.getSiteContent();
+    const mockContent = JSON.parse(JSON.stringify(originalContent));
+    mockContent.pricing.photo[0].enabled = false; // Disable photo-essential
+
+    const spy = vi.spyOn(siteContentServer, 'getSiteContent').mockReturnValue(mockContent);
+
+    const req = createRequest({ ...getValidBody(), formula: "photo-essential" });
+    const result = await processContactAction(req, "fr");
+
+    expect(result.error).toContain("Formule invalide");
+    expect(sendContactEmailMock).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it('should reject honeypot without sending email', async () => {

@@ -10,6 +10,7 @@ import {
 } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { getRawSiteContent, savePricing, RevisionConflictError, ValidationError, CorruptedContentError } from "../lib/site-content.server";
+import crypto from "node:crypto";
 import { requireValidAdminSession, validateAdminFormData, createAdminHeaders, ActionSecurityError } from "../lib/admin-auth.server";
 import { commitSession } from "../lib/session.server";
 import styles from "./admin.module.css";
@@ -22,7 +23,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const headers = createAdminHeaders();
   let csrfToken = session.get("csrfToken");
   if (!csrfToken) {
-    csrfToken = globalThis.globalThis.crypto.randomUUID();
+    csrfToken = crypto.randomUUID();
     session.set("csrfToken", csrfToken);
     headers.set("Set-Cookie", await commitSession(session));
   }
@@ -197,7 +198,7 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting,
 
   const addItem = (cat: keyof PricingCategory, formulaIndex: number) => {
     setPricing((prev) => {
-      const newItems = [...prev[cat][formulaIndex].includedItems, { id: globalThis.globalThis.crypto.randomUUID(), text: { fr: "", en: "" } }];
+      const newItems = [...prev[cat][formulaIndex].includedItems, { id: globalThis.crypto.randomUUID(), text: { fr: "", en: "" } }];
       return {
         ...prev,
         [cat]: prev[cat].map((f, i) => i === formulaIndex ? { ...f, includedItems: newItems } : f)
@@ -288,10 +289,15 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting,
                 <input id={`price-${idx}`} type="number" min="0" max="100000" value={formula.priceCents / 100} onChange={(e) => handleChange(activeTab, idx, "priceEuros", e.target.value)} className={styles.input} />
               </div>
               <div className={styles.formGroup}>
-                <label>Texte bouton (FR/EN) (Champs requis)</label>
                 <div className={styles.flexGap}>
-                  <input type="text" value={formula.buttonText.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "buttonText", "fr", e.target.value)} className={styles.input} placeholder="FR" />
-                  <input type="text" value={formula.buttonText.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "buttonText", "en", e.target.value)} className={styles.input} placeholder="EN" />
+                  <div style={{ flex: 1 }}>
+                    <label htmlFor={`btn-fr-${idx}`}>Texte bouton (FR)</label>
+                    <input id={`btn-fr-${idx}`} type="text" value={formula.buttonText.fr} onChange={(e) => handleLocalizedChange(activeTab, idx, "buttonText", "fr", e.target.value)} className={styles.input} placeholder="FR" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label htmlFor={`btn-en-${idx}`}>Texte bouton (EN)</label>
+                    <input id={`btn-en-${idx}`} type="text" value={formula.buttonText.en} onChange={(e) => handleLocalizedChange(activeTab, idx, "buttonText", "en", e.target.value)} className={styles.input} placeholder="EN" />
+                  </div>
                 </div>
               </div>
             </div>

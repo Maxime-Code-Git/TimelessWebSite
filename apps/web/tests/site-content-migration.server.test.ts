@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { getRawSiteContent } from "../app/lib/site-content.server";
+import { getRawSiteContent, validateSiteContent } from "../app/lib/site-content.server";
 
 const INTERMEDIATE_V2 = {
   "schemaVersion": 2,
@@ -137,10 +137,10 @@ describe("Migration of intermediate V2 content", () => {
   });
 
   it("objet d’entrée totalement inchangé après migration", () => {
-    fs.writeFileSync(filePath, JSON.stringify(INTERMEDIATE_V2), "utf8");
-    const before = JSON.stringify(INTERMEDIATE_V2);
-    getRawSiteContent();
-    const after = JSON.stringify(INTERMEDIATE_V2);
+    const input = JSON.parse(JSON.stringify(INTERMEDIATE_V2));
+    const before = JSON.stringify(input);
+    validateSiteContent(input);
+    const after = JSON.stringify(input);
     expect(before).toBe(after);
   });
 

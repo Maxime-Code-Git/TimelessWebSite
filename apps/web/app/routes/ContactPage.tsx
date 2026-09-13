@@ -21,14 +21,19 @@ export function ContactPage({ lang }: ContactPageProps) {
 
   // Validate initial formula
   let initialFormula = "";
-  if (rawInitialFormula === "custom" || rawInitialFormula === "unknown") {
+  const validFormulas = new Set<string>(["custom", "unknown"]);
+  if (rootData?.siteContent?.pricing) {
+    Object.entries(rootData.siteContent.pricing).forEach(([cat, formulas]) => {
+      formulas.forEach(f => {
+        if (f.enabled) {
+          validFormulas.add(`${cat}-${f.id}`);
+        }
+      });
+    });
+  }
+
+  if (validFormulas.has(rawInitialFormula)) {
     initialFormula = rawInitialFormula;
-  } else if (rootData?.siteContent?.pricing) {
-    const [cat, id] = rawInitialFormula.split("-");
-    const formulas = rootData.siteContent.pricing[cat as keyof typeof rootData.siteContent.pricing] || [];
-    if (formulas.some(f => f.id === id && f.enabled)) {
-      initialFormula = rawInitialFormula;
-    }
   }
 
   const [selectedFormula, setSelectedFormula] = useState<string>(initialFormula);
@@ -48,6 +53,7 @@ export function ContactPage({ lang }: ContactPageProps) {
   useEffect(() => {
     if (fetcher.data?.success && formRef.current) {
       formRef.current.reset();
+      setSelectedFormula("");
       successRef.current?.focus();
     }
     if (fetcher.data?.error && errorRef.current) {
