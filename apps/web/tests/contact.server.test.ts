@@ -84,7 +84,7 @@ describe('Contact Server Logic', () => {
       email: "john@example.com",
       date: "2027-08-15",
       location: "Bruxelles",
-      formula: "photo",
+      formula: "photo-essential",
       message: "Un message de test",
       phone: "0477 12 34 56"
     };

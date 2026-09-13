@@ -8,7 +8,7 @@ import { getPortfolioContent, updateWatermarkText } from "../lib/portfolio-conte
 import { requireValidAdminSession, validateAdminFormData, ActionSecurityError } from "../lib/admin-auth.server";
 import { RevisionConflictError, CorruptedContentError, ValidationError } from "../lib/site-content.server";
 import styles from "./admin.module.css";
-import * as crypto from "node:crypto";
+
 import { commitSession } from "../lib/session.server";
 
 export const headers: HeadersFunction = () => ({
@@ -23,7 +23,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let csrfToken = session.get("csrfToken");
   const responseHeaders = new Headers();
   if (!csrfToken) {
-    csrfToken = crypto.randomUUID();
+    csrfToken = globalThis.crypto.randomUUID();
     session.set("csrfToken", csrfToken);
     responseHeaders.set("Set-Cookie", await commitSession(session));
   }

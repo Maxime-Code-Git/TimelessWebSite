@@ -12,7 +12,6 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { getRawSiteContent, savePricing, RevisionConflictError, ValidationError, CorruptedContentError } from "../lib/site-content.server";
 import { requireValidAdminSession, validateAdminFormData, createAdminHeaders, ActionSecurityError } from "../lib/admin-auth.server";
 import { commitSession } from "../lib/session.server";
-import * as crypto from "node:crypto";
 import styles from "./admin.module.css";
 import type { PricingCategory } from "../lib/site-content.server";
 
@@ -23,7 +22,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const headers = createAdminHeaders();
   let csrfToken = session.get("csrfToken");
   if (!csrfToken) {
-    csrfToken = crypto.randomUUID();
+    csrfToken = globalThis.globalThis.crypto.randomUUID();
     session.set("csrfToken", csrfToken);
     headers.set("Set-Cookie", await commitSession(session));
   }
@@ -198,7 +197,7 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting,
 
   const addItem = (cat: keyof PricingCategory, formulaIndex: number) => {
     setPricing((prev) => {
-      const newItems = [...prev[cat][formulaIndex].includedItems, { id: crypto.randomUUID(), text: { fr: "", en: "" } }];
+      const newItems = [...prev[cat][formulaIndex].includedItems, { id: globalThis.globalThis.crypto.randomUUID(), text: { fr: "", en: "" } }];
       return {
         ...prev,
         [cat]: prev[cat].map((f, i) => i === formulaIndex ? { ...f, includedItems: newItems } : f)
@@ -243,7 +242,7 @@ function PricingEditor({ initialPricing, revision, error, success, isSubmitting,
 
       <div className={styles.tabContent}>
         {pricing[activeTab].map((formula, idx) => (
-          <div key={formula.id} className={styles.formulaEditorCard}>
+          <div key={formula.id} className={styles.formulaEditorCard} data-testid={`formula-card-${activeTab}-${formula.id}`}>
             <div className={styles.formulaEditorHeader}>
               <h3 className={styles.formulaIdTitle}>Formule: {formula.id.toUpperCase()}</h3>
               <label className={styles.checkboxLabel}>

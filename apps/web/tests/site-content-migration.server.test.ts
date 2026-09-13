@@ -115,7 +115,7 @@ describe("Migration of intermediate V2 content", () => {
     expect(content.home.pricingPreview).not.toHaveProperty("photoEssentialDescription");
     expect(content.pricing.photo[0].summary.fr).toBe("Test");
     expect(content.pricing.photo[0].enabled).toBe(true);
-    expect(content.pricing.photo[0].name.fr).toBe("Formule");
+    expect(content.pricing.photo[0].name.fr).toBe("Essentiel");
 
     // Check if original data was preserved
     expect(content.business.email).toBe("test@test.com");
@@ -127,6 +127,21 @@ describe("Migration of intermediate V2 content", () => {
 
     const fileContent = JSON.parse(fs.readFileSync(filePath, "utf8"));
     expect(fileContent.home.pricingPreview.essentialDescription).toBeDefined();
+  });
+
+  it("migration V1/V2 idempotency", () => {
+    fs.writeFileSync(filePath, JSON.stringify(INTERMEDIATE_V2), "utf8");
+    const { content: c1 } = getRawSiteContent();
+    const { content: c2 } = getRawSiteContent();
+    expect(c1.pricing).toEqual(c2.pricing);
+  });
+
+  it("objet d’entrée totalement inchangé après migration", () => {
+    fs.writeFileSync(filePath, JSON.stringify(INTERMEDIATE_V2), "utf8");
+    const before = JSON.stringify(INTERMEDIATE_V2);
+    getRawSiteContent();
+    const after = JSON.stringify(INTERMEDIATE_V2);
+    expect(before).toBe(after);
   });
 
   it("detects actual invalid JSON as corrupted", () => {

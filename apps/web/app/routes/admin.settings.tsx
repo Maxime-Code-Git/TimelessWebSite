@@ -11,7 +11,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { getRawSiteContent, saveSettings, RevisionConflictError, ValidationError, CorruptedContentError } from "../lib/site-content.server";
 import { requireValidAdminSession, validateAdminFormData, createAdminHeaders, ActionSecurityError } from "../lib/admin-auth.server";
 import { commitSession } from "../lib/session.server";
-import * as crypto from "node:crypto";
+
 import styles from "./admin.module.css";
 import type { BusinessContent } from "../lib/site-content.server";
 import { useState } from "react";
@@ -23,7 +23,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const headers = createAdminHeaders();
   let csrfToken = session.get("csrfToken");
   if (!csrfToken) {
-    csrfToken = crypto.randomUUID();
+    csrfToken = globalThis.crypto.randomUUID();
     session.set("csrfToken", csrfToken);
     headers.set("Set-Cookie", await commitSession(session));
   }

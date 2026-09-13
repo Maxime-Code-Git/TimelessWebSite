@@ -20,7 +20,7 @@ import {
 } from "../lib/portfolio-content.server";
 import { requireValidAdminSession, validateAdminFormData, ActionSecurityError } from "../lib/admin-auth.server";
 import styles from "./admin.module.css";
-import * as crypto from "node:crypto";
+
 import { commitSession } from "../lib/session.server";
 import { useState, useRef, useEffect } from "react";
 import { z } from "zod";
@@ -42,7 +42,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let csrfToken = session.get("csrfToken");
   const headers = new Headers();
   if (!csrfToken) {
-    csrfToken = crypto.randomUUID();
+    csrfToken = globalThis.crypto.randomUUID();
     session.set("csrfToken", csrfToken);
     headers.set("Set-Cookie", await commitSession(session));
   }
@@ -434,7 +434,7 @@ export default function AdminPortfolio() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const uploadId = globalThis.crypto.randomUUID();
+      const uploadId = globalThis.globalThis.crypto.randomUUID();
 
       setUploads(prev => [...prev, { id: uploadId, name: file.name, progress: 0, status: "Uploading..." }]);
 

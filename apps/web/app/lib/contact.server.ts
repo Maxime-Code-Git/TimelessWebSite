@@ -121,17 +121,23 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
   const siteContent = getSiteContent();
   let readableFormulaLabel;
   if (formula === "custom") {
-    readableFormulaLabel = "Sur-mesure (custom)";
+    readableFormulaLabel = lang === "fr" ? "Sur-mesure" : "Custom";
   } else if (formula === "unknown") {
-    readableFormulaLabel = "Ne sait pas encore (unknown)";
+    readableFormulaLabel = lang === "fr" ? "Ne sait pas encore" : "Not sure yet";
   } else {
-    const [cat, id] = formula.split("-");
+    const parts = formula.split("-");
+    const cat = parts[0];
+
+    if (cat !== "photo" && cat !== "film" && cat !== "duo") {
+      return { error: lang === "fr" ? "Formule invalide." : "Invalid formula." };
+    }
+
     const formulas = siteContent.pricing[cat as keyof typeof siteContent.pricing] || [];
-    const matched = formulas.find(f => f.id === id && f.enabled);
+    const matched = formulas.find(f => f.enabled && formula === `${cat}-${f.id}`);
     if (!matched) {
       return { error: lang === "fr" ? "Formule invalide." : "Invalid formula." };
     }
-    const catLabel = cat === "photo" ? "Photographie" : cat === "film" ? "Film" : "Duo";
+    const catLabel = cat === "photo" ? (lang === "fr" ? "Photographie" : "Photography") : cat === "film" ? "Film" : "Duo";
     readableFormulaLabel = `[${catLabel}] ${matched.name[lang]} (${formula})`;
   }
 

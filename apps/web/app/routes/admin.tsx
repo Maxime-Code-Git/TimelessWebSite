@@ -16,7 +16,7 @@ import { verifyAdminPassword, constantTimeEqual, getAdminConfig, requireAdminSes
 import { checkRateLimit, resetRateLimit } from "../lib/rate-limit.server";
 import { commitSession, destroySession } from "../lib/session.server";
 import styles from "./admin.module.css";
-import * as crypto from "node:crypto";
+
 import { getClientIp, validateOrigin } from "../lib/security.server";
 
 const MAX_BODY_SIZE = 100 * 1024; // 100 KB
@@ -46,7 +46,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Generate CSRF token for forms
   let csrfToken = session.get("csrfToken");
   if (!csrfToken) {
-    csrfToken = crypto.randomUUID();
+    csrfToken = globalThis.crypto.randomUUID();
     session.set("csrfToken", csrfToken);
     headers.set("Set-Cookie", await commitSession(session));
   }
@@ -202,11 +202,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Success: clear rate limit and create session
     resetRateLimit(ip, "admin");
-    session.set("adminId", crypto.randomUUID());
+    session.set("adminId", globalThis.crypto.randomUUID());
     session.set("credentialVersion", computeCredentialVersion());
 
     // Rotate CSRF token after login
-    session.set("csrfToken", crypto.randomUUID());
+    session.set("csrfToken", globalThis.crypto.randomUUID());
 
     return redirect("/admin", {
       headers: {
