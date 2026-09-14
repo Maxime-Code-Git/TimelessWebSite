@@ -79,21 +79,6 @@ export interface FormulesStrings {
 
 
 
-/* ── About page ─────────────────────────────────────────── */
-export interface AboutStrings {
-  heroTitle: string;
-  heroSubtitle: string;
-  duoTitle: string;
-  personRole1: string;
-  personRole2: string;
-  personBio: string;
-  personNamePlaceholder: string;
-  approachTitle: string;
-  principles: Array<{ title: string; text: string }>;
-  differenceTitle: string;
-  differenceText: string;
-}
-
 /* ── Contact page ───────────────────────────────────────── */
 export interface ContactStrings {
   heroTitle: string;
@@ -181,8 +166,6 @@ export interface I18nStrings {
   home: HomeStrings;
   portfolio: PortfolioStrings;
   formules: FormulesStrings;
-
-  about: AboutStrings;
   contact: ContactStrings;
   clients: ClientsStrings;
   footer: FooterStrings;
@@ -275,35 +258,6 @@ const FR: I18nStrings = {
       "Composons ensemble une formule à la mesure de votre événement.",
     customCta: "Demander un devis sur-mesure",
     featuredBadge: "Le plus choisi",
-  },
-  about: {
-    heroTitle: "Arrêter le temps, rendre le jour éternel.",
-    heroSubtitle:
-      "Deux regards, une même exigence\u00a0: capter votre journée avec justesse, pour qu'elle vous revienne intacte dans trente ans.",
-    duoTitle: "Nous deux",
-    personRole1: "Photographe",
-    personRole2: "Vidéaste",
-    personBio:
-      "Quelques lignes de présentation\u00a0: son parcours, sa sensibilité, ce qui guide son regard le jour d'un mariage.",
-    personNamePlaceholder: "Prénom Nom",
-    approachTitle: "Notre approche",
-    principles: [
-      {
-        title: "Discrétion le jour J",
-        text: "Présents sans jamais s'imposer, pour que vous viviez votre journée pleinement.",
-      },
-      {
-        title: "Un seul studio",
-        text: "Photo et film pensés ensemble, pour une même sensibilité du début à la fin.",
-      },
-      {
-        title: "Un rendu intemporel",
-        text: "Des choix sobres et durables, qui vieillissent bien — loin des effets de mode.",
-      },
-    ],
-    differenceTitle: "Notre différence",
-    differenceText:
-      "Réunir la photo et le film sous un même studio, c'est une cohérence de regard du premier au dernier plan — et une présence commune le jour J, pour ne rien manquer de votre histoire.",
   },
   contact: {
     heroTitle: "Racontons votre jour.",
@@ -477,35 +431,6 @@ const EN: I18nStrings = {
       "Let's create a package tailored to your event together.",
     customCta: "Request a bespoke quote",
     featuredBadge: "Most popular",
-  },
-  about: {
-    heroTitle: "Stop time, make the day eternal.",
-    heroSubtitle:
-      "Two perspectives, one standard: capturing your day with precision, so it comes back to you intact in thirty years.",
-    duoTitle: "The two of us",
-    personRole1: "Photographer",
-    personRole2: "Videographer",
-    personBio:
-      "A few lines of introduction: their background, their sensitivity, what guides their eye on a wedding day.",
-    personNamePlaceholder: "First Last",
-    approachTitle: "Our approach",
-    principles: [
-      {
-        title: "Discretion on the day",
-        text: "Present without ever imposing, so you can live your day fully.",
-      },
-      {
-        title: "One studio",
-        text: "Photo and film conceived together, for the same sensitivity from start to finish.",
-      },
-      {
-        title: "A timeless result",
-        text: "Sober and lasting choices that age well — far from passing trends.",
-      },
-    ],
-    differenceTitle: "Our difference",
-    differenceText:
-      "Uniting photo and film under one studio means a coherent vision from the first to the last frame — and a shared presence on the day, to miss nothing of your story.",
   },
   contact: {
     heroTitle: "Let's tell your day.",

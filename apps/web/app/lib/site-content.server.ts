@@ -729,7 +729,7 @@ function validateAboutPageContent(data: unknown): AboutPageContent {
       text: validateLocalizedString(pObj.text, `aboutPage.approach.principles[${i}].text`, 2000)
     };
   });
-  
+
   // Verify that all 3 expected IDs are present and unique
   const ids = new Set(validPrinciples.map(p => p.id));
   if (ids.size !== 3 || !ids.has("discretion") || !ids.has("single-studio") || !ids.has("timeless")) {
@@ -922,7 +922,7 @@ export function validateSiteContent(data: unknown): SiteContent {
     objRef = { ...objRef, pricingPage: pricingPageData };
   }
 
-  
+
   if (obj.schemaVersion === 1 || obj.schemaVersion === 2 || obj.schemaVersion === 3 || obj.schemaVersion === 4) {
     const aboutPageData = JSON.parse(JSON.stringify(defaultContent.aboutPage));
     objRef = { ...objRef, aboutPage: aboutPageData };

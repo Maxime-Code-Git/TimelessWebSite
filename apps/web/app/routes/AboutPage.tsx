@@ -32,12 +32,27 @@ export function AboutPage({ lang }: AboutPageProps) {
             <div className={styles.personCard}>
               {content.team.image.imageId ? (
                 <div className={styles.personPhoto}>
-                  <img
-                    src={`/media/home/about-team/${content.team.image.imageId}/640p/webp`}
-                    alt={content.team.image.alt?.[lang] || content.team.name[lang]}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    loading="lazy"
-                  />
+                  <picture>
+                    <source
+                      type="image/avif"
+                      srcSet={`/media/home/about-team/${content.team.image.imageId}/640p/avif 640w, /media/home/about-team/${content.team.image.imageId}/960p/avif 960w, /media/home/about-team/${content.team.image.imageId}/1440p/avif 1440w, /media/home/about-team/${content.team.image.imageId}/1920p/avif 1920w`}
+                      sizes="(max-width: 720px) 100vw, 50vw"
+                    />
+                    <source
+                      type="image/webp"
+                      srcSet={`/media/home/about-team/${content.team.image.imageId}/640p/webp 640w, /media/home/about-team/${content.team.image.imageId}/960p/webp 960w, /media/home/about-team/${content.team.image.imageId}/1440p/webp 1440w, /media/home/about-team/${content.team.image.imageId}/1920p/webp 1920w`}
+                      sizes="(max-width: 720px) 100vw, 50vw"
+                    />
+                    <img
+                      src={`/media/home/about-team/${content.team.image.imageId}/640p/webp`}
+                      alt={content.team.image.alt?.[lang] || content.team.name[lang]}
+                      className={styles.personImage}
+                      loading="lazy"
+                      decoding="async"
+                      width={content.team.image.width}
+                      height={content.team.image.height}
+                    />
+                  </picture>
                 </div>
               ) : (
                 <div className={styles.personPhoto} />

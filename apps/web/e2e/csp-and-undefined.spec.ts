@@ -53,7 +53,7 @@ test.describe('Technical Fidelity & CSP', () => {
     await page.click('button[type="submit"]');
     await expect(page.locator('h1')).toContainText('Administration Sempra');
 
-    const adminPages = ['/admin/pricing', '/admin/settings'];
+    const adminPages = ['/admin/pricing', '/admin/settings', '/admin/about'];
 
     for (const pagePath of adminPages) {
       // 2. ouvrir réellement chaque interface protégée
