@@ -252,10 +252,10 @@ export default function AdminPage() {
               Le tableau de bord complet sera implémenté lors des prochaines phases.
             </p>
             <div className={styles.grid}>
-              <div className={`${styles.card} ${styles.disabledCard}`}>
+              <Link to="/admin/galleries" className={styles.card}>
                 <h3>Galeries clients</h3>
-                <p>Fonctionnalité disponible prochainement</p>
-              </div>
+                <p>Gérer les galeries privées des clients</p>
+              </Link>
               <Link to="/admin/portfolio" className={styles.card}>
                 <h3>Portfolio public</h3>
                 <p>Gérer les projets et photos du portfolio</p>
