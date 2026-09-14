@@ -26,10 +26,10 @@ test.describe('SEO & Meta Tags for all routes', () => {
     test(`route ${route.path} should have correct canonical, alternate and robots`, async ({ page }) => {
       const response = await page.goto(route.path);
       expect(response?.status()).not.toBe(404);
-      
+
       const canonical = await page.locator('link[rel="canonical"]').getAttribute('href');
       expect(canonical).toBe(`http://localhost:4174${route.path}`);
-      
+
       const lang = route.path.startsWith('/fr') ? 'fr' : 'en';
       const altLang = lang === 'fr' ? 'en' : 'fr';
 
@@ -60,11 +60,11 @@ test.describe('SEO & Meta Tags for all routes', () => {
   test('sitemap should not include galleries or noindex pages', async ({ request }) => {
     const response = await request.get('/sitemap.xml');
     expect(response.ok()).toBeTruthy();
-    
+
     const xml = await response.text();
     expect(xml).toContain('<loc>http://localhost:4174/fr/</loc>');
     expect(xml).toContain('<loc>http://localhost:4174/fr/portfolio</loc>');
-    
+
     // Check missing things
     expect(xml).not.toContain('espace-clients');
     expect(xml).not.toContain('mentions-legales');

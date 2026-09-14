@@ -62,7 +62,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       intro_fr: gallery.intro_fr,
       intro_en: gallery.intro_en,
       signature_fr: gallery.signature_fr,
-      signature_en: gallery.signature_en
+      signature_en: gallery.signature_en,
+      cover_image_id: gallery.cover_image_id
     },
     accessLevel,
     media: media as unknown as GalleryMedia[]

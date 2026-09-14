@@ -32,7 +32,7 @@ interface FileToProcess {
   visibility: "invites" | "maries";
 }
 
-function scanFolderForFiles(basePath: string, subFolder: string, visibility: "invites" | "maries"): FileToProcess[] {
+function scanFolderForFiles(basePath: string, subFolder: string, visibility: "invites" | "maries", rejected: {file: string, reason: string}[] = []): FileToProcess[] {
   const targetDir = path.join(basePath, subFolder);
   if (!fs.existsSync(targetDir)) return [];
 
@@ -41,6 +41,13 @@ function scanFolderForFiles(basePath: string, subFolder: string, visibility: "in
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
+
+      const stat = fs.lstatSync(fullPath);
+      if (stat.isSymbolicLink()) {
+        rejected.push({ file: entry.name, reason: "Les liens symboliques sont interdits." });
+        continue;
+      }
+
       if (entry.isDirectory()) {
         scan(fullPath);
       } else if (entry.isFile()) {
@@ -56,31 +63,74 @@ function scanFolderForFiles(basePath: string, subFolder: string, visibility: "in
 }
 
 export async function getImportPreview(folderName: string) {
+  const baseReal = fs.realpathSync(ENV.GALLERY_IMPORT_PATH);
   const importDir = path.resolve(ENV.GALLERY_IMPORT_PATH, folderName);
-  // Security: prevent path traversal
-  if (!importDir.startsWith(fs.realpathSync(ENV.GALLERY_IMPORT_PATH))) {
+
+  if (!importDir.startsWith(baseReal + path.sep) && importDir !== baseReal) {
     throw new Error("Invalid import path");
   }
 
+  const rejected: {file: string, reason: string}[] = [];
+
   const invitesFiles = [
-    ...scanFolderForFiles(importDir, "invites/photos", "invites"),
-    ...scanFolderForFiles(importDir, "invites/videos", "invites")
+    ...scanFolderForFiles(importDir, "invites/photos", "invites", rejected),
+    ...scanFolderForFiles(importDir, "invites/videos", "invites", rejected)
   ];
   const mariesFiles = [
-    ...scanFolderForFiles(importDir, "maries/photos", "maries"),
-    ...scanFolderForFiles(importDir, "maries/videos", "maries")
+    ...scanFolderForFiles(importDir, "maries/photos", "maries", rejected),
+    ...scanFolderForFiles(importDir, "maries/videos", "maries", rejected)
   ];
+
+  let validInvitesPhotos = 0;
+  let validInvitesVideos = 0;
+  let validMariesPhotos = 0;
+  let validMariesVideos = 0;
+
+  const checkMime = (file: FileToProcess, isInvites: boolean) => {
+    try {
+      const fd = fs.openSync(file.fullPath, "r");
+      const header = Buffer.alloc(1024);
+      const bytesRead = fs.readSync(fd, header, 0, 1024, 0);
+      fs.closeSync(fd);
+      const mimeType = detectMimeType(header.subarray(0, bytesRead));
+      if (!mimeType) {
+        rejected.push({ file: file.name, reason: "Format non supporté ou inconnu" });
+        return;
+      }
+      if (isInvites) {
+        if (mimeType.startsWith("image/")) validInvitesPhotos++;
+        else validInvitesVideos++;
+      } else {
+        if (mimeType.startsWith("image/")) validMariesPhotos++;
+        else validMariesVideos++;
+      }
+    } catch {
+      rejected.push({ file: file.name, reason: "Erreur de lecture" });
+    }
+  };
+
+  for (const f of invitesFiles) checkMime(f, true);
+  for (const f of mariesFiles) checkMime(f, false);
 
   return {
     folder: folderName,
-    invitesCount: invitesFiles.length,
-    mariesCount: mariesFiles.length,
-    total: invitesFiles.length + mariesFiles.length
+    invitesPhotosCount: validInvitesPhotos,
+    invitesVideosCount: validInvitesVideos,
+    mariesPhotosCount: validMariesPhotos,
+    mariesVideosCount: validMariesVideos,
+    total: validInvitesPhotos + validInvitesVideos + validMariesPhotos + validMariesVideos,
+    rejected
   };
 }
 
+
+
 export function startGalleryImport(galleryId: string, folderName: string) {
   const db = getGalleryDb();
+
+  // Update import path on gallery
+  db.prepare("UPDATE galleries SET import_path = ? WHERE id = ?").run(folderName, galleryId);
+
   const importId = crypto.randomUUID();
   const now = Date.now();
 
@@ -95,20 +145,33 @@ export function startGalleryImport(galleryId: string, folderName: string) {
   return importId;
 }
 
+export function resumeImports() {
+  const db = getGalleryDb();
+  const pending = db.prepare("SELECT gi.id, gi.gallery_id, g.import_path FROM gallery_imports gi JOIN galleries g ON gi.gallery_id = g.id WHERE gi.status IN ('pending', 'processing')").all() as { id: string, gallery_id: string, import_path: string | null }[];
+  for (const p of pending) {
+    if (p.import_path) {
+      void processImport(p.id, p.gallery_id, p.import_path).catch(err => console.error("Resume failed:", err));
+    }
+  }
+}
+
 async function processImport(importId: string, galleryId: string, folderName: string) {
   const db = getGalleryDb();
 
   try {
+    const baseReal = fs.realpathSync(ENV.GALLERY_IMPORT_PATH);
     const importDir = path.resolve(ENV.GALLERY_IMPORT_PATH, folderName);
-    if (!importDir.startsWith(fs.realpathSync(ENV.GALLERY_IMPORT_PATH))) {
+
+    if (!importDir.startsWith(baseReal + path.sep) && importDir !== baseReal) {
       throw new Error("Invalid import path");
     }
 
+    const ignoredFiles: {file: string, reason: string}[] = [];
     const files = [
-      ...scanFolderForFiles(importDir, "invites/photos", "invites"),
-      ...scanFolderForFiles(importDir, "invites/videos", "invites"),
-      ...scanFolderForFiles(importDir, "maries/photos", "maries"),
-      ...scanFolderForFiles(importDir, "maries/videos", "maries")
+      ...scanFolderForFiles(importDir, "invites/photos", "invites", ignoredFiles),
+      ...scanFolderForFiles(importDir, "invites/videos", "invites", ignoredFiles),
+      ...scanFolderForFiles(importDir, "maries/photos", "maries", ignoredFiles),
+      ...scanFolderForFiles(importDir, "maries/videos", "maries", ignoredFiles)
     ];
 
     db.prepare("UPDATE gallery_imports SET status = 'processing', total = ?, updated_at = ? WHERE id = ?")
@@ -120,7 +183,7 @@ async function processImport(importId: string, galleryId: string, folderName: st
     }
 
     let progress = 0;
-    const results = { imported: 0, ignored: [] as { file: string, reason: string }[] };
+    const results = { imported: 0, ignored: [...ignoredFiles] };
 
     for (const file of files) {
       try {
@@ -169,9 +232,15 @@ async function processImport(importId: string, galleryId: string, folderName: st
 
         const mediaId = crypto.randomUUID();
         const destPath = path.join(mediaDir, mediaId);
+        const tmpPath = destPath + ".tmp";
 
-        // Copy original file to managed storage
-        fs.copyFileSync(file.fullPath, destPath);
+        try {
+          fs.copyFileSync(file.fullPath, tmpPath);
+          fs.renameSync(tmpPath, destPath);
+        } catch (copyErr) {
+          if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+          throw copyErr;
+        }
 
         db.prepare(`
           INSERT INTO gallery_media (id, gallery_id, type, visibility, original_name, mime_type, size, hash, width, height, created_at)

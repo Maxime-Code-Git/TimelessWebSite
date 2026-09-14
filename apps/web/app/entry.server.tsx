@@ -37,7 +37,7 @@ function generateNonce(): string {
 
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV === "development";
-  
+
   const styleSrc = isDev ? "'self' 'unsafe-inline'" : "'self'";
   const connectSrc = isDev ? "'self' ws: wss:" : "'self'";
 

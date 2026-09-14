@@ -71,7 +71,11 @@ describe("Real HTTP isolation WITH valid admin config", () => {
           ADMIN_SESSION_SECRET: "12345678901234567890123456789012", // 32 chars
           SITE_CONTENT_PATH: siteContentPath,
           PORTFOLIO_CONTENT_PATH: path.join(tempDir, "portfolio.json"),
-          PORTFOLIO_MEDIA_PATH: path.join(tempDir, "media")
+          PORTFOLIO_MEDIA_PATH: path.join(tempDir, "media"),
+          GALLERY_SECRET: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          GALLERY_DB_PATH: path.join(tempDir, "gallery.db"),
+          GALLERY_MEDIA_PATH: path.join(tempDir, "gallery-media"),
+          GALLERY_IMPORT_PATH: path.join(tempDir, "gallery-import")
         },
         stdio: ["ignore", "pipe", "pipe"]
       });
@@ -259,7 +263,11 @@ describe("Real HTTP isolation WITHOUT admin config", () => {
           ADMIN_SESSION_SECRET: "",
           SITE_CONTENT_PATH: siteContentPath,
           PORTFOLIO_CONTENT_PATH: path.join(tempDir, "portfolio.json"),
-          PORTFOLIO_MEDIA_PATH: path.join(tempDir, "media")
+          PORTFOLIO_MEDIA_PATH: path.join(tempDir, "media"),
+          GALLERY_SECRET: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          GALLERY_DB_PATH: path.join(tempDir, "gallery.db"),
+          GALLERY_MEDIA_PATH: path.join(tempDir, "gallery-media"),
+          GALLERY_IMPORT_PATH: path.join(tempDir, "gallery-import")
         },
         stdio: ["ignore", "pipe", "pipe"]
       });

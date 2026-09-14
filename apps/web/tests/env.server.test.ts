@@ -34,7 +34,11 @@ describe("Environment Validation — fail-fast on import", () => {
       ADMIN_SESSION_SECRET: "admin_secret",
       PORTFOLIO_CONTENT_PATH: path.join(os.tmpdir(), "portfolio.json"),
       PORTFOLIO_MEDIA_PATH: path.join(os.tmpdir(), "media"),
-      BOOKING_DB_PATH: path.join(os.tmpdir(), "booking.db")
+      BOOKING_DB_PATH: path.join(os.tmpdir(), "booking.db"),
+      GALLERY_SECRET: "gallery_secret_key_32b_minimum_length",
+      GALLERY_DB_PATH: path.join(os.tmpdir(), "gallery.db"),
+      GALLERY_MEDIA_PATH: path.join(os.tmpdir(), "gallery-media"),
+      GALLERY_IMPORT_PATH: path.join(os.tmpdir(), "gallery-import")
     };
   }
 
@@ -88,6 +92,7 @@ describe("Environment Validation — fail-fast on import", () => {
     "PORTFOLIO_CONTENT_PATH",
     "PORTFOLIO_MEDIA_PATH",
     "BOOKING_DB_PATH"
+    // Note: We don't strictly test GALLERY_* as required vars here since some tests mock different modes, but they are now in validEnv
   ];
 
   for (const varName of requiredVars) {

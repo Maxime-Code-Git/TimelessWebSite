@@ -172,6 +172,10 @@ function getFutureTuesday(): string {
               BOOKING_DB_PATH: d.dbPath,
               PORTFOLIO_CONTENT_PATH: path.join(os.tmpdir(), "portfolio.json"),
               PORTFOLIO_MEDIA_PATH: path.join(os.tmpdir(), "portfolio"),
+              GALLERY_SECRET: "secret",
+              GALLERY_DB_PATH: d.dbPath,
+              GALLERY_MEDIA_PATH: path.join(os.tmpdir(), "gallery-media"),
+              GALLERY_IMPORT_PATH: path.join(os.tmpdir(), "gallery-import")
             }
           }, (err, stdout, stderr) => {
             if (err && err.code !== 0) {

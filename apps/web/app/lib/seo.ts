@@ -1,7 +1,7 @@
 /**
  * Helper pur pour générer les balises SEO, Open Graph et hreflang.
  *
- * Les composants et loaders ne lisent pas process.env directement pour éviter 
+ * Les composants et loaders ne lisent pas process.env directement pour éviter
  * l'injection accidentelle dans le bundle client. La variable PUBLIC_SITE_URL
  * est transmise via l'argument `matches` dans la fonction meta.
  */
@@ -30,7 +30,7 @@ export function getSeoMeta({
 }: SeoArgs) {
   const absoluteUrl = `${siteUrl}${path}`;
   const absoluteAltUrl = alternatePath ? `${siteUrl}${alternatePath}` : undefined;
-  
+
   // Par défaut, la racine /en/ est l'équivalent de /fr/ etc.
   // x-default est généralement défini sur /fr/ ou /en/. Disons /fr/ pour ce site basé en Belgique,
   // ou on route vers le contenu français par défaut.
@@ -66,7 +66,7 @@ export function getSeoMeta({
     const altLang = isFr ? "en" : "fr";
     links.push({ tagName: "link", rel: "alternate", hrefLang: altLang, href: absoluteAltUrl });
   }
-  
+
   // x-default pointera vers le français
   links.push({ tagName: "link", rel: "alternate", hrefLang: "x-default", href: xDefaultUrl });
 

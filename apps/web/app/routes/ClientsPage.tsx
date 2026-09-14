@@ -1,4 +1,4 @@
-import { Form, Link, useActionData, useNavigation } from "react-router";
+import { Form, Link, useActionData, useNavigation, useLoaderData } from "react-router";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
@@ -18,6 +18,7 @@ export function ClientsPage({ lang }: ClientsPageProps) {
   const [code, setCode] = useState("");
   const actionData = useActionData<{ error?: string }>();
   const navigation = useNavigation();
+  const loaderData = useLoaderData<{ csrf?: string }>();
   const isSubmitting = navigation.state === "submitting";
 
   return (
@@ -31,6 +32,7 @@ export function ClientsPage({ lang }: ClientsPageProps) {
           <p className={styles.subtitle}>{t.subtitle}</p>
 
           <Form method="post" className={styles.form}>
+            {loaderData?.csrf && <input type="hidden" name="csrf" value={loaderData.csrf} />}
             <div className={styles.formGroup}>
               <label htmlFor="code" className={styles.label}>
                 {t.accessLabel}
@@ -46,7 +48,7 @@ export function ClientsPage({ lang }: ClientsPageProps) {
                 required
               />
             </div>
-            
+
             {actionData?.error && (
               <div className={styles.errorMsg} role="alert">
                 {actionData.error}

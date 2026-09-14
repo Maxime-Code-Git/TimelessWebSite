@@ -1,94 +1,93 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { getGallerySession } from "~/lib/gallery-auth.server";
-import type { GalleryAccessLevel } from "~/lib/gallery-auth.server";
-import { getGalleryDb } from "~/lib/gallery-db.server";
+import { requireGalleryAccess, GALLERY_PRIVATE_HEADERS } from "~/lib/gallery-auth.server";
 import { ENV } from "~/lib/env.server";
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
+import { Readable } from "node:stream";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const session = await getGallerySession(request);
-  const galleryId = session.get("galleryId");
-  const accessLevel = session.get("accessLevel") as GalleryAccessLevel | undefined;
-  const codeVersion = session.get("codeVersion") as number | undefined;
-
-  if (!galleryId || !accessLevel || codeVersion === undefined) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
   const { publicId, mediaId } = params;
   if (!publicId || !mediaId) return new Response("Bad Request", { status: 400 });
 
-  const db = getGalleryDb();
+  const { gallery, media } = await requireGalleryAccess(request, publicId, mediaId);
+  if (!media) return new Response("Media not found", { status: 404 });
 
-  // Verify gallery & session match
-  const gallery = db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as { id: string, status: string, expires_at: number, couple_code_version: number, guest_code_version: number } | undefined;
-  if (!gallery || gallery.id !== galleryId || gallery.status !== "published" || gallery.expires_at < Date.now()) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-  const currentVersion = accessLevel === "maries" ? gallery.couple_code_version : gallery.guest_code_version;
-  if (codeVersion !== currentVersion) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
-  // Verify media access
-  const media = db.prepare("SELECT * FROM gallery_media WHERE id = ? AND gallery_id = ?").get(mediaId, galleryId) as { id: string, visibility: string, type: string, mime_type: string } | undefined;
-  if (!media) return new Response("Not found", { status: 404 });
-  if (media.visibility === "maries" && accessLevel === "invites") {
-    return new Response("Forbidden", { status: 403 });
-  }
-
-  const filePath = path.join(ENV.GALLERY_MEDIA_PATH, gallery.id, media.id);
+  const filePath = path.join(ENV.GALLERY_MEDIA_PATH, gallery.id as string, media.id as string);
   if (!fs.existsSync(filePath)) {
     return new Response("File not found", { status: 404 });
   }
 
   const stat = fs.statSync(filePath);
+  const size = stat.size;
 
   if (media.type === "video") {
     const range = request.headers.get("range");
     if (range) {
-      const parts = range.replace(/bytes=/, "").split("-");
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+      const match = range.match(/^bytes=(\d+)-(\d*)$/);
+      if (!match) {
+        return new Response(null, {
+          status: 416,
+          headers: {
+            "Content-Range": `bytes */${size}`,
+            ...GALLERY_PRIVATE_HEADERS
+          }
+        });
+      }
+
+      const start = parseInt(match[1], 10);
+      const end = match[2] ? parseInt(match[2], 10) : size - 1;
+
+      if (isNaN(start) || start < 0 || start >= size || (match[2] && (isNaN(end) || end >= size || end < start))) {
+        return new Response(null, {
+          status: 416,
+          headers: {
+            "Content-Range": `bytes */${size}`,
+            ...GALLERY_PRIVATE_HEADERS
+          }
+        });
+      }
+
       const chunksize = (end - start) + 1;
-      const file = fs.createReadStream(filePath, { start, end });
+      const fileStream = fs.createReadStream(filePath, { start, end });
+      const webStream = Readable.toWeb(fileStream) as ReadableStream;
+
       const head = {
-        "Content-Range": `bytes ${start}-${end}/${stat.size}`,
+        "Content-Range": `bytes ${start}-${end}/${size}`,
         "Accept-Ranges": "bytes",
-        "Content-Length": chunksize,
-        "Content-Type": media.mime_type || "video/mp4",
-        "Cache-Control": "private, max-age=3600"
+        "Content-Length": chunksize.toString(),
+        "Content-Type": media.mime_type as string,
+        ...GALLERY_PRIVATE_HEADERS
       };
-      // @ts-expect-error Response supports stream
-      return new Response(file, { status: 206, headers: head });
+
+      return new Response(webStream, { status: 206, headers: head });
     } else {
       const head = {
-        "Content-Length": stat.size,
-        "Content-Type": media.mime_type || "video/mp4",
-        "Cache-Control": "private, max-age=3600"
+        "Content-Length": size.toString(),
+        "Content-Type": media.mime_type as string,
+        ...GALLERY_PRIVATE_HEADERS
       };
-      // @ts-expect-error Response supports stream
-      return new Response(fs.createReadStream(filePath), { status: 200, headers: head });
+      const fileStream = fs.createReadStream(filePath);
+      const webStream = Readable.toWeb(fileStream) as ReadableStream;
+      return new Response(webStream, { status: 200, headers: head });
     }
   }
 
   // It's a photo, compress and resize on the fly
   const accept = request.headers.get("Accept") || "";
-  let format = "jpeg";
+  let format: "jpeg" | "webp" | "avif" = "jpeg";
   if (accept.includes("image/avif")) format = "avif";
   else if (accept.includes("image/webp")) format = "webp";
 
   const transform = sharp(filePath)
     .resize(1920, 1920, { fit: "inside", withoutEnlargement: true })
-    .toFormat(format as "jpeg" | "webp" | "avif", { quality: 80 });
+    .toFormat(format, { quality: 80 });
 
-  return new Response(transform as unknown as BodyInit, {
+  return new Response(Readable.toWeb(transform) as ReadableStream, {
     status: 200,
     headers: {
       "Content-Type": `image/${format}`,
-      "Cache-Control": "private, max-age=3600"
+      ...GALLERY_PRIVATE_HEADERS
     }
   });
 }

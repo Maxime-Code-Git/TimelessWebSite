@@ -33,62 +33,105 @@ export function openGalleryDb(dbPath: string): DatabaseSync {
 
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec("PRAGMA busy_timeout = 5000;");
-  db.exec("PRAGMA journal_mode = DELETE;");
+  db.exec("PRAGMA journal_mode = WAL;");
 
   db.exec("BEGIN EXCLUSIVE TRANSACTION;");
   try {
     db.exec(`
-      CREATE TABLE IF NOT EXISTS galleries (
-        id TEXT PRIMARY KEY,
-        public_id TEXT NOT NULL UNIQUE,
-        bride_names TEXT NOT NULL,
-        wedding_date TEXT NOT NULL,
-        location TEXT,
-        intro_fr TEXT,
-        intro_en TEXT,
-        signature_fr TEXT,
-        signature_en TEXT,
-        created_at INTEGER NOT NULL,
-        expires_at INTEGER NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('draft', 'published', 'archived')),
-        guest_code_hash TEXT NOT NULL,
-        couple_code_hash TEXT NOT NULL,
-        guest_code_encrypted TEXT NOT NULL,
-        couple_code_encrypted TEXT NOT NULL,
-        guest_code_version INTEGER NOT NULL DEFAULT 1,
-        couple_code_version INTEGER NOT NULL DEFAULT 1,
-        cover_image_id TEXT,
-        import_path TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS gallery_media (
-        id TEXT PRIMARY KEY,
-        gallery_id TEXT NOT NULL,
-        type TEXT NOT NULL CHECK (type IN ('photo', 'video')),
-        visibility TEXT NOT NULL CHECK (visibility IN ('invites', 'maries')),
-        sort_order INTEGER NOT NULL DEFAULT 0,
-        original_name TEXT NOT NULL,
-        mime_type TEXT NOT NULL,
-        size INTEGER NOT NULL,
-        hash TEXT NOT NULL,
-        width INTEGER,
-        height INTEGER,
-        created_at INTEGER NOT NULL,
-        FOREIGN KEY(gallery_id) REFERENCES galleries(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS gallery_imports (
-        id TEXT PRIMARY KEY,
-        gallery_id TEXT NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
-        progress INTEGER NOT NULL DEFAULT 0,
-        total INTEGER NOT NULL DEFAULT 0,
-        result_json TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        FOREIGN KEY(gallery_id) REFERENCES galleries(id) ON DELETE CASCADE
+      CREATE TABLE IF NOT EXISTS gallery_migrations (
+        version INTEGER PRIMARY KEY,
+        applied_at INTEGER NOT NULL
       );
     `);
+
+    let currentVersion = 0;
+    const versionRow = db.prepare("SELECT MAX(version) as v FROM gallery_migrations").get() as { v: number | null } | undefined;
+    if (versionRow && versionRow.v !== null) {
+      currentVersion = versionRow.v;
+    }
+
+    if (currentVersion < 1) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS galleries (
+          id TEXT PRIMARY KEY,
+          public_id TEXT NOT NULL UNIQUE,
+          bride_names TEXT NOT NULL,
+          wedding_date TEXT NOT NULL,
+          location TEXT,
+          intro_fr TEXT,
+          intro_en TEXT,
+          signature_fr TEXT,
+          signature_en TEXT,
+          created_at INTEGER NOT NULL,
+          expires_at INTEGER NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('draft', 'published', 'archived')),
+          guest_code_hash TEXT NOT NULL,
+          couple_code_hash TEXT NOT NULL,
+          guest_code_encrypted TEXT NOT NULL,
+          couple_code_encrypted TEXT NOT NULL,
+          guest_code_version INTEGER NOT NULL DEFAULT 1,
+          couple_code_version INTEGER NOT NULL DEFAULT 1,
+          cover_image_id TEXT,
+          import_path TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS gallery_media (
+          id TEXT PRIMARY KEY,
+          gallery_id TEXT NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('photo', 'video')),
+          visibility TEXT NOT NULL CHECK (visibility IN ('invites', 'maries')),
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          original_name TEXT NOT NULL,
+          mime_type TEXT NOT NULL,
+          size INTEGER NOT NULL,
+          hash TEXT NOT NULL,
+          width INTEGER,
+          height INTEGER,
+          created_at INTEGER NOT NULL,
+          FOREIGN KEY(gallery_id) REFERENCES galleries(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS gallery_imports (
+          id TEXT PRIMARY KEY,
+          gallery_id TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+          progress INTEGER NOT NULL DEFAULT 0,
+          total INTEGER NOT NULL DEFAULT 0,
+          result_json TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY(gallery_id) REFERENCES galleries(id) ON DELETE CASCADE
+        );
+      `);
+      db.prepare("INSERT INTO gallery_migrations (version, applied_at) VALUES (1, ?)").run(Date.now());
+      currentVersion = 1;
+    }
+
+    if (currentVersion < 2) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS gallery_codes (
+          code_hash TEXT PRIMARY KEY,
+          gallery_id TEXT NOT NULL,
+          level TEXT NOT NULL CHECK (level IN ('invites', 'maries')),
+          version INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          FOREIGN KEY(gallery_id) REFERENCES galleries(id) ON DELETE CASCADE
+        );
+      `);
+
+      // Migrate existing hashes to the gallery_codes table
+      const galleries = db.prepare("SELECT id, guest_code_hash, guest_code_version, couple_code_hash, couple_code_version FROM galleries").all() as { id: string, guest_code_hash: string, guest_code_version: number, couple_code_hash: string, couple_code_version: number }[];
+
+      const insertCode = db.prepare("INSERT OR IGNORE INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)");
+      const now = Date.now();
+      for (const g of galleries) {
+        insertCode.run(g.guest_code_hash, g.id, 'invites', g.guest_code_version, now);
+        insertCode.run(g.couple_code_hash, g.id, 'maries', g.couple_code_version, now);
+      }
+
+      db.prepare("INSERT INTO gallery_migrations (version, applied_at) VALUES (2, ?)").run(Date.now());
+      currentVersion = 2;
+    }
 
     db.exec("COMMIT;");
   } catch (err) {

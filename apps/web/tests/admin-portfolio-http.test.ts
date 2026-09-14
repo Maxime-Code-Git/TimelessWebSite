@@ -83,7 +83,11 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
           ADMIN_SESSION_SECRET: "12345678901234567890123456789012", // 32 chars
           SITE_CONTENT_PATH: siteContentPath,
           PORTFOLIO_CONTENT_PATH: portfolioContentPath,
-          PORTFOLIO_MEDIA_PATH: portfolioMediaPath
+          PORTFOLIO_MEDIA_PATH: portfolioMediaPath,
+          GALLERY_SECRET: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          GALLERY_DB_PATH: path.join(tempDir, "gallery.db"),
+          GALLERY_MEDIA_PATH: path.join(tempDir, "gallery-media"),
+          GALLERY_IMPORT_PATH: path.join(tempDir, "gallery-import")
         },
         stdio: ["ignore", "pipe", "pipe"]
       });

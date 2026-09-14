@@ -13,6 +13,11 @@ export default [
   route("api/admin/home-image", "routes/api.admin.home-image.ts"),
   route("portfolio/media/:photoId/:variant", "routes/portfolio.media.$photoId.$variant.tsx"),
   route("media/home/:section/:imageId/:variant/:ext", "routes/media.home.$section.$imageId.$variant.$ext.tsx"),
+  route("api/gallery/:publicId/media/:mediaId", "routes/api.gallery.$publicId.media.$mediaId.ts"),
+  route("api/gallery/:publicId/download", "routes/api.gallery.$publicId.download.ts"),
+  route("api/gallery/:publicId/download/original/:mediaId", "routes/api.gallery.$publicId.download.original.$mediaId.ts"),
+  route("api/gallery/:publicId/photos", "routes/api.gallery.$publicId.photos.ts"),
+  route("api/admin/gallery-import/:id", "routes/api.admin.gallery-import.$id.ts"),
 
   // ── French routes ─────────────────────────────────────────
   ...prefix("fr", [
@@ -60,6 +65,9 @@ export default [
   route("admin/portfolio/media/:photoId/:variant", "routes/admin.portfolio.media.$photoId.$variant.tsx"),
   route("admin/home", "routes/admin.home.tsx"),
   route("admin/about", "routes/admin.about.tsx"),
+  route("admin/galleries", "routes/admin.galleries.tsx"),
+  route("admin/galleries/new", "routes/admin.galleries.new.tsx"),
+  route("admin/galleries/:id", "routes/admin.galleries.$id.tsx"),
 
   // ── Catch-all (404) ───────────────────────────────────────
   route("*", "routes/404.tsx"),

@@ -43,7 +43,8 @@ export function decryptGalleryCode(encryptedStr: string): string {
   const authTag = Buffer.from(authTagHex, "hex");
   const decipher = crypto.createDecipheriv("aes-256-gcm", AES_KEY, iv);
   decipher.setAuthTag(authTag);
-  return decipher.update(encrypted) + decipher.final("utf8");
+  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+  return decrypted.toString("utf8");
 }
 
 export function generateGalleryCode(): string {
@@ -73,9 +74,33 @@ export async function getGallerySession(request: Request) {
   return gallerySessionStorage.getSession(cookie);
 }
 
-export async function loginGalleryClient(request: Request, code: string, lang: "fr" | "en") {
+export function createCsrfToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+import type { Session } from "react-router";
+
+export function verifyCsrfToken(session: Session, token: string | null): boolean {
+  if (!token || typeof token !== "string") return false;
+  const stored = session.get("csrf");
+  if (!stored) return false;
+  return crypto.timingSafeEqual(Buffer.from(token, "hex"), Buffer.from(stored, "hex"));
+}
+
+export async function loginGalleryClient(request: Request, formData: URLSearchParams, lang: "fr" | "en") {
   const ip = getClientIp(request);
   if (!ip) throw new Response("Forbidden", { status: 403 });
+
+  const session = await getGallerySession(request);
+  const csrfToken = formData.get("csrf");
+  if (!verifyCsrfToken(session, csrfToken)) {
+    throw new Response("Invalid CSRF token", { status: 403 });
+  }
+
+  const code = formData.get("code");
+  if (!code || typeof code !== "string" || code.length > 50) {
+    return Response.json({ error: lang === "fr" ? "Code invalide ou galerie indisponible." : "Invalid code or unavailable gallery." }, { status: 400 });
+  }
 
   try {
     checkRateLimit(ip, "gallery");
@@ -96,10 +121,11 @@ export async function loginGalleryClient(request: Request, code: string, lang: "
 
   resetRateLimit(ip, "gallery");
 
-  const session = await getGallerySession(request);
   session.set("galleryId", gallery.id);
   session.set("accessLevel", accessLevel);
   session.set("codeVersion", version);
+  // Re-generate CSRF for new session
+  session.set("csrf", createCsrfToken());
 
   return redirect(`/${lang}/${lang === "fr" ? "galerie" : "gallery"}/${gallery.public_id}`, {
     headers: {
@@ -107,4 +133,43 @@ export async function loginGalleryClient(request: Request, code: string, lang: "
       "Cache-Control": "no-store"
     }
   });
+}
+
+export const GALLERY_PRIVATE_HEADERS = {
+  "Cache-Control": "no-store",
+  "X-Robots-Tag": "noindex, nofollow",
+  "Referrer-Policy": "no-referrer"
+};
+
+export async function requireGalleryAccess(request: Request, publicId: string, requiredMediaId?: string) {
+  const session = await getGallerySession(request);
+  const galleryId = session.get("galleryId");
+  const accessLevel = session.get("accessLevel") as GalleryAccessLevel | undefined;
+  const codeVersion = session.get("codeVersion") as number | undefined;
+
+  if (!galleryId || !accessLevel || codeVersion === undefined) {
+    throw redirect("/fr/espace-clients");
+  }
+
+  const db = getGalleryDb();
+  const gallery = db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as Record<string, unknown>;
+  if (!gallery || gallery.id !== galleryId || gallery.status !== "published" || (gallery.expires_at as number) < Date.now()) {
+    throw redirect("/fr/espace-clients");
+  }
+
+  const currentVersion = accessLevel === "maries" ? (gallery.couple_code_version as number) : (gallery.guest_code_version as number);
+  if (codeVersion !== currentVersion) {
+    throw redirect("/fr/espace-clients");
+  }
+
+  let media = null;
+  if (requiredMediaId) {
+    media = db.prepare("SELECT * FROM gallery_media WHERE id = ? AND gallery_id = ?").get(requiredMediaId, galleryId) as Record<string, unknown>;
+    if (!media) throw new Response("Not found", { status: 404 });
+    if (media.visibility === "maries" && accessLevel === "invites") {
+      throw new Response("Not found", { status: 404 });
+    }
+  }
+
+  return { gallery, accessLevel, codeVersion, media };
 }

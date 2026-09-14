@@ -126,6 +126,41 @@
   margin-top: 40px;
 }
 
+.downloadsArea.errorText {
+  color: #ff4d4f;
+  margin-top: 4px;
+}
+
+.introSection {
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.signatureText {
+  margin-top: 20px;
+  font-style: italic;
+}
+
+.sectionTitleLight {
+  color: var(--bg);
+}
+
+.videoElement {
+  width: 100%;
+  border-radius: 10px;
+}
+
+.videoDownloadLink {
+  display: block;
+  text-align: center;
+  margin-top: 10px;
+  color: var(--gold-light);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
 .downloadsList {
   display: flex;
   justify-content: center;

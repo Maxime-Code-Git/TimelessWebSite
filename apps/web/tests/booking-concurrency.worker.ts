@@ -15,7 +15,7 @@ async function run() {
 
   try {
     const db = openBookingDb(dbPath);
-    
+
     const result = createPendingBooking({
       date,
       time,
@@ -23,15 +23,15 @@ async function run() {
       email,
       language: 'fr'
     }, db);
-    
+
     db.close();
 
     console.log(JSON.stringify({ success: true, id: result.id }));
     process.exit(0);
   } catch (err: unknown) {
-    console.log(JSON.stringify({ 
-      success: false, 
-      error: err instanceof Error ? err.message : String(err) 
+    console.log(JSON.stringify({
+      success: false,
+      error: err instanceof Error ? err.message : String(err)
     }));
     process.exit(0);
   }

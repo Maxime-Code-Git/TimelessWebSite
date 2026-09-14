@@ -84,24 +84,41 @@ export function createGallery(data: {
     }
   }
 
-  const now = Date.now();
-  // Default to 24 months
-  const expires_at = data.expires_at || (now + 24 * 30 * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const future = new Date(now);
+  future.setMonth(future.getMonth() + 24);
+  const expires_at = data.expires_at || future.getTime();
 
-  db.prepare(`
-    INSERT INTO galleries (
-      id, public_id, bride_names, wedding_date, location,
-      intro_fr, intro_en, signature_fr, signature_en,
-      created_at, expires_at, status,
-      guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)
-  `).run(
-    id, public_id, data.bride_names, data.wedding_date, data.location || null,
-    data.intro_fr || null, data.intro_en || null, data.signature_fr || null, data.signature_en || null,
-    now, expires_at,
-    hashGalleryCode(guestCode), hashGalleryCode(coupleCode),
-    encryptGalleryCode(guestCode), encryptGalleryCode(coupleCode)
-  );
+  const nowMs = now.getTime();
+
+  db.exec("BEGIN EXCLUSIVE TRANSACTION;");
+  try {
+    const guestHash = hashGalleryCode(guestCode);
+    const coupleHash = hashGalleryCode(coupleCode);
+
+    db.prepare(`
+      INSERT INTO galleries (
+        id, public_id, bride_names, wedding_date, location,
+        intro_fr, intro_en, signature_fr, signature_en,
+        created_at, expires_at, status,
+        guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)
+    `).run(
+      id, public_id, data.bride_names, data.wedding_date, data.location || null,
+      data.intro_fr || null, data.intro_en || null, data.signature_fr || null, data.signature_en || null,
+      nowMs, expires_at,
+      guestHash, coupleHash,
+      encryptGalleryCode(guestCode), encryptGalleryCode(coupleCode)
+    );
+
+    db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(guestHash, id, 'invites', 1, nowMs);
+    db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(coupleHash, id, 'maries', 1, nowMs);
+
+    db.exec("COMMIT;");
+  } catch (err) {
+    db.exec("ROLLBACK;");
+    throw err;
+  }
 
   return getGalleryById(id)!;
 }
@@ -114,10 +131,13 @@ export function updateGallery(id: string, data: Partial<Gallery>) {
   const fields: string[] = [];
   const values: Array<string | number | null> = [];
 
-  for (const [key, value] of Object.entries(data)) {
-    if (key === "id" || key === "public_id") continue;
-    fields.push(`${key} = ?`);
-    values.push(value);
+  const whitelist = ['bride_names', 'wedding_date', 'location', 'intro_fr', 'intro_en', 'signature_fr', 'signature_en', 'expires_at', 'status', 'cover_image_id'];
+
+  for (const key of whitelist) {
+    if (key in data) {
+      fields.push(`${key} = ?`);
+      values.push((data as Record<string, unknown>)[key] as string | number | null);
+    }
   }
 
   if (fields.length === 0) return gallery;
@@ -136,18 +156,33 @@ export function rotateGalleryCodes(id: string, guestCodeStr?: string, coupleCode
   const updates: string[] = [];
   const values: Array<string | number | null> = [];
 
-  if (guestCodeStr) {
-    updates.push("guest_code_hash = ?", "guest_code_encrypted = ?", "guest_code_version = guest_code_version + 1");
-    values.push(hashGalleryCode(guestCodeStr), encryptGalleryCode(guestCodeStr));
-  }
-  if (coupleCodeStr) {
-    updates.push("couple_code_hash = ?", "couple_code_encrypted = ?", "couple_code_version = couple_code_version + 1");
-    values.push(hashGalleryCode(coupleCodeStr), encryptGalleryCode(coupleCodeStr));
-  }
+  const nowMs = Date.now();
 
-  if (updates.length > 0) {
-    values.push(id);
-    db.prepare(`UPDATE galleries SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  db.exec("BEGIN EXCLUSIVE TRANSACTION;");
+  try {
+    if (guestCodeStr) {
+      const gHash = hashGalleryCode(guestCodeStr);
+      updates.push("guest_code_hash = ?", "guest_code_encrypted = ?", "guest_code_version = guest_code_version + 1");
+      values.push(gHash, encryptGalleryCode(guestCodeStr));
+      db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, guest_code_version + 1, ?)").run(gHash, id, 'invites', nowMs);
+    }
+
+    if (coupleCodeStr) {
+      const cHash = hashGalleryCode(coupleCodeStr);
+      updates.push("couple_code_hash = ?", "couple_code_encrypted = ?", "couple_code_version = couple_code_version + 1");
+      values.push(cHash, encryptGalleryCode(coupleCodeStr));
+      db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, couple_code_version + 1, ?)").run(cHash, id, 'maries', nowMs);
+    }
+
+    if (updates.length > 0) {
+      values.push(id);
+      db.prepare(`UPDATE galleries SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+    }
+
+    db.exec("COMMIT;");
+  } catch (err) {
+    db.exec("ROLLBACK;");
+    throw err;
   }
 }
 

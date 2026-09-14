@@ -81,6 +81,10 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
           SITE_CONTENT_PATH: siteContentPath,
           PORTFOLIO_CONTENT_PATH: portfolioContentPath,
           PORTFOLIO_MEDIA_PATH: portfolioMediaPath,
+          GALLERY_SECRET: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          GALLERY_DB_PATH: path.join(tempDir, "gallery.db"),
+          GALLERY_MEDIA_PATH: path.join(tempDir, "gallery-media"),
+          GALLERY_IMPORT_PATH: path.join(tempDir, "gallery-import")
         },
         stdio: ["ignore", "pipe", "pipe"]
       });

@@ -4,7 +4,7 @@ import {
 } from "react-router";
 import { data, Form, Link, useLoaderData, useNavigation, useSubmit } from "react-router";
 import { requireValidAdminSession, validateAdminFormData, ActionSecurityError } from "../lib/admin-auth.server";
-import { 
+import {
   getAllBookings, getWeeklySlots, getBlockedDates, updateBookingStatus,
   toggleWeeklySlot, addBlockedDate, removeBlockedDate, isValidVisioUrl, getBooking
 } from "../lib/booking.server";
@@ -41,7 +41,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   await requireValidAdminSession(request);
-  
+
   let formData: FormData;
   try {
     formData = await validateAdminFormData(request);
@@ -53,41 +53,41 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const intent = formData.get("intent");
-  
+
   try {
     if (intent === "confirm_booking") {
       const id = String(formData.get("id"));
       const meetingUrl = String(formData.get("meeting_url"));
       const adminNote = formData.get("admin_note") ? String(formData.get("admin_note")) : undefined;
-      
+
       if (!isValidVisioUrl(meetingUrl)) {
         return Response.json({ error: "Invalid meeting URL. Must be HTTPS and from Google Meet, Zoom, or Teams." }, { status: 400 });
       }
-      
+
       const booking = updateBookingStatus(id, "confirmed", meetingUrl, adminNote);
       await sendBookingConfirmedEmail(booking);
       return Response.json({ success: true });
     }
-    
+
     if (intent === "reject_booking" || intent === "cancel_booking") {
       const id = String(formData.get("id"));
       const status = intent === "reject_booking" ? "rejected" : "cancelled";
       const adminNote = formData.get("admin_note") ? String(formData.get("admin_note")) : undefined;
-      
+
       const oldBooking = getBooking(id);
       if (!oldBooking) return Response.json({ error: "Not found" }, { status: 404 });
-      
+
       const booking = updateBookingStatus(id, status, undefined, adminNote);
       await sendBookingStatusEmail(booking, status);
       return Response.json({ success: true });
     }
-    
+
     if (intent === "toggle_weekly_slot") {
       const id = String(formData.get("id"));
       toggleWeeklySlot(id);
       return Response.json({ success: true });
     }
-    
+
     if (intent === "add_blocked_date") {
       const date = String(formData.get("date"));
       const reason = formData.get("reason") ? String(formData.get("reason")) : undefined;
@@ -97,13 +97,13 @@ export async function action({ request }: ActionFunctionArgs) {
       addBlockedDate(date, reason);
       return Response.json({ success: true });
     }
-    
+
     if (intent === "remove_blocked_date") {
       const id = String(formData.get("id"));
       removeBlockedDate(id);
       return Response.json({ success: true });
     }
-    
+
     return Response.json({ error: "Unknown intent" }, { status: 400 });
   } catch (err: unknown) {
     return Response.json({ error: err instanceof Error ? err.message : "Action failed" }, { status: 500 });
@@ -317,7 +317,7 @@ export default function AdminBookings() {
               <input type="hidden" name="csrfToken" value={csrfToken} />
               <input type="hidden" name="intent" value="confirm_booking" />
               <input type="hidden" name="id" value={confirmModalData.id} />
-              
+
               <label className={styles.label}>Lien visio (Google Meet, Zoom, Teams)</label>
               <input type="url" name="meeting_url" required className={`${styles.input} ${styles.inputMargin}`} />
 

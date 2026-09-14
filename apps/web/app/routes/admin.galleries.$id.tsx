@@ -53,6 +53,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const expires_at = expiresStr ? new Date(String(expiresStr)).getTime() : gallery.expires_at;
     const status = String(formData.get("status")) as "draft" | "published" | "archived";
 
+    const intro_fr = formData.get("intro_fr") ? String(formData.get("intro_fr")) : undefined;
+    const intro_en = formData.get("intro_en") ? String(formData.get("intro_en")) : undefined;
+    const signature_fr = formData.get("signature_fr") ? String(formData.get("signature_fr")) : undefined;
+    const signature_en = formData.get("signature_en") ? String(formData.get("signature_en")) : undefined;
+    const cover_image_id = formData.get("cover_image_id") ? String(formData.get("cover_image_id")) : undefined;
+
     if (status === "published") {
       const stats = getGalleryMediaStats(gallery.id);
       if (stats.invitesPhotos === 0 && stats.invitesVideos === 0 && stats.mariesPhotos === 0 && stats.mariesVideos === 0) {
@@ -65,7 +71,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
       wedding_date,
       location,
       expires_at,
-      status
+      status,
+      intro_fr,
+      intro_en,
+      signature_fr,
+      signature_en,
+      cover_image_id
     });
     return Response.json({ success: true });
   }
@@ -113,7 +124,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 interface LoaderData {
-  gallery: ReturnType<typeof getGalleryById> & { id: string, bride_names: string, wedding_date: string, location: string | null, expires_at: number, status: string };
+  gallery: ReturnType<typeof getGalleryById> & { id: string, bride_names: string, wedding_date: string, location: string | null, expires_at: number, status: string, intro_fr: string | null, intro_en: string | null, signature_fr: string | null, signature_en: string | null, cover_image_id: string | null };
   stats: ReturnType<typeof getGalleryMediaStats>;
   imports: Record<string, unknown>[];
   guestCode: string;
@@ -187,6 +198,31 @@ export default function AdminGalleryEdit() {
                 <option value="published">Publié</option>
                 <option value="archived">Archivé</option>
               </select>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Intro FR</label>
+              <textarea name="intro_fr" className={styles.input} defaultValue={gallery.intro_fr || ""} rows={3} />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Intro EN</label>
+              <textarea name="intro_en" className={styles.input} defaultValue={gallery.intro_en || ""} rows={3} />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Signature FR</label>
+              <input type="text" name="signature_fr" className={styles.input} defaultValue={gallery.signature_fr || ""} />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Signature EN</label>
+              <input type="text" name="signature_en" className={styles.input} defaultValue={gallery.signature_en || ""} />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>ID Image de couverture (optionnel)</label>
+              <input type="text" name="cover_image_id" className={styles.input} defaultValue={gallery.cover_image_id || ""} />
             </div>
 
             {actionData?.error && navigation.formData?.get("intent") === "update_info" && (

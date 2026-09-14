@@ -87,11 +87,11 @@ export function GalleryPage({
             <p className={styles.chapterCount}>
               {chapter.count} {lang === "fr" ? "photos" : "photos"}
             </p>
-            
+
             <div className={styles.photoGrid}>
               {chapter.photos.map((photo) => (
-                <div 
-                  key={photo.id} 
+                <div
+                  key={photo.id}
                   className={`${styles.photoWrap} ${styles[photo.aspect]} ${
                     photo.span ? styles[photo.span] : ""
                   }`}
