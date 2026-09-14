@@ -1,6 +1,27 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { restoreDefaultSiteContent } from "./test-helpers";
 import sharp from "sharp";
+
+async function saveAboutPage(page: Page) {
+  const responsePromise = page.waitForResponse(
+    response =>
+      response.url().includes("/admin/about.data") &&
+      response.request().method() === "POST"
+  );
+
+  await page.getByRole("button", {
+    name: "Enregistrer les textes et métadonnées",
+    exact: true,
+  }).click();
+
+  const response = await responsePromise;
+  expect(response.status()).toBe(200);
+
+  await expect(page.getByRole("status")).toContainText(
+    "Les modifications ont été enregistrées avec succès."
+  );
+}
+
 test.describe("Admin About Page", () => {
   let firstImageBuffer: Buffer;
   let secondImageBuffer: Buffer;
@@ -45,11 +66,11 @@ test.describe("Admin About Page", () => {
     await page.getByLabel("Texte alternatif (fr)").fill("Alt FR");
 
     // 2. Edit EN texts
-    await page.getByRole("button", { name: "EN" }).click();
+    await page.getByRole("button", { name: "EN", exact: true }).click();
     await page.getByLabel("Titre SEO (en)").fill("SEO EN Modified");
     await page.getByLabel("Titre principal (en)").fill("Hero EN Modified");
     await page.getByLabel("Texte alternatif (en)").fill("Alt EN");
-    await page.getByRole("button", { name: "FR" }).click();
+    await page.getByRole("button", { name: "FR", exact: true }).click();
 
     // 3. Upload first image
     const uploadBtn = page.getByRole("button", { name: "Ajouter une image" });
@@ -74,8 +95,7 @@ test.describe("Admin About Page", () => {
     await expect(preview).toBeVisible({ timeout: 10000 });
 
     // Save
-    await page.getByRole("button", { name: "Enregistrer les textes et métadonnées" }).click();
-    await expect(page.getByRole("status")).toContainText("Les modifications ont été enregistrées avec succès.");
+    await saveAboutPage(page);
 
     // Extract image URL from preview
     const imgSrc = await preview.getAttribute("src");
@@ -125,8 +145,7 @@ test.describe("Admin About Page", () => {
     expect(newImgSrc).toBeTruthy();
 
     // Save
-    await page.getByRole("button", { name: "Enregistrer les textes et métadonnées" }).click();
-    await expect(page.getByRole("status")).toContainText("Les modifications ont été enregistrées avec succès.");
+    await saveAboutPage(page);
 
     // Verify old image 404
     const resOld = await request.get(imgSrc!);
@@ -148,8 +167,7 @@ test.describe("Admin About Page", () => {
     await expect(modal).not.toBeVisible();
     await expect(page.getByText("Aucune image")).toBeVisible();
 
-    await page.getByRole("button", { name: "Enregistrer les textes et métadonnées" }).click();
-    await expect(page.getByRole("status")).toContainText("Les modifications ont été enregistrées avec succès.");
+    await saveAboutPage(page);
 
     // Verify deleted image 404
     const resDeleted = await request.get(newImgSrc!);
