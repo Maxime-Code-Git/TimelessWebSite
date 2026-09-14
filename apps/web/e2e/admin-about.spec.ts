@@ -1,37 +1,28 @@
 import { test, expect } from "@playwright/test";
 import { restoreDefaultSiteContent } from "./test-helpers";
-import path from "node:path";
-import fs from "node:fs/promises";
 import sharp from "sharp";
-
 test.describe("Admin About Page", () => {
-  let firstImagePath: string;
-  let secondImagePath: string;
+  let firstImageBuffer: Buffer;
+  let secondImageBuffer: Buffer;
 
   test.beforeAll(async () => {
-    firstImagePath = path.join(__dirname, "test-image-1.jpg");
-    secondImagePath = path.join(__dirname, "test-image-2.jpg");
-    await sharp({
+    firstImageBuffer = await sharp({
       create: {
         width: 800,
         height: 1000,
         channels: 3,
-        background: { r: 255, g: 0, b: 0 }
-      }
-    }).jpeg().toFile(firstImagePath);
-    await sharp({
-      create: {
-        width: 800,
-        height: 1000,
-        channels: 3,
-        background: { r: 0, g: 255, b: 0 }
-      }
-    }).jpeg().toFile(secondImagePath);
-  });
+        background: { r: 255, g: 0, b: 0 },
+      },
+    }).jpeg().toBuffer();
 
-  test.afterAll(async () => {
-    await fs.unlink(firstImagePath).catch(() => {});
-    await fs.unlink(secondImagePath).catch(() => {});
+    secondImageBuffer = await sharp({
+      create: {
+        width: 800,
+        height: 1000,
+        channels: 3,
+        background: { r: 0, g: 255, b: 0 },
+      },
+    }).jpeg().toBuffer();
   });
 
   test.beforeEach(async ({ page }) => {
@@ -65,7 +56,18 @@ test.describe("Admin About Page", () => {
     const fileChooserPromise = page.waitForEvent('filechooser');
     await uploadBtn.click();
     const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles(firstImagePath);
+
+    const uploadResponsePromise = page.waitForResponse(response =>
+      response.url().includes("/api/admin/home-image") && response.request().method() === "POST"
+    );
+    await fileChooser.setFiles({
+      name: "about-team-1.jpg",
+      mimeType: "image/jpeg",
+      buffer: firstImageBuffer,
+    });
+
+    const uploadResponse = await uploadResponsePromise;
+    expect(uploadResponse.status()).toBe(200);
 
     // Wait for upload preview
     const preview = page.getByTestId("about-image-preview-about-team");
@@ -107,7 +109,11 @@ test.describe("Admin About Page", () => {
     const uploadResponsePromise2 = page.waitForResponse(response =>
       response.url().includes("/api/admin/home-image") && response.request().method() === "POST"
     );
-    await fileChooser2.setFiles(secondImagePath);
+    await fileChooser2.setFiles({
+      name: "about-team-2.jpg",
+      mimeType: "image/jpeg",
+      buffer: secondImageBuffer,
+    });
 
     const uploadResponse2 = await uploadResponsePromise2;
     expect(uploadResponse2.status()).toBe(200);
