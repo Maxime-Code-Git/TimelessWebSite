@@ -35,6 +35,20 @@ export function getGalleryById(id: string): Gallery | undefined {
   return db.prepare("SELECT * FROM galleries WHERE id = ?").get(id) as unknown as Gallery | undefined;
 }
 
+export function getGalleryByPublicId(publicId: string): Gallery | undefined {
+  const db = getGalleryDb();
+  return db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as unknown as Gallery | undefined;
+}
+
+export function getGalleryMedia(galleryId: string, accessLevel: "invites" | "maries") {
+  const db = getGalleryDb();
+  if (accessLevel === "maries") {
+    return db.prepare("SELECT id, type, width, height, mime_type FROM gallery_media WHERE gallery_id = ? ORDER BY created_at ASC").all(galleryId) as Record<string, unknown>[];
+  } else {
+    return db.prepare("SELECT id, type, width, height, mime_type FROM gallery_media WHERE gallery_id = ? AND visibility = 'invites' ORDER BY created_at ASC").all(galleryId) as Record<string, unknown>[];
+  }
+}
+
 export function createGallery(data: {
   bride_names: string;
   wedding_date: string;
@@ -49,10 +63,10 @@ export function createGallery(data: {
   const id = crypto.randomUUID();
   // We use a non-predictable UUID for public_id to avoid enumeration
   const public_id = crypto.randomUUID();
-  
+
   let guestCode = generateGalleryCode();
   let coupleCode = generateGalleryCode();
-  
+
   // Ensure they are different
   while (guestCode === coupleCode) coupleCode = generateGalleryCode();
 
@@ -143,7 +157,7 @@ export function getGalleryMediaStats(id: string) {
   const invitesVideos = (db.prepare("SELECT COUNT(*) as c FROM gallery_media WHERE gallery_id = ? AND visibility = 'invites' AND type = 'video'").get(id) as { c: number }).c;
   const mariesPhotos = (db.prepare("SELECT COUNT(*) as c FROM gallery_media WHERE gallery_id = ? AND visibility = 'maries' AND type = 'photo'").get(id) as { c: number }).c;
   const mariesVideos = (db.prepare("SELECT COUNT(*) as c FROM gallery_media WHERE gallery_id = ? AND visibility = 'maries' AND type = 'video'").get(id) as { c: number }).c;
-  
+
   return { invitesPhotos, invitesVideos, mariesPhotos, mariesVideos };
 }
 

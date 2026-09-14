@@ -1,6 +1,10 @@
 import crypto from "node:crypto";
 import { ENV } from "./env.server";
 import { createCookieSessionStorage } from "react-router";
+import { getClientIp } from "./security.server";
+import { checkRateLimit, resetRateLimit } from "./rate-limit.server";
+import { getGalleryDb } from "./gallery-db.server";
+import { redirect } from "react-router";
 
 // Derive keys from GALLERY_SECRET
 const MASTER_SECRET = Buffer.from(ENV.GALLERY_SECRET, "hex");
@@ -67,4 +71,40 @@ export type GalleryAccessLevel = "invites" | "maries";
 export async function getGallerySession(request: Request) {
   const cookie = request.headers.get("Cookie");
   return gallerySessionStorage.getSession(cookie);
+}
+
+export async function loginGalleryClient(request: Request, code: string, lang: "fr" | "en") {
+  const ip = getClientIp(request);
+  if (!ip) throw new Response("Forbidden", { status: 403 });
+
+  try {
+    checkRateLimit(ip, "gallery");
+  } catch {
+    return Response.json({ error: lang === "fr" ? "Trop de tentatives. Veuillez réessayer plus tard." : "Too many attempts. Please try again later." }, { status: 429 });
+  }
+
+  const db = getGalleryDb();
+  const hash = hashGalleryCode(code);
+  const gallery = db.prepare("SELECT * FROM galleries WHERE guest_code_hash = ? OR couple_code_hash = ?").get(hash, hash) as { id: string, status: string, expires_at: number, couple_code_hash: string, couple_code_version: number, guest_code_version: number, public_id: string } | undefined;
+
+  if (!gallery || gallery.status !== "published" || gallery.expires_at < Date.now()) {
+    return Response.json({ error: lang === "fr" ? "Code invalide ou galerie indisponible." : "Invalid code or unavailable gallery." }, { status: 401 });
+  }
+
+  const accessLevel: GalleryAccessLevel = hash === gallery.couple_code_hash ? "maries" : "invites";
+  const version = accessLevel === "maries" ? gallery.couple_code_version : gallery.guest_code_version;
+
+  resetRateLimit(ip, "gallery");
+
+  const session = await getGallerySession(request);
+  session.set("galleryId", gallery.id);
+  session.set("accessLevel", accessLevel);
+  session.set("codeVersion", version);
+
+  return redirect(`/${lang}/${lang === "fr" ? "galerie" : "gallery"}/${gallery.public_id}`, {
+    headers: {
+      "Set-Cookie": await gallerySessionStorage.commitSession(session),
+      "Cache-Control": "no-store"
+    }
+  });
 }

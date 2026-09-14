@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { Form, Link, useActionData, useNavigation } from "react-router";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
 import { getStrings } from "~/lib/i18n";
 import styles from "./clients.module.css";
+import { useState } from "react";
 
 interface ClientsPageProps {
   lang: Lang;
@@ -16,19 +16,12 @@ export function ClientsPage({ lang }: ClientsPageProps) {
   const contactHref = lang === "fr" ? "/fr/contact" : "/en/contact";
 
   const [code, setCode] = useState("");
-  const [error, setError] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate error since no backend is connected yet
-    if (code.trim()) {
-      setError(true);
-    }
-  };
+  const actionData = useActionData<{ error?: string }>();
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
 
   return (
     <>
-      {/* Header hidden nav as per maquette */}
       <Header lang={lang} alternateLangHref={alternateLangHref} hideNav />
 
       <main id="main-content" className={styles.pageWrap}>
@@ -37,7 +30,7 @@ export function ClientsPage({ lang }: ClientsPageProps) {
           <h1 className={styles.title}>{t.title}</h1>
           <p className={styles.subtitle}>{t.subtitle}</p>
 
-          <form className={styles.form} onSubmit={handleSubmit}>
+          <Form method="post" className={styles.form}>
             <div className={styles.formGroup}>
               <label htmlFor="code" className={styles.label}>
                 {t.accessLabel}
@@ -45,27 +38,25 @@ export function ClientsPage({ lang }: ClientsPageProps) {
               <input
                 type="text"
                 id="code"
+                name="code"
                 className={styles.input}
                 placeholder={t.accessPlaceholder}
                 value={code}
-                onChange={(e) => {
-                  setCode(e.target.value.toUpperCase());
-                  setError(false);
-                }}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
                 required
               />
             </div>
             
-            {error && (
-              <div className={styles.errorMsg}>
-                {t.unavailableError}
+            {actionData?.error && (
+              <div className={styles.errorMsg} role="alert">
+                {actionData.error}
               </div>
             )}
 
-            <button type="submit" className={`btn btn--primary ${styles.submitBtn}`}>
-              {t.submitBtn}
+            <button type="submit" disabled={isSubmitting} className={`btn btn--primary ${styles.submitBtn}`}>
+              {isSubmitting ? "..." : t.submitBtn}
             </button>
-          </form>
+          </Form>
 
           <p className={styles.helpText}>
             {t.helpText}{" "}

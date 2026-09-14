@@ -35,7 +35,7 @@ interface FileToProcess {
 function scanFolderForFiles(basePath: string, subFolder: string, visibility: "invites" | "maries"): FileToProcess[] {
   const targetDir = path.join(basePath, subFolder);
   if (!fs.existsSync(targetDir)) return [];
-  
+
   const files: FileToProcess[] = [];
   const scan = (dir: string) => {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -97,7 +97,7 @@ export function startGalleryImport(galleryId: string, folderName: string) {
 
 async function processImport(importId: string, galleryId: string, folderName: string) {
   const db = getGalleryDb();
-  
+
   try {
     const importDir = path.resolve(ENV.GALLERY_IMPORT_PATH, folderName);
     if (!importDir.startsWith(fs.realpathSync(ENV.GALLERY_IMPORT_PATH))) {
@@ -169,7 +169,7 @@ async function processImport(importId: string, galleryId: string, folderName: st
 
         const mediaId = crypto.randomUUID();
         const destPath = path.join(mediaDir, mediaId);
-        
+
         // Copy original file to managed storage
         fs.copyFileSync(file.fullPath, destPath);
 

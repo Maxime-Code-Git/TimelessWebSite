@@ -50,6 +50,9 @@ export function checkRateLimit(ip: string, namespace: string = "contact") {
   if (namespace === "admin") {
     windowMs = 15 * 60 * 1000; // 15 minutes for admin
     maxAttempts = ENV.CONTACT_RATE_LIMIT_MAX > 10 ? 100 : 5;
+  } else if (namespace === "gallery") {
+    windowMs = 15 * 60 * 1000; // 15 minutes
+    maxAttempts = 10; // 10 attempts
   }
 
   const windowStart = now - windowMs;

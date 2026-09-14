@@ -84,7 +84,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return Response.json({ error: "Les deux codes d'une galerie ne peuvent pas être identiques." }, { status: 400 });
     }
 
-    // Checking collision across other galleries is a nice to have here, but we will catch DB UNIQUE violations if we implemented that. 
+    // Checking collision across other galleries is a nice to have here, but we will catch DB UNIQUE violations if we implemented that.
     // Wait, codes are not strictly UNIQUE in DB (only their hashes), but we can't let them overlap.
     const db = (await import("../lib/gallery-db.server")).getGalleryDb();
     const guestHash = hashGalleryCode(guestCode);
@@ -104,7 +104,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const guestCode = generateGalleryCode();
     let coupleCode = generateGalleryCode();
     while (guestCode === coupleCode) coupleCode = generateGalleryCode();
-    
+
     rotateGalleryCodes(gallery.id, guestCode, coupleCode);
     return Response.json({ success: true });
   }
@@ -242,7 +242,7 @@ export default function AdminGalleryEdit() {
             {actionData?.error && (navigation.formData?.get("intent") === "update_codes" || navigation.formData?.get("intent") === "regenerate_codes") && (
               <p className={styles.errorText} role="alert">{actionData.error}</p>
             )}
-            
+
             {actionData?.success && (navigation.formData?.get("intent") === "update_codes" || navigation.formData?.get("intent") === "regenerate_codes") && (
               <p className={styles.successMessage} role="status">Codes mis à jour.</p>
             )}
