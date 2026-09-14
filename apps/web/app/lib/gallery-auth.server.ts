@@ -1,0 +1,70 @@
+import crypto from "node:crypto";
+import { ENV } from "./env.server";
+import { createCookieSessionStorage } from "react-router";
+
+// Derive keys from GALLERY_SECRET
+const MASTER_SECRET = Buffer.from(ENV.GALLERY_SECRET, "hex");
+if (MASTER_SECRET.length < 32) {
+  throw new Error("CRITICAL: GALLERY_SECRET must be a hex string of at least 32 bytes (64 characters).");
+}
+
+const HMAC_KEY = Buffer.from(crypto.hkdfSync("sha256", MASTER_SECRET, Buffer.alloc(0), "gallery-hmac-key", 32));
+const AES_KEY = Buffer.from(crypto.hkdfSync("sha256", MASTER_SECRET, Buffer.alloc(0), "gallery-aes-key", 32));
+const SESSION_SECRET = Buffer.from(crypto.hkdfSync("sha256", MASTER_SECRET, Buffer.alloc(0), "gallery-session-key", 32)).toString("base64");
+
+function normalizeCode(code: string) {
+  return code.toUpperCase().replace(/[\s-]/g, "");
+}
+
+// HMAC for deterministic search
+export function hashGalleryCode(code: string): string {
+  return crypto.createHmac("sha256", HMAC_KEY).update(normalizeCode(code)).digest("hex");
+}
+
+// AES-256-GCM for encryption
+export function encryptGalleryCode(code: string): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", AES_KEY, iv);
+  const normalized = normalizeCode(code);
+  const encrypted = Buffer.concat([cipher.update(normalized, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return `${iv.toString("hex")}:${encrypted.toString("hex")}:${authTag.toString("hex")}`;
+}
+
+export function decryptGalleryCode(encryptedStr: string): string {
+  const [ivHex, encryptedHex, authTagHex] = encryptedStr.split(":");
+  if (!ivHex || !encryptedHex || !authTagHex) throw new Error("Invalid encrypted format");
+  const iv = Buffer.from(ivHex, "hex");
+  const encrypted = Buffer.from(encryptedHex, "hex");
+  const authTag = Buffer.from(authTagHex, "hex");
+  const decipher = crypto.createDecipheriv("aes-256-gcm", AES_KEY, iv);
+  decipher.setAuthTag(authTag);
+  return decipher.update(encrypted) + decipher.final("utf8");
+}
+
+export function generateGalleryCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Exclude ambiguous I, O, 0, 1
+  let code = "SEMPRA-";
+  for (let i = 0; i < 4; i++) code += chars[crypto.randomInt(0, chars.length)];
+  code += "-";
+  for (let i = 0; i < 4; i++) code += chars[crypto.randomInt(0, chars.length)];
+  return code;
+}
+
+export const gallerySessionStorage = createCookieSessionStorage({
+  cookie: {
+    name: "sempra_gallery_session",
+    secure: process.env.NODE_ENV === "production",
+    secrets: [SESSION_SECRET],
+    sameSite: "lax",
+    path: "/",
+    httpOnly: true,
+  }
+});
+
+export type GalleryAccessLevel = "invites" | "maries";
+
+export async function getGallerySession(request: Request) {
+  const cookie = request.headers.get("Cookie");
+  return gallerySessionStorage.getSession(cookie);
+}

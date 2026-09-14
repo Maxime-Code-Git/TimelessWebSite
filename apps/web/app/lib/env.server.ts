@@ -206,6 +206,42 @@ export const ENV = {
   },
   get ADMIN_SESSION_SECRET() {
     return process.env.ADMIN_SESSION_SECRET;
+  },
+  get GALLERY_DB_PATH() {
+    const isProd = process.env.NODE_ENV === "production";
+    const isTest = process.env.NODE_ENV === "test";
+    const val = process.env.GALLERY_DB_PATH;
+    if (isProd) {
+      if (!val) throw new Error("CRITICAL: Environment variable GALLERY_DB_PATH is missing. Please check your .env files.");
+      return validateProductionPath(val, "GALLERY_DB_PATH", false);
+    }
+    if (isTest) return validateTestPath(val, "GALLERY_DB_PATH");
+    return path.resolve(val || "./data/db/galleries.sqlite");
+  },
+  get GALLERY_MEDIA_PATH() {
+    const isProd = process.env.NODE_ENV === "production";
+    const isTest = process.env.NODE_ENV === "test";
+    const val = process.env.GALLERY_MEDIA_PATH;
+    if (isProd) {
+      if (!val) throw new Error("CRITICAL: Environment variable GALLERY_MEDIA_PATH is missing. Please check your .env files.");
+      return validateProductionPath(val, "GALLERY_MEDIA_PATH", true);
+    }
+    if (isTest) return validateTestPath(val, "GALLERY_MEDIA_PATH");
+    return path.resolve(val || "./data/media/galleries");
+  },
+  get GALLERY_IMPORT_PATH() {
+    const isProd = process.env.NODE_ENV === "production";
+    const isTest = process.env.NODE_ENV === "test";
+    const val = process.env.GALLERY_IMPORT_PATH;
+    if (isProd) {
+      if (!val) throw new Error("CRITICAL: Environment variable GALLERY_IMPORT_PATH is missing. Please check your .env files.");
+      return validateProductionPath(val, "GALLERY_IMPORT_PATH", true);
+    }
+    if (isTest) return validateTestPath(val, "GALLERY_IMPORT_PATH");
+    return path.resolve(val || "./data/gallery-imports");
+  },
+  get GALLERY_SECRET() {
+    return requireEnvVar("GALLERY_SECRET");
   }
 };
 
@@ -224,3 +260,7 @@ void ENV.TRUST_PROXY;
 void ENV.PORTFOLIO_CONTENT_PATH;
 void ENV.PORTFOLIO_MEDIA_PATH;
 void ENV.BOOKING_DB_PATH;
+void ENV.GALLERY_DB_PATH;
+void ENV.GALLERY_MEDIA_PATH;
+void ENV.GALLERY_IMPORT_PATH;
+void ENV.GALLERY_SECRET;
