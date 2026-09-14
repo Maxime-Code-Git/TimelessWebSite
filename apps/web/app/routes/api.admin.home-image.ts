@@ -273,7 +273,7 @@ export async function action({ request }: ActionFunctionArgs) {
       newAbout.team.image.width = processed.originalWidth;
       newAbout.team.image.height = processed.originalHeight;
       newAbout.team.image.variants = processed.variants;
-      
+
       const transaction = oldImageId ? prepareHomeImageDeletion(section, oldImageId) : null;
       try {
         const newRevision = saveAboutPageSettings(newAbout, previousRevision);

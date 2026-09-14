@@ -70,7 +70,7 @@ test.describe("Admin About Page", () => {
     // Wait for upload preview
     const preview = page.getByTestId("about-image-preview-about-team");
     await expect(preview).toBeVisible({ timeout: 10000 });
-    
+
     // Save
     await page.getByRole("button", { name: "Enregistrer les textes et métadonnées" }).click();
     await expect(page.getByRole("status")).toContainText("Les modifications ont été enregistrées avec succès.");

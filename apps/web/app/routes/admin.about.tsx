@@ -327,7 +327,7 @@ export default function AdminAbout({ loaderData, actionData }: Route.ComponentPr
                 className={styles.input}
               />
             </div>
-            
+
             <div className={styles.grid}>
               {content.approach.principles.map((p) => (
                 <div key={p.id} className={styles.card}>
@@ -400,7 +400,7 @@ export default function AdminAbout({ loaderData, actionData }: Route.ComponentPr
                   className={styles.input}
                   disabled={disabled}
                 />
-                
+
                 <label htmlFor={`team-role-${lang}`} className={styles.marginTopSmall}>Rôle ({lang})</label>
                 <input id={`team-role-${lang}`}
                   type="text"

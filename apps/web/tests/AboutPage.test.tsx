@@ -61,7 +61,7 @@ describe("AboutPage Component", () => {
         <AboutPage lang="fr" />
       </MemoryRouter>
     );
-    
+
     expect(screen.getByText("Hero FR")).toBeInTheDocument();
     expect(screen.getByText("Hero Sub FR")).toBeInTheDocument();
     expect(screen.getByText("Team Name FR")).toBeInTheDocument();
@@ -81,7 +81,7 @@ describe("AboutPage Component", () => {
         <AboutPage lang="en" />
       </MemoryRouter>
     );
-    
+
     expect(screen.getByText("Hero EN")).toBeInTheDocument();
     expect(screen.getByText("Team Name EN")).toBeInTheDocument();
     expect(screen.getByText("Diff EN")).toBeInTheDocument();
