@@ -103,13 +103,20 @@ test.describe("Admin About Page", () => {
     const fileChooserPromise2 = page.waitForEvent('filechooser');
     await replaceBtn.click();
     const fileChooser2 = await fileChooserPromise2;
+
+    const uploadResponsePromise2 = page.waitForResponse(response =>
+      response.url().includes("/api/admin/home-image") && response.request().method() === "POST"
+    );
     await fileChooser2.setFiles(secondImagePath);
 
-    await page.waitForTimeout(1000); // Wait for upload
+    const uploadResponse2 = await uploadResponsePromise2;
+    expect(uploadResponse2.status()).toBe(200);
+
     const preview2 = page.getByTestId("about-image-preview-about-team");
     await expect(preview2).toBeVisible({ timeout: 10000 });
+    await expect(preview2).not.toHaveAttribute("src", imgSrc!);
     const newImgSrc = await preview2.getAttribute("src");
-    expect(newImgSrc).not.toBe(imgSrc);
+    expect(newImgSrc).toBeTruthy();
 
     // Save
     await page.getByRole("button", { name: "Enregistrer les textes et métadonnées" }).click();
@@ -126,6 +133,15 @@ test.describe("Admin About Page", () => {
     // 7. Delete image
     const deleteBtn = page.getByRole("button", { name: "Supprimer" });
     await deleteBtn.click();
+
+    const modal = page.getByRole("dialog");
+    await expect(modal).toBeVisible();
+
+    await page.getByRole("button", { name: "Confirmer la suppression" }).click();
+
+    await expect(modal).not.toBeVisible();
+    await expect(page.getByText("Aucune image")).toBeVisible();
+
     await page.getByRole("button", { name: "Enregistrer les textes et métadonnées" }).click();
     await expect(page.getByRole("status")).toContainText("Les modifications ont été enregistrées avec succès.");
 

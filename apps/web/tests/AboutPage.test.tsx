@@ -8,7 +8,7 @@ import "@testing-library/jest-dom";
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...(actual as any),
+    ...(actual as Record<string, unknown>),
     useRouteLoaderData: vi.fn(),
   };
 });
