@@ -381,7 +381,7 @@ export default function AdminAbout({ loaderData, actionData }: Route.ComponentPr
                   }}
                 />
                 <div className={styles.marginTopSmall}>
-                  <label htmlFor={`team-alt-${lang}`}>Alt text ({lang})</label>
+                  <label htmlFor={`team-alt-${lang}`}>Texte alternatif ({lang})</label>
                   <input id={`team-alt-${lang}`}
                     type="text"
                     value={content.team.image.alt?.[lang] || ""}
