@@ -108,14 +108,14 @@ test.describe("Admin About Page", () => {
     // 4. Verify public page FR
     await page.goto("/fr/a-propos");
     await expect(page.locator("h1")).toContainText("Hero FR Modifié");
-    await expect(page.locator("title")).toHaveText("SEO FR Modifié");
+    await expect(page).toHaveTitle("SEO FR Modifié");
     const pubImgFr = page.locator("picture img");
     await expect(pubImgFr).toHaveAttribute("alt", "Alt FR");
 
     // 5. Verify public page EN
     await page.goto("/en/about");
     await expect(page.locator("h1")).toContainText("Hero EN Modified");
-    await expect(page.locator("title")).toHaveText("SEO EN Modified");
+    await expect(page).toHaveTitle("SEO EN Modified");
     const pubImgEn = page.locator("picture img");
     await expect(pubImgEn).toHaveAttribute("alt", "Alt EN");
 
