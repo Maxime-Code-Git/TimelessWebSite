@@ -39,7 +39,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   }
 
   const gallery = getGalleryByPublicId(params.id);
-  
+
   if (!gallery || gallery.id !== galleryId || gallery.status !== "published" || gallery.expires_at < Date.now()) {
     throw redirect("/fr/espace-clients?status=unavailable");
   }

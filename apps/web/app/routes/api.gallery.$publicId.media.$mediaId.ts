@@ -21,7 +21,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!publicId || !mediaId) return new Response("Bad Request", { status: 400 });
 
   const db = getGalleryDb();
-  
+
   // Verify gallery & session match
   const gallery = db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as { id: string, status: string, expires_at: number, couple_code_version: number, guest_code_version: number } | undefined;
   if (!gallery || gallery.id !== galleryId || gallery.status !== "published" || gallery.expires_at < Date.now()) {
@@ -45,7 +45,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const stat = fs.statSync(filePath);
-  
+
   if (media.type === "video") {
     const range = request.headers.get("range");
     if (range) {

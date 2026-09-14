@@ -29,14 +29,14 @@ interface GalleryViewProps {
 }
 
 export function GalleryView({ lang, gallery, media }: Omit<GalleryViewProps, "accessLevel">) {
-  const t = { 
+  const t = {
     downloadAll: lang === "fr" ? "Tout télécharger" : "Download all",
     photos: lang === "fr" ? "Photos" : "Photos",
     videos: lang === "fr" ? "Vidéos" : "Videos"
   };
 
   const alternateLangHref = lang === "fr" ? `/en/gallery/${gallery.public_id}` : `/fr/galerie/${gallery.public_id}`;
-  
+
   const intro = lang === "fr" ? gallery.intro_fr : gallery.intro_en;
   const signature = lang === "fr" ? gallery.signature_fr : gallery.signature_en;
 
@@ -89,10 +89,10 @@ export function GalleryView({ lang, gallery, media }: Omit<GalleryViewProps, "ac
             <div className={styles.photoGrid}>
               {photos.map(p => (
                 <div key={p.id} className={styles.photoItem}>
-                  <img 
-                    src={`/api/gallery/${gallery.public_id}/media/${p.id}`} 
-                    loading="lazy" 
-                    alt={`Photo de ${gallery.bride_names}`} 
+                  <img
+                    src={`/api/gallery/${gallery.public_id}/media/${p.id}`}
+                    loading="lazy"
+                    alt={`Photo de ${gallery.bride_names}`}
                     style={p.width && p.height ? { aspectRatio: `${p.width}/${p.height}` } : undefined}
                   />
                 </div>

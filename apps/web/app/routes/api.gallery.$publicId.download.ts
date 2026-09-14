@@ -21,7 +21,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!publicId) return new Response("Bad Request", { status: 400 });
 
   const db = getGalleryDb();
-  
+
   // Verify gallery & session match
   const gallery = db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as { id: string, status: string, expires_at: number, couple_code_version: number, guest_code_version: number, bride_names: string } | undefined;
   if (!gallery || gallery.id !== galleryId || gallery.status !== "published" || gallery.expires_at < Date.now()) {
@@ -47,7 +47,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const zipfile = new yazl.ZipFile();
   const zipFileName = `Sempra-${gallery.bride_names.replace(/[^a-zA-Z0-9-]/g, "_")}.zip`;
-  
+
   for (const m of media) {
     const filePath = path.join(ENV.GALLERY_MEDIA_PATH, gallery.id, m.id as string);
     if (fs.existsSync(filePath)) {
