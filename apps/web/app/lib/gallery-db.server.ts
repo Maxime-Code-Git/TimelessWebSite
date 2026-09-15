@@ -133,6 +133,38 @@ export function openGalleryDb(dbPath: string): DatabaseSync {
       currentVersion = 2;
     }
 
+    if (currentVersion < 3) {
+      db.exec(`
+        CREATE TABLE gallery_codes_v3 (
+          code_hash TEXT PRIMARY KEY,
+          gallery_id TEXT NOT NULL,
+          level TEXT NOT NULL CHECK (level IN ('invites', 'maries')),
+          version INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          UNIQUE(gallery_id, level),
+          FOREIGN KEY(gallery_id) REFERENCES galleries(id) ON DELETE CASCADE
+        );
+      `);
+
+      const duplicates = db.prepare(`
+        SELECT gallery_id, level, COUNT(*) as c FROM gallery_codes GROUP BY gallery_id, level HAVING c > 1
+      `).all() as {gallery_id: string, level: string}[];
+
+      if (duplicates.length > 0) {
+        throw new Error("Migration failed: duplicate gallery_id and level in gallery_codes detected: " + JSON.stringify(duplicates));
+      }
+
+      db.exec(`
+        INSERT INTO gallery_codes_v3 (code_hash, gallery_id, level, version, created_at)
+        SELECT code_hash, gallery_id, level, version, created_at FROM gallery_codes;
+        DROP TABLE gallery_codes;
+        ALTER TABLE gallery_codes_v3 RENAME TO gallery_codes;
+      `);
+
+      db.prepare("INSERT INTO gallery_migrations (version, applied_at) VALUES (3, ?)").run(Date.now());
+      currentVersion = 3;
+    }
+
     db.exec("COMMIT;");
   } catch (err) {
     db.exec("ROLLBACK;");

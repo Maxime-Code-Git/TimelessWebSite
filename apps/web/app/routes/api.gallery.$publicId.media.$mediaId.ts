@@ -10,7 +10,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const { publicId, mediaId } = params;
   if (!publicId || !mediaId) return new Response("Bad Request", { status: 400 });
 
-  const { gallery, media } = await requireGalleryAccess(request, publicId, mediaId);
+  const { gallery, media } = await requireGalleryAccess(request, publicId, mediaId, true);
   if (!media) return new Response("Media not found", { status: 404 });
 
   const filePath = path.join(ENV.GALLERY_MEDIA_PATH, gallery.id as string, media.id as string);
@@ -23,53 +23,56 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   if (media.type === "video") {
     const range = request.headers.get("range");
-    if (range) {
-      const match = range.match(/^bytes=(\d+)-(\d*)$/);
-      if (!match) {
-        return new Response(null, {
-          status: 416,
-          headers: {
-            "Content-Range": `bytes */${size}`,
-            ...GALLERY_PRIVATE_HEADERS
-          }
-        });
+    if (range && range.startsWith("bytes=")) {
+      let start: number;
+      let end: number;
+
+      if (range.startsWith("bytes=-")) {
+        const suffix = parseInt(range.substring(7), 10);
+        if (isNaN(suffix) || suffix <= 0) {
+          return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}`, ...GALLERY_PRIVATE_HEADERS } });
+        }
+        start = Math.max(0, size - suffix);
+        end = size - 1;
+      } else {
+        const match = range.match(/^bytes=(\d+)-(\d*)$/);
+        if (!match) {
+          return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}`, ...GALLERY_PRIVATE_HEADERS } });
+        }
+        start = parseInt(match[1], 10);
+        end = match[2] ? parseInt(match[2], 10) : size - 1;
       }
 
-      const start = parseInt(match[1], 10);
-      const end = match[2] ? parseInt(match[2], 10) : size - 1;
-
-      if (isNaN(start) || start < 0 || start >= size || (match[2] && (isNaN(end) || end >= size || end < start))) {
-        return new Response(null, {
-          status: 416,
-          headers: {
-            "Content-Range": `bytes */${size}`,
-            ...GALLERY_PRIVATE_HEADERS
-          }
-        });
+      if (isNaN(start) || start < 0 || start >= size || isNaN(end) || end >= size || end < start) {
+        return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}`, ...GALLERY_PRIVATE_HEADERS } });
       }
 
       const chunksize = (end - start) + 1;
       const fileStream = fs.createReadStream(filePath, { start, end });
       const webStream = Readable.toWeb(fileStream) as ReadableStream;
 
-      const head = {
-        "Content-Range": `bytes ${start}-${end}/${size}`,
-        "Accept-Ranges": "bytes",
-        "Content-Length": chunksize.toString(),
-        "Content-Type": media.mime_type as string,
-        ...GALLERY_PRIVATE_HEADERS
-      };
-
-      return new Response(webStream, { status: 206, headers: head });
+      return new Response(webStream, {
+        status: 206,
+        headers: {
+          "Content-Range": `bytes ${start}-${end}/${size}`,
+          "Accept-Ranges": "bytes",
+          "Content-Length": chunksize.toString(),
+          "Content-Type": media.mime_type as string,
+          ...GALLERY_PRIVATE_HEADERS
+        }
+      });
     } else {
-      const head = {
-        "Content-Length": size.toString(),
-        "Content-Type": media.mime_type as string,
-        ...GALLERY_PRIVATE_HEADERS
-      };
       const fileStream = fs.createReadStream(filePath);
       const webStream = Readable.toWeb(fileStream) as ReadableStream;
-      return new Response(webStream, { status: 200, headers: head });
+      return new Response(webStream, {
+        status: 200,
+        headers: {
+          "Accept-Ranges": "bytes",
+          "Content-Length": size.toString(),
+          "Content-Type": media.mime_type as string,
+          ...GALLERY_PRIVATE_HEADERS
+        }
+      });
     }
   }
 

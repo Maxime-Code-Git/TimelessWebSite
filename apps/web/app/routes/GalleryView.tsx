@@ -51,11 +51,8 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
   const videos = media.filter(m => m.type === "video");
 
   const [photos, setPhotos] = useState<GalleryMedia[]>(initialPhotos);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(initialPhotos.length === 24);
   const [loading, setLoading] = useState(false);
-
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const fetchMorePhotos = useCallback(async () => {
     if (loading || !hasMore) return;
@@ -63,12 +60,9 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
     try {
       const res = await fetch(`/api/gallery/${gallery.public_id}/photos?skip=${photos.length}`);
       if (res.ok) {
-        const newPhotos = await res.json();
-        if (newPhotos.length === 0) {
-          setHasMore(false);
-        } else {
-          setPhotos(prev => [...prev, ...newPhotos]);
-        }
+        const data = await res.json();
+        setPhotos(prev => [...prev, ...data.photos]);
+        setHasMore(data.hasMore);
       }
     } catch (e) {
       console.error("Failed to load more photos", e);
@@ -76,24 +70,6 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
       setLoading(false);
     }
   }, [loading, hasMore, gallery.public_id, photos.length]);
-
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect();
-
-    observerRef.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        void fetchMorePhotos();
-      }
-    }, { rootMargin: "400px" });
-
-    if (loadMoreRef.current) {
-      observerRef.current.observe(loadMoreRef.current);
-    }
-
-    return () => {
-      if (observerRef.current) observerRef.current.disconnect();
-    };
-  }, [fetchMorePhotos]);
 
   const coverUrl = gallery.cover_image_id
     ? `/api/gallery/${gallery.public_id}/media/${gallery.cover_image_id}`
@@ -152,8 +128,8 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
             <div className={styles.videoGrid}>
               {videos.map(v => (
                 <div key={v.id} className={styles.videoCard}>
-                  <video controls preload="metadata" className={styles.videoElement}>
-                    <source src={`/api/gallery/${gallery.public_id}/media/${v.id}`} type="video/mp4" />
+                  <video controls playsInline preload="metadata" className={styles.videoElement}>
+                    <source src={`/api/gallery/${gallery.public_id}/media/${v.id}`} type={v.mime_type || "video/mp4"} />
                   </video>
                   <a
                     href={`/api/gallery/${gallery.public_id}/download/original/${v.id}`}
@@ -178,14 +154,17 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
                 const isLandscape = p.width && p.height && p.width > p.height;
                 return (
                   <div key={p.id} className={`${styles.photoItem} ${isLandscape ? styles.photoItemLandscape : styles.photoItemPortrait}`}>
-                    <img
-                      src={`/api/gallery/${gallery.public_id}/media/${p.id}`}
-                      loading="lazy"
-                      alt={`Photo de ${gallery.bride_names} ${p.original_name ? `- ${p.original_name}` : ""}`}
-                      className={styles.photoImg}
-                      width={p.width || undefined}
-                      height={p.height || undefined}
-                    />
+                    <picture>
+                      <source srcSet={`/api/gallery/${gallery.public_id}/media/${p.id}?width=1920 1920w, /api/gallery/${gallery.public_id}/media/${p.id}?width=1440 1440w, /api/gallery/${gallery.public_id}/media/${p.id}?width=960 960w, /api/gallery/${gallery.public_id}/media/${p.id}?width=480 480w`} sizes="(max-width: 480px) 480px, (max-width: 960px) 960px, (max-width: 1440px) 1440px, 1920px" type="image/webp" />
+                      <img
+                        src={`/api/gallery/${gallery.public_id}/media/${p.id}?width=960`}
+                        loading="lazy"
+                        alt={`Photo de ${gallery.bride_names}`}
+                        className={styles.photoImg}
+                        width={p.width || undefined}
+                        height={p.height || undefined}
+                      />
+                    </picture>
                     <a
                       href={`/api/gallery/${gallery.public_id}/download/original/${p.id}`}
                       className={styles.downloadIcon}
@@ -200,7 +179,7 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
             </div>
 
             {hasMore && (
-              <div ref={loadMoreRef} className={styles.loadMoreArea}>
+              <div className={styles.loadMoreArea}>
                 <button onClick={fetchMorePhotos} className={styles.loadMoreBtn} disabled={loading}>
                   {loading ? t.loading : t.loadMore}
                 </button>

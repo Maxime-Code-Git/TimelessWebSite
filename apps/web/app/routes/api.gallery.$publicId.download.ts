@@ -17,7 +17,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return new Response("Bad Request", { status: 400 });
   }
 
-  const { gallery, accessLevel } = await requireGalleryAccess(request, publicId);
+  const { gallery, accessLevel } = await requireGalleryAccess(request, publicId, undefined, true);
   const db = getGalleryDb();
 
   // Get media
@@ -66,6 +66,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   zipfile.end();
+
+  if (usedNames.size === 0) {
+    return new Response("No valid files to download", { status: 404 });
+  }
+
+  request.signal.addEventListener("abort", () => {
+    zipfile.outputStream.destroy();
+  });
 
   const webStream = Readable.toWeb(Readable.from(zipfile.outputStream)) as unknown as BodyInit;
 

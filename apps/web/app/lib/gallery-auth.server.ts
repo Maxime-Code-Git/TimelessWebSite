@@ -81,9 +81,9 @@ export function createCsrfToken(): string {
 import type { Session } from "react-router";
 
 export function verifyCsrfToken(session: Session, token: string | null): boolean {
-  if (!token || typeof token !== "string") return false;
+  if (!token || typeof token !== "string" || token.length !== 64 || !/^[0-9a-f]{64}$/i.test(token)) return false;
   const stored = session.get("csrf");
-  if (!stored) return false;
+  if (!stored || typeof stored !== "string" || stored.length !== 64 || !/^[0-9a-f]{64}$/i.test(stored)) return false;
   return crypto.timingSafeEqual(Buffer.from(token, "hex"), Buffer.from(stored, "hex"));
 }
 
@@ -110,14 +110,20 @@ export async function loginGalleryClient(request: Request, formData: URLSearchPa
 
   const db = getGalleryDb();
   const hash = hashGalleryCode(code);
-  const gallery = db.prepare("SELECT * FROM galleries WHERE guest_code_hash = ? OR couple_code_hash = ?").get(hash, hash) as { id: string, status: string, expires_at: number, couple_code_hash: string, couple_code_version: number, guest_code_version: number, public_id: string } | undefined;
+
+  const codeRow = db.prepare("SELECT gallery_id, level, version FROM gallery_codes WHERE code_hash = ?").get(hash) as { gallery_id: string, level: string, version: number } | undefined;
+  if (!codeRow) {
+    return Response.json({ error: lang === "fr" ? "Code invalide ou galerie indisponible." : "Invalid code or unavailable gallery." }, { status: 401 });
+  }
+
+  const gallery = db.prepare("SELECT * FROM galleries WHERE id = ?").get(codeRow.gallery_id) as { id: string, status: string, expires_at: number, public_id: string } | undefined;
 
   if (!gallery || gallery.status !== "published" || gallery.expires_at < Date.now()) {
     return Response.json({ error: lang === "fr" ? "Code invalide ou galerie indisponible." : "Invalid code or unavailable gallery." }, { status: 401 });
   }
 
-  const accessLevel: GalleryAccessLevel = hash === gallery.couple_code_hash ? "maries" : "invites";
-  const version = accessLevel === "maries" ? gallery.couple_code_version : gallery.guest_code_version;
+  const accessLevel: GalleryAccessLevel = codeRow.level as GalleryAccessLevel;
+  const version = codeRow.version;
 
   resetRateLimit(ip, "gallery");
 
@@ -138,28 +144,35 @@ export async function loginGalleryClient(request: Request, formData: URLSearchPa
 export const GALLERY_PRIVATE_HEADERS = {
   "Cache-Control": "no-store",
   "X-Robots-Tag": "noindex, nofollow",
-  "Referrer-Policy": "no-referrer"
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff"
 };
 
-export async function requireGalleryAccess(request: Request, publicId: string, requiredMediaId?: string) {
+export async function requireGalleryAccess(request: Request, publicId: string, requiredMediaId?: string, isApi = false) {
   const session = await getGallerySession(request);
   const galleryId = session.get("galleryId");
   const accessLevel = session.get("accessLevel") as GalleryAccessLevel | undefined;
   const codeVersion = session.get("codeVersion") as number | undefined;
 
+  const unauthorized = () => {
+    if (isApi) return new Response("Unauthorized", { status: 401, headers: GALLERY_PRIVATE_HEADERS });
+    return redirect("/fr/espace-clients", { headers: GALLERY_PRIVATE_HEADERS });
+  };
+
   if (!galleryId || !accessLevel || codeVersion === undefined) {
-    throw redirect("/fr/espace-clients");
+    throw unauthorized();
   }
 
   const db = getGalleryDb();
-  const gallery = db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as Record<string, unknown>;
-  if (!gallery || gallery.id !== galleryId || gallery.status !== "published" || (gallery.expires_at as number) < Date.now()) {
-    throw redirect("/fr/espace-clients");
+  // Fetch current code version from gallery_codes since it's the source of truth!
+  const codeRow = db.prepare("SELECT version FROM gallery_codes WHERE gallery_id = ? AND level = ?").get(galleryId, accessLevel) as { version: number } | undefined;
+  if (!codeRow || codeRow.version !== codeVersion) {
+    throw unauthorized();
   }
 
-  const currentVersion = accessLevel === "maries" ? (gallery.couple_code_version as number) : (gallery.guest_code_version as number);
-  if (codeVersion !== currentVersion) {
-    throw redirect("/fr/espace-clients");
+  const gallery = db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as Record<string, unknown>;
+  if (!gallery || gallery.id !== galleryId || gallery.status !== "published" || (gallery.expires_at as number) < Date.now()) {
+    throw unauthorized();
   }
 
   let media = null;

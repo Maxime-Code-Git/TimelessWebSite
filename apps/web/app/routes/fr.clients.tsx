@@ -3,7 +3,7 @@ import { getSeoMeta } from "~/lib/seo";
 import { ClientsPage } from "./ClientsPage";
 import { loginGalleryClient, getGallerySession, createCsrfToken, gallerySessionStorage } from "~/lib/gallery-auth.server";
 import { ActionSecurityError } from "~/lib/admin-auth.server";
-import { validateOrigin } from "~/lib/security.server";
+import { validateOrigin, readStrictFormUrlEncoded } from "~/lib/security.server";
 
 export function meta({ matches }: Route.MetaArgs) {
   const rootData = matches.find((m) => m?.id === "root")?.loaderData as { PUBLIC_SITE_URL?: string } | undefined;
@@ -36,20 +36,17 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
-  const contentType = request.headers.get("Content-Type");
-  if (!contentType || !contentType.includes("application/x-www-form-urlencoded")) {
+  let searchParams: URLSearchParams;
+  try {
+    searchParams = await readStrictFormUrlEncoded(request, 500);
+  } catch (err: any) {
+    if (err.message === "Payload Too Large") return new Response("Payload Too Large", { status: 413 });
     return new Response("Unsupported Media Type", { status: 415 });
   }
-  const contentLength = parseInt(request.headers.get("Content-Length") || "0", 10);
-  if (contentLength > 500) {
-    return new Response("Payload Too Large", { status: 413 });
-  }
+
   if (!validateOrigin(request)) {
     return new Response("Forbidden", { status: 403 });
   }
-
-  const text = await request.text();
-  const searchParams = new URLSearchParams(text);
 
   try {
     return await loginGalleryClient(request, searchParams, "fr");

@@ -12,10 +12,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   if (isNaN(skip) || skip < 0) return new Response("Bad Request", { status: 400 });
 
-  const { gallery, accessLevel } = await requireGalleryAccess(request, publicId);
+  const { gallery, accessLevel } = await requireGalleryAccess(request, publicId, undefined, true);
   const db = getGalleryDb();
 
-  let query = "SELECT * FROM gallery_media WHERE gallery_id = ? AND type = 'photo'";
+  const countQuery = "SELECT COUNT(*) as total FROM gallery_media WHERE gallery_id = ? AND type = 'photo'" + (accessLevel !== "maries" ? " AND visibility = 'invites'" : "");
+  const totalRow = db.prepare(countQuery).get(gallery.id) as { total: number };
+  const total = totalRow.total;
+
+  let query = "SELECT id, type, mime_type, width, height FROM gallery_media WHERE gallery_id = ? AND type = 'photo'";
   const queryParams: (string | number)[] = [gallery.id as string];
 
   if (accessLevel !== "maries") {
@@ -27,7 +31,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const photos = db.prepare(query).all(...queryParams);
 
-  return Response.json(photos, {
+  return Response.json({ photos, total, hasMore: skip + photos.length < total }, {
     headers: GALLERY_PRIVATE_HEADERS
   });
 }

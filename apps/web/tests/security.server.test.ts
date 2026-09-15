@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { validateOrigin, getClientIp } from "../app/lib/security.server";
+import { validateOrigin, getClientIp, readStrictFormUrlEncoded } from "../app/lib/security.server";
 import { ENV } from "../app/lib/env.server";
 
 vi.mock("../app/lib/env.server", () => ({
@@ -89,6 +89,39 @@ describe("security.server", () => {
         headers: { "x-forwarded-for": "192.168.1.1" },
       });
       expect(getClientIp(req)).toBe("127.0.0.1");
+    });
+  });
+
+  describe("readStrictFormUrlEncoded", () => {
+
+    it("should accept valid urlencoded payload", async () => {
+      const req = new Request("https://timeless.example.com", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: "foo=bar&baz=123"
+      });
+      const data = await readStrictFormUrlEncoded(req);
+      expect(data.get("foo")).toBe("bar");
+      expect(data.get("baz")).toBe("123");
+    });
+
+    it("should reject wrong content-type", async () => {
+      const req = new Request("https://timeless.example.com", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: '{"foo":"bar"}'
+      });
+      await expect(readStrictFormUrlEncoded(req)).rejects.toThrow("Unsupported Media Type");
+    });
+
+    it("should enforce size limit", async () => {
+      const largeBody = "a=" + "A".repeat(5000); // Exceeds 4096 bytes limit
+      const req = new Request("https://timeless.example.com", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: largeBody
+      });
+      await expect(readStrictFormUrlEncoded(req, 4096)).rejects.toThrow("Payload Too Large");
     });
   });
 });

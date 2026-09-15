@@ -26,12 +26,22 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return Response.json({ importState: imports || null });
 }
 
+import { validateAdminFormData, ActionSecurityError } from "~/lib/admin-auth.server";
+
 export async function action({ request, params }: LoaderFunctionArgs) {
-  await requireValidAdminSession(request);
+  let formData: FormData;
+  try {
+    formData = await validateAdminFormData(request);
+  } catch (err) {
+    if (err instanceof ActionSecurityError) {
+      return Response.json({ error: err.message }, { status: err.status });
+    }
+    return Response.json({ error: "Requête invalide." }, { status: 400 });
+  }
+
   const { id } = params;
   if (!id) return new Response("Bad Request", { status: 400 });
 
-  const formData = await request.formData();
   const folderName = formData.get("folderName");
 
   if (!folderName || typeof folderName !== "string") {

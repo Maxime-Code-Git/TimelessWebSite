@@ -2,7 +2,7 @@ import { Form, Link, useActionData, useNavigation, useLoaderData, useRevalidator
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { requireValidAdminSession, validateAdminFormData, createAdminHeaders, ActionSecurityError } from "../lib/admin-auth.server";
 import { getGalleryById, updateGallery, rotateGalleryCodes, getGalleryMediaStats, getGalleryImports } from "../lib/gallery.server";
-import { decryptGalleryCode, hashGalleryCode, generateGalleryCode } from "../lib/gallery-auth.server";
+import { decryptGalleryCode, generateGalleryCode } from "../lib/gallery-auth.server";
 import styles from "./admin.module.css";
 import { commitSession } from "../lib/session.server";
 import crypto from "node:crypto";
@@ -27,7 +27,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     headers.set("Set-Cookie", await commitSession(session));
   }
 
-  return Response.json({ gallery, stats, imports, guestCode, coupleCode, csrfToken }, { headers });
+  const { getAvailableImportFolders } = await import("../lib/gallery-import.server");
+  const folders = getAvailableImportFolders();
+
+  return Response.json({ gallery, stats, imports, folders, guestCode, coupleCode, csrfToken }, { headers });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -64,6 +67,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (stats.invitesPhotos === 0 && stats.invitesVideos === 0 && stats.mariesPhotos === 0 && stats.mariesVideos === 0) {
         return Response.json({ error: "Une galerie ne peut pas être publiée sans média valide." }, { status: 400 });
       }
+
+      const pendingImports = getGalleryImports(gallery.id).filter(i => i.status === "pending" || i.status === "processing");
+      if (pendingImports.length > 0) {
+        return Response.json({ error: "Une galerie ne peut pas être publiée si un import est en cours." }, { status: 400 });
+      }
+
+      if (cover_image_id) {
+        const db = (await import("../lib/gallery-db.server")).getGalleryDb();
+        const checkCover = db.prepare("SELECT id FROM gallery_media WHERE id = ? AND gallery_id = ?").get(cover_image_id, gallery.id);
+        if (!checkCover) {
+          return Response.json({ error: "L'image de couverture choisie est invalide ou n'appartient pas à cette galerie." }, { status: 400 });
+        }
+      }
     }
 
     updateGallery(gallery.id, {
@@ -95,45 +111,45 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return Response.json({ error: "Les deux codes d'une galerie ne peuvent pas être identiques." }, { status: 400 });
     }
 
-    // Checking collision across other galleries is a nice to have here, but we will catch DB UNIQUE violations if we implemented that.
-    // Wait, codes are not strictly UNIQUE in DB (only their hashes), but we can't let them overlap.
-    const db = (await import("../lib/gallery-db.server")).getGalleryDb();
-    const guestHash = hashGalleryCode(guestCode);
-    const coupleHash = hashGalleryCode(coupleCode);
-    const check1 = db.prepare("SELECT id FROM galleries WHERE (guest_code_hash = ? OR couple_code_hash = ?) AND id != ?").get(guestHash, guestHash, gallery.id);
-    const check2 = db.prepare("SELECT id FROM galleries WHERE (guest_code_hash = ? OR couple_code_hash = ?) AND id != ?").get(coupleHash, coupleHash, gallery.id);
-
-    if (check1 || check2) {
-      return Response.json({ error: "L'un de ces codes est déjà utilisé par une autre galerie." }, { status: 400 });
+    try {
+      rotateGalleryCodes(gallery.id, guestCode, coupleCode);
+      return Response.json({ success: true });
+    } catch (err: any) {
+      if (err.status === 409) {
+        return Response.json({ error: "L'un des codes choisis est déjà utilisé ailleurs. Veuillez en choisir d'autres." }, { status: 409 });
+      }
+      return Response.json({ error: "Erreur lors de la mise à jour des codes." }, { status: 500 });
     }
-
-    rotateGalleryCodes(gallery.id, guestCode, coupleCode);
-    return Response.json({ success: true });
   }
 
   if (intent === "regenerate_codes") {
-    const guestCode = generateGalleryCode();
-    let coupleCode = generateGalleryCode();
-    while (guestCode === coupleCode) coupleCode = generateGalleryCode();
-
-    rotateGalleryCodes(gallery.id, guestCode, coupleCode);
+    let success = false;
+    let attempts = 0;
+    while (!success && attempts < 5) {
+      const guestCode = generateGalleryCode();
+      let coupleCode = generateGalleryCode();
+      while (guestCode === coupleCode) coupleCode = generateGalleryCode();
+      try {
+        rotateGalleryCodes(gallery.id, guestCode, coupleCode);
+        success = true;
+      } catch (err: any) {
+        if (err.status !== 409) {
+          return Response.json({ error: "Erreur lors de la génération." }, { status: 500 });
+        }
+      }
+      attempts++;
+    }
+    if (!success) {
+      return Response.json({ error: "Impossible de générer des codes uniques, veuillez réessayer." }, { status: 500 });
+    }
     return Response.json({ success: true });
   }
 
   return Response.json({ error: "Intent inconnu." }, { status: 400 });
 }
 
-interface LoaderData {
-  gallery: ReturnType<typeof getGalleryById> & { id: string, bride_names: string, wedding_date: string, location: string | null, expires_at: number, status: string, intro_fr: string | null, intro_en: string | null, signature_fr: string | null, signature_en: string | null, cover_image_id: string | null };
-  stats: ReturnType<typeof getGalleryMediaStats>;
-  imports: Record<string, unknown>[];
-  guestCode: string;
-  coupleCode: string;
-  csrfToken: string;
-}
-
 export default function AdminGalleryEdit() {
-  const { gallery, stats, imports, guestCode, coupleCode, csrfToken } = useLoaderData() as unknown as LoaderData;
+  const { gallery, stats, imports, folders, guestCode, coupleCode, csrfToken } = useLoaderData<typeof loader>();
   const actionData = useActionData<{ error?: string, success?: boolean }>();
   const navigation = useNavigation();
   const revalidator = useRevalidator();
@@ -298,6 +314,21 @@ export default function AdminGalleryEdit() {
           <li>Photos Mariés : {stats.mariesPhotos}</li>
           <li>Vidéos Mariés : {stats.mariesVideos}</li>
         </ul>
+
+        <h4>Lancer un nouvel import</h4>
+        <Form method="post" action={`/api/admin/gallery-import/${gallery.id}`} className={styles.form}>
+          <input type="hidden" name="csrfToken" value={csrfToken} />
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Dossier d'import</label>
+            <select name="folderName" className={styles.input} required>
+              <option value="">Sélectionnez un dossier...</option>
+              {folders.map((f: string) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" className={styles.button}>Lancer l'importation</button>
+        </Form>
 
         <h4>Historique d'importation</h4>
         {imports.length === 0 ? (

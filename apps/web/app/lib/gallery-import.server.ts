@@ -64,9 +64,9 @@ function scanFolderForFiles(basePath: string, subFolder: string, visibility: "in
 
 export async function getImportPreview(folderName: string) {
   const baseReal = fs.realpathSync(ENV.GALLERY_IMPORT_PATH);
-  const importDir = path.resolve(ENV.GALLERY_IMPORT_PATH, folderName);
+  const importDir = fs.realpathSync(path.resolve(ENV.GALLERY_IMPORT_PATH, folderName));
 
-  if (!importDir.startsWith(baseReal + path.sep) && importDir !== baseReal) {
+  if (!importDir.startsWith(baseReal)) {
     throw new Error("Invalid import path");
   }
 
@@ -147,7 +147,22 @@ export function startGalleryImport(galleryId: string, folderName: string) {
 
 export function resumeImports() {
   const db = getGalleryDb();
-  const pending = db.prepare("SELECT gi.id, gi.gallery_id, g.import_path FROM gallery_imports gi JOIN galleries g ON gi.gallery_id = g.id WHERE gi.status IN ('pending', 'processing')").all() as { id: string, gallery_id: string, import_path: string | null }[];
+
+  // Atomic lock for resuming imports using an IMMEDIATE transaction
+  db.exec("BEGIN IMMEDIATE");
+  let pending: any[] = [];
+  try {
+    pending = db.prepare("SELECT gi.id, gi.gallery_id, g.import_path FROM gallery_imports gi JOIN galleries g ON gi.gallery_id = g.id WHERE gi.status IN ('pending', 'processing')").all();
+    for (const p of pending) {
+      db.prepare("UPDATE gallery_imports SET status = 'processing' WHERE id = ?").run(p.id);
+    }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    console.error("Failed to acquire atomic lock for imports", err);
+    return;
+  }
+
   for (const p of pending) {
     if (p.import_path) {
       void processImport(p.id, p.gallery_id, p.import_path).catch(err => console.error("Resume failed:", err));
@@ -160,9 +175,9 @@ async function processImport(importId: string, galleryId: string, folderName: st
 
   try {
     const baseReal = fs.realpathSync(ENV.GALLERY_IMPORT_PATH);
-    const importDir = path.resolve(ENV.GALLERY_IMPORT_PATH, folderName);
+    const importDir = fs.realpathSync(path.resolve(ENV.GALLERY_IMPORT_PATH, folderName));
 
-    if (!importDir.startsWith(baseReal + path.sep) && importDir !== baseReal) {
+    if (!importDir.startsWith(baseReal)) {
       throw new Error("Invalid import path");
     }
 
@@ -174,12 +189,24 @@ async function processImport(importId: string, galleryId: string, folderName: st
       ...scanFolderForFiles(importDir, "maries/videos", "maries", ignoredFiles)
     ];
 
+    if (files.length > 1000) {
+      throw new Error("La galerie dépasse la limite de 1000 médias.");
+    }
+
     db.prepare("UPDATE gallery_imports SET status = 'processing', total = ?, updated_at = ? WHERE id = ?")
       .run(files.length, Date.now(), importId);
 
     const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId);
     if (!fs.existsSync(mediaDir)) {
       fs.mkdirSync(mediaDir, { recursive: true });
+    } else {
+      // Cleanup orphans .tmp files from previous crashed runs
+      const existingFiles = fs.readdirSync(mediaDir);
+      for (const f of existingFiles) {
+        if (f.endsWith(".tmp")) {
+          fs.unlinkSync(path.join(mediaDir, f));
+        }
+      }
     }
 
     let progress = 0;
@@ -242,10 +269,15 @@ async function processImport(importId: string, galleryId: string, folderName: st
           throw copyErr;
         }
 
-        db.prepare(`
-          INSERT INTO gallery_media (id, gallery_id, type, visibility, original_name, mime_type, size, hash, width, height, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(mediaId, galleryId, type, file.visibility, file.name, mimeType, stat.size, hash, width, height, Date.now());
+        try {
+          db.prepare(`
+            INSERT INTO gallery_media (id, gallery_id, type, visibility, original_name, mime_type, size, hash, width, height, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(mediaId, galleryId, type, file.visibility, file.name, mimeType, stat.size, hash, width, height, Date.now());
+        } catch (dbErr) {
+          if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
+          throw dbErr;
+        }
 
         results.imported++;
       } catch (err) {

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { getGalleryDb } from "./gallery-db.server";
-import { generateGalleryCode, encryptGalleryCode, hashGalleryCode } from "./gallery-auth.server";
+import { generateGalleryCode, hashGalleryCode, encryptGalleryCode } from "./gallery-auth.server";
+import { addCalendarMonths } from "./date";
 
 export interface Gallery {
   id: string;
@@ -42,11 +43,16 @@ export function getGalleryByPublicId(publicId: string): Gallery | undefined {
 
 export function getGalleryMedia(galleryId: string, accessLevel: "invites" | "maries") {
   const db = getGalleryDb();
-  if (accessLevel === "maries") {
-    return db.prepare("SELECT id, type, width, height, mime_type FROM gallery_media WHERE gallery_id = ? ORDER BY created_at ASC").all(galleryId) as Record<string, unknown>[];
-  } else {
-    return db.prepare("SELECT id, type, width, height, mime_type FROM gallery_media WHERE gallery_id = ? AND visibility = 'invites' ORDER BY created_at ASC").all(galleryId) as Record<string, unknown>[];
-  }
+
+  const visCondition = accessLevel === "maries" ? "" : " AND visibility = 'invites'";
+
+  const videoQuery = "SELECT id, type, width, height, mime_type FROM gallery_media WHERE gallery_id = ? AND type = 'video'" + visCondition + " ORDER BY created_at ASC";
+  const videos = db.prepare(videoQuery).all(galleryId) as Record<string, unknown>[];
+
+  const photoQuery = "SELECT id, type, width, height, mime_type FROM gallery_media WHERE gallery_id = ? AND type = 'photo'" + visCondition + " ORDER BY created_at ASC LIMIT 24";
+  const photos = db.prepare(photoQuery).all(galleryId) as Record<string, unknown>[];
+
+  return [...videos, ...photos];
 }
 
 export function createGallery(data: {
@@ -85,9 +91,7 @@ export function createGallery(data: {
   }
 
   const now = new Date();
-  const future = new Date(now);
-  future.setMonth(future.getMonth() + 24);
-  const expires_at = data.expires_at || future.getTime();
+  const expires_at = data.expires_at || addCalendarMonths(now, 24).getTime();
 
   const nowMs = now.getTime();
 
@@ -161,17 +165,43 @@ export function rotateGalleryCodes(id: string, guestCodeStr?: string, coupleCode
   db.exec("BEGIN EXCLUSIVE TRANSACTION;");
   try {
     if (guestCodeStr) {
+      const newVersion = (gallery.guest_code_version as number) + 1;
       const gHash = hashGalleryCode(guestCodeStr);
-      updates.push("guest_code_hash = ?", "guest_code_encrypted = ?", "guest_code_version = guest_code_version + 1");
-      values.push(gHash, encryptGalleryCode(guestCodeStr));
-      db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, guest_code_version + 1, ?)").run(gHash, id, 'invites', nowMs);
+      updates.push("guest_code_hash = ?", "guest_code_encrypted = ?", "guest_code_version = ?");
+      values.push(gHash, encryptGalleryCode(guestCodeStr), newVersion);
+
+      // Delete old code for this level
+      db.prepare("DELETE FROM gallery_codes WHERE gallery_id = ? AND level = 'invites'").run(id);
+      try {
+        db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(gHash, id, 'invites', newVersion, nowMs);
+      } catch (err: any) {
+        if (err.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' || err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+          const e = new Error("Code collision");
+          (e as any).status = 409;
+          throw e;
+        }
+        throw err;
+      }
     }
 
     if (coupleCodeStr) {
+      const newVersion = (gallery.couple_code_version as number) + 1;
       const cHash = hashGalleryCode(coupleCodeStr);
-      updates.push("couple_code_hash = ?", "couple_code_encrypted = ?", "couple_code_version = couple_code_version + 1");
-      values.push(cHash, encryptGalleryCode(coupleCodeStr));
-      db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, couple_code_version + 1, ?)").run(cHash, id, 'maries', nowMs);
+      updates.push("couple_code_hash = ?", "couple_code_encrypted = ?", "couple_code_version = ?");
+      values.push(cHash, encryptGalleryCode(coupleCodeStr), newVersion);
+
+      // Delete old code for this level
+      db.prepare("DELETE FROM gallery_codes WHERE gallery_id = ? AND level = 'maries'").run(id);
+      try {
+        db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(cHash, id, 'maries', newVersion, nowMs);
+      } catch (err: any) {
+        if (err.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' || err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+          const e = new Error("Code collision");
+          (e as any).status = 409;
+          throw e;
+        }
+        throw err;
+      }
     }
 
     if (updates.length > 0) {

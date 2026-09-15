@@ -2,6 +2,7 @@ import { Form, Link, useActionData, useNavigation, redirect, useLoaderData } fro
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { requireValidAdminSession, validateAdminFormData, createAdminHeaders, ActionSecurityError } from "../lib/admin-auth.server";
 import { createGallery } from "../lib/gallery.server";
+import { addCalendarMonths } from "../lib/date";
 import { startGalleryImport, getAvailableImportFolders } from "../lib/gallery-import.server";
 import styles from "./admin.module.css";
 import { commitSession } from "../lib/session.server";
@@ -39,7 +40,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const expiresStr = formData.get("expires_at");
   let expires_at: number | undefined;
   if (expiresStr) {
-    expires_at = new Date(String(expiresStr)).getTime();
+    const d = new Date(String(expiresStr));
+    if (isNaN(d.getTime()) || d.getTime() <= Date.now()) {
+      return Response.json({ error: "La date d'expiration doit être future et valide." }, { status: 400 });
+    }
+    expires_at = d.getTime();
   }
 
   const importFolder = formData.get("importFolder");
@@ -73,8 +78,7 @@ export default function AdminGalleryNew() {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
-  // approx 24 months from now
-  const defaultExpires = new Date(Date.now() + 24 * 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const defaultExpires = addCalendarMonths(new Date(), 24).toISOString().split("T")[0];
 
   return (
     <div className={styles.adminPage}>
