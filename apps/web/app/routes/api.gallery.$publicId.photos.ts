@@ -16,7 +16,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const db = getGalleryDb();
 
   const countQuery = "SELECT COUNT(*) as total FROM gallery_media WHERE gallery_id = ? AND type = 'photo'" + (accessLevel !== "maries" ? " AND visibility = 'invites'" : "");
-  const totalRow = db.prepare(countQuery).get(gallery.id) as { total: number };
+  const galleryId = gallery.id as string;
+  const totalRow = db.prepare(countQuery).get(galleryId) as { total: number };
   const total = totalRow.total;
 
   let query = "SELECT id, type, mime_type, width, height FROM gallery_media WHERE gallery_id = ? AND type = 'photo'";

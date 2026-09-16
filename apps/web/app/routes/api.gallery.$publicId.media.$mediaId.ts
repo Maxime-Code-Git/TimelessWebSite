@@ -6,16 +6,24 @@ import path from "node:path";
 import sharp from "sharp";
 import { Readable } from "node:stream";
 
+const VALID_WIDTHS = new Set([480, 960, 1440, 1920]);
+
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { publicId, mediaId } = params;
-  if (!publicId || !mediaId) return new Response("Bad Request", { status: 400 });
+  if (!publicId || !mediaId) {
+    return new Response("Bad Request", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
+  }
 
   const { gallery, media } = await requireGalleryAccess(request, publicId, mediaId, true);
-  if (!media) return new Response("Media not found", { status: 404 });
+  if (!media) {
+    return new Response("Media not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
+  }
 
-  const filePath = path.join(ENV.GALLERY_MEDIA_PATH, gallery.id as string, media.id as string);
+  const galleryId = gallery.id as string;
+  const mediaIdStr = media.id as string;
+  const filePath = path.join(ENV.GALLERY_MEDIA_PATH, galleryId, mediaIdStr);
   if (!fs.existsSync(filePath)) {
-    return new Response("File not found", { status: 404 });
+    return new Response("File not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
   }
 
   const stat = fs.statSync(filePath);
@@ -76,20 +84,37 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
   }
 
-  // It's a photo, compress and resize on the fly
+  // Photo: resize on the fly with width parameter support
+  const url = new URL(request.url);
+  const widthParam = url.searchParams.get("width");
+  let targetWidth = 1920;
+  if (widthParam) {
+    const parsed = parseInt(widthParam, 10);
+    if (VALID_WIDTHS.has(parsed)) {
+      targetWidth = parsed;
+    }
+  }
+
+  // Content negotiation for format
   const accept = request.headers.get("Accept") || "";
+  const formatParam = url.searchParams.get("format");
   let format: "jpeg" | "webp" | "avif" = "jpeg";
-  if (accept.includes("image/avif")) format = "avif";
-  else if (accept.includes("image/webp")) format = "webp";
+
+  if (formatParam === "avif" || (!formatParam && accept.includes("image/avif"))) {
+    format = "avif";
+  } else if (formatParam === "webp" || (!formatParam && accept.includes("image/webp"))) {
+    format = "webp";
+  }
 
   const transform = sharp(filePath)
-    .resize(1920, 1920, { fit: "inside", withoutEnlargement: true })
+    .resize(targetWidth, targetWidth, { fit: "inside", withoutEnlargement: true })
     .toFormat(format, { quality: 80 });
 
   return new Response(Readable.toWeb(transform) as ReadableStream, {
     status: 200,
     headers: {
       "Content-Type": `image/${format}`,
+      "Vary": "Accept",
       ...GALLERY_PRIVATE_HEADERS
     }
   });

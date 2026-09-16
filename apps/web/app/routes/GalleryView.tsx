@@ -2,21 +2,19 @@ import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
 import styles from "./gallery.module.css";
-
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 export interface GalleryMedia {
   id: string;
   type: "photo" | "video";
+  mime_type: string;
   width: number | null;
   height: number | null;
-  original_name?: string;
 }
 
 interface GalleryViewProps {
   lang: Lang;
   gallery: {
-    id: string;
     public_id: string;
     bride_names: string;
     wedding_date: string;
@@ -31,21 +29,27 @@ interface GalleryViewProps {
 }
 
 export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
+  const isFr = lang === "fr";
   const t = {
-    downloadAll: lang === "fr" ? "Tout télécharger (ZIP)" : "Download all (ZIP)",
-    downloadPhotos: lang === "fr" ? "Photos uniquement" : "Photos only",
-    downloadVideos: lang === "fr" ? "Vidéos uniquement" : "Videos only",
-    photosTitle: lang === "fr" ? "La Galerie" : "The Gallery",
-    videosTitle: lang === "fr" ? "Le Film" : "The Film",
-    shortcuts: lang === "fr" ? "Raccourcis" : "Shortcuts",
-    loadMore: lang === "fr" ? "Charger plus" : "Load more",
-    loading: lang === "fr" ? "Chargement..." : "Loading...",
+    downloadAll: isFr ? "Tout télécharger (ZIP)" : "Download all (ZIP)",
+    downloadPhotos: isFr ? "Photos uniquement" : "Photos only",
+    downloadVideos: isFr ? "Vidéos uniquement" : "Videos only",
+    photosTitle: isFr ? "La Galerie" : "The Gallery",
+    videosTitle: isFr ? "Le Film" : "The Film",
+    loadMore: isFr ? "Voir plus" : "View more",
+    loading: isFr ? "Chargement..." : "Loading...",
+    downloadNote: isFr ? "Les téléchargements peuvent prendre plusieurs minutes." : "Downloads may take several minutes.",
+    downloadOriginal: isFr ? "Télécharger l'original" : "Download original",
+    photosShown: (n: number) => isFr ? `${n} photos affichées` : `${n} photos shown`,
+    photoOf: isFr ? "Photo de" : "Photo of",
+    close: isFr ? "Fermer" : "Close",
+    previous: isFr ? "Précédent" : "Previous",
+    next: isFr ? "Suivant" : "Next",
   };
 
-  const alternateLangHref = lang === "fr" ? `/en/gallery/${gallery.public_id}` : `/fr/galerie/${gallery.public_id}`;
-
-  const intro = lang === "fr" ? gallery.intro_fr : gallery.intro_en;
-  const signature = lang === "fr" ? gallery.signature_fr : gallery.signature_en;
+  const alternateLangHref = isFr ? `/en/gallery/${gallery.public_id}` : `/fr/galerie/${gallery.public_id}`;
+  const intro = isFr ? gallery.intro_fr : gallery.intro_en;
+  const signature = isFr ? gallery.signature_fr : gallery.signature_en;
 
   const initialPhotos = media.filter(m => m.type === "photo");
   const videos = media.filter(m => m.type === "video");
@@ -53,6 +57,7 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
   const [photos, setPhotos] = useState<GalleryMedia[]>(initialPhotos);
   const [hasMore, setHasMore] = useState(initialPhotos.length === 24);
   const [loading, setLoading] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const fetchMorePhotos = useCallback(async () => {
     if (loading || !hasMore) return;
@@ -61,8 +66,13 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
       const res = await fetch(`/api/gallery/${gallery.public_id}/photos?skip=${photos.length}`);
       if (res.ok) {
         const data = await res.json();
-        setPhotos(prev => [...prev, ...data.photos]);
-        setHasMore(data.hasMore);
+        const newPhotos = data.photos as GalleryMedia[];
+        setPhotos(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const deduped = newPhotos.filter(p => !existingIds.has(p.id));
+          return [...prev, ...deduped];
+        });
+        setHasMore(data.hasMore as boolean);
       }
     } catch (e) {
       console.error("Failed to load more photos", e);
@@ -71,9 +81,28 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
     }
   }, [loading, hasMore, gallery.public_id, photos.length]);
 
+  // Lightbox keyboard navigation
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft" && lightboxIndex > 0) setLightboxIndex(lightboxIndex - 1);
+      if (e.key === "ArrowRight" && lightboxIndex < photos.length - 1) setLightboxIndex(lightboxIndex + 1);
+    };
+    document.addEventListener("keydown", handler);
+    // Prevent body scroll when lightbox is open
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handler);
+      document.body.style.overflow = "";
+    };
+  }, [lightboxIndex, photos.length]);
+
+  const mediaUrl = (id: string) => `/api/gallery/${gallery.public_id}/media/${id}`;
+
   const coverUrl = gallery.cover_image_id
-    ? `/api/gallery/${gallery.public_id}/media/${gallery.cover_image_id}`
-    : `/media/home/hero/hero-2/desktop/webp`;
+    ? mediaUrl(gallery.cover_image_id)
+    : "/media/home/hero/hero-2/desktop/webp";
 
   return (
     <div className={styles.container}>
@@ -81,11 +110,15 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
 
       <section className={styles.hero}>
         <div className={styles.heroBg}>
-          <img src={coverUrl} alt="Cover" className={styles.heroImage} />
+          <picture>
+            <source srcSet={gallery.cover_image_id ? `${mediaUrl(gallery.cover_image_id)}?width=1920&format=avif` : coverUrl} type="image/avif" />
+            <source srcSet={gallery.cover_image_id ? `${mediaUrl(gallery.cover_image_id)}?width=1920&format=webp` : coverUrl} type="image/webp" />
+            <img src={coverUrl} alt="Cover" className={styles.heroImage} />
+          </picture>
           <div className={styles.heroOverlay} />
         </div>
         <div className={styles.heroContent}>
-          <p className={styles.heroSubtitle}>{gallery.location || "Mariage"}</p>
+          <p className={styles.heroSubtitle}>{gallery.location || (isFr ? "Mariage" : "Wedding")}</p>
           <h1 className={styles.heroTitle}>{gallery.bride_names}</h1>
           <p className={styles.heroText}>{gallery.wedding_date}</p>
         </div>
@@ -116,7 +149,7 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
                 </>
               )}
             </div>
-            <p className={styles.downloadsNote}>Les téléchargements peuvent prendre plusieurs minutes.</p>
+            <p className={styles.downloadsNote}>{t.downloadNote}</p>
           </div>
         </div>
       </section>
@@ -129,14 +162,14 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
               {videos.map(v => (
                 <div key={v.id} className={styles.videoCard}>
                   <video controls playsInline preload="metadata" className={styles.videoElement}>
-                    <source src={`/api/gallery/${gallery.public_id}/media/${v.id}`} type={v.mime_type || "video/mp4"} />
+                    <source src={mediaUrl(v.id)} type={v.mime_type} />
                   </video>
                   <a
                     href={`/api/gallery/${gallery.public_id}/download/original/${v.id}`}
                     download
                     className={styles.videoDownloadLink}
                   >
-                    Télécharger l'original
+                    {t.downloadOriginal}
                   </a>
                 </div>
               ))}
@@ -150,25 +183,43 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
           <div className={styles.photoWrapper}>
             <h2 className={styles.sectionTitle}>{t.photosTitle}</h2>
             <div className={styles.photoGrid}>
-              {photos.map(p => {
+              {photos.map((p, idx) => {
                 const isLandscape = p.width && p.height && p.width > p.height;
                 return (
                   <div key={p.id} className={`${styles.photoItem} ${isLandscape ? styles.photoItemLandscape : styles.photoItemPortrait}`}>
-                    <picture>
-                      <source srcSet={`/api/gallery/${gallery.public_id}/media/${p.id}?width=1920 1920w, /api/gallery/${gallery.public_id}/media/${p.id}?width=1440 1440w, /api/gallery/${gallery.public_id}/media/${p.id}?width=960 960w, /api/gallery/${gallery.public_id}/media/${p.id}?width=480 480w`} sizes="(max-width: 480px) 480px, (max-width: 960px) 960px, (max-width: 1440px) 1440px, 1920px" type="image/webp" />
-                      <img
-                        src={`/api/gallery/${gallery.public_id}/media/${p.id}?width=960`}
-                        loading="lazy"
-                        alt={`Photo de ${gallery.bride_names}`}
-                        className={styles.photoImg}
-                        width={p.width || undefined}
-                        height={p.height || undefined}
-                      />
-                    </picture>
+                    <button
+                      type="button"
+                      className={styles.photoButton}
+                      onClick={() => setLightboxIndex(idx)}
+                      aria-label={`${t.photoOf} ${gallery.bride_names}`}
+                    >
+                      <picture>
+                        <source
+                          srcSet={`${mediaUrl(p.id)}?width=480&format=avif 480w, ${mediaUrl(p.id)}?width=960&format=avif 960w, ${mediaUrl(p.id)}?width=1440&format=avif 1440w, ${mediaUrl(p.id)}?width=1920&format=avif 1920w`}
+                          sizes="(max-width: 480px) 480px, (max-width: 960px) 960px, (max-width: 1440px) 1440px, 1920px"
+                          type="image/avif"
+                        />
+                        <source
+                          srcSet={`${mediaUrl(p.id)}?width=480&format=webp 480w, ${mediaUrl(p.id)}?width=960&format=webp 960w, ${mediaUrl(p.id)}?width=1440&format=webp 1440w, ${mediaUrl(p.id)}?width=1920&format=webp 1920w`}
+                          sizes="(max-width: 480px) 480px, (max-width: 960px) 960px, (max-width: 1440px) 1440px, 1920px"
+                          type="image/webp"
+                        />
+                        <img
+                          src={`${mediaUrl(p.id)}?width=960`}
+                          srcSet={`${mediaUrl(p.id)}?width=480 480w, ${mediaUrl(p.id)}?width=960 960w, ${mediaUrl(p.id)}?width=1440 1440w, ${mediaUrl(p.id)}?width=1920 1920w`}
+                          sizes="(max-width: 480px) 480px, (max-width: 960px) 960px, (max-width: 1440px) 1440px, 1920px"
+                          loading="lazy"
+                          alt={`${t.photoOf} ${gallery.bride_names}`}
+                          className={styles.photoImg}
+                          width={p.width || undefined}
+                          height={p.height || undefined}
+                        />
+                      </picture>
+                    </button>
                     <a
                       href={`/api/gallery/${gallery.public_id}/download/original/${p.id}`}
                       className={styles.downloadIcon}
-                      title="Télécharger"
+                      title={t.downloadOriginal}
                       download
                     >
                       ↓
@@ -186,9 +237,67 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
               </div>
             )}
 
-            <p className={styles.photoCount}>{photos.length} photos affichées</p>
+            <p className={styles.photoCount}>{t.photosShown(photos.length)}</p>
           </div>
         </section>
+      )}
+
+      {/* Lightbox */}
+      {lightboxIndex !== null && photos[lightboxIndex] && (
+        <div
+          className={styles.lightboxOverlay}
+          onClick={() => setLightboxIndex(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${t.photoOf} ${gallery.bride_names}`}
+        >
+          <div className={styles.lightboxContent} onClick={e => e.stopPropagation()}>
+            <button
+              className={styles.lightboxClose}
+              onClick={() => setLightboxIndex(null)}
+              aria-label={t.close}
+              type="button"
+            >
+              ✕
+            </button>
+
+            {lightboxIndex > 0 && (
+              <button
+                className={styles.lightboxPrev}
+                onClick={() => setLightboxIndex(lightboxIndex - 1)}
+                aria-label={t.previous}
+                type="button"
+              >
+                ‹
+              </button>
+            )}
+
+            <img
+              src={`${mediaUrl(photos[lightboxIndex].id)}?width=1920`}
+              alt={`${t.photoOf} ${gallery.bride_names}`}
+              className={styles.lightboxImage}
+            />
+
+            {lightboxIndex < photos.length - 1 && (
+              <button
+                className={styles.lightboxNext}
+                onClick={() => setLightboxIndex(lightboxIndex + 1)}
+                aria-label={t.next}
+                type="button"
+              >
+                ›
+              </button>
+            )}
+
+            <a
+              href={`/api/gallery/${gallery.public_id}/download/original/${photos[lightboxIndex].id}`}
+              download
+              className={styles.lightboxDownload}
+            >
+              {t.downloadOriginal}
+            </a>
+          </div>
+        </div>
       )}
 
       <Footer lang={lang} />

@@ -9,18 +9,17 @@ import { Readable } from "node:stream";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { publicId } = params;
-  if (!publicId) return new Response("Bad Request", { status: 400 });
+  if (!publicId) return new Response("Bad Request", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
 
   const url = new URL(request.url);
   const typeParam = url.searchParams.get("type");
   if (typeParam !== "photos" && typeParam !== "videos" && typeParam !== "all") {
-    return new Response("Bad Request", { status: 400 });
+    return new Response("Bad Request", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
   }
 
   const { gallery, accessLevel } = await requireGalleryAccess(request, publicId, undefined, true);
   const db = getGalleryDb();
 
-  // Get media
   let query = "SELECT * FROM gallery_media WHERE gallery_id = ?";
   const queryParams: string[] = [gallery.id as string];
 
@@ -34,10 +33,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     query += " AND type = 'video'";
   }
 
-  const media = db.prepare(query).all(...queryParams) as { id: string, original_name: string }[];
+  const media = db.prepare(query).all(...queryParams) as { id: string; original_name: string }[];
 
   if (media.length === 0) {
-    return new Response("No media to download", { status: 404 });
+    return new Response("No media to download", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
   }
 
   const zipfile = new yazl.ZipFile();
@@ -48,10 +47,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   for (const m of media) {
     const filePath = path.join(ENV.GALLERY_MEDIA_PATH, gallery.id as string, m.id);
     if (fs.existsSync(filePath)) {
-      // Zip Slip protection: only keep the base name
       let safeName = path.basename(m.original_name || "media");
 
-      // Handle duplicates
       if (usedNames.has(safeName)) {
         const ext = path.extname(safeName);
         const name = path.basename(safeName, ext);
@@ -68,16 +65,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   zipfile.end();
 
   if (usedNames.size === 0) {
-    return new Response("No valid files to download", { status: 404 });
+    return new Response("No valid files to download", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
   }
 
+  // Wrap in Node.js Readable for proper .destroy() and .toWeb() support
+  const nodeReadable = Readable.from(zipfile.outputStream as Readable);
+
   request.signal.addEventListener("abort", () => {
-    zipfile.outputStream.destroy();
+    nodeReadable.destroy();
   });
 
-  const webStream = Readable.toWeb(Readable.from(zipfile.outputStream)) as unknown as BodyInit;
+  const webStream = Readable.toWeb(nodeReadable);
 
-  return new Response(webStream, {
+  return new Response(webStream as ReadableStream, {
     status: 200,
     headers: {
       "Content-Type": "application/zip",

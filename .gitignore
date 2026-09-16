@@ -15,6 +15,7 @@ build/
 .env.production
 .env.*.local
 !.env.example
+.env.test
 
 # TLS test certs
 apps/web/e2e/certs/

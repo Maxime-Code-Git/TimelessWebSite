@@ -1,8 +1,9 @@
 import { redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/en.gallery";
-import { getGallerySession } from "~/lib/gallery-auth.server";
+import { getGallerySession, GALLERY_PRIVATE_HEADERS } from "~/lib/gallery-auth.server";
 import type { GalleryAccessLevel } from "~/lib/gallery-auth.server";
 import { getGalleryByPublicId, getGalleryMedia } from "~/lib/gallery.server";
+import { getGalleryDb } from "~/lib/gallery-db.server";
 import { getSeoMeta } from "~/lib/seo";
 import { GalleryView } from "./GalleryView";
 import type { GalleryMedia } from "./GalleryView";
@@ -14,7 +15,7 @@ interface LoaderData {
   };
 }
 
-export function meta({ data, matches }: { data?: LoaderData, matches: Record<string, unknown>[] }) {
+export function meta({ data, matches }: { data?: LoaderData; matches: Record<string, unknown>[] }) {
   const rootData = matches.find((m: Record<string, unknown>) => m?.id === "root")?.loaderData as { PUBLIC_SITE_URL?: string } | undefined;
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
@@ -30,7 +31,7 @@ export function meta({ data, matches }: { data?: LoaderData, matches: Record<str
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const session = await getGallerySession(request);
-  const galleryId = session.get("galleryId");
+  const galleryId = session.get("galleryId") as string | undefined;
   const accessLevel = session.get("accessLevel") as GalleryAccessLevel | undefined;
   const codeVersion = session.get("codeVersion") as number | undefined;
 
@@ -44,17 +45,17 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw redirect("/en/client-area?status=unavailable");
   }
 
-  // Validate session against code version to ensure codes weren't rotated
-  const currentVersion = accessLevel === "maries" ? gallery.couple_code_version : gallery.guest_code_version;
-  if (codeVersion !== currentVersion) {
+  // Validate session against code version from gallery_codes (source of truth)
+  const db = getGalleryDb();
+  const codeRow = db.prepare("SELECT version FROM gallery_codes WHERE gallery_id = ? AND level = ?").get(galleryId, accessLevel) as { version: number } | undefined;
+  if (!codeRow || codeRow.version !== codeVersion) {
     throw redirect("/en/client-area?status=expired");
   }
 
   const media = getGalleryMedia(gallery.id, accessLevel);
 
-  return {
+  return Response.json({
     gallery: {
-      id: gallery.id,
       public_id: gallery.public_id,
       bride_names: gallery.bride_names,
       wedding_date: gallery.wedding_date,
@@ -66,11 +67,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       cover_image_id: gallery.cover_image_id
     },
     accessLevel,
-    media: media as unknown as GalleryMedia[]
-  };
+    media: media as GalleryMedia[]
+  }, {
+    headers: GALLERY_PRIVATE_HEADERS
+  });
 }
 
 export default function GalleryEn() {
   const data = useLoaderData<typeof loader>();
-  return <GalleryView lang="en" {...data} />;
+  const typed = data as unknown as { gallery: Parameters<typeof GalleryView>[0]["gallery"]; media: Parameters<typeof GalleryView>[0]["media"] };
+  return <GalleryView lang="en" gallery={typed.gallery} media={typed.media} />;
 }

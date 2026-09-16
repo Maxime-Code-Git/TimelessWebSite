@@ -26,6 +26,32 @@ export interface Gallery {
   import_path: string | null;
 }
 
+export interface GalleryMediaRow {
+  id: string;
+  gallery_id: string;
+  type: "photo" | "video";
+  visibility: "invites" | "maries";
+  sort_order: number;
+  original_name: string;
+  mime_type: string;
+  size: number;
+  hash: string;
+  width: number | null;
+  height: number | null;
+  created_at: number;
+}
+
+export interface GalleryImportRow {
+  id: string;
+  gallery_id: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  progress: number;
+  total: number;
+  result_json: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
 export function getGalleries(): Gallery[] {
   const db = getGalleryDb();
   return db.prepare("SELECT * FROM galleries ORDER BY created_at DESC").all() as unknown as Gallery[];
@@ -33,12 +59,12 @@ export function getGalleries(): Gallery[] {
 
 export function getGalleryById(id: string): Gallery | undefined {
   const db = getGalleryDb();
-  return db.prepare("SELECT * FROM galleries WHERE id = ?").get(id) as unknown as Gallery | undefined;
+  return db.prepare("SELECT * FROM galleries WHERE id = ?").get(id) as Gallery | undefined;
 }
 
 export function getGalleryByPublicId(publicId: string): Gallery | undefined {
   const db = getGalleryDb();
-  return db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as unknown as Gallery | undefined;
+  return db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as Gallery | undefined;
 }
 
 export function getGalleryMedia(galleryId: string, accessLevel: "invites" | "maries") {
@@ -47,10 +73,10 @@ export function getGalleryMedia(galleryId: string, accessLevel: "invites" | "mar
   const visCondition = accessLevel === "maries" ? "" : " AND visibility = 'invites'";
 
   const videoQuery = "SELECT id, type, width, height, mime_type FROM gallery_media WHERE gallery_id = ? AND type = 'video'" + visCondition + " ORDER BY created_at ASC";
-  const videos = db.prepare(videoQuery).all(galleryId) as Record<string, unknown>[];
+  const videos = db.prepare(videoQuery).all(galleryId) as unknown as GalleryMediaRow[];
 
   const photoQuery = "SELECT id, type, width, height, mime_type FROM gallery_media WHERE gallery_id = ? AND type = 'photo'" + visCondition + " ORDER BY created_at ASC LIMIT 24";
-  const photos = db.prepare(photoQuery).all(galleryId) as Record<string, unknown>[];
+  const photos = db.prepare(photoQuery).all(galleryId) as unknown as GalleryMediaRow[];
 
   return [...videos, ...photos];
 }
@@ -67,32 +93,36 @@ export function createGallery(data: {
 }): Gallery {
   const db = getGalleryDb();
   const id = crypto.randomUUID();
-  // We use a non-predictable UUID for public_id to avoid enumeration
   const public_id = crypto.randomUUID();
 
   let guestCode = generateGalleryCode();
   let coupleCode = generateGalleryCode();
-
-  // Ensure they are different
   while (guestCode === coupleCode) coupleCode = generateGalleryCode();
 
-  // Check collision in db (very unlikely but required)
+  // Check collision in gallery_codes (the source of truth)
   let collision = true;
-  while (collision) {
-    const check = db.prepare("SELECT id FROM galleries WHERE guest_code_hash = ? OR couple_code_hash = ? OR guest_code_hash = ? OR couple_code_hash = ?")
-      .get(hashGalleryCode(guestCode), hashGalleryCode(guestCode), hashGalleryCode(coupleCode), hashGalleryCode(coupleCode));
-    if (!check) {
+  let attempts = 0;
+  while (collision && attempts < 10) {
+    const guestHash = hashGalleryCode(guestCode);
+    const coupleHash = hashGalleryCode(coupleCode);
+    const existingCode = db.prepare(
+      "SELECT code_hash FROM gallery_codes WHERE code_hash = ? OR code_hash = ?"
+    ).get(guestHash, coupleHash);
+    if (!existingCode) {
       collision = false;
     } else {
       guestCode = generateGalleryCode();
       coupleCode = generateGalleryCode();
       while (guestCode === coupleCode) coupleCode = generateGalleryCode();
     }
+    attempts++;
+  }
+  if (collision) {
+    throw new Error("Failed to generate unique gallery codes after 10 attempts");
   }
 
   const now = new Date();
   const expires_at = data.expires_at || addCalendarMonths(now, 24).getTime();
-
   const nowMs = now.getTime();
 
   db.exec("BEGIN EXCLUSIVE TRANSACTION;");
@@ -115,8 +145,8 @@ export function createGallery(data: {
       encryptGalleryCode(guestCode), encryptGalleryCode(coupleCode)
     );
 
-    db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(guestHash, id, 'invites', 1, nowMs);
-    db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(coupleHash, id, 'maries', 1, nowMs);
+    db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(guestHash, id, "invites", 1, nowMs);
+    db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(coupleHash, id, "maries", 1, nowMs);
 
     db.exec("COMMIT;");
   } catch (err) {
@@ -135,12 +165,12 @@ export function updateGallery(id: string, data: Partial<Gallery>) {
   const fields: string[] = [];
   const values: Array<string | number | null> = [];
 
-  const whitelist = ['bride_names', 'wedding_date', 'location', 'intro_fr', 'intro_en', 'signature_fr', 'signature_en', 'expires_at', 'status', 'cover_image_id'];
+  const whitelist = ["bride_names", "wedding_date", "location", "intro_fr", "intro_en", "signature_fr", "signature_en", "expires_at", "status", "cover_image_id"];
 
   for (const key of whitelist) {
     if (key in data) {
       fields.push(`${key} = ?`);
-      values.push((data as Record<string, unknown>)[key] as string | number | null);
+      values.push((data as Record<string, string | number | null>)[key]);
     }
   }
 
@@ -152,61 +182,57 @@ export function updateGallery(id: string, data: Partial<Gallery>) {
   return getGalleryById(id)!;
 }
 
-export function rotateGalleryCodes(id: string, guestCodeStr?: string, coupleCodeStr?: string) {
+export class CodeCollisionError extends Error {
+  readonly status = 409;
+  constructor(message = "Code collision") {
+    super(message);
+    this.name = "CodeCollisionError";
+  }
+}
+
+/**
+ * Rotate a single level's code. Pass exactly one of guestCodeStr or coupleCodeStr.
+ * For rotating both independently, call twice.
+ */
+export function rotateGalleryCode(id: string, level: "invites" | "maries", newCodeStr: string): void {
   const db = getGalleryDb();
   const gallery = getGalleryById(id);
   if (!gallery) throw new Error("Gallery not found");
 
-  const updates: string[] = [];
-  const values: Array<string | number | null> = [];
+  const newHash = hashGalleryCode(newCodeStr);
+  const isGuest = level === "invites";
 
-  const nowMs = Date.now();
+  const currentVersion = isGuest ? gallery.guest_code_version : gallery.couple_code_version;
+  const newVersion = currentVersion + 1;
 
   db.exec("BEGIN EXCLUSIVE TRANSACTION;");
   try {
-    if (guestCodeStr) {
-      const newVersion = (gallery.guest_code_version as number) + 1;
-      const gHash = hashGalleryCode(guestCodeStr);
-      updates.push("guest_code_hash = ?", "guest_code_encrypted = ?", "guest_code_version = ?");
-      values.push(gHash, encryptGalleryCode(guestCodeStr), newVersion);
+    // Check for collision in gallery_codes
+    const collision = db.prepare(
+      "SELECT gallery_id, level FROM gallery_codes WHERE code_hash = ?"
+    ).get(newHash) as { gallery_id: string; level: string } | undefined;
 
-      // Delete old code for this level
-      db.prepare("DELETE FROM gallery_codes WHERE gallery_id = ? AND level = 'invites'").run(id);
-      try {
-        db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(gHash, id, 'invites', newVersion, nowMs);
-      } catch (err: any) {
-        if (err.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' || err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-          const e = new Error("Code collision");
-          (e as any).status = 409;
-          throw e;
-        }
-        throw err;
-      }
+    if (collision) {
+      throw new CodeCollisionError();
     }
 
-    if (coupleCodeStr) {
-      const newVersion = (gallery.couple_code_version as number) + 1;
-      const cHash = hashGalleryCode(coupleCodeStr);
-      updates.push("couple_code_hash = ?", "couple_code_encrypted = ?", "couple_code_version = ?");
-      values.push(cHash, encryptGalleryCode(coupleCodeStr), newVersion);
+    // Delete old code for this level
+    db.prepare("DELETE FROM gallery_codes WHERE gallery_id = ? AND level = ?").run(id, level);
 
-      // Delete old code for this level
-      db.prepare("DELETE FROM gallery_codes WHERE gallery_id = ? AND level = 'maries'").run(id);
-      try {
-        db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(cHash, id, 'maries', newVersion, nowMs);
-      } catch (err: any) {
-        if (err.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' || err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-          const e = new Error("Code collision");
-          (e as any).status = 409;
-          throw e;
-        }
-        throw err;
-      }
-    }
+    // Insert new code
+    db.prepare(
+      "INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)"
+    ).run(newHash, id, level, newVersion, Date.now());
 
-    if (updates.length > 0) {
-      values.push(id);
-      db.prepare(`UPDATE galleries SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+    // Update galleries table
+    if (isGuest) {
+      db.prepare(
+        "UPDATE galleries SET guest_code_hash = ?, guest_code_encrypted = ?, guest_code_version = ? WHERE id = ?"
+      ).run(newHash, encryptGalleryCode(newCodeStr), newVersion, id);
+    } else {
+      db.prepare(
+        "UPDATE galleries SET couple_code_hash = ?, couple_code_encrypted = ?, couple_code_version = ? WHERE id = ?"
+      ).run(newHash, encryptGalleryCode(newCodeStr), newVersion, id);
     }
 
     db.exec("COMMIT;");
@@ -214,6 +240,14 @@ export function rotateGalleryCodes(id: string, guestCodeStr?: string, coupleCode
     db.exec("ROLLBACK;");
     throw err;
   }
+}
+
+/**
+ * @deprecated Use rotateGalleryCode for independent rotation
+ */
+export function rotateGalleryCodes(id: string, guestCodeStr?: string, coupleCodeStr?: string): void {
+  if (guestCodeStr) rotateGalleryCode(id, "invites", guestCodeStr);
+  if (coupleCodeStr) rotateGalleryCode(id, "maries", coupleCodeStr);
 }
 
 export function getGalleryMediaStats(id: string) {
@@ -226,7 +260,7 @@ export function getGalleryMediaStats(id: string) {
   return { invitesPhotos, invitesVideos, mariesPhotos, mariesVideos };
 }
 
-export function getGalleryImports(galleryId: string) {
+export function getGalleryImports(galleryId: string): GalleryImportRow[] {
   const db = getGalleryDb();
-  return db.prepare("SELECT * FROM gallery_imports WHERE gallery_id = ? ORDER BY created_at DESC").all(galleryId);
+  return db.prepare("SELECT * FROM gallery_imports WHERE gallery_id = ? ORDER BY created_at DESC").all(galleryId) as unknown as GalleryImportRow[];
 }

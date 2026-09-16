@@ -165,6 +165,88 @@ export function openGalleryDb(dbPath: string): DatabaseSync {
       currentVersion = 3;
     }
 
+    if (currentVersion < 4) {
+      // V4: Rebuild gallery_codes from galleries to fix any drift
+      // First verify the gallery_codes table has proper constraints
+      const tableInfo = db.prepare("PRAGMA table_info(gallery_codes)").all() as { name: string }[];
+      const hasTable = tableInfo.length > 0;
+
+      if (!hasTable) {
+        db.exec(`
+          CREATE TABLE gallery_codes (
+            code_hash TEXT PRIMARY KEY,
+            gallery_id TEXT NOT NULL,
+            level TEXT NOT NULL CHECK (level IN ('invites', 'maries')),
+            version INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            UNIQUE(gallery_id, level),
+            FOREIGN KEY(gallery_id) REFERENCES galleries(id) ON DELETE CASCADE
+          );
+        `);
+      }
+
+      // Rebuild: for each gallery, ensure exactly one invites and one maries code
+      const allGalleries = db.prepare(
+        "SELECT id, guest_code_hash, guest_code_version, couple_code_hash, couple_code_version FROM galleries"
+      ).all() as {
+        id: string;
+        guest_code_hash: string;
+        guest_code_version: number;
+        couple_code_hash: string;
+        couple_code_version: number;
+      }[];
+
+      const nowMs = Date.now();
+
+      // Check for hash collisions across ALL galleries before modifying anything
+      const allHashes = new Map<string, { galleryId: string; level: string }>();
+      for (const g of allGalleries) {
+        const guestKey = `${g.guest_code_hash}`;
+        const coupleKey = `${g.couple_code_hash}`;
+
+        if (g.guest_code_hash === g.couple_code_hash) {
+          throw new Error(`Migration V4 failed: gallery ${g.id} has identical guest and couple code hashes`);
+        }
+
+        const existingGuest = allHashes.get(guestKey);
+        if (existingGuest && existingGuest.galleryId !== g.id) {
+          throw new Error(`Migration V4 failed: hash collision for guest code of gallery ${g.id} with ${existingGuest.galleryId}/${existingGuest.level}`);
+        }
+        allHashes.set(guestKey, { galleryId: g.id, level: "invites" });
+
+        const existingCouple = allHashes.get(coupleKey);
+        if (existingCouple && existingCouple.galleryId !== g.id) {
+          throw new Error(`Migration V4 failed: hash collision for couple code of gallery ${g.id} with ${existingCouple.galleryId}/${existingCouple.level}`);
+        }
+        allHashes.set(coupleKey, { galleryId: g.id, level: "maries" });
+      }
+
+      // Clear and rebuild gallery_codes atomically
+      db.prepare("DELETE FROM gallery_codes").run();
+
+      const insertStmt = db.prepare(
+        "INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)"
+      );
+      for (const g of allGalleries) {
+        insertStmt.run(g.guest_code_hash, g.id, "invites", g.guest_code_version, nowMs);
+        insertStmt.run(g.couple_code_hash, g.id, "maries", g.couple_code_version, nowMs);
+      }
+
+      // Verify each gallery has exactly 2 codes (one per level)
+      for (const g of allGalleries) {
+        const codes = db.prepare(
+          "SELECT level FROM gallery_codes WHERE gallery_id = ?"
+        ).all(g.id) as { level: string }[];
+        const levels = new Set(codes.map(c => c.level));
+        if (!levels.has("invites") || !levels.has("maries") || codes.length !== 2) {
+          throw new Error(`Migration V4 failed: gallery ${g.id} does not have exactly one invites and one maries code after rebuild`);
+        }
+      }
+
+      db.prepare("INSERT INTO gallery_migrations (version, applied_at) VALUES (4, ?)").run(Date.now());
+      currentVersion = 4;
+    }
+
     db.exec("COMMIT;");
   } catch (err) {
     db.exec("ROLLBACK;");

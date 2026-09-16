@@ -73,7 +73,7 @@ interface LoaderData {
 }
 
 export default function AdminGalleryNew() {
-  const { folders, csrfToken } = useLoaderData() as unknown as LoaderData;
+  const { folders, csrfToken } = useLoaderData<LoaderData>();
   const actionData = useActionData<{ error?: string }>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
