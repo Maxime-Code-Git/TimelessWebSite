@@ -413,13 +413,39 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // 32. Archivage par l'admin
     await adminPage.selectOption('select[name="status"]', "archived");
-    await adminPage.click('button:has-text("Enregistrer les informations")');
-    await expect(
-      adminPage.getByRole("status")
-    ).toHaveText("Enregistré.");
+
+    const archiveResponsePromise = adminPage.waitForResponse(
+      response =>
+        response.request().method() === "POST" &&
+        response.url().includes(`/admin/galleries/${galleryId}`)
+    );
+
+    await adminPage.getByRole("button", {
+      name: "Enregistrer les informations",
+      exact: true,
+    }).click();
+
+    const archiveResponse = await archiveResponsePromise;
+    expect(archiveResponse.status()).toBe(200);
+
+    // Vérifier directement que l'archivage a réellement été persisté
+    const archiveCheckDb = new DatabaseSync(galleryDbPath);
+    const archiveRow = archiveCheckDb
+      .prepare("SELECT status FROM galleries WHERE id = ?")
+      .get(galleryId) as { status: string } | undefined;
+    archiveCheckDb.close();
+
+    expect(archiveRow?.status).toBe("archived");
 
     // 33. Refus d'accès après archivage
-    const archivedRes = await newGuestContext.request.get(`/fr/galerie/${galleryPublicId}`);
-    expect(archivedRes.url()).toContain("espace-clients");
+    const archivedRes = await newGuestContext.request.get(
+      `/fr/galerie/${galleryPublicId}`,
+      { maxRedirects: 0 }
+    );
+
+    expect(archivedRes.status()).toBe(302);
+    expect(archivedRes.headers()["location"]).toContain(
+      "/fr/espace-clients"
+    );
   });
 });
