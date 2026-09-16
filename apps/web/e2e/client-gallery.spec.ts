@@ -188,13 +188,22 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await adminPage.reload();
 
     // 6. Sélection d'une couverture avec locator accessible
-    const coverRadio = adminPage
-      .locator(
-        'input[type="radio"][name="cover_image_id"]:not([value=""])'
-      )
+    const coverOption = adminPage
+      .locator("label")
+      .filter({
+        has: adminPage.locator(
+          'input[type="radio"][name="cover_image_id"]:not([value=""])'
+        ),
+      })
       .first();
 
-    await coverRadio.check({ force: true });
+    await expect(coverOption).toBeVisible();
+    await coverOption.click();
+
+    const coverRadio = coverOption.locator(
+      'input[type="radio"][name="cover_image_id"]'
+    );
+
     await expect(coverRadio).toBeChecked();
 
     // 7. Publication
