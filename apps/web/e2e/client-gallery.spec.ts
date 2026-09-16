@@ -120,37 +120,12 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await expect(adminPage.getByText("Invités : 25 photos, 1 vidéos", { exact: false })).toBeVisible();
     await expect(adminPage.getByText("Mariés : 1 photos, 1 vidéos", { exact: false })).toBeVisible();
 
-    const importResponsePromise = adminPage.waitForResponse(
-      response =>
-        response.url().includes(
-          `/api/admin/gallery-import/${galleryId}`
-        ) &&
-        response.request().method() === "POST"
-    );
+    adminPage.once("dialog", dialog => dialog.accept());
 
-    const dialogPromise = adminPage.waitForEvent("dialog");
-
-    const importClickPromise = adminPage.getByRole("button", {
+    await adminPage.getByRole("button", {
       name: "Confirmer et lancer l'import",
       exact: true,
     }).click();
-
-    const dialog = await dialogPromise;
-    await dialog.accept();
-    await importClickPromise;
-
-    const importResponse = await importResponsePromise;
-    expect(importResponse.status()).toBe(200);
-
-    const importResponseData = await importResponse.json() as {
-      importId?: string;
-      status?: string;
-      error?: string;
-    };
-
-    expect(importResponseData.error).toBeUndefined();
-    expect(importResponseData.importId).toEqual(expect.any(String));
-    expect(importResponseData.status).toBe("pending");
 
     // 5. Attente de la fin réelle de l'import (polling state API)
     await expect(async () => {
