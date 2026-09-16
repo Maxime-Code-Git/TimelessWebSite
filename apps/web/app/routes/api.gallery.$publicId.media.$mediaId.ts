@@ -5,8 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { Readable } from "node:stream";
-
-const VALID_WIDTHS = new Set([480, 960, 1440, 1920]);
+import { parseRangeHeader, parseWidth, parseFormat } from "~/lib/media-utils";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { publicId, mediaId } = params;
@@ -32,30 +31,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (media.type === "video") {
     const range = request.headers.get("range");
     if (range && range.startsWith("bytes=")) {
+      
       let start: number;
       let end: number;
-
-      if (range.startsWith("bytes=-")) {
-        const suffix = parseInt(range.substring(7), 10);
-        if (isNaN(suffix) || suffix <= 0) {
+      try {
+        const parsed = parseRangeHeader(range, size);
+        if (!parsed) {
           return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}`, ...GALLERY_PRIVATE_HEADERS } });
         }
-        start = Math.max(0, size - suffix);
-        end = size - 1;
-      } else {
-        const match = range.match(/^bytes=(\d+)-(\d*)$/);
-        if (!match) {
-          return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}`, ...GALLERY_PRIVATE_HEADERS } });
-        }
-        start = parseInt(match[1], 10);
-        end = match[2] ? parseInt(match[2], 10) : size - 1;
-      }
-
-      if (isNaN(start) || start < 0 || start >= size || isNaN(end) || end >= size || end < start) {
+        start = parsed.start;
+        end = parsed.end;
+      } catch {
         return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}`, ...GALLERY_PRIVATE_HEADERS } });
       }
-
-      const chunksize = (end - start) + 1;
+const chunksize = (end - start) + 1;
       const fileStream = fs.createReadStream(filePath, { start, end });
       const webStream = Readable.toWeb(fileStream) as ReadableStream;
 
@@ -85,24 +74,28 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   // Photo: resize on the fly with width parameter support
+  
   const url = new URL(request.url);
   const widthParam = url.searchParams.get("width");
+    const formatParam = url.searchParams.get("format");
   let targetWidth = 1920;
-  if (widthParam) {
-    const parsed = parseInt(widthParam, 10);
-    if (VALID_WIDTHS.has(parsed)) {
-      targetWidth = parsed;
-    }
+  let targetFormat: "jpeg" | "webp" | "avif" | null;
+  
+  
+  try {
+    const parsedW = parseWidth(widthParam);
+    if (parsedW) targetWidth = parsedW;
+    targetFormat = parseFormat(formatParam);
+  } catch {
+    return new Response("Bad Request", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
   }
 
-  // Content negotiation for format
   const accept = request.headers.get("Accept") || "";
-  const formatParam = url.searchParams.get("format");
   let format: "jpeg" | "webp" | "avif" = "jpeg";
 
-  if (formatParam === "avif" || (!formatParam && accept.includes("image/avif"))) {
+  if (targetFormat === "avif" || (!targetFormat && accept.includes("image/avif"))) {
     format = "avif";
-  } else if (formatParam === "webp" || (!formatParam && accept.includes("image/webp"))) {
+  } else if (targetFormat === "webp" || (!targetFormat && accept.includes("image/webp"))) {
     format = "webp";
   }
 

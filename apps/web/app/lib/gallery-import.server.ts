@@ -234,22 +234,24 @@ export function startGalleryImport(galleryId: string, folderName: string): strin
  * Atomic job acquisition: attempts to claim exactly one pending job.
  * Returns the job if acquired, null otherwise.
  */
+const WORKER_ID = crypto.randomUUID();
+const LEASE_DURATION_MS = 30000;
+
 function acquireNextJob(): { id: string; gallery_id: string; import_path: string } | null {
   const db = getGalleryDb();
+  const now = Date.now();
 
-  // Find the oldest pending job
   const pending = db.prepare(
-    "SELECT gi.id, gi.gallery_id, g.import_path FROM gallery_imports gi JOIN galleries g ON gi.gallery_id = g.id WHERE gi.status = 'pending' ORDER BY gi.created_at ASC LIMIT 1"
-  ).get() as { id: string; gallery_id: string; import_path: string } | undefined;
+    "SELECT gi.id, gi.gallery_id, g.import_path FROM gallery_imports gi JOIN galleries g ON gi.gallery_id = g.id WHERE gi.status = 'pending' OR (gi.status = 'processing' AND gi.lease_expires_at < ?) ORDER BY gi.created_at ASC LIMIT 1"
+  ).get(now) as { id: string; gallery_id: string; import_path: string } | undefined;
 
   if (!pending) return null;
 
-  // Atomically transition from pending to processing
+  const expiresAt = now + LEASE_DURATION_MS;
   const result = db.prepare(
-    "UPDATE gallery_imports SET status = 'processing', updated_at = ? WHERE id = ? AND status = 'pending'"
-  ).run(Date.now(), pending.id);
+    "UPDATE gallery_imports SET status = 'processing', worker_id = ?, lease_expires_at = ?, attempt_count = attempt_count + 1, updated_at = ? WHERE id = ? AND (status = 'pending' OR (status = 'processing' AND lease_expires_at < ?))"
+  ).run(WORKER_ID, expiresAt, now, pending.id, now);
 
-  // Verify exactly one row was modified
   if (result.changes !== 1) return null;
 
   return pending;
@@ -258,15 +260,10 @@ function acquireNextJob(): { id: string; gallery_id: string; import_path: string
 export function resumeImports(): void {
   if (workerStarted) return;
   workerStarted = true;
-
-  // We intentionally DO NOT blindly reset 'processing' jobs to 'pending' here,
-  // to prevent stealing jobs that are actively being processed by another worker process.
-  // A job stuck in 'processing' due to a crash must be reset manually or via timeout.
   scheduleWorker();
 }
 
 function scheduleWorker(): void {
-  // Use setImmediate to avoid blocking the event loop
   setImmediate(() => {
     void runWorkerLoop().catch(err => {
       console.error("Import worker error:", err);
@@ -286,10 +283,10 @@ async function runWorkerLoop(): Promise<void> {
 
 async function processImport(importId: string, galleryId: string, folderName: string): Promise<void> {
   const db = getGalleryDb();
+  let leaseTimer: NodeJS.Timeout | null = null;
 
   try {
     const importDir = validateImportPath(folderName);
-
     const ignoredFiles: RejectedFile[] = [];
     const files = collectFiles(importDir, ignoredFiles);
 
@@ -297,18 +294,22 @@ async function processImport(importId: string, galleryId: string, folderName: st
       throw new Error(`La galerie dépasse la limite de ${MAX_MEDIA_COUNT} médias.`);
     }
 
-    db.prepare("UPDATE gallery_imports SET total = ?, updated_at = ? WHERE id = ?")
-      .run(files.length, Date.now(), importId);
+    db.prepare("UPDATE gallery_imports SET total = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
+      .run(files.length, Date.now(), importId, WORKER_ID);
+
+    leaseTimer = setInterval(() => {
+      db.prepare("UPDATE gallery_imports SET lease_expires_at = ? WHERE id = ? AND worker_id = ?")
+        .run(Date.now() + LEASE_DURATION_MS, importId, WORKER_ID);
+    }, LEASE_DURATION_MS / 2);
 
     const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId);
     if (!fs.existsSync(mediaDir)) {
       fs.mkdirSync(mediaDir, { recursive: true });
     } else {
-      // Cleanup orphan .tmp files from previous crashed runs
       const existingFiles = fs.readdirSync(mediaDir);
       for (const f of existingFiles) {
         if (f.endsWith(".tmp")) {
-          fs.unlinkSync(path.join(mediaDir, f));
+          try { fs.unlinkSync(path.join(mediaDir, f)); } catch { /* ignore */ }
         }
       }
     }
@@ -321,9 +322,9 @@ async function processImport(importId: string, galleryId: string, folderName: st
       let fd: number | null = null;
       let tmpPath: string | null = null;
       let destPath: string | null = null;
+      let inserted = false;
 
       try {
-        // Open with O_NOFOLLOW to prevent symlink attacks, O_RDONLY for reading
         const flags = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0);
         fd = fs.openSync(file.fullPath, flags);
 
@@ -345,9 +346,7 @@ async function processImport(importId: string, galleryId: string, folderName: st
 
         const header = Buffer.alloc(1024);
         const bytesRead = fs.readSync(fd, header, 0, 1024, 0);
-        console.log("Header HEX:", header.subarray(0, 20).toString("hex"));
         const mimeType = detectMimeType(header.subarray(0, bytesRead));
-        console.log("File:", file.name, "bytesRead:", bytesRead, "MimeType:", mimeType);
 
         if (!mimeType || !validateFileType(mimeType, file.expectedCategory, file.name, results.ignored)) {
           continue;
@@ -358,34 +357,29 @@ async function processImport(importId: string, galleryId: string, folderName: st
         destPath = path.join(mediaDir, mediaId);
         tmpPath = destPath + ".tmp";
 
-        // Copy file
-        await fs.promises.copyFile(file.fullPath, tmpPath!);
+        // TOCTOU FIX: Hash and copy from the open descriptor
+        const hash = crypto.createHash("sha256");
+        const readStream = fs.createReadStream("", { fd, autoClose: false }); // reads from beginning because file position is unchanged by readSync(,,0)
+        const writeStream = fs.createWriteStream(tmpPath);
 
-        // Close the fd
+        await new Promise<void>((resolve, reject) => {
+          readStream.on("data", chunk => hash.update(chunk));
+          readStream.pipe(writeStream);
+          writeStream.on("finish", resolve);
+          writeStream.on("error", reject);
+          readStream.on("error", reject);
+        });
+
+        const finalHash = hash.digest("hex");
+
         fs.closeSync(fd);
         fd = null;
 
-        // Hash the local .tmp file to guarantee no TOCTOU
-        const hash = await new Promise<string>((resolve, reject) => {
-          const stream = fs.createReadStream(tmpPath!);
-          const h = crypto.createHash("sha256");
-          stream.on("data", chunk => h.update(chunk));
-          stream.on("end", () => resolve(h.digest("hex")));
-          stream.on("error", reject);
-        });
-
-        const tmpSize = fs.statSync(tmpPath!).size;
-        console.log("Copied tmpSize:", tmpSize);
-
-        // Check duplicates
-        const existing = db.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND hash = ?").get(galleryId, hash);
+        const existing = db.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND hash = ?").get(galleryId, finalHash);
         if (existing) {
           results.ignored.push({ file: file.name, reason: "Doublon (même contenu exact)" });
           continue;
         }
-
-        const first20 = fs.readFileSync(tmpPath!).subarray(0, 20).toString("hex");
-        console.log("File HEX before sharp:", first20);
 
         let width: number | null = null;
         let height: number | null = null;
@@ -402,7 +396,8 @@ async function processImport(importId: string, galleryId: string, folderName: st
         db.prepare(`
           INSERT INTO gallery_media (id, gallery_id, type, visibility, original_name, mime_type, size, hash, width, height, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(mediaId, galleryId, type, file.visibility, file.name, mimeType, stat.size, hash, width, height, Date.now());
+        `).run(mediaId, galleryId, type, file.visibility, file.name, mimeType, stat.size, finalHash, width, height, Date.now());
+        inserted = true;
 
         fs.renameSync(tmpPath, destPath);
         tmpPath = null;
@@ -410,6 +405,12 @@ async function processImport(importId: string, galleryId: string, folderName: st
         currentTotalSize += stat.size;
         results.imported++;
       } catch (err) {
+        if (inserted && tmpPath) {
+           // Compensation: if rename fails but DB was inserted, remove DB record to keep consistency
+           try {
+             db.prepare("DELETE FROM gallery_media WHERE id = ?").run(destPath ? path.basename(destPath) : "");
+           } catch { /* ignore */ }
+        }
         results.ignored.push({ file: file.name, reason: "Erreur: " + (err instanceof Error ? err.message : String(err)) });
       } finally {
         if (fd !== null) {
@@ -419,15 +420,19 @@ async function processImport(importId: string, galleryId: string, folderName: st
           try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
         }
         progress++;
-        db.prepare("UPDATE gallery_imports SET progress = ?, updated_at = ? WHERE id = ?").run(progress, Date.now(), importId);
+        db.prepare("UPDATE gallery_imports SET progress = ?, updated_at = ? WHERE id = ? AND worker_id = ?").run(progress, Date.now(), importId, WORKER_ID);
       }
     }
 
-    db.prepare("UPDATE gallery_imports SET status = 'completed', result_json = ?, updated_at = ? WHERE id = ?")
-      .run(JSON.stringify(results), Date.now(), importId);
+    if (leaseTimer) clearInterval(leaseTimer);
+    
+    // Finalize
+    db.prepare("UPDATE gallery_imports SET status = 'completed', result_json = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
+      .run(JSON.stringify(results), Date.now(), importId, WORKER_ID);
 
   } catch (err) {
-    db.prepare("UPDATE gallery_imports SET status = 'failed', result_json = ?, updated_at = ? WHERE id = ?")
-      .run(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), Date.now(), importId);
+    if (leaseTimer) clearInterval(leaseTimer);
+    db.prepare("UPDATE gallery_imports SET status = 'failed', result_json = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
+      .run(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), Date.now(), importId, WORKER_ID);
   }
 }

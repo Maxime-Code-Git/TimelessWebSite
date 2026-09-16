@@ -4,6 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 import { createRequire } from "node:module";
+import { DatabaseSync } from "node:sqlite";
 
 const requireModule = createRequire(import.meta.url);
 const servePkgPath = requireModule.resolve("@react-router/serve/package.json");
@@ -33,7 +34,7 @@ async function stopServer(proc: ChildProcess | undefined) {
 
 describe("Admin Gallery E2E Lifecycle", () => {
   let serverProcess: ChildProcess;
-  const PORT = 43213;
+  const PORT = Math.floor(Math.random() * 20000) + 40000;
   const BASE_URL = `http://localhost:${PORT}`;
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-gallery-e2e-"));
@@ -51,7 +52,7 @@ describe("Admin Gallery E2E Lifecycle", () => {
     // Create a mock import folder structure
     fs.mkdirSync(path.join(importPath, "invites", "photos"), { recursive: true });
     // Valid 1x1 JPEG base64
-    const validJpeg = require("node:buffer").Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64");
+    const validJpeg = Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64");
     fs.writeFileSync(path.join(importPath, "invites", "photos", "test.jpg"), validJpeg);
 
     return new Promise((resolve, reject) => {
@@ -121,9 +122,8 @@ describe("Admin Gallery E2E Lifecycle", () => {
     });
     expect(loginRes.status).toBe(302);
     const authCookie = loginRes.headers.get("Set-Cookie") || "";
-    const loginLoc = loginRes.headers.get("Location") || "";
-    console.log("authCookie:", authCookie);
-    console.log("loginLoc:", loginLoc);
+    
+    
 
     // 3. Get /admin/galleries/new for new CSRF
     console.log("fetching newRes");
@@ -131,7 +131,7 @@ describe("Admin Gallery E2E Lifecycle", () => {
       headers: { "Cookie": authCookie },
       redirect: "manual",
     });
-    console.log("newRes status:", newRes.status);
+    
     const newText = await newRes.text();
     const newCsrfToken = newText.match(/name="csrfToken" value="([^"]+)"/)?.[1] || "";
 
@@ -152,7 +152,7 @@ describe("Admin Gallery E2E Lifecycle", () => {
       redirect: "manual",
     });
     
-    console.log("createRes status:", createRes.status);
+    
     expect(createRes.status).toBe(302);
     const location = createRes.headers.get("Location");
     expect(location).toContain("/admin/galleries/");
@@ -176,10 +176,7 @@ describe("Admin Gallery E2E Lifecycle", () => {
       },
       redirect: "manual",
     });
-    console.log("updateRes status:", updateRes.status);
-    const updateText = await updateRes.text();
-    // Use regex to find the actionData in Remix context
-    console.log("actionData match:", updateText.match(/"error":"([^"]+)"/));
+        // Use regex to find the actionData in Remix context
     expect(updateRes.status).toBe(400);
 
     // 6. Start import
@@ -210,7 +207,6 @@ describe("Admin Gallery E2E Lifecycle", () => {
       });
       const statusJson = await statusRes.json();
       if (statusJson.importState?.status === "completed") {
-        console.log("Import completed result_json:", statusJson.importState.result_json);
         imported = true;
         break;
       }
@@ -220,7 +216,7 @@ describe("Admin Gallery E2E Lifecycle", () => {
     // Get the imported media ID for the cover image
     const pageRes = await fetch(`${BASE_URL}/admin/galleries/${galleryId}`, { headers: { Cookie: authCookie } });
     const pageHtml = await pageRes.text();
-    const mediaIdMatch = pageHtml.match(/name="cover_image_id" value="([a-f0-9\-]{36})"/);
+    const mediaIdMatch = pageHtml.match(/name="cover_image_id" value="([a-f0-9-]{36})"/);
     const cover_image_id = mediaIdMatch ? mediaIdMatch[1] : "";
 
     // 8. Publish successfully
@@ -249,9 +245,9 @@ describe("Admin Gallery E2E Lifecycle", () => {
     expect(pubRes.status).toBe(200);
     expect(pubText).toContain("success");
 
-    const { execSync } = require("node:child_process");
-    const public_id = execSync(`sqlite3 ${galleryDbPath} "SELECT public_id FROM galleries WHERE id = '${galleryId}'"`).toString().trim();
-    
+    const publicIdDb = new DatabaseSync(galleryDbPath);
+    const public_id = (publicIdDb.prepare("SELECT public_id FROM galleries WHERE id = ?").get(galleryId as string) as { public_id: string }).public_id;
+    publicIdDb.close();
     // Rotate guest code to a known value
     const guest_code = "myGuestCode123";
     await fetch(`${BASE_URL}/admin/galleries/${galleryId}?_data=routes/admin.galleries.$id`, {
@@ -342,12 +338,19 @@ describe("Admin Gallery E2E Lifecycle", () => {
     const zipRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download?type=all`, {
       headers: { "Cookie": coupleCookie! }
     });
-    // It might return a redirect or a ZIP stream depending on the implementation
-    expect([200, 302, 303]).toContain(zipRes.status);
+    expect(zipRes.status).toBe(200);
+    expect(zipRes.headers.get("Content-Type")).toBe("application/zip");
+    
+    const zipBuffer = await zipRes.arrayBuffer();
+    expect(zipBuffer.byteLength).toBeGreaterThan(100);
 
     // 11. Verify Expiration
     // Expire the gallery by updating the expiration date to the past in DB
-    execSync(`sqlite3 ${galleryDbPath} "UPDATE galleries SET expires_at = ${Date.now() - 86400000} WHERE id = '${galleryId}'"`);
+    
+        const expireDb = new DatabaseSync(galleryDbPath);
+    expireDb.prepare("UPDATE galleries SET expires_at = ? WHERE id = ?").run(Date.now() - 86400000, galleryId as string);
+    expireDb.close();
+
 
     // Try logging in again as guest, should fail
     const expiredLoginRes = await fetch(`${BASE_URL}/fr/espace-clients?_data=routes/fr.clients`, {

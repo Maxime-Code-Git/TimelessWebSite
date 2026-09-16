@@ -39,15 +39,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return new Response("No media to download", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
   }
 
-  const zipfile = new yazl.ZipFile();
-  const zipFileName = `Sempra-${(gallery.bride_names as string).replace(/[^a-zA-Z0-9-]/g, "_")}.zip`;
-
+  
+  const filesToAdd: { filePath: string; safeName: string }[] = [];
   const usedNames = new Set<string>();
 
   for (const m of media) {
-    const filePath = path.join(ENV.GALLERY_MEDIA_PATH, gallery.id as string, m.id);
+    const filePath = path.join(ENV.GALLERY_MEDIA_PATH, String(gallery.id), String(m.id));
     if (fs.existsSync(filePath)) {
-      let safeName = path.basename(m.original_name || "media");
+      const rawName = m.original_name ? String(m.original_name) : "media";
+      let safeName = path.basename(rawName).replace(/[\r\n]/g, "").replace(/[^\x20-\x7E]/g, "_").replace(/"/g, '');
 
       if (usedNames.has(safeName)) {
         const ext = path.extname(safeName);
@@ -57,18 +57,23 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         safeName = `${name}-${i}${ext}`;
       }
       usedNames.add(safeName);
-
-      zipfile.addFile(filePath, safeName);
+      filesToAdd.push({ filePath, safeName });
     }
   }
 
-  zipfile.end();
-
-  if (usedNames.size === 0) {
+  if (filesToAdd.length === 0) {
     return new Response("No valid files to download", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
   }
 
-  // Wrap in Node.js Readable for proper .destroy() and .toWeb() support
+  const zipfile = new yazl.ZipFile();
+  const zipFileName = `Sempra-${String(gallery.bride_names).replace(/[^a-zA-Z0-9-]/g, "_")}.zip`;
+
+  for (const f of filesToAdd) {
+    zipfile.addFile(f.filePath, f.safeName);
+  }
+
+  zipfile.end();
+// Wrap in Node.js Readable for proper .destroy() and .toWeb() support
   const nodeReadable = Readable.from(zipfile.outputStream as Readable);
 
   request.signal.addEventListener("abort", () => {

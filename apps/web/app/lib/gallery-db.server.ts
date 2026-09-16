@@ -257,6 +257,16 @@ export function openGalleryDb(dbPath: string): DatabaseSync {
       currentVersion = 5;
     }
 
+    if (currentVersion < 6) {
+      db.exec(`
+        ALTER TABLE gallery_imports ADD COLUMN worker_id TEXT;
+        ALTER TABLE gallery_imports ADD COLUMN lease_expires_at INTEGER;
+        ALTER TABLE gallery_imports ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 0;
+      `);
+      db.prepare("INSERT INTO gallery_migrations (version, applied_at) VALUES (6, ?)").run(Date.now());
+      currentVersion = 6;
+    }
+
     db.exec("COMMIT;");
   } catch (err) {
     db.exec("ROLLBACK;");
