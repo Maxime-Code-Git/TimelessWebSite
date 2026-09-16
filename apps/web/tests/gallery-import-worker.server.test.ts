@@ -97,7 +97,7 @@ describe("Gallery Import Worker Logic", () => {
     expect(job).toBeDefined();
 
     const before = db.prepare("SELECT lease_expires_at FROM gallery_imports WHERE id = ?").get(importId) as Record<string, unknown>;
-    
+
     // Block the read stream so processImport stays alive
     let unblockStream: () => void;
     const blockPromise = new Promise<void>(r => { unblockStream = r; });
