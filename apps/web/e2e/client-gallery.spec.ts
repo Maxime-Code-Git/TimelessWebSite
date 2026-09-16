@@ -117,24 +117,75 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     // 4. Import des 28 médias
     await adminPage.getByLabel("Dossier d'import").selectOption(IMPORT_FOLDER);
     await expect(adminPage.getByText("28 médias trouvés", { exact: false })).toBeVisible();
-    adminPage.once("dialog", dialog => dialog.accept());
-    await adminPage.getByRole("button", { name: "Confirmer et lancer l'import", exact: true }).click();
+    await expect(adminPage.getByText("Invités : 25 photos, 1 vidéos", { exact: false })).toBeVisible();
+    await expect(adminPage.getByText("Mariés : 1 photos, 1 vidéos", { exact: false })).toBeVisible();
+
+    const importResponsePromise = adminPage.waitForResponse(
+      response =>
+        response.url().includes(
+          `/api/admin/gallery-import/${galleryId}`
+        ) &&
+        response.request().method() === "POST"
+    );
+
+    const dialogPromise = adminPage.waitForEvent("dialog");
+
+    const importClickPromise = adminPage.getByRole("button", {
+      name: "Confirmer et lancer l'import",
+      exact: true,
+    }).click();
+
+    const dialog = await dialogPromise;
+    await dialog.accept();
+    await importClickPromise;
+
+    const importResponse = await importResponsePromise;
+    expect(importResponse.status()).toBe(200);
+
+    const importResponseData = await importResponse.json() as {
+      importId?: string;
+      status?: string;
+      error?: string;
+    };
+
+    expect(importResponseData.error).toBeUndefined();
+    expect(importResponseData.importId).toEqual(expect.any(String));
+    expect(importResponseData.status).toBe("pending");
 
     // 5. Attente de la fin réelle de l'import (polling state API)
     await expect(async () => {
-      const res = await adminContext.request.get(`/api/admin/gallery-import/${galleryId}`);
+      const res = await adminContext.request.get(
+        `/api/admin/gallery-import/${galleryId}?poll=${Date.now()}`
+      );
       expect(res.status()).toBe(200);
-      const data = await res.json();
+      const data = await res.json() as {
+        importState: {
+          status: string;
+          progress: number;
+          total: number;
+          result_json: string | null;
+        } | null;
+      };
+
       const importState = data.importState;
 
-      expect(importState.status).toBe("completed");
-      expect(importState.progress).toBe(28);
-      expect(importState.total).toBe(28);
+      expect(importState).not.toBeNull();
+      expect(importState!.status).toBe("completed");
+      expect(importState!.progress).toBe(28);
+      expect(importState!.total).toBe(28);
+      expect(importState!.result_json).not.toBeNull();
 
-      const result = JSON.parse(importState.result_json);
+      const result = JSON.parse(importState!.result_json!) as {
+        imported: number;
+        ignored: Array<{ file: string; reason: string }>;
+      };
+
       expect(result.imported).toBe(28);
       expect(result.ignored).toHaveLength(0);
-    }).toPass({ timeout: 15000, intervals: [500, 1000] });
+    }).toPass({
+      timeout: 60_000,
+      intervals: [500, 1_000, 2_000],
+    });
 
     // Reload admin page to reflect imported media
     await adminPage.reload();

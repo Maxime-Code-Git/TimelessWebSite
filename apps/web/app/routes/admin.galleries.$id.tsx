@@ -5,6 +5,7 @@ import { getGalleryById, updateGallery, rotateGalleryCode, CodeCollisionError, g
 import type { GalleryImportRow, GalleryMediaRow } from "../lib/gallery.server";
 import { decryptGalleryCode, generateGalleryCode } from "../lib/gallery-auth.server";
 import { getGalleryDb } from "../lib/gallery-db.server";
+import { getAvailableImportFolders } from "../lib/gallery-import.server";
 import styles from "./admin.module.css";
 import { commitSession } from "../lib/session.server";
 import crypto from "node:crypto";
@@ -29,7 +30,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     headers.set("Set-Cookie", await commitSession(session));
   }
 
-  const { getAvailableImportFolders } = await import("../lib/gallery-import.server");
   const folders = getAvailableImportFolders();
 
   // Get gallery photos for cover selection
@@ -246,10 +246,10 @@ export default function AdminGalleryEdit() {
   const [previewData, setPreviewData] = useState<{
     error?: string;
     total?: number;
-    invitesPhotos?: number;
-    invitesVideos?: number;
-    mariesPhotos?: number;
-    mariesVideos?: number;
+    invitesPhotosCount?: number;
+    invitesVideosCount?: number;
+    mariesPhotosCount?: number;
+    mariesVideosCount?: number;
     rejected?: { file: string; reason: string }[];
   } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -498,8 +498,8 @@ export default function AdminGalleryEdit() {
               <div>
                 <p><strong>{previewData.total} médias trouvés :</strong></p>
                 <ul className={styles.previewList}>
-                  <li>Invités : {previewData.invitesPhotos} photos, {previewData.invitesVideos} vidéos</li>
-                  <li>Mariés : {previewData.mariesPhotos} photos, {previewData.mariesVideos} vidéos</li>
+                  <li>Invités : {previewData.invitesPhotosCount} photos, {previewData.invitesVideosCount} vidéos</li>
+                  <li>Mariés : {previewData.mariesPhotosCount} photos, {previewData.mariesVideosCount} vidéos</li>
                 </ul>
                 {(previewData.rejected as { file: string; reason: string }[])?.length > 0 && (
                   <details>
