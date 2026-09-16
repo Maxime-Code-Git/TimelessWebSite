@@ -29,7 +29,9 @@ test.describe('Admin Login Flow (Phase 3A)', () => {
     await expect(page.locator('h1')).toContainText('Administration Sempra');
     await expect(page.getByText('Vous êtes connecté')).toBeVisible();
     await expect(page.getByText('Galeries clients')).toBeVisible();
-    await expect(page.getByText('Fonctionnalité disponible prochainement')).toHaveCount(1);
+    await expect(page.locator('a[href="/admin/galleries"]')).toBeVisible();
+    await expect(page.locator('a[href="/admin/portfolio"]')).toBeVisible();
+    await expect(page.locator('a[href="/admin/pricing"]')).toBeVisible();
 
     // Refreshing should keep the session
     await page.reload();
