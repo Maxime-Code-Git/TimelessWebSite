@@ -39,8 +39,8 @@ export async function action({ request }: Route.ActionArgs) {
   let searchParams: URLSearchParams;
   try {
     searchParams = await readStrictFormUrlEncoded(request, 500);
-  } catch (err: any) {
-    if (err.message === "Payload Too Large") return new Response("Payload Too Large", { status: 413 });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "Payload Too Large") return new Response("Payload Too Large", { status: 413 });
     return new Response("Unsupported Media Type", { status: 415 });
   }
 

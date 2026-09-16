@@ -215,6 +215,7 @@ interface ActionData {
 interface LoaderData {
   gallery: {
     id: string;
+    public_id: string;
     bride_names: string;
     wedding_date: string;
     location: string | null;
@@ -242,7 +243,15 @@ export default function AdminGalleryEdit() {
   const importFetcher = useFetcher();
 
   const [showCodes, setShowCodes] = useState(false);
-  const [previewData, setPreviewData] = useState<Record<string, unknown> | null>(null);
+  const [previewData, setPreviewData] = useState<{
+    error?: string;
+    total?: number;
+    invitesPhotos?: number;
+    invitesVideos?: number;
+    mariesPhotos?: number;
+    mariesVideos?: number;
+    rejected?: { file: string; reason: string }[];
+  } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState("");
 

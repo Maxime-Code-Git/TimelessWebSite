@@ -125,14 +125,13 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await page.waitForURL(/\/fr\/galerie\//);
 
     // If there are 24+ photos, the button should say "Voir plus"
-    const loadMoreFr = page.locator("text=Voir plus");
     // Note: only visible if there are >= 24 photos
 
     // Check download buttons exist
     await expect(page.locator("text=Tout télécharger")).toBeVisible();
   });
 
-  test("should have private headers on gallery page", async ({ request }) => {
+  test("should have private headers on gallery page", async () => {
     // Make a direct request and check headers
     // This requires a valid session which is hard to set up via API
     // So we verify the loader returns proper headers via the page

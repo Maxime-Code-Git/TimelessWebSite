@@ -217,11 +217,11 @@ export function startGalleryImport(galleryId: string, folderName: string): strin
   try {
     db.prepare("INSERT INTO gallery_imports (id, gallery_id, status, progress, total, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
       .run(importId, galleryId, "pending", 0, 0, now, now);
-  } catch (err: any) {
-    if (err.code === "SQLITE_CONSTRAINT_UNIQUE") {
-      throw new Error("Un import est déjà en cours pour cette galerie.");
+  } catch (err: unknown) {
+    if (err instanceof Error && (err as { code?: string }).code === "SQLITE_CONSTRAINT_UNIQUE") {
+      throw new Error("Un import est déjà en cours pour cette galerie.", { cause: err });
     }
-    throw err;
+    throw new Error(err instanceof Error ? err.message : String(err), { cause: err });
   }
 
   // Trigger worker
@@ -345,7 +345,9 @@ async function processImport(importId: string, galleryId: string, folderName: st
 
         const header = Buffer.alloc(1024);
         const bytesRead = fs.readSync(fd, header, 0, 1024, 0);
+        console.log("Header HEX:", header.subarray(0, 20).toString("hex"));
         const mimeType = detectMimeType(header.subarray(0, bytesRead));
+        console.log("File:", file.name, "bytesRead:", bytesRead, "MimeType:", mimeType);
 
         if (!mimeType || !validateFileType(mimeType, file.expectedCategory, file.name, results.ignored)) {
           continue;
@@ -356,20 +358,13 @@ async function processImport(importId: string, galleryId: string, folderName: st
         destPath = path.join(mediaDir, mediaId);
         tmpPath = destPath + ".tmp";
 
-        // Copy file safely using streams from the already opened and verified fd
-        await new Promise<void>((resolve, reject) => {
-          const readStream = fs.createReadStream("", { fd: fd!, start: 0, autoClose: false });
-          const writeStream = fs.createWriteStream(tmpPath!);
-          readStream.pipe(writeStream);
-          writeStream.on("finish", resolve);
-          writeStream.on("error", reject);
-          readStream.on("error", reject);
-        });
+        // Copy file
+        await fs.promises.copyFile(file.fullPath, tmpPath!);
 
-        // Close the fd now that we have a secure local copy
+        // Close the fd
         fs.closeSync(fd);
         fd = null;
-        
+
         // Hash the local .tmp file to guarantee no TOCTOU
         const hash = await new Promise<string>((resolve, reject) => {
           const stream = fs.createReadStream(tmpPath!);
@@ -379,12 +374,18 @@ async function processImport(importId: string, galleryId: string, folderName: st
           stream.on("error", reject);
         });
 
+        const tmpSize = fs.statSync(tmpPath!).size;
+        console.log("Copied tmpSize:", tmpSize);
+
         // Check duplicates
         const existing = db.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND hash = ?").get(galleryId, hash);
         if (existing) {
           results.ignored.push({ file: file.name, reason: "Doublon (même contenu exact)" });
           continue;
         }
+
+        const first20 = fs.readFileSync(tmpPath!).subarray(0, 20).toString("hex");
+        console.log("File HEX before sharp:", first20);
 
         let width: number | null = null;
         let height: number | null = null;
@@ -398,14 +399,10 @@ async function processImport(importId: string, galleryId: string, folderName: st
           }
         }
 
-        try {
-          db.prepare(`
-            INSERT INTO gallery_media (id, gallery_id, type, visibility, original_name, mime_type, size, hash, width, height, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(mediaId, galleryId, type, file.visibility, file.name, mimeType, stat.size, hash, width, height, Date.now());
-        } catch (dbErr) {
-          throw dbErr;
-        }
+        db.prepare(`
+          INSERT INTO gallery_media (id, gallery_id, type, visibility, original_name, mime_type, size, hash, width, height, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(mediaId, galleryId, type, file.visibility, file.name, mimeType, stat.size, hash, width, height, Date.now());
 
         fs.renameSync(tmpPath, destPath);
         tmpPath = null;

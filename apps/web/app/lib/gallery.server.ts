@@ -8,7 +8,7 @@ export interface Gallery {
   public_id: string;
   bride_names: string;
   wedding_date: string;
-  location: string;
+  location: string | null;
   intro_fr: string | null;
   intro_en: string | null;
   signature_fr: string | null;

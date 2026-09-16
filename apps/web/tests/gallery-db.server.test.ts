@@ -34,7 +34,7 @@ describe("gallery-db migrations", () => {
     const db = openGalleryDb(dbPath);
 
     const version = db.prepare("SELECT MAX(version) as v FROM gallery_migrations").get() as { v: number };
-    expect(version.v).toBe(4);
+    expect(version.v).toBe(5);
 
     // Verify tables exist
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as { name: string }[];
@@ -121,7 +121,7 @@ describe("gallery-db migrations", () => {
     const db2 = openGalleryDb(dbPath);
 
     const version = db2.prepare("SELECT MAX(version) as v FROM gallery_migrations").get() as { v: number };
-    expect(version.v).toBe(4);
+    expect(version.v).toBe(5);
 
     // Verify codes were migrated
     const codes = db2.prepare("SELECT * FROM gallery_codes WHERE gallery_id = 'g1'").all() as { code_hash: string; level: string; version: number }[];
@@ -173,7 +173,7 @@ describe("gallery-db migrations", () => {
     const db2 = openGalleryDb(dbPath);
 
     const version = db2.prepare("SELECT MAX(version) as v FROM gallery_migrations").get() as { v: number };
-    expect(version.v).toBe(4);
+    expect(version.v).toBe(5);
 
     const codes = db2.prepare("SELECT * FROM gallery_codes WHERE gallery_id = 'g1'").all() as { code_hash: string; level: string }[];
     expect(codes).toHaveLength(2);
@@ -220,7 +220,7 @@ describe("gallery-db migrations", () => {
     const db2 = openGalleryDb(dbPath);
 
     const version = db2.prepare("SELECT MAX(version) as v FROM gallery_migrations").get() as { v: number };
-    expect(version.v).toBe(4);
+    expect(version.v).toBe(5);
 
     // Versions should be preserved from galleries table
     const codes = db2.prepare("SELECT * FROM gallery_codes WHERE gallery_id = 'g1' ORDER BY level").all() as { code_hash: string; level: string; version: number }[];

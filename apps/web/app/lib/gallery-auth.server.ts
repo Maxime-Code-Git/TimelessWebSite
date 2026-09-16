@@ -149,7 +149,7 @@ export const GALLERY_PRIVATE_HEADERS: Record<string, string> = {
 };
 
 export async function requireGalleryAccess(request: Request, publicId: string, requiredMediaId?: string, isApi = false) {
-  const { getSession: getAdminSession } = await import("./session.server");
+
   const { requireAdminSession } = await import("./auth.server");
   
   const { isValid: isAdmin } = await requireAdminSession(request);
@@ -165,7 +165,7 @@ export async function requireGalleryAccess(request: Request, publicId: string, r
     
     let media = null;
     if (requiredMediaId) {
-      media = db.prepare("SELECT * FROM gallery_media WHERE id = ? AND gallery_id = ?").get(requiredMediaId, gallery.id) as Record<string, unknown> | undefined;
+      media = db.prepare("SELECT * FROM gallery_media WHERE id = ? AND gallery_id = ?").get(requiredMediaId, gallery.id as string) as Record<string, unknown> | undefined;
       if (!media) throw new Response("Not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
     }
     
@@ -188,7 +188,7 @@ export async function requireGalleryAccess(request: Request, publicId: string, r
 
   const db = getGalleryDb();
   // Fetch current code version from gallery_codes since it's the source of truth
-  const codeRow = db.prepare("SELECT version FROM gallery_codes WHERE gallery_id = ? AND level = ?").get(galleryId, accessLevel) as { version: number } | undefined;
+  const codeRow = db.prepare("SELECT version FROM gallery_codes WHERE gallery_id = ? AND level = ?").get(galleryId as string, accessLevel as string) as { version: number } | undefined;
   if (!codeRow || codeRow.version !== codeVersion) {
     throw unauthorized();
   }
