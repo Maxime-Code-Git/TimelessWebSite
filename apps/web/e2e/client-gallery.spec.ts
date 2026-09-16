@@ -70,11 +70,23 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // 1. Connexion admin
     await adminPage.goto("/admin");
-    await expect(adminPage.locator('input[name="password"]')).toBeVisible();
-    await adminPage.fill('input[name="email"]', 'admin@example.com');
-    await adminPage.fill('input[name="password"]', "e2e_password");
-    await adminPage.click('button[type="submit"]');
-    await adminPage.waitForURL("**/admin/galleries");
+    await expect(
+      adminPage.locator('input[name="password"]')
+    ).toBeVisible();
+
+    await adminPage.fill(
+      'input[name="password"]',
+      "e2e_password"
+    );
+
+    await adminPage.getByRole("button", {
+      name: "Se connecter",
+      exact: true,
+    }).click();
+
+    await expect(adminPage.locator("h1")).toHaveText(
+      "Administration Sempra"
+    );
 
     // 2. Création de galerie
     await adminPage.goto("/admin/galleries/new");
@@ -95,7 +107,11 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     // 3. Refus publication sans média
     await adminPage.selectOption('select[name="status"]', "published");
     await adminPage.click('button:has-text("Enregistrer les informations")');
-    await expect(adminPage.locator("text=impossible de publier une galerie vide")).toBeVisible();
+    await expect(
+      adminPage.getByRole("alert")
+    ).toContainText(
+      "Une galerie ne peut pas être publiée sans média valide."
+    );
     await adminPage.selectOption('select[name="status"]', "draft");
 
     // 4. Import des 28 médias
@@ -136,7 +152,9 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     // 7. Publication
     await adminPage.selectOption('select[name="status"]', "published");
     await adminPage.click('button:has-text("Enregistrer les informations")');
-    await expect(adminPage.locator("text=Galerie mise à jour")).toBeVisible();
+    await expect(
+      adminPage.getByRole("status")
+    ).toHaveText("Enregistré.");
 
     const db = new DatabaseSync(galleryDbPath);
     const galleryPublicId = (db.prepare("SELECT public_id FROM galleries WHERE id = ?").get(galleryId) as { public_id: string }).public_id;
@@ -327,7 +345,9 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     // 32. Archivage par l'admin
     await adminPage.selectOption('select[name="status"]', "archived");
     await adminPage.click('button:has-text("Enregistrer les informations")');
-    await expect(adminPage.locator("text=Galerie mise à jour")).toBeVisible();
+    await expect(
+      adminPage.getByRole("status")
+    ).toHaveText("Enregistré.");
 
     // 33. Refus d'accès après archivage
     const archivedRes = await newGuestContext.request.get(`/fr/galerie/${galleryPublicId}`);

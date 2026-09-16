@@ -76,7 +76,6 @@ describe("Environment Validation — fail-fast on import", () => {
     process.env = originalEnv;
   });
 
-  
   it("rejects GALLERY_SECRET if shorter than 64 characters", async () => {
     const env = validEnv();
     env.GALLERY_SECRET = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde"; // 63 chars
