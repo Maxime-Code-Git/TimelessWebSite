@@ -241,7 +241,11 @@ export const ENV = {
     return path.resolve(val || "./data/gallery-imports");
   },
   get GALLERY_SECRET() {
-    return requireEnvVar("GALLERY_SECRET");
+    const val = requireEnvVar("GALLERY_SECRET");
+    if (val.length < 64 || val.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(val)) {
+      throw new Error("CRITICAL: GALLERY_SECRET must be a hex string of at least 32 bytes (64 characters).");
+    }
+    return val;
   }
 };
 

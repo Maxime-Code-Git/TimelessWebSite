@@ -62,7 +62,7 @@ try {
   process.env.GALLERY_DB_PATH = path.join(e2eTempDir, 'galleries.sqlite');
   process.env.GALLERY_MEDIA_PATH = path.join(e2eTempDir, 'gallery-media');
   process.env.GALLERY_IMPORT_PATH = path.join(e2eTempDir, 'gallery-imports');
-  process.env.GALLERY_SECRET = 'e2e_gallery_secret_key_123456789';
+  process.env.GALLERY_SECRET = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
   process.env.NODE_ENV = 'test';
 
   fs.mkdirSync(process.env.GALLERY_MEDIA_PATH, { recursive: true });

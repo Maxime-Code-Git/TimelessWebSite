@@ -35,7 +35,7 @@ describe("Environment Validation — fail-fast on import", () => {
       PORTFOLIO_CONTENT_PATH: path.join(os.tmpdir(), "portfolio.json"),
       PORTFOLIO_MEDIA_PATH: path.join(os.tmpdir(), "media"),
       BOOKING_DB_PATH: path.join(os.tmpdir(), "booking.db"),
-      GALLERY_SECRET: "gallery_secret_key_32b_minimum_length",
+      GALLERY_SECRET: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       GALLERY_DB_PATH: path.join(os.tmpdir(), "gallery.db"),
       GALLERY_MEDIA_PATH: path.join(os.tmpdir(), "gallery-media"),
       GALLERY_IMPORT_PATH: path.join(os.tmpdir(), "gallery-import")
@@ -76,7 +76,37 @@ describe("Environment Validation — fail-fast on import", () => {
     process.env = originalEnv;
   });
 
-  // ---------------------------------------------------------------
+  
+  it("rejects GALLERY_SECRET if shorter than 64 characters", async () => {
+    const env = validEnv();
+    env.GALLERY_SECRET = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde"; // 63 chars
+    setEnv(env);
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("CRITICAL: GALLERY_SECRET must be a hex string of at least 32 bytes (64 characters).");
+  });
+
+  it("rejects GALLERY_SECRET if it contains non-hex characters", async () => {
+    const env = validEnv();
+    // 64 chars but contains 'z'
+    env.GALLERY_SECRET = "z123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    setEnv(env);
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("CRITICAL: GALLERY_SECRET must be a hex string of at least 32 bytes (64 characters).");
+  });
+
+  it("accepts a valid hex string for GALLERY_SECRET", async () => {
+    const env = validEnv();
+    env.GALLERY_SECRET = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // 64 chars hex
+    setEnv(env);
+    const err = await captureImportError();
+    if (err !== null) {
+      throw new Error("Expected valid hex key to be accepted: " + err.message);
+    }
+  });
+
+// ---------------------------------------------------------------
   // Missing required variables: import itself must throw
   // ---------------------------------------------------------------
   const requiredVars = [

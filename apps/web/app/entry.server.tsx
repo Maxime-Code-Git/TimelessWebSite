@@ -16,16 +16,17 @@ import { renderToPipeableStream } from "react-dom/server";
 import { ServerRouter } from "react-router";
 import type { EntryContext } from "react-router";
 import crypto from "node:crypto";
+import { resumeImports } from "~/lib/gallery-import.server";
 
 const ABORT_DELAY = 5_000;
 
 if (typeof globalThis !== "undefined") {
-  const g = globalThis as unknown as { __gallery_import_started?: boolean };
-  if (!g.__gallery_import_started) {
-    g.__gallery_import_started = true;
-    import("~/lib/gallery-import.server")
-      .then(m => m.resumeImports())
-      .catch(console.error);
+  const galleryWorkerGlobal = globalThis as typeof globalThis & {
+    __gallery_import_started?: boolean;
+  };
+  if (!galleryWorkerGlobal.__gallery_import_started) {
+    resumeImports();
+    galleryWorkerGlobal.__gallery_import_started = true;
   }
 }
 

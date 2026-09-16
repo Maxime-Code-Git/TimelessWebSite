@@ -172,7 +172,7 @@ function getFutureTuesday(): string {
               BOOKING_DB_PATH: d.dbPath,
               PORTFOLIO_CONTENT_PATH: path.join(os.tmpdir(), "portfolio.json"),
               PORTFOLIO_MEDIA_PATH: path.join(os.tmpdir(), "portfolio"),
-              GALLERY_SECRET: "secret",
+              GALLERY_SECRET: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
               GALLERY_DB_PATH: d.dbPath,
               GALLERY_MEDIA_PATH: path.join(os.tmpdir(), "gallery-media"),
               GALLERY_IMPORT_PATH: path.join(os.tmpdir(), "gallery-import")
