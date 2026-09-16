@@ -348,6 +348,12 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     const enText = await enRes.text();
     expect(enText).toContain("Logout");
 
+    const enHeaders = enRes.headers();
+    expect(enHeaders["cache-control"]).toContain("no-store");
+    expect(enHeaders["x-robots-tag"]).toContain("noindex");
+    expect(enHeaders["x-robots-tag"]).toContain("nofollow");
+    expect(enHeaders["referrer-policy"]).toContain("no-referrer");
+
     // 26. Rotation du code invités
     await adminPage.goto(`/admin/galleries/${galleryId}`);
     const [rotationResponse] = await Promise.all([

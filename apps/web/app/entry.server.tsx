@@ -89,7 +89,9 @@ function addSecurityHeaders(headers: Headers, nonce: string): void {
   headers.set("X-Frame-Options", "DENY");
 
   // Control referrer information
-  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  if (!headers.has("Referrer-Policy")) {
+    headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  }
 
   // Disable browser features not used by this site
   headers.set(
