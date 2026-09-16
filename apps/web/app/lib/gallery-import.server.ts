@@ -225,7 +225,7 @@ export function startGalleryImport(galleryId: string, folderName: string): strin
   }
 
   // Trigger worker
-  scheduleWorker();
+  if (!process.env.__TEST_DISABLE_WORKER) scheduleWorker();
 
   return importId;
 }
@@ -234,7 +234,8 @@ export function startGalleryImport(galleryId: string, folderName: string): strin
  * Atomic job acquisition: attempts to claim exactly one pending job.
  * Returns the job if acquired, null otherwise.
  */
-const LEASE_DURATION_MS = 30000;
+let LEASE_DURATION_MS = 30000;
+export function __setLeaseDurationForTest(ms: number) { LEASE_DURATION_MS = ms; }
 
 export function acquireNextJob(): { id: string; gallery_id: string; import_path: string; lease_token: string } | null {
   const leaseToken = crypto.randomUUID();
@@ -263,7 +264,7 @@ export function acquireNextJob(): { id: string; gallery_id: string; import_path:
 export function resumeImports(): void {
   if (workerStarted) return;
   workerStarted = true;
-  scheduleWorker();
+  if (!process.env.__TEST_DISABLE_WORKER) scheduleWorker();
 }
 
 function scheduleWorker(): void {

@@ -160,7 +160,7 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
             <h2 className={`${styles.sectionTitle} ${styles.sectionTitleLight}`}>{t.videosTitle}</h2>
             <div className={styles.videoGrid}>
               {videos.map(v => (
-                <div key={v.id} className={styles.videoCard}>
+                <div key={v.id} className={styles.videoCard} data-testid="gallery-video">
                   <video controls playsInline preload="metadata" className={styles.videoElement}>
                     <source src={mediaUrl(v.id)} type={v.mime_type} />
                   </video>
@@ -186,7 +186,7 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
               {photos.map((p, idx) => {
                 const isLandscape = p.width && p.height && p.width > p.height;
                 return (
-                  <div key={p.id} className={`${styles.photoItem} ${isLandscape ? styles.photoItemLandscape : styles.photoItemPortrait}`}>
+                  <div key={p.id} className={`${styles.photoItem} ${isLandscape ? styles.photoItemLandscape : styles.photoItemPortrait}`} data-testid="gallery-photo">
                     <button
                       type="button"
                       className={styles.photoButton}

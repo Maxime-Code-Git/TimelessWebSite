@@ -1,10 +1,14 @@
 import { test, expect } from "@playwright/test";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import AdmZip from "adm-zip";
 import crypto from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import sharp from "sharp";
+
+
+const fixtureDirectory = fileURLToPath(new URL(".", import.meta.url));
 
 const IMPORT_FOLDER = "e2e-playwright-import";
 
@@ -43,11 +47,11 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // Generate 1 guest video (valid MP4)
     const guestVideoPath = path.join(targetDir, "invites/videos/guest-video.mp4");
-    fs.copyFileSync(path.join(__dirname, "fixtures/vid1.mp4"), guestVideoPath);
+    fs.copyFileSync(path.join(fixtureDirectory, "fixtures/vid1.mp4"), guestVideoPath);
 
     // Generate 1 couple video (valid MP4)
     const coupleVideoPath = path.join(targetDir, "maries/videos/couple-video.mp4");
-    fs.copyFileSync(path.join(__dirname, "fixtures/vid2.mp4"), coupleVideoPath);
+    fs.copyFileSync(path.join(fixtureDirectory, "fixtures/vid2.mp4"), coupleVideoPath);
   });
 
   test("cycle complet des galeries clientes", async ({ browser }) => {
@@ -65,12 +69,11 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // 1. Connexion admin
     await adminPage.goto("/admin");
-    const heading = await adminPage.locator("h2", { hasText: "Espace Administrateur" }).count();
-    if (heading > 0) {
-      await adminPage.fill('input[name="password"]', "e2e_password");
-      await adminPage.click('button[type="submit"]');
-      await adminPage.waitForURL("**/admin/galleries");
-    }
+    await expect(adminPage.locator('input[name="password"]')).toBeVisible();
+    await adminPage.fill('input[name="email"]', 'admin@example.com');
+    await adminPage.fill('input[name="password"]', "e2e_password");
+    await adminPage.click('button[type="submit"]');
+    await adminPage.waitForURL("**/admin/galleries");
 
     // 2. Création de galerie
     await adminPage.goto("/admin/galleries/new");
@@ -84,7 +87,7 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     expect(galleryId).toBeTruthy();
 
     await adminPage.click("text=Afficher les codes");
-    const guestCode = await adminPage.locator('input[name="guestCode"]').inputValue();
+    const guestCode = await adminPage.getByLabel("Code invités actuel").inputValue();
     const coupleCode = await adminPage.getByLabel("Code mariés actuel").inputValue();
     const originalGuestCode = guestCode;
 
@@ -95,21 +98,25 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await adminPage.selectOption('select[name="status"]', "draft");
 
     // 4. Import des 28 médias
-    await adminPage.selectOption('select[name="import_folder"]', IMPORT_FOLDER);
-    await adminPage.click('button:has-text("Aperçu de l\'import")');
-    await expect(adminPage.locator("text=25 photo(s) invités")).toBeVisible();
-    await adminPage.click('button:has-text("Lancer l\'importation")');
+    await adminPage.getByLabel("Dossier d'import").selectOption(IMPORT_FOLDER);
+    await expect(adminPage.getByText("28 médias trouvés", { exact: false })).toBeVisible();
+    adminPage.once("dialog", dialog => dialog.accept());
+    await adminPage.getByRole("button", { name: "Confirmer et lancer l'import", exact: true }).click();
 
     // 5. Attente de la fin réelle de l'import (polling state API)
     await expect(async () => {
       const res = await adminContext.request.get(`/api/admin/gallery-import/${galleryId}`);
       expect(res.status()).toBe(200);
       const data = await res.json();
-      expect(data.status).toBe("completed");
-      expect(data.progress).toBe(28);
-      expect(data.total).toBe(28);
-      expect(data.stats.maries_videos).toBe(1);
-      expect(data.stats.invites_photos).toBe(25);
+      const importState = data.importState;
+
+      expect(importState.status).toBe("completed");
+      expect(importState.progress).toBe(28);
+      expect(importState.total).toBe(28);
+
+      const result = JSON.parse(importState.result_json);
+      expect(result.imported).toBe(28);
+      expect(result.ignored).toHaveLength(0);
     }).toPass({ timeout: 15000, intervals: [500, 1000] });
 
     // Reload admin page to reflect imported media
@@ -165,7 +172,7 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await expect(guestVideo).toHaveAttribute("controls", "");
 
     // 13. Réponse 206 à Range valide sur vidéo
-    const videoSrc = await guestVideo.getAttribute("src");
+    const videoSrc = await guestVideo.locator("source").getAttribute("src");
     const rangeRes = await guestContext.request.get(videoSrc!, {
       headers: { Range: "bytes=0-100" }
     });
