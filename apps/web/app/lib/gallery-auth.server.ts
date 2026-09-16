@@ -151,7 +151,7 @@ export const GALLERY_PRIVATE_HEADERS: Record<string, string> = {
 export async function requireGalleryAccess(request: Request, publicId: string, requiredMediaId?: string, isApi = false) {
 
   const { requireAdminSession } = await import("./auth.server");
-  
+
   const { isValid: isAdmin } = await requireAdminSession(request);
 
   if (isAdmin) {
@@ -162,13 +162,13 @@ export async function requireGalleryAccess(request: Request, publicId: string, r
       if (isApi) throw new Response("Unauthorized", { status: 401, headers: GALLERY_PRIVATE_HEADERS });
       throw redirect("/fr/espace-clients", { headers: GALLERY_PRIVATE_HEADERS });
     }
-    
+
     let media = null;
     if (requiredMediaId) {
       media = db.prepare("SELECT * FROM gallery_media WHERE id = ? AND gallery_id = ?").get(requiredMediaId, gallery.id as string) as Record<string, unknown> | undefined;
       if (!media) throw new Response("Not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
     }
-    
+
     return { gallery, accessLevel: "maries" as GalleryAccessLevel, codeVersion: 0, media };
   }
 

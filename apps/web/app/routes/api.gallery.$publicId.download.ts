@@ -39,7 +39,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return new Response("No media to download", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
   }
 
-  
+
   const filesToAdd: { filePath: string; safeName: string }[] = [];
   const usedNames = new Set<string>();
 

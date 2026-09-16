@@ -234,27 +234,30 @@ export function startGalleryImport(galleryId: string, folderName: string): strin
  * Atomic job acquisition: attempts to claim exactly one pending job.
  * Returns the job if acquired, null otherwise.
  */
-const WORKER_ID = crypto.randomUUID();
+export const WORKER_ID = crypto.randomUUID();
 const LEASE_DURATION_MS = 30000;
 
 function acquireNextJob(): { id: string; gallery_id: string; import_path: string } | null {
   const db = getGalleryDb();
   const now = Date.now();
-
-  const pending = db.prepare(
-    "SELECT gi.id, gi.gallery_id, g.import_path FROM gallery_imports gi JOIN galleries g ON gi.gallery_id = g.id WHERE gi.status = 'pending' OR (gi.status = 'processing' AND gi.lease_expires_at < ?) ORDER BY gi.created_at ASC LIMIT 1"
-  ).get(now) as { id: string; gallery_id: string; import_path: string } | undefined;
-
-  if (!pending) return null;
-
   const expiresAt = now + LEASE_DURATION_MS;
-  const result = db.prepare(
-    "UPDATE gallery_imports SET status = 'processing', worker_id = ?, lease_expires_at = ?, attempt_count = attempt_count + 1, updated_at = ? WHERE id = ? AND (status = 'pending' OR (status = 'processing' AND lease_expires_at < ?))"
-  ).run(WORKER_ID, expiresAt, now, pending.id, now);
 
-  if (result.changes !== 1) return null;
+  const result = db.prepare(`
+    UPDATE gallery_imports
+    SET status = 'processing', worker_id = ?, lease_expires_at = ?, attempt_count = attempt_count + 1, updated_at = ?
+    WHERE id = (
+      SELECT id FROM gallery_imports
+      WHERE status = 'pending' OR (status = 'processing' AND lease_expires_at < ?)
+      ORDER BY created_at ASC
+      LIMIT 1
+    )
+    RETURNING id, gallery_id
+  `).get(WORKER_ID, expiresAt, now, now) as { id: string; gallery_id: string } | undefined;
 
-  return pending;
+  if (!result) return null;
+
+  const gallery = db.prepare("SELECT import_path FROM galleries WHERE id = ?").get(result.gallery_id) as { import_path: string };
+  return { id: result.id, gallery_id: result.gallery_id, import_path: gallery.import_path };
 }
 
 export function resumeImports(): void {
@@ -281,9 +284,19 @@ async function runWorkerLoop(): Promise<void> {
   }
 }
 
-async function processImport(importId: string, galleryId: string, folderName: string): Promise<void> {
+export async function processImport(importId: string, galleryId: string, folderName: string): Promise<void> {
   const db = getGalleryDb();
   let leaseTimer: NodeJS.Timeout | null = null;
+    let canceled = false;
+    const checkLease = () => {
+      if (canceled) return false;
+      const res = db.prepare("UPDATE gallery_imports SET lease_expires_at = ? WHERE id = ? AND worker_id = ?")
+        .run(Date.now() + LEASE_DURATION_MS, importId, WORKER_ID);
+      if (res.changes === 0) {
+        canceled = true;
+      }
+      return !canceled;
+    };
 
   try {
     const importDir = validateImportPath(folderName);
@@ -298,19 +311,44 @@ async function processImport(importId: string, galleryId: string, folderName: st
       .run(files.length, Date.now(), importId, WORKER_ID);
 
     leaseTimer = setInterval(() => {
-      db.prepare("UPDATE gallery_imports SET lease_expires_at = ? WHERE id = ? AND worker_id = ?")
-        .run(Date.now() + LEASE_DURATION_MS, importId, WORKER_ID);
+      if (!checkLease()) clearInterval(leaseTimer!);
     }, LEASE_DURATION_MS / 2);
 
     const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId);
     if (!fs.existsSync(mediaDir)) {
       fs.mkdirSync(mediaDir, { recursive: true });
-    } else {
-      const existingFiles = fs.readdirSync(mediaDir);
-      for (const f of existingFiles) {
-        if (f.endsWith(".tmp")) {
-          try { fs.unlinkSync(path.join(mediaDir, f)); } catch { /* ignore */ }
-        }
+    }
+
+    // RECONCILIATION
+    const existingFiles = fs.readdirSync(mediaDir);
+    const tmpFiles = existingFiles.filter(f => f.endsWith(".tmp"));
+    const finalFiles = existingFiles.filter(f => !f.endsWith(".tmp"));
+
+    // 1. Check tmp files: if DB has them, recover by renaming. Else, delete.
+    for (const tmp of tmpFiles) {
+      const mediaId = tmp.replace(".tmp", "");
+      const existsInDb = db.prepare("SELECT id FROM gallery_media WHERE id = ?").get(mediaId);
+      if (existsInDb) {
+        try { fs.renameSync(path.join(mediaDir, tmp), path.join(mediaDir, mediaId)); } catch { /* ignore */ }
+        finalFiles.push(mediaId); // now it's a final file
+      } else {
+        try { fs.unlinkSync(path.join(mediaDir, tmp)); } catch { /* ignore */ }
+      }
+    }
+
+    // 2. Check orphan final files: if not in DB, delete.
+    for (const f of finalFiles) {
+      const existsInDb = db.prepare("SELECT id FROM gallery_media WHERE id = ?").get(f);
+      if (!existsInDb) {
+        try { fs.unlinkSync(path.join(mediaDir, f)); } catch { /* ignore */ }
+      }
+    }
+
+    // 3. Check phantom DB records for this gallery: if file missing, delete record.
+    const dbRecords = db.prepare("SELECT id FROM gallery_media WHERE gallery_id = ?").all(galleryId) as { id: string }[];
+    for (const rec of dbRecords) {
+      if (!fs.existsSync(path.join(mediaDir, rec.id))) {
+        db.prepare("DELETE FROM gallery_media WHERE id = ?").run(rec.id);
       }
     }
 
@@ -319,6 +357,7 @@ async function processImport(importId: string, galleryId: string, folderName: st
     let currentTotalSize = 0;
 
     for (const file of files) {
+      if (!checkLease()) break;
       let fd: number | null = null;
       let tmpPath: string | null = null;
       let destPath: string | null = null;
@@ -338,7 +377,7 @@ async function processImport(importId: string, galleryId: string, folderName: st
           results.ignored.push({ file: file.name, reason: "Fichier trop volumineux" });
           continue;
         }
-        
+
         if (currentTotalSize + stat.size > MAX_TOTAL_SIZE) {
           results.ignored.push({ file: file.name, reason: "Limite totale de stockage atteinte" });
           continue;
@@ -370,6 +409,7 @@ async function processImport(importId: string, galleryId: string, folderName: st
           readStream.on("error", reject);
         });
 
+        if (!checkLease()) throw new Error("Lease lost");
         const finalHash = hash.digest("hex");
 
         fs.closeSync(fd);
@@ -385,6 +425,7 @@ async function processImport(importId: string, galleryId: string, folderName: st
         let height: number | null = null;
         if (type === "photo") {
           const metadata = await sharp(tmpPath).metadata();
+          if (!checkLease()) throw new Error("Lease lost");
           width = metadata.width || null;
           height = metadata.height || null;
           if (metadata.orientation && metadata.orientation >= 5) {
@@ -393,15 +434,17 @@ async function processImport(importId: string, galleryId: string, folderName: st
           }
         }
 
+        if (!checkLease()) throw new Error("Lease lost");
         db.prepare(`
           INSERT INTO gallery_media (id, gallery_id, type, visibility, original_name, mime_type, size, hash, width, height, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(mediaId, galleryId, type, file.visibility, file.name, mimeType, stat.size, finalHash, width, height, Date.now());
         inserted = true;
 
+        if (!checkLease()) throw new Error("Lease lost");
         fs.renameSync(tmpPath, destPath);
         tmpPath = null;
-        
+
         currentTotalSize += stat.size;
         results.imported++;
       } catch (err) {
@@ -420,19 +463,25 @@ async function processImport(importId: string, galleryId: string, folderName: st
           try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
         }
         progress++;
-        db.prepare("UPDATE gallery_imports SET progress = ?, updated_at = ? WHERE id = ? AND worker_id = ?").run(progress, Date.now(), importId, WORKER_ID);
+        if (checkLease()) {
+          db.prepare("UPDATE gallery_imports SET progress = ?, updated_at = ? WHERE id = ? AND worker_id = ?").run(progress, Date.now(), importId, WORKER_ID);
+        }
       }
     }
 
     if (leaseTimer) clearInterval(leaseTimer);
-    
+
     // Finalize
-    db.prepare("UPDATE gallery_imports SET status = 'completed', result_json = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
+    if (!canceled) {
+      db.prepare("UPDATE gallery_imports SET status = 'completed', result_json = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
       .run(JSON.stringify(results), Date.now(), importId, WORKER_ID);
+    }
 
   } catch (err) {
     if (leaseTimer) clearInterval(leaseTimer);
-    db.prepare("UPDATE gallery_imports SET status = 'failed', result_json = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
+    if (!canceled) {
+      db.prepare("UPDATE gallery_imports SET status = 'failed', result_json = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
       .run(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), Date.now(), importId, WORKER_ID);
+    }
   }
 }

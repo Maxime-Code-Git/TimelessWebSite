@@ -32,7 +32,7 @@ async function stopServer(proc: ChildProcess | undefined) {
   });
 }
 
-describe("Admin Gallery E2E Lifecycle", () => {
+describe("Admin Gallery Integration Lifecycle", () => {
   let serverProcess: ChildProcess;
   const PORT = Math.floor(Math.random() * 20000) + 40000;
   const BASE_URL = `http://localhost:${PORT}`;
@@ -48,7 +48,7 @@ describe("Admin Gallery E2E Lifecycle", () => {
   beforeAll(async () => {
     fs.copyFileSync(defaultContentPath, siteContentPath);
     fs.mkdirSync(mediaPath, { recursive: true });
-    
+
     // Create a mock import folder structure
     fs.mkdirSync(path.join(importPath, "invites", "photos"), { recursive: true });
     // Valid 1x1 JPEG base64
@@ -80,8 +80,7 @@ describe("Admin Gallery E2E Lifecycle", () => {
 
       let started = false;
       serverProcess.stdout?.on("data", (d) => {
-        console.log("Server stdout:", d.toString());
-        if (!started && d.toString().includes(String(PORT))) {
+                if (!started && d.toString().includes(String(PORT))) {
           started = true;
           resolve(undefined);
         }
@@ -122,21 +121,19 @@ describe("Admin Gallery E2E Lifecycle", () => {
     });
     expect(loginRes.status).toBe(302);
     const authCookie = loginRes.headers.get("Set-Cookie") || "";
-    
-    
+
+
 
     // 3. Get /admin/galleries/new for new CSRF
-    console.log("fetching newRes");
-    const newRes = await fetch(`${BASE_URL}/admin/galleries/new`, {
+        const newRes = await fetch(`${BASE_URL}/admin/galleries/new`, {
       headers: { "Cookie": authCookie },
       redirect: "manual",
     });
-    
+
     const newText = await newRes.text();
     const newCsrfToken = newText.match(/name="csrfToken" value="([^"]+)"/)?.[1] || "";
 
-    console.log("fetching createRes");
-    const createRes = await fetch(`${BASE_URL}/admin/galleries/new`, {
+        const createRes = await fetch(`${BASE_URL}/admin/galleries/new`, {
       method: "POST",
       body: new URLSearchParams({
         csrfToken: newCsrfToken,
@@ -151,16 +148,15 @@ describe("Admin Gallery E2E Lifecycle", () => {
       },
       redirect: "manual",
     });
-    
-    
+
+
     expect(createRes.status).toBe(302);
     const location = createRes.headers.get("Location");
     expect(location).toContain("/admin/galleries/");
     const galleryId = location?.split("/").pop();
     expect(galleryId).toBeTruthy();
 
-    console.log("fetching updateRes");
-    const updateRes = await fetch(`${BASE_URL}/admin/galleries/${galleryId}`, {
+        const updateRes = await fetch(`${BASE_URL}/admin/galleries/${galleryId}`, {
       method: "POST",
       body: new URLSearchParams({
         intent: "update_info",
@@ -240,9 +236,7 @@ describe("Admin Gallery E2E Lifecycle", () => {
       redirect: "manual",
     });
     const pubText = await pubRes.text();
-    console.log("pubRes status:", pubRes.status);
-    console.log("pubText snippet:", pubText.substring(0, 500));
-    expect(pubRes.status).toBe(200);
+            expect(pubRes.status).toBe(200);
     expect(pubText).toContain("success");
 
     const publicIdDb = new DatabaseSync(galleryDbPath);
@@ -287,10 +281,10 @@ describe("Admin Gallery E2E Lifecycle", () => {
       },
       redirect: "manual"
     });
-    
+
     // Check if login redirects to the gallery
     expect([302, 303]).toContain(guestLoginRes.status);
-    
+
     const guestCookie = guestLoginRes.headers.get("Set-Cookie");
     expect(guestCookie).toBeTruthy();
 
@@ -330,23 +324,23 @@ describe("Admin Gallery E2E Lifecycle", () => {
       },
       redirect: "manual"
     });
-    
+
     expect([302, 303]).toContain(coupleLoginRes.status);
     const coupleCookie = coupleLoginRes.headers.get("Set-Cookie");
-    
+
     // Verify ZIP download API works for couples
     const zipRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download?type=all`, {
       headers: { "Cookie": coupleCookie! }
     });
     expect(zipRes.status).toBe(200);
     expect(zipRes.headers.get("Content-Type")).toBe("application/zip");
-    
+
     const zipBuffer = await zipRes.arrayBuffer();
     expect(zipBuffer.byteLength).toBeGreaterThan(100);
 
     // 11. Verify Expiration
     // Expire the gallery by updating the expiration date to the past in DB
-    
+
         const expireDb = new DatabaseSync(galleryDbPath);
     expireDb.prepare("UPDATE galleries SET expires_at = ? WHERE id = ?").run(Date.now() - 86400000, galleryId as string);
     expireDb.close();
@@ -367,7 +361,7 @@ describe("Admin Gallery E2E Lifecycle", () => {
       },
       redirect: "manual"
     });
-    
+
     // Should be unauthorized
     expect(expiredLoginRes.status).toBe(401);
   }, 15000);

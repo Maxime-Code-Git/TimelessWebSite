@@ -1,220 +1,316 @@
 import { test, expect } from "@playwright/test";
-import fs from "node:fs";
-import path from "node:path";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { execSync } from "node:child_process";
+import AdmZip from "adm-zip";
+import crypto from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
+import sharp from "sharp";
 
 const IMPORT_FOLDER = "e2e-playwright-import";
-let galleryId: string;
-let galleryPublicId: string;
-let guestCode: string;
-let coupleCode: string;
-let originalGuestCode: string;
 
-test.describe.serial("Client Gallery E2E — Full Cycle", () => {
-  test.beforeAll(() => {
+test.describe("Client Gallery E2E — Full Cycle", () => {
+  let targetDir: string;
+  let galleryDbPath: string;
+
+  test.beforeAll(async () => {
+    galleryDbPath = process.env.GALLERY_DB_PATH!;
+    if (!galleryDbPath) throw new Error("GALLERY_DB_PATH is required");
+
     const importBase = process.env.GALLERY_IMPORT_PATH || path.join(process.cwd(), "imports");
-    const targetDir = path.join(importBase, IMPORT_FOLDER);
-    
+    targetDir = path.join(importBase, IMPORT_FOLDER);
+
+    if (fs.existsSync(targetDir)) {
+      fs.rmSync(targetDir, { recursive: true, force: true });
+    }
+
     fs.mkdirSync(path.join(targetDir, "invites/photos"), { recursive: true });
     fs.mkdirSync(path.join(targetDir, "invites/videos"), { recursive: true });
     fs.mkdirSync(path.join(targetDir, "maries/photos"), { recursive: true });
     fs.mkdirSync(path.join(targetDir, "maries/videos"), { recursive: true });
 
-    const dummyJpeg = Buffer.from("FFD8FFE000104A464946000100000000000000000000000000000000", "hex");
-    const dummyMp4 = Buffer.from("000000206674797069736F6D0000020069736F6D69736F32617663316D703431", "hex");
-
+    // Generate 25 distinct guest photos
     for (let i = 1; i <= 25; i++) {
-      fs.writeFileSync(path.join(targetDir, `invites/photos/guest-photo-${i}.jpg`), dummyJpeg);
+      const p = path.join(targetDir, `invites/photos/guest-photo-${i}.jpg`);
+      await sharp({ create: { width: 100, height: 100, channels: 3, background: { r: i * 10, g: 100, b: 100 } } })
+        .jpeg()
+        .toFile(p);
     }
-    fs.writeFileSync(path.join(targetDir, "invites/videos/guest-video.mp4"), dummyMp4);
-    fs.writeFileSync(path.join(targetDir, "maries/photos/couple-photo.jpg"), dummyJpeg);
-    fs.writeFileSync(path.join(targetDir, "maries/videos/couple-video.mp4"), dummyMp4);
+    // Generate 1 distinct couple photo
+    const couplePhotoPath = path.join(targetDir, "maries/photos/couple-photo.jpg");
+    await sharp({ create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 0, b: 0 } } })
+      .jpeg()
+      .toFile(couplePhotoPath);
+
+    // Generate 1 guest video (valid MP4)
+    const guestVideoPath = path.join(targetDir, "invites/videos/guest-video.mp4");
+    execSync(`ffmpeg -f lavfi -i color=c=blue:s=160x120:d=0.1 -vcodec libx264 -pix_fmt yuv420p -y ${guestVideoPath}`);
+
+    // Generate 1 couple video (valid MP4)
+    const coupleVideoPath = path.join(targetDir, "maries/videos/couple-video.mp4");
+    execSync(`ffmpeg -f lavfi -i color=c=red:s=160x120:d=0.1 -vcodec libx264 -pix_fmt yuv420p -y ${coupleVideoPath}`);
   });
 
-  test("1. Admin login", async ({ page }) => {
-    await page.goto("/admin");
-    const heading = await page.locator("h2", { hasText: "Espace Administrateur" }).count();
+  test("cycle complet des galeries clientes", async ({ browser }) => {
+    // Contextes
+    const adminContext = await browser.newContext();
+    const guestContext = await browser.newContext();
+    const coupleContext = await browser.newContext();
+    const oldGuestContext = await browser.newContext();
+
+    const adminPage = await adminContext.newPage();
+    const guestPage = await guestContext.newPage();
+    const couplePage = await coupleContext.newPage();
+    const oldGuestPage = await oldGuestContext.newPage();
+
+
+    // 1. Connexion admin
+    await adminPage.goto("/admin");
+    const heading = await adminPage.locator("h2", { hasText: "Espace Administrateur" }).count();
     if (heading > 0) {
-      await page.fill('input[name="username"]', "testadmin");
-      await page.fill('input[name="password"]', "testadmin123");
-      await page.click('button[type="submit"]');
-      await page.waitForURL("**/admin/galleries");
+      await adminPage.fill('input[name="password"]', "testadmin123");
+      await adminPage.click('button[type="submit"]');
+      await adminPage.waitForURL("**/admin/galleries");
     }
-  });
 
-  test("2. Create gallery", async ({ page }) => {
-    await page.goto("/admin/galleries/new");
-    await page.fill('input[name="bride_names"]', "Playwright Couple");
-    await page.fill('input[name="wedding_date"]', "2027-07-15");
-    await page.fill('input[name="location"]', "Château");
-    await page.click('button[type="submit"]');
+    // 2. Création de galerie
+    await adminPage.goto("/admin/galleries/new");
+    await adminPage.fill('input[name="bride_names"]', "Playwright Couple");
+    await adminPage.fill('input[name="wedding_date"]', "2027-07-15");
+    await adminPage.fill('input[name="location"]', "Château");
+    await adminPage.click('button[type="submit"]');
 
-    await page.waitForURL(/\/admin\/galleries\/.+/);
-    galleryId = page.url().split("/admin/galleries/")[1];
+    await adminPage.waitForURL(/\/admin\/galleries\/.+/);
+    const galleryId = adminPage.url().split("/admin/galleries/")[1];
     expect(galleryId).toBeTruthy();
 
-    await page.click("text=Afficher les codes");
-    guestCode = await page.locator('input[name="guestCode"]').inputValue();
-    coupleCode = await page.locator('input[name="coupleCode"]').inputValue();
-    originalGuestCode = guestCode;
-    expect(guestCode).not.toBe(coupleCode);
-  });
+    await adminPage.click("text=Afficher les codes");
+    const guestCode = await adminPage.locator('input[name="guestCode"]').inputValue();
+    const coupleCode = await adminPage.locator('input[name="coupleCode"]').inputValue();
+    const originalGuestCode = guestCode;
 
-  test("3. Refuse publication before import", async ({ page }) => {
-    await page.selectOption('select[name="status"]', "published");
-    await page.click('button:has-text("Enregistrer les modifications")');
-    await expect(page.locator("text=impossible de publier une galerie vide")).toBeVisible();
-    await page.selectOption('select[name="status"]', "draft");
-  });
+    // 3. Refus publication sans média
+    await adminPage.selectOption('select[name="status"]', "published");
+    await adminPage.click('button:has-text("Enregistrer les modifications")');
+    await expect(adminPage.locator("text=impossible de publier une galerie vide")).toBeVisible();
+    await adminPage.selectOption('select[name="status"]', "draft");
 
-  test("4. Start import", async ({ page }) => {
-    await page.selectOption('select[name="import_folder"]', IMPORT_FOLDER);
-    await page.click('button:has-text("Aperçu de l\'import")');
-    await expect(page.locator("text=25 photo(s) invités")).toBeVisible();
-    await page.click('button:has-text("Lancer l\'importation")');
-  });
+    // 4. Import des 28 médias
+    await adminPage.selectOption('select[name="import_folder"]', IMPORT_FOLDER);
+    await adminPage.click('button:has-text("Aperçu de l\'import")');
+    await expect(adminPage.locator("text=25 photo(s) invités")).toBeVisible();
+    await adminPage.click('button:has-text("Lancer l\'importation")');
 
-  test("5. Wait for import completion", async ({ page }) => {
-    await expect(page.locator("text=Importation en cours...")).toBeVisible();
-    await expect(page.locator("text=Import terminé").or(page.locator('select[name="import_folder"]'))).toBeVisible({ timeout: 60000 });
-  });
+    // 5. Attente de la fin réelle de l'import (polling state API)
+    await expect(async () => {
+      const res = await adminContext.request.get(`/api/admin/gallery-import/${galleryId}`);
+      expect(res.status()).toBe(200);
+      const data = await res.json();
+      expect(data.status).toBe("completed");
+      expect(data.progress).toBe(28);
+      expect(data.total).toBe(28);
+      expect(data.stats.maries_videos).toBe(1);
+      expect(data.stats.invites_photos).toBe(25);
+    }).toPass({ timeout: 15000, intervals: [500, 1000] });
 
-  test("6. Select cover image", async ({ page }) => {
-    const firstImg = page.locator('.media-grid img').first();
-    if (await firstImg.isVisible()) {
-      await firstImg.click();
-    }
-  });
+    // Reload admin page to reflect imported media
+    await adminPage.reload();
 
-  test("7. Publish gallery", async ({ page }) => {
-    await page.selectOption('select[name="status"]', "published");
-    await page.click('button:has-text("Enregistrer les modifications")');
-    await expect(page.locator("text=Galerie mise à jour")).toBeVisible();
-    
-    galleryPublicId = await page.locator('input[name="public_id"]').inputValue();
-    if (!galleryPublicId) {
-       const link = await page.locator('a:has-text("Voir la galerie")').getAttribute("href");
-       galleryPublicId = link!.split("/galerie/")[1];
-    }
-  });
+    // 6. Sélection d'une couverture avec locator accessible
+    await adminPage.locator('input[type="radio"][name="cover_image_id"]').first().click({ force: true });
 
-  test("8. Guest login", async ({ page }) => {
-    await page.goto("/fr/espace-clients");
-    await page.fill('input[name="code"]', guestCode);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(`/fr/galerie/${galleryPublicId}`);
-  });
+    // 7. Publication
+    await adminPage.selectOption('select[name="status"]', "published");
+    await adminPage.click('button:has-text("Enregistrer les modifications")');
+    await expect(adminPage.locator("text=Galerie mise à jour")).toBeVisible();
 
-  test("9. Guest media visibility", async ({ page }) => {
-    const images = page.locator("img");
-    await expect(images).toHaveCount(24);
-  });
+    const db = new DatabaseSync(galleryDbPath);
+    const galleryPublicId = (db.prepare("SELECT public_id FROM galleries WHERE id = ?").get(galleryId) as { public_id: string }).public_id;
+    db.close();
 
-  test("10. No access to couple media", async ({ page }) => {
-    const req = await page.request.get(`/api/gallery/${galleryPublicId}/photos`);
-    const data = await req.json();
-    const coupleMedia = data.photos.find((p: { visibility: string }) => p.visibility === "maries");
-    expect(coupleMedia).toBeUndefined();
-  });
+    // 8. Connexion invités (old guest context as well)
+    await guestPage.goto("/fr/espace-clients");
+    await guestPage.fill('input[name="code"]', guestCode);
+    await guestPage.click('button[type="submit"]');
+    await guestPage.waitForURL(`/fr/galerie/${galleryPublicId}`);
 
-  test("11. Guest downloads", async ({ page }) => {
-    const zipReq = await page.request.get(`/api/gallery/${galleryPublicId}/download?type=all`);
-    expect(zipReq.status()).toBe(200);
-    expect(zipReq.headers()["content-type"]).toBe("application/zip");
-  });
+    await oldGuestPage.goto("/fr/espace-clients");
+    await oldGuestPage.fill('input[name="code"]', guestCode);
+    await oldGuestPage.click('button[type="submit"]');
+    await oldGuestPage.waitForURL(`/fr/galerie/${galleryPublicId}`);
 
-  test("12. See more button visible", async ({ page }) => {
-    const seeMoreBtn = page.locator('button:has-text("Voir plus")');
+    // 22-25. En-têtes de confidentialité (sur la page invité)
+    const galleryRes = await guestContext.request.get(`/fr/galerie/${galleryPublicId}`);
+    const headers = galleryRes.headers();
+    expect(headers["cache-control"]).toContain("no-store");
+    expect(headers["x-robots-tag"]).toContain("noindex");
+    expect(headers["x-robots-tag"]).toContain("nofollow");
+    expect(headers["referrer-policy"]).toContain("no-referrer");
+
+    // 9. Présence des 24 premières photos de galerie (sans compter logo et couverture)
+    // Logo is inside header, cover is probably in a banner. Photos are in .media-item
+    await expect(guestPage.locator('.media-item')).toHaveCount(24);
+
+    // 10. Présence du bouton Voir plus
+    const seeMoreBtn = guestPage.locator('button:has-text("Voir plus")');
     await expect(seeMoreBtn).toBeVisible();
-  });
 
-  test("13. Click See more", async ({ page }) => {
-    const seeMoreBtn = page.locator('button:has-text("Voir plus")');
+    // 11. Clic et chargement de la 25e photo (24 + 1 vidéo + 1 photo = 26 items)
     await seeMoreBtn.click();
-    await expect(page.locator("img")).toHaveCount(25);
-  });
+    await expect(guestPage.locator('.media-item')).toHaveCount(26);
 
-  test("14. Couple login", async ({ page, context }) => {
-    await context.clearCookies();
-    await page.goto("/fr/espace-clients");
-    await page.fill('input[name="code"]', coupleCode);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(`/fr/galerie/${galleryPublicId}`);
-  });
+    // 12. Présence vidéo invité avec controls
+    const guestVideo = guestPage.locator('video');
+    await expect(guestVideo).toHaveCount(1);
+    await expect(guestVideo).toHaveAttribute("controls", "");
 
-  test("15. Couple has access to all media", async ({ page }) => {
-    const req = await page.request.get(`/api/gallery/${galleryPublicId}/photos`);
-    const data = await req.json();
-    const coupleMedia = data.photos.find((p: { visibility: string }) => p.visibility === "maries");
-    expect(coupleMedia).toBeDefined();
-  });
+    // 13. Réponse 206 à Range valide sur vidéo
+    const videoSrc = await guestVideo.getAttribute("src");
+    const rangeRes = await guestContext.request.get(videoSrc!, {
+      headers: { Range: "bytes=0-100" }
+    });
+    expect(rangeRes.status()).toBe(206);
 
-  test("16. Original download check", async ({ page }) => {
-    const req = await page.request.get(`/api/gallery/${galleryPublicId}/photos`);
-    const data = await req.json();
-    const firstId = data.photos[0].id;
-    const dlReq = await page.request.get(`/api/gallery/${galleryPublicId}/download/original/${firstId}`);
-    expect(dlReq.status()).toBe(200);
-    const buffer = await dlReq.body();
-    expect(buffer.length).toBeGreaterThan(0);
-  });
+    const invalidRanges = [
+      "bits=0-100",
+      "bytes=0-100,200-300",
+      "bytes=-500abc",
+      "bytes=0-100abc",
+      "bytes=999999-",
+      "bytes=-"
+    ];
+    for (const invalid of invalidRanges) {
+      const errRes = await guestContext.request.get(videoSrc!, {
+        headers: { Range: invalid }
+      });
+      expect(errRes.status()).toBe(416);
+    }
 
-  test("17. Couple ZIP download", async ({ page }) => {
-    const zipReq = await page.request.get(`/api/gallery/${galleryPublicId}/download?type=all`);
-    expect(zipReq.status()).toBe(200);
-  });
+    // 14. Accès invité refusé en 404 aux médias mariés
+    // Find couple media ID using API
+    const adminPhotosRes = await adminContext.request.get(`/api/admin/gallery-media/${galleryId}`);
+    const adminPhotos = await adminPhotosRes.json();
+    const coupleMediaId = adminPhotos.find((p: Record<string, unknown>) => p.visibility === "maries").id;
+    const forbidRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/media/${coupleMediaId}`);
+    expect(forbidRes.status()).toBe(404);
 
-  test("18. FR and EN functionality", async ({ page }) => {
-    await page.goto(`/en/gallery/${galleryPublicId}`);
-    await expect(page.locator("body")).toBeVisible();
-  });
+    // 15-16. ZIP invités photos, vidéos et all sans médias mariés
+    for (const type of ["photos", "videos", "all"]) {
+      const zipRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/download?type=${type}`);
+      expect(zipRes.status()).toBe(200);
+      const zipBuffer = await zipRes.body();
+      const zip = new AdmZip(zipBuffer);
+      const entries = zip.getEntries().map(e => e.entryName);
 
-  test("19. Privacy headers", async ({ page }) => {
-    const req = await page.request.get(`/fr/galerie/${galleryPublicId}`);
-    expect(req.headers()["cache-control"]).toContain("no-store");
-  });
+      if (type === "photos") {
+        expect(entries.length).toBe(25);
+      } else if (type === "videos") {
+        expect(entries.length).toBe(1);
+      } else {
+        expect(entries.length).toBe(26);
+      }
 
-  test("20. Guest code rotation", async ({ page, context }) => {
-    await context.clearCookies();
-    await page.goto("/admin");
-    await page.fill('input[name="username"]', "testadmin");
-    await page.fill('input[name="password"]', "testadmin123");
-    await page.click('button[type="submit"]');
+      for (const entry of entries) {
+        expect(entry).not.toContain("maries");
+        expect(entry).not.toContain("couple");
+      }
+    }
 
-    await page.goto(`/admin/galleries/${galleryId}`);
-    await page.click("text=Générer un nouveau code");
-    await page.waitForTimeout(1000);
-  });
+    // 17. Connexion mariés
+    await couplePage.goto("/fr/espace-clients");
+    await couplePage.fill('input[name="code"]', coupleCode);
+    await couplePage.click('button[type="submit"]');
+    await couplePage.waitForURL(`/fr/galerie/${galleryPublicId}`);
 
-  test("21. Invalidation of old code", async ({ page, context }) => {
-    await context.clearCookies();
-    await page.goto("/fr/espace-clients");
-    await page.fill('input[name="code"]', originalGuestCode);
-    await page.click('button[type="submit"]');
-    await expect(page.locator("text=invalide")).toBeVisible();
-  });
+    // 18. Visibilité des médias invités et mariés
+    // 25 guest photos + 1 couple photo + 1 guest video + 1 couple video = 28
+    // Mariés sees all 28. Pagination is 24 items, so need to click see more.
+    await expect(couplePage.locator('.media-item')).toHaveCount(24);
+    await couplePage.locator('button:has-text("Voir plus")').click();
+    await expect(couplePage.locator('.media-item')).toHaveCount(28);
 
-  test("22. Old session invalidation", async () => {
-    expect(true).toBe(true);
-  });
+    // 19. ZIP mariés contenant les 4 catégories
+    const coupleZipRes = await coupleContext.request.get(`/api/gallery/${galleryPublicId}/download?type=all`);
+    expect(coupleZipRes.status()).toBe(200);
+    const coupleZip = new AdmZip(await coupleZipRes.body());
+    expect(coupleZip.getEntries().length).toBe(28);
 
-  test("23. Expired gallery block", async () => {
-    // Cannot be done via UI easily as UI blocks past dates.
-    expect(true).toBe(true);
-  });
+    // 20. Téléchargement original (SHA-256 identique)
+    // Find guest photo 1 ID
+    const guestMediaId = adminPhotos.find((p: Record<string, unknown>) => p.original_name === "guest-photo-1.jpg").id;
+    const origRes = await coupleContext.request.get(`/api/gallery/${galleryPublicId}/download/original/${guestMediaId}`);
+    expect(origRes.status()).toBe(200);
+    const origBuffer = await origRes.body();
+    const origHash = crypto.createHash("sha256").update(origBuffer).digest("hex");
 
-  test("24. Archived gallery block", async ({ page, context }) => {
-    await context.clearCookies();
-    await page.goto("/admin");
-    await page.fill('input[name="username"]', "testadmin");
-    await page.fill('input[name="password"]', "testadmin123");
-    await page.click('button[type="submit"]');
-    
-    await page.goto(`/admin/galleries/${galleryId}`);
-    await page.selectOption('select[name="status"]', "archived");
-    await page.click('button:has-text("Enregistrer les modifications")');
-    
-    await context.clearCookies();
-    const guestReq = await page.request.get(`/fr/galerie/${galleryPublicId}`);
-    expect(guestReq.url()).toContain("espace-clients");
+    const fixtureBuffer = fs.readFileSync(path.join(targetDir, "invites/photos/guest-photo-1.jpg"));
+    const fixtureHash = crypto.createHash("sha256").update(fixtureBuffer).digest("hex");
+    expect(origHash).toBe(fixtureHash);
+
+    // 21. Véritables contenus FR et EN
+    const frRes = await coupleContext.request.get(`/fr/galerie/${galleryPublicId}`);
+    const frText = await frRes.text();
+    expect(frText).toContain("Déconnexion");
+
+    const enRes = await coupleContext.request.get(`/en/gallery/${galleryPublicId}`);
+    const enText = await enRes.text();
+    expect(enText).toContain("Logout");
+
+    // 26. Rotation du code invités
+    await adminPage.goto(`/admin/galleries/${galleryId}`);
+    await adminPage.click("text=Générer un nouveau code");
+
+    // Attendre la sauvegarde du code rotatif
+    const newGuestCodeInput = adminPage.locator('input[name="guestCode"]');
+    await expect(newGuestCodeInput).not.toHaveValue(originalGuestCode);
+    const newGuestCode = await newGuestCodeInput.inputValue();
+
+    // 27. Refus de l'ancien code
+    const invalidGuestContext = await browser.newContext();
+    const invalidGuestPage = await invalidGuestContext.newPage();
+    await invalidGuestPage.goto("/fr/espace-clients");
+    await invalidGuestPage.fill('input[name="code"]', originalGuestCode);
+    await invalidGuestPage.click('button[type="submit"]');
+    await expect(invalidGuestPage.locator("text=invalide")).toBeVisible();
+
+    // 28. Invalidation d'une session invitée déjà connectée avant la rotation
+    const oldSessionRes = await oldGuestContext.request.get(`/api/gallery/${galleryPublicId}/download?type=photos`);
+    // Should be unauthorized
+    expect(oldSessionRes.status()).toBe(401);
+
+    // 29. Fonctionnement du nouveau code
+    const newGuestContext = await browser.newContext();
+    const newGuestPage = await newGuestContext.newPage();
+    await newGuestPage.goto("/fr/espace-clients");
+    await newGuestPage.fill('input[name="code"]', newGuestCode);
+    await newGuestPage.click('button[type="submit"]');
+    await newGuestPage.waitForURL(`/fr/galerie/${galleryPublicId}`);
+
+    // 30. Expiration forcée avec DatabaseSync, suivie d'un refus d'accès
+    const expireDb = new DatabaseSync(galleryDbPath);
+    expireDb.prepare("UPDATE galleries SET expires_at = ? WHERE id = ?").run(Date.now() - 86400000, galleryId);
+    expireDb.close();
+
+    const expiredRes = await newGuestContext.request.get(`/fr/galerie/${galleryPublicId}`);
+    // Unexpired is 200. Expired should redirect to login.
+        expect(expiredRes.url()).toContain("espace-clients");
+
+    // 31. Restauration d'une expiration future
+    const restoreDb = new DatabaseSync(galleryDbPath);
+    restoreDb.prepare("UPDATE galleries SET expires_at = ? WHERE id = ?").run(Date.now() + 86400000, galleryId);
+    restoreDb.close();
+
+    const restoredRes = await newGuestContext.request.get(`/fr/galerie/${galleryPublicId}`);
+    expect(restoredRes.status()).toBe(200);
+    expect(restoredRes.url()).not.toContain("espace-clients");
+
+    // 32. Archivage par l'admin
+    await adminPage.selectOption('select[name="status"]', "archived");
+    await adminPage.click('button:has-text("Enregistrer les modifications")');
+    await expect(adminPage.locator("text=Galerie mise à jour")).toBeVisible();
+
+    // 33. Refus d'accès après archivage
+    const archivedRes = await newGuestContext.request.get(`/fr/galerie/${galleryPublicId}`);
+    expect(archivedRes.url()).toContain("espace-clients");
   });
 });

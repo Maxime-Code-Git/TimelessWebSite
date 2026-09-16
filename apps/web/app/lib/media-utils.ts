@@ -20,10 +20,10 @@ export function parseRangeHeader(range: string | null | undefined, size: number)
   } else {
     const match = rangeValue.match(/^(\d+)-(.*)$/);
     if (!match) throw new Error("Invalid range format");
-    
+
     const startStr = match[1];
     const endStr = match[2];
-    
+
     if (!/^\d+$/.test(startStr)) throw new Error("Invalid range format");
     if (endStr && !/^\d+$/.test(endStr)) throw new Error("Invalid range format");
 

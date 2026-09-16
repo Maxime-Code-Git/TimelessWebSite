@@ -30,8 +30,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   if (media.type === "video") {
     const range = request.headers.get("range");
-    if (range && range.startsWith("bytes=")) {
-      
+    if (range !== null) {
+
       let start: number;
       let end: number;
       try {
@@ -74,14 +74,14 @@ const chunksize = (end - start) + 1;
   }
 
   // Photo: resize on the fly with width parameter support
-  
+
   const url = new URL(request.url);
   const widthParam = url.searchParams.get("width");
     const formatParam = url.searchParams.get("format");
   let targetWidth = 1920;
   let targetFormat: "jpeg" | "webp" | "avif" | null;
-  
-  
+
+
   try {
     const parsedW = parseWidth(widthParam);
     if (parsedW) targetWidth = parsedW;

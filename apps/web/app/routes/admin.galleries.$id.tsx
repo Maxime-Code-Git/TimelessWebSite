@@ -335,7 +335,7 @@ export default function AdminGalleryEdit() {
 
             <div className={styles.formGroup}>
               <label className={styles.label}>Date du mariage</label>
-              <input type="text" name="wedding_date" className={styles.input} required defaultValue={gallery.wedding_date} />
+              <input type="date" name="wedding_date" className={styles.input} required defaultValue={gallery.wedding_date} />
             </div>
 
             <div className={styles.formGroup}>

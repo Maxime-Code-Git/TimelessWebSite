@@ -59,7 +59,14 @@ try {
   process.env.SITE_MEDIA_PATH = path.join(e2eTempDir, 'site-media');
   process.env.RATE_LIMIT_DB_PATH = path.join(e2eTempDir, 'rate-limit.sqlite');
   process.env.BOOKING_DB_PATH = path.join(e2eTempDir, 'bookings.sqlite');
+  process.env.GALLERY_DB_PATH = path.join(e2eTempDir, 'galleries.sqlite');
+  process.env.GALLERY_MEDIA_PATH = path.join(e2eTempDir, 'gallery-media');
+  process.env.GALLERY_IMPORT_PATH = path.join(e2eTempDir, 'gallery-imports');
+  process.env.GALLERY_SECRET = 'e2e_gallery_secret_key_123456789';
   process.env.NODE_ENV = 'test';
+
+  fs.mkdirSync(process.env.GALLERY_MEDIA_PATH, { recursive: true });
+  fs.mkdirSync(process.env.GALLERY_IMPORT_PATH, { recursive: true });
 
   const args = process.argv.slice(2);
   const result = spawnSync('npx', ['playwright', 'test', ...args], {

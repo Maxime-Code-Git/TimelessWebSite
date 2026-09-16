@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-if (!process.env.SITE_CONTENT_PATH || !process.env.RATE_LIMIT_DB_PATH || !process.env.PORTFOLIO_CONTENT_PATH || !process.env.PORTFOLIO_MEDIA_PATH || !process.env.BOOKING_DB_PATH) {
+if (!process.env.SITE_CONTENT_PATH || !process.env.RATE_LIMIT_DB_PATH || !process.env.PORTFOLIO_CONTENT_PATH || !process.env.PORTFOLIO_MEDIA_PATH || !process.env.BOOKING_DB_PATH || !process.env.GALLERY_DB_PATH || !process.env.GALLERY_MEDIA_PATH || !process.env.GALLERY_IMPORT_PATH || !process.env.GALLERY_SECRET) {
   throw new Error("Required env vars must be defined in the environment. Run with npm run test:e2e");
 }
 
@@ -91,6 +91,10 @@ export default defineConfig({
       PORTFOLIO_CONTENT_PATH: process.env.PORTFOLIO_CONTENT_PATH,
       PORTFOLIO_MEDIA_PATH: process.env.PORTFOLIO_MEDIA_PATH,
       BOOKING_DB_PATH: process.env.BOOKING_DB_PATH,
+      GALLERY_DB_PATH: process.env.GALLERY_DB_PATH,
+      GALLERY_MEDIA_PATH: process.env.GALLERY_MEDIA_PATH,
+      GALLERY_IMPORT_PATH: process.env.GALLERY_IMPORT_PATH,
+      GALLERY_SECRET: process.env.GALLERY_SECRET,
       ADMIN_PASSWORD_HASH: '$argon2id$v=19$m=19456,t=2,p=1$mA6OzU+rMEkQeBBnZfesFQ$1rIHIz/8BAyH0+GNXhYq8KDDu99lqaOTBtwGg1Lzczs',
       ADMIN_SESSION_SECRET: 'e2e_test_session_secret_for_admin_only',
     },
