@@ -247,6 +247,16 @@ export function openGalleryDb(dbPath: string): DatabaseSync {
       currentVersion = 4;
     }
 
+    if (currentVersion < 5) {
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_gallery_imports_active 
+        ON gallery_imports (gallery_id) 
+        WHERE status IN ('pending', 'processing');
+      `);
+      db.prepare("INSERT INTO gallery_migrations (version, applied_at) VALUES (5, ?)").run(Date.now());
+      currentVersion = 5;
+    }
+
     db.exec("COMMIT;");
   } catch (err) {
     db.exec("ROLLBACK;");

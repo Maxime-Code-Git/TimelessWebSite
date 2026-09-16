@@ -823,3 +823,140 @@
   border-radius: var(--radius);
   background: var(--bg-secondary);
 }
+/* Gallery cover grid */
+.coverGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--gold-light);
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.coverOption {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  position: relative;
+  align-items: center;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.coverOption:has(input:checked) {
+  border-color: var(--gold);
+}
+
+.coverOption input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.coverThumbPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.coverImage {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+/* Utilities for replacing inline styles */
+.flexGroup {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.flex1 {
+  flex: 1;
+}
+
+.marginBottom16 {
+  margin-bottom: 16px;
+}
+
+.marginBottom24 {
+  margin-bottom: 24px;
+}
+
+.marginTop16 {
+  margin-top: 16px;
+}
+
+.previewBox {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--gold-light);
+  border-radius: 8px;
+}
+
+.previewBoxError {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.previewBoxSuccess {
+  border-color: #22c55e;
+  background-color: #f0fdf4;
+}
+
+/* Admin galleries table */
+.galleryTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.galleryTh {
+  padding: 12px;
+  border-bottom: 1px solid var(--gold-light);
+}
+
+.galleryTd {
+  padding: 12px;
+  border-bottom: 1px solid rgba(186, 153, 107, 0.2);
+}
+
+.statusBadge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.statusDraft {
+  background-color: #fef9c3;
+  color: #a16207;
+}
+
+.statusPublished {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.statusArchived {
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+
+.emptyStateRow {
+  text-align: center;
+  padding: 30px;
+  font-style: italic;
+  color: var(--grey);
+}

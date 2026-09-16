@@ -34,13 +34,26 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json({ error: "Requête invalide." }, { status: 400 });
   }
 
-  const bride_names = String(formData.get("bride_names"));
-  const wedding_date = String(formData.get("wedding_date"));
-  const location = formData.get("location") ? String(formData.get("location")) : undefined;
-  const expiresStr = formData.get("expires_at");
+  const bride_names = String(formData.get("bride_names")).trim();
+  if (!bride_names || bride_names.length > 100) {
+    return Response.json({ error: "Noms des mariés invalides (max 100 caractères)." }, { status: 400 });
+  }
+
+  const wedding_date = String(formData.get("wedding_date")).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(wedding_date)) {
+    return Response.json({ error: "Date de mariage invalide." }, { status: 400 });
+  }
+
+  const locationRaw = String(formData.get("location") || "").trim();
+  if (locationRaw.length > 100) {
+    return Response.json({ error: "Lieu invalide (max 100 caractères)." }, { status: 400 });
+  }
+  const location = locationRaw || undefined;
+
+  const expiresStr = String(formData.get("expires_at") || "").trim();
   let expires_at: number | undefined;
   if (expiresStr) {
-    const d = new Date(String(expiresStr));
+    const d = new Date(expiresStr);
     if (isNaN(d.getTime()) || d.getTime() <= Date.now()) {
       return Response.json({ error: "La date d'expiration doit être future et valide." }, { status: 400 });
     }
@@ -48,10 +61,6 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const importFolder = formData.get("importFolder");
-
-  if (!bride_names || !wedding_date) {
-    return Response.json({ error: "Noms et date obligatoires." }, { status: 400 });
-  }
 
   const gallery = createGallery({
     bride_names,

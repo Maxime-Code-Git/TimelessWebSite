@@ -206,14 +206,6 @@ export async function getImportPreview(folderName: string) {
 export function startGalleryImport(galleryId: string, folderName: string): string {
   const db = getGalleryDb();
 
-  // Prevent concurrent imports
-  const active = db.prepare(
-    "SELECT id FROM gallery_imports WHERE gallery_id = ? AND status IN ('pending', 'processing')"
-  ).get(galleryId);
-  if (active) {
-    throw new Error("Un import est déjà en cours pour cette galerie.");
-  }
-
   // Validate path early
   validateImportPath(folderName);
 
@@ -222,8 +214,15 @@ export function startGalleryImport(galleryId: string, folderName: string): strin
   const importId = crypto.randomUUID();
   const now = Date.now();
 
-  db.prepare("INSERT INTO gallery_imports (id, gallery_id, status, progress, total, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-    .run(importId, galleryId, "pending", 0, 0, now, now);
+  try {
+    db.prepare("INSERT INTO gallery_imports (id, gallery_id, status, progress, total, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(importId, galleryId, "pending", 0, 0, now, now);
+  } catch (err: any) {
+    if (err.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      throw new Error("Un import est déjà en cours pour cette galerie.");
+    }
+    throw err;
+  }
 
   // Trigger worker
   scheduleWorker();
@@ -256,25 +255,13 @@ function acquireNextJob(): { id: string; gallery_id: string; import_path: string
   return pending;
 }
 
-/**
- * Reset interrupted jobs (processing -> pending) on startup.
- * Must be called before worker starts processing.
- */
-export function resetInterruptedImports(): void {
-  const db = getGalleryDb();
-  const reset = db.prepare(
-    "UPDATE gallery_imports SET status = 'pending', updated_at = ? WHERE status = 'processing'"
-  ).run(Date.now());
-  if (reset.changes > 0) {
-    console.log(`Reset ${reset.changes} interrupted import(s) to pending`);
-  }
-}
-
 export function resumeImports(): void {
   if (workerStarted) return;
   workerStarted = true;
 
-  resetInterruptedImports();
+  // We intentionally DO NOT blindly reset 'processing' jobs to 'pending' here,
+  // to prevent stealing jobs that are actively being processed by another worker process.
+  // A job stuck in 'processing' due to a crash must be reset manually or via timeout.
   scheduleWorker();
 }
 
@@ -328,107 +315,112 @@ async function processImport(importId: string, galleryId: string, folderName: st
 
     let progress = 0;
     const results = { imported: 0, ignored: [...ignoredFiles] };
+    let currentTotalSize = 0;
 
     for (const file of files) {
+      let fd: number | null = null;
+      let tmpPath: string | null = null;
+      let destPath: string | null = null;
+
       try {
-        // Re-stat to prevent TOCTOU — use the file descriptor for all operations
-        const fd = fs.openSync(file.fullPath, "r");
-        try {
-          const stat = fs.fstatSync(fd);
-          if (stat.size > MAX_FILE_SIZE) {
-            results.ignored.push({ file: file.name, reason: `Fichier trop volumineux` });
-            continue;
-          }
+        // Open with O_NOFOLLOW to prevent symlink attacks, O_RDONLY for reading
+        const flags = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0);
+        fd = fs.openSync(file.fullPath, flags);
 
-          // Read header for MIME detection from the same fd
-          const header = Buffer.alloc(1024);
-          const bytesRead = fs.readSync(fd, header, 0, 1024, 0);
-          const mimeType = detectMimeType(header.subarray(0, bytesRead));
-
-          if (!mimeType || !validateFileType(mimeType, file.expectedCategory, file.name, results.ignored)) {
-            continue;
-          }
-
-          const type = PHOTO_MIME_TYPES.has(mimeType) ? "photo" : "video";
-
-          // Calculate SHA-256 from the fd path (re-open stream from same path)
-          // Close fd first, then hash from path — acceptable since we've validated
-          fs.closeSync(fd);
-
-          const hash = await new Promise<string>((resolve, reject) => {
-            const stream = fs.createReadStream(file.fullPath);
-            const h = crypto.createHash("sha256");
-            stream.on("data", chunk => h.update(chunk));
-            stream.on("end", () => resolve(h.digest("hex")));
-            stream.on("error", reject);
-          });
-
-          // Check duplicates
-          const existing = db.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND hash = ?").get(galleryId, hash);
-          if (existing) {
-            results.ignored.push({ file: file.name, reason: "Doublon (même contenu exact)" });
-            continue;
-          }
-
-          let width: number | null = null;
-          let height: number | null = null;
-          if (type === "photo") {
-            const metadata = await sharp(file.fullPath).metadata();
-            width = metadata.width || null;
-            height = metadata.height || null;
-            if (metadata.orientation && metadata.orientation >= 5) {
-              width = metadata.height || null;
-              height = metadata.width || null;
-            }
-          }
-
-          const mediaId = crypto.randomUUID();
-          const destPath = path.join(mediaDir, mediaId);
-          const tmpPath = destPath + ".tmp";
-
-          try {
-            fs.copyFileSync(file.fullPath, tmpPath);
-            fs.renameSync(tmpPath, destPath);
-          } catch (copyErr) {
-            if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-            throw copyErr;
-          }
-
-          // Verify the copied file's hash matches to prevent TOCTOU
-          const verifyHash = await new Promise<string>((resolve, reject) => {
-            const stream = fs.createReadStream(destPath);
-            const h = crypto.createHash("sha256");
-            stream.on("data", chunk => h.update(chunk));
-            stream.on("end", () => resolve(h.digest("hex")));
-            stream.on("error", reject);
-          });
-
-          if (verifyHash !== hash) {
-            if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
-            results.ignored.push({ file: file.name, reason: "Fichier modifié pendant l'import (hash mismatch)" });
-            continue;
-          }
-
-          try {
-            db.prepare(`
-              INSERT INTO gallery_media (id, gallery_id, type, visibility, original_name, mime_type, size, hash, width, height, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(mediaId, galleryId, type, file.visibility, file.name, mimeType, stat.size, hash, width, height, Date.now());
-          } catch (dbErr) {
-            if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
-            throw dbErr;
-          }
-
-          results.imported++;
-          continue; // Skip the finally fd close since we already closed it
-        } catch (innerErr) {
-          // fd might already be closed
-          try { fs.closeSync(fd); } catch { /* already closed */ }
-          throw innerErr;
+        const stat = fs.fstatSync(fd);
+        if (!stat.isFile()) {
+          results.ignored.push({ file: file.name, reason: "N'est pas un fichier régulier" });
+          continue;
         }
+
+        if (stat.size > MAX_FILE_SIZE) {
+          results.ignored.push({ file: file.name, reason: "Fichier trop volumineux" });
+          continue;
+        }
+        
+        if (currentTotalSize + stat.size > MAX_TOTAL_SIZE) {
+          results.ignored.push({ file: file.name, reason: "Limite totale de stockage atteinte" });
+          continue;
+        }
+
+        const header = Buffer.alloc(1024);
+        const bytesRead = fs.readSync(fd, header, 0, 1024, 0);
+        const mimeType = detectMimeType(header.subarray(0, bytesRead));
+
+        if (!mimeType || !validateFileType(mimeType, file.expectedCategory, file.name, results.ignored)) {
+          continue;
+        }
+
+        const type = PHOTO_MIME_TYPES.has(mimeType) ? "photo" : "video";
+        const mediaId = crypto.randomUUID();
+        destPath = path.join(mediaDir, mediaId);
+        tmpPath = destPath + ".tmp";
+
+        // Copy file safely using streams from the already opened and verified fd
+        await new Promise<void>((resolve, reject) => {
+          const readStream = fs.createReadStream("", { fd: fd!, start: 0, autoClose: false });
+          const writeStream = fs.createWriteStream(tmpPath!);
+          readStream.pipe(writeStream);
+          writeStream.on("finish", resolve);
+          writeStream.on("error", reject);
+          readStream.on("error", reject);
+        });
+
+        // Close the fd now that we have a secure local copy
+        fs.closeSync(fd);
+        fd = null;
+        
+        // Hash the local .tmp file to guarantee no TOCTOU
+        const hash = await new Promise<string>((resolve, reject) => {
+          const stream = fs.createReadStream(tmpPath!);
+          const h = crypto.createHash("sha256");
+          stream.on("data", chunk => h.update(chunk));
+          stream.on("end", () => resolve(h.digest("hex")));
+          stream.on("error", reject);
+        });
+
+        // Check duplicates
+        const existing = db.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND hash = ?").get(galleryId, hash);
+        if (existing) {
+          results.ignored.push({ file: file.name, reason: "Doublon (même contenu exact)" });
+          continue;
+        }
+
+        let width: number | null = null;
+        let height: number | null = null;
+        if (type === "photo") {
+          const metadata = await sharp(tmpPath).metadata();
+          width = metadata.width || null;
+          height = metadata.height || null;
+          if (metadata.orientation && metadata.orientation >= 5) {
+            width = metadata.height || null;
+            height = metadata.width || null;
+          }
+        }
+
+        try {
+          db.prepare(`
+            INSERT INTO gallery_media (id, gallery_id, type, visibility, original_name, mime_type, size, hash, width, height, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(mediaId, galleryId, type, file.visibility, file.name, mimeType, stat.size, hash, width, height, Date.now());
+        } catch (dbErr) {
+          throw dbErr;
+        }
+
+        fs.renameSync(tmpPath, destPath);
+        tmpPath = null;
+        
+        currentTotalSize += stat.size;
+        results.imported++;
       } catch (err) {
         results.ignored.push({ file: file.name, reason: "Erreur: " + (err instanceof Error ? err.message : String(err)) });
       } finally {
+        if (fd !== null) {
+          try { fs.closeSync(fd); } catch { /* ignore */ }
+        }
+        if (tmpPath && fs.existsSync(tmpPath)) {
+          try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+        }
         progress++;
         db.prepare("UPDATE gallery_imports SET progress = ?, updated_at = ? WHERE id = ?").run(progress, Date.now(), importId);
       }

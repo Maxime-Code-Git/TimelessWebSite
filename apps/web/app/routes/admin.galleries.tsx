@@ -27,41 +27,39 @@ export default function AdminGalleries({ loaderData }: Route.ComponentProps) {
       </div>
 
       <div className={styles.card}>
-        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+        <table className={styles.galleryTable}>
           <thead>
             <tr>
-              <th style={{ padding: "12px", borderBottom: "1px solid var(--gold-light)" }}>Mariés</th>
-              <th style={{ padding: "12px", borderBottom: "1px solid var(--gold-light)" }}>ID Public</th>
-              <th style={{ padding: "12px", borderBottom: "1px solid var(--gold-light)" }}>Date du Mariage</th>
-              <th style={{ padding: "12px", borderBottom: "1px solid var(--gold-light)" }}>Statut</th>
-              <th style={{ padding: "12px", borderBottom: "1px solid var(--gold-light)" }}>Actions</th>
+              <th className={styles.galleryTh}>Mariés</th>
+              <th className={styles.galleryTh}>ID Public</th>
+              <th className={styles.galleryTh}>Date du Mariage</th>
+              <th className={styles.galleryTh}>Statut</th>
+              <th className={styles.galleryTh}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {galleries.map(g => (
               <tr key={g.id}>
-                <td style={{ padding: "12px", borderBottom: "1px solid rgba(186, 153, 107, 0.2)" }}>{g.bride_names}</td>
-                <td style={{ padding: "12px", borderBottom: "1px solid rgba(186, 153, 107, 0.2)" }}>{g.public_id}</td>
-                <td style={{ padding: "12px", borderBottom: "1px solid rgba(186, 153, 107, 0.2)" }}>{new Date(g.wedding_date).toLocaleDateString()}</td>
-                <td style={{ padding: "12px", borderBottom: "1px solid rgba(186, 153, 107, 0.2)" }}>
-                  <span style={{
-                    padding: "4px 8px",
-                    borderRadius: "4px",
-                    fontSize: "12px",
-                    background: g.status === "published" ? "rgba(40, 167, 69, 0.1)" : "rgba(255, 193, 7, 0.1)",
-                    color: g.status === "published" ? "#28a745" : "#ffc107"
-                  }}>
-                    {g.status === "published" ? "Publiée" : "Brouillon"}
+                <td className={styles.galleryTd}>{g.bride_names}</td>
+                <td className={styles.galleryTd}>{g.public_id}</td>
+                <td className={styles.galleryTd}>{new Date(g.wedding_date).toLocaleDateString()}</td>
+                <td className={styles.galleryTd}>
+                  <span className={`${styles.statusBadge} ${
+                    g.status === 'draft' ? styles.statusDraft :
+                    g.status === 'published' ? styles.statusPublished :
+                    styles.statusArchived
+                  }`}>
+                    {g.status}
                   </span>
                 </td>
-                <td style={{ padding: "12px", borderBottom: "1px solid rgba(186, 153, 107, 0.2)" }}>
+                <td className={styles.galleryTd}>
                   <Link to={`/admin/galleries/${g.id}`} className={styles.button}>Modifier</Link>
                 </td>
               </tr>
             ))}
             {galleries.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ textAlign: "center", padding: "30px", fontStyle: "italic", color: "var(--grey)" }}>
+                <td colSpan={5} className={styles.emptyStateRow}>
                   Aucune galerie. Créez-en une !
                 </td>
               </tr>

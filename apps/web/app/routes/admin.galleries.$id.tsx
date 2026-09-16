@@ -35,7 +35,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   // Get gallery photos for cover selection
   const db = getGalleryDb();
   const galleryPhotos = db.prepare(
-    "SELECT id, original_name, width, height FROM gallery_media WHERE gallery_id = ? AND type = 'photo' ORDER BY created_at ASC LIMIT 100"
+    "SELECT id, original_name, width, height FROM gallery_media WHERE gallery_id = ? AND type = 'photo' ORDER BY created_at ASC"
   ).all(gallery.id) as Pick<GalleryMediaRow, "id" | "original_name" | "width" | "height">[];
 
   return Response.json({ gallery, stats, imports, folders, guestCode, coupleCode, csrfToken, galleryPhotos }, { headers });
@@ -57,18 +57,53 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!gallery) return Response.json({ error: "Gallery not found", intent }, { status: 404 });
 
   if (intent === "update_info") {
-    const bride_names = String(formData.get("bride_names"));
-    const wedding_date = String(formData.get("wedding_date"));
-    const location = formData.get("location") ? String(formData.get("location")) : undefined;
-    const expiresStr = formData.get("expires_at");
-    const expires_at = expiresStr ? new Date(String(expiresStr)).getTime() : gallery.expires_at;
-    const status = String(formData.get("status")) as "draft" | "published" | "archived";
+    const bride_names = String(formData.get("bride_names")).trim();
+    if (!bride_names || bride_names.length > 100) {
+      return Response.json({ error: "Noms des mariés invalides (max 100 caractères).", intent }, { status: 400 });
+    }
 
-    const intro_fr = formData.get("intro_fr") ? String(formData.get("intro_fr")) : undefined;
-    const intro_en = formData.get("intro_en") ? String(formData.get("intro_en")) : undefined;
-    const signature_fr = formData.get("signature_fr") ? String(formData.get("signature_fr")) : undefined;
-    const signature_en = formData.get("signature_en") ? String(formData.get("signature_en")) : undefined;
-    const cover_image_id = formData.get("cover_image_id") ? String(formData.get("cover_image_id")) : undefined;
+    const wedding_date = String(formData.get("wedding_date")).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(wedding_date)) {
+      return Response.json({ error: "Date de mariage invalide.", intent }, { status: 400 });
+    }
+
+    const locationRaw = String(formData.get("location") || "").trim();
+    if (locationRaw.length > 100) {
+      return Response.json({ error: "Lieu invalide (max 100 caractères).", intent }, { status: 400 });
+    }
+    const location = locationRaw || null;
+
+    const expiresStr = String(formData.get("expires_at") || "").trim();
+    const expiresDate = new Date(expiresStr);
+    if (!expiresStr || isNaN(expiresDate.getTime()) || expiresDate.getTime() < Date.now()) {
+      return Response.json({ error: "Date d'expiration invalide ou dans le passé.", intent }, { status: 400 });
+    }
+    const expires_at = expiresDate.getTime();
+
+    const statusRaw = String(formData.get("status"));
+    if (statusRaw !== "draft" && statusRaw !== "published" && statusRaw !== "archived") {
+      return Response.json({ error: "Statut invalide.", intent }, { status: 400 });
+    }
+    const status = statusRaw as "draft" | "published" | "archived";
+
+    const parseOptionalText = (field: string, maxLen: number) => {
+      const val = String(formData.get(field) || "").trim();
+      if (val.length > maxLen) throw new Error(`${field} dépasse la longueur maximale de ${maxLen}.`);
+      return val || null;
+    };
+
+    let intro_fr, intro_en, signature_fr, signature_en;
+    try {
+      intro_fr = parseOptionalText("intro_fr", 2000);
+      intro_en = parseOptionalText("intro_en", 2000);
+      signature_fr = parseOptionalText("signature_fr", 100);
+      signature_en = parseOptionalText("signature_en", 100);
+    } catch (err) {
+      return Response.json({ error: (err as Error).message, intent }, { status: 400 });
+    }
+
+    const coverRaw = String(formData.get("cover_image_id") || "").trim();
+    const cover_image_id = coverRaw || null;
 
     if (status === "published") {
       const stats = getGalleryMediaStats(gallery.id);
@@ -336,12 +371,18 @@ export default function AdminGalleryEdit() {
             <div className={styles.formGroup}>
               <label className={styles.label}>Image de couverture</label>
               {galleryPhotos.length > 0 ? (
-                <select name="cover_image_id" className={styles.input} defaultValue={gallery.cover_image_id || ""}>
-                  <option value="">Aucune</option>
+                <div className={styles.coverGrid}>
+                  <label className={styles.coverOption}>
+                    <input type="radio" name="cover_image_id" value="" defaultChecked={!gallery.cover_image_id} />
+                    <span className={styles.coverThumbPlaceholder}>Aucune</span>
+                  </label>
                   {galleryPhotos.map(p => (
-                    <option key={p.id} value={p.id}>{p.original_name} ({p.width}×{p.height})</option>
+                    <label key={p.id} className={styles.coverOption}>
+                      <input type="radio" name="cover_image_id" value={p.id} defaultChecked={gallery.cover_image_id === p.id} />
+                      <img className={styles.coverImage} src={`/api/gallery/${gallery.public_id}/media/${p.id}?width=480`} alt={p.original_name} loading="lazy" />
+                    </label>
                   ))}
-                </select>
+                </div>
               ) : (
                 <p className={styles.helperText}>Aucune photo importée. Importez des médias d'abord.</p>
               )}
@@ -363,11 +404,11 @@ export default function AdminGalleryEdit() {
 
           {/* Guest code section */}
           <h4>Code Invités</h4>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-            <input type={showCodes ? "text" : "password"} readOnly value={guestCode} className={styles.input} style={{ flex: 1 }} />
+          <div className={styles.flexGroup}>
+            <input type={showCodes ? "text" : "password"} readOnly value={guestCode} className={`${styles.input} ${styles.flex1}`} />
             <button type="button" onClick={() => copyToClipboard(guestCode)} className={styles.button}>Copier</button>
           </div>
-          <Form method="post" className={styles.form} style={{ marginBottom: "16px" }}>
+          <Form method="post" className={`${styles.form} ${styles.marginBottom16}`}>
             <input type="hidden" name="csrfToken" value={csrfToken} />
             <input type="hidden" name="intent" value="rotate_guest_code" />
             <div className={styles.formGroup}>
@@ -376,7 +417,7 @@ export default function AdminGalleryEdit() {
             {intentMsg("rotate_guest_code")}
             <button type="submit" className={styles.button}>Modifier le code invités</button>
           </Form>
-          <Form method="post" style={{ marginBottom: "24px" }}>
+          <Form method="post" className={styles.marginBottom24}>
             <input type="hidden" name="csrfToken" value={csrfToken} />
             <input type="hidden" name="intent" value="regenerate_guest_code" />
             {intentMsg("regenerate_guest_code")}
@@ -385,11 +426,11 @@ export default function AdminGalleryEdit() {
 
           {/* Couple code section */}
           <h4>Code Mariés</h4>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-            <input type={showCodes ? "text" : "password"} readOnly value={coupleCode} className={styles.input} style={{ flex: 1 }} />
+          <div className={styles.flexGroup}>
+            <input type={showCodes ? "text" : "password"} readOnly value={coupleCode} className={`${styles.input} ${styles.flex1}`} />
             <button type="button" onClick={() => copyToClipboard(coupleCode)} className={styles.button}>Copier</button>
           </div>
-          <Form method="post" className={styles.form} style={{ marginBottom: "16px" }}>
+          <Form method="post" className={`${styles.form} ${styles.marginBottom16}`}>
             <input type="hidden" name="csrfToken" value={csrfToken} />
             <input type="hidden" name="intent" value="rotate_couple_code" />
             <div className={styles.formGroup}>
@@ -405,7 +446,7 @@ export default function AdminGalleryEdit() {
             <button type="submit" className={styles.button}>Régénérer auto le code mariés</button>
           </Form>
 
-          <p className={styles.helperText} style={{ marginTop: "16px" }}>
+          <p className={`${styles.helperText} ${styles.marginTop16}`}>
             Modifier un code invalide immédiatement les sessions actives de ce niveau.
           </p>
         </div>
@@ -441,18 +482,15 @@ export default function AdminGalleryEdit() {
         {previewLoading && <p>Analyse du dossier en cours...</p>}
 
         {previewData && !previewLoading && (
-          <div style={{ margin: "12px 0", padding: "12px", border: "1px solid var(--gold-light)", borderRadius: "8px" }}>
+          <div className={`${styles.previewBox} ${previewData.error ? styles.previewBoxError : ''}`}>
             {previewData.error ? (
-              <p className={styles.errorText}>{String(previewData.error)}</p>
+              <p className={styles.errorText}>{previewData.error}</p>
             ) : (
-              <>
-                <p><strong>Aperçu :</strong></p>
-                <ul>
-                  <li>Photos invités : {String(previewData.invitesPhotosCount)}</li>
-                  <li>Vidéos invités : {String(previewData.invitesVideosCount)}</li>
-                  <li>Photos mariés : {String(previewData.mariesPhotosCount)}</li>
-                  <li>Vidéos mariés : {String(previewData.mariesVideosCount)}</li>
-                  <li><strong>Total : {String(previewData.total)}</strong></li>
+              <div>
+                <p><strong>{previewData.total} médias trouvés :</strong></p>
+                <ul className={styles.previewList}>
+                  <li>Invités : {previewData.invitesPhotos} photos, {previewData.invitesVideos} vidéos</li>
+                  <li>Mariés : {previewData.mariesPhotos} photos, {previewData.mariesVideos} vidéos</li>
                 </ul>
                 {(previewData.rejected as { file: string; reason: string }[])?.length > 0 && (
                   <details>
@@ -464,9 +502,15 @@ export default function AdminGalleryEdit() {
                     </ul>
                   </details>
                 )}
-              </>
+              </div>
             )}
           </div>
+        )}
+
+        {importFetcher.data?.error && (
+          <p className={`${styles.errorText} ${styles.marginTop16}`}>
+            {importFetcher.data.error}
+          </p>
         )}
 
         {previewData && !previewData.error && !previewLoading && (

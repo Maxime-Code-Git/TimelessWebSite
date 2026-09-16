@@ -149,6 +149,29 @@ export const GALLERY_PRIVATE_HEADERS: Record<string, string> = {
 };
 
 export async function requireGalleryAccess(request: Request, publicId: string, requiredMediaId?: string, isApi = false) {
+  const { getSession: getAdminSession } = await import("./session.server");
+  const { requireAdminSession } = await import("./auth.server");
+  
+  const { isValid: isAdmin } = await requireAdminSession(request);
+
+  if (isAdmin) {
+    // Admin bypass: Admin can view any media in any gallery
+    const db = getGalleryDb();
+    const gallery = db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as Record<string, unknown> | undefined;
+    if (!gallery) {
+      if (isApi) throw new Response("Unauthorized", { status: 401, headers: GALLERY_PRIVATE_HEADERS });
+      throw redirect("/fr/espace-clients", { headers: GALLERY_PRIVATE_HEADERS });
+    }
+    
+    let media = null;
+    if (requiredMediaId) {
+      media = db.prepare("SELECT * FROM gallery_media WHERE id = ? AND gallery_id = ?").get(requiredMediaId, gallery.id) as Record<string, unknown> | undefined;
+      if (!media) throw new Response("Not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
+    }
+    
+    return { gallery, accessLevel: "maries" as GalleryAccessLevel, codeVersion: 0, media };
+  }
+
   const session = await getGallerySession(request);
   const galleryId = session.get("galleryId") as string | undefined;
   const accessLevel = session.get("accessLevel") as GalleryAccessLevel | undefined;
@@ -170,14 +193,14 @@ export async function requireGalleryAccess(request: Request, publicId: string, r
     throw unauthorized();
   }
 
-  const gallery = db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as Record<string, unknown>;
+  const gallery = db.prepare("SELECT * FROM galleries WHERE public_id = ?").get(publicId) as Record<string, unknown> | undefined;
   if (!gallery || gallery.id !== galleryId || gallery.status !== "published" || (gallery.expires_at as number) < Date.now()) {
     throw unauthorized();
   }
 
   let media = null;
   if (requiredMediaId) {
-    media = db.prepare("SELECT * FROM gallery_media WHERE id = ? AND gallery_id = ?").get(requiredMediaId, galleryId) as Record<string, unknown>;
+    media = db.prepare("SELECT * FROM gallery_media WHERE id = ? AND gallery_id = ?").get(requiredMediaId, galleryId) as Record<string, unknown> | undefined;
     if (!media) throw new Response("Not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
     if (media.visibility === "maries" && accessLevel === "invites") {
       throw new Response("Not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
