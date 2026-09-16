@@ -341,12 +341,18 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // 21. Véritables contenus FR et EN
     const frRes = await coupleContext.request.get(`/fr/galerie/${galleryPublicId}`);
+    expect(frRes.status()).toBe(200);
+
     const frText = await frRes.text();
-    expect(frText).toContain("Déconnexion");
+    expect(frText).toContain("Tout télécharger (ZIP)");
+    expect(frText).toContain("La Galerie");
 
     const enRes = await coupleContext.request.get(`/en/gallery/${galleryPublicId}`);
+    expect(enRes.status()).toBe(200);
+
     const enText = await enRes.text();
-    expect(enText).toContain("Logout");
+    expect(enText).toContain("Download all (ZIP)");
+    expect(enText).toContain("The Gallery");
 
     const enHeaders = enRes.headers();
     expect(enHeaders["cache-control"]).toContain("no-store");
