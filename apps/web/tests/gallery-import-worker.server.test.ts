@@ -28,17 +28,17 @@ describe("Gallery Import Worker Logic", () => {
   beforeAll(async () => {
     importDir = path.join(ENV.GALLERY_IMPORT_PATH, "worker-test");
     fs.mkdirSync(path.join(importDir, "invites/photos"), { recursive: true });
-    
+
     const dummyJpegPath1 = path.join(importDir, "invites/photos/test1.jpg");
     const dummyJpegPath2 = path.join(importDir, "invites/photos/test2.jpg");
     await sharp({ create: { width: 10, height: 10, channels: 3, background: { r: 255, g: 0, b: 0 } } }).jpeg().toFile(dummyJpegPath1);
     await sharp({ create: { width: 10, height: 10, channels: 3, background: { r: 255, g: 0, b: 0 } } }).jpeg().toFile(dummyJpegPath2);
 
     db = getGalleryDb();
-    
+
     // Ensure gallery exists
     try {
-      db.prepare(`INSERT INTO galleries (id, public_id, bride_names, wedding_date, created_at, expires_at, status, guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted) 
+      db.prepare(`INSERT INTO galleries (id, public_id, bride_names, wedding_date, created_at, expires_at, status, guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted)
       VALUES (?, 'pub', 'A&B', '2026-01-01', ?, ?, 'draft', 'x', 'y', 'z', 'w')`).run(galleryId, Date.now(), Date.now() + 86400000);
     } catch { /* ignore */ }
   });
@@ -57,7 +57,7 @@ describe("Gallery Import Worker Logic", () => {
     startGalleryImport(galleryId, "worker-test");
     const job1 = acquireNextJob();
     expect(job1).toBeDefined();
-    
+
     const job2 = acquireNextJob();
     expect(job2).toBeNull();
   });
@@ -94,7 +94,7 @@ describe("Gallery Import Worker Logic", () => {
     expect(job).toBeDefined();
 
     const before = db.prepare("SELECT lease_expires_at FROM gallery_imports WHERE id = ?").get(importId) as Record<string, unknown>;
-    
+
     const originalPrepare = db.prepare.bind(db);
     vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
       if (sql.includes("INSERT INTO gallery_media")) {
@@ -124,10 +124,10 @@ describe("Gallery Import Worker Logic", () => {
     expect(job).toBeDefined();
 
     const promise = processImport(importId, galleryId, "worker-test", job!.lease_token);
-    
+
     // steal lease
     db.prepare("UPDATE gallery_imports SET lease_expires_at = ?, worker_id = 'thief' WHERE id = ?").run(Date.now() + 10000, importId);
-    
+
     await promise;
 
     const row = db.prepare("SELECT status FROM gallery_imports WHERE id = ?").get(importId) as Record<string, unknown>;
@@ -143,7 +143,7 @@ describe("Gallery Import Worker Logic", () => {
     db.prepare("UPDATE gallery_imports SET lease_expires_at = ?, worker_id = 'thief' WHERE id = ?").run(Date.now() + 10000, importId);
 
     await processImport(importId, galleryId, "worker-test", job!.lease_token);
-    
+
     const row = db.prepare("SELECT status, worker_id, result_json FROM gallery_imports WHERE id = ?").get(importId) as Record<string, unknown>;
     expect(row.status).toBe("processing");
     expect(row.worker_id).toBe("thief");
