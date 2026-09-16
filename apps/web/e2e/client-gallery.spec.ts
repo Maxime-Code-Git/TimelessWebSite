@@ -1,7 +1,6 @@
 import { test, expect } from "@playwright/test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execSync } from "node:child_process";
 import AdmZip from "adm-zip";
 import crypto from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
@@ -44,11 +43,11 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // Generate 1 guest video (valid MP4)
     const guestVideoPath = path.join(targetDir, "invites/videos/guest-video.mp4");
-    execSync(`ffmpeg -f lavfi -i color=c=blue:s=160x120:d=0.1 -vcodec libx264 -pix_fmt yuv420p -y ${guestVideoPath}`);
+    fs.copyFileSync(path.join(__dirname, "fixtures/vid1.mp4"), guestVideoPath);
 
     // Generate 1 couple video (valid MP4)
     const coupleVideoPath = path.join(targetDir, "maries/videos/couple-video.mp4");
-    execSync(`ffmpeg -f lavfi -i color=c=red:s=160x120:d=0.1 -vcodec libx264 -pix_fmt yuv420p -y ${coupleVideoPath}`);
+    fs.copyFileSync(path.join(__dirname, "fixtures/vid2.mp4"), coupleVideoPath);
   });
 
   test("cycle complet des galeries clientes", async ({ browser }) => {
@@ -68,7 +67,7 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await adminPage.goto("/admin");
     const heading = await adminPage.locator("h2", { hasText: "Espace Administrateur" }).count();
     if (heading > 0) {
-      await adminPage.fill('input[name="password"]', "testadmin123");
+      await adminPage.fill('input[name="password"]', "e2e_password");
       await adminPage.click('button[type="submit"]');
       await adminPage.waitForURL("**/admin/galleries");
     }
@@ -86,12 +85,12 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     await adminPage.click("text=Afficher les codes");
     const guestCode = await adminPage.locator('input[name="guestCode"]').inputValue();
-    const coupleCode = await adminPage.locator('input[name="coupleCode"]').inputValue();
+    const coupleCode = await adminPage.getByLabel("Code mariés actuel").inputValue();
     const originalGuestCode = guestCode;
 
     // 3. Refus publication sans média
     await adminPage.selectOption('select[name="status"]', "published");
-    await adminPage.click('button:has-text("Enregistrer les modifications")');
+    await adminPage.click('button:has-text("Enregistrer les informations")');
     await expect(adminPage.locator("text=impossible de publier une galerie vide")).toBeVisible();
     await adminPage.selectOption('select[name="status"]', "draft");
 
@@ -121,7 +120,7 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // 7. Publication
     await adminPage.selectOption('select[name="status"]', "published");
-    await adminPage.click('button:has-text("Enregistrer les modifications")');
+    await adminPage.click('button:has-text("Enregistrer les informations")');
     await expect(adminPage.locator("text=Galerie mise à jour")).toBeVisible();
 
     const db = new DatabaseSync(galleryDbPath);
@@ -148,8 +147,8 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     expect(headers["referrer-policy"]).toContain("no-referrer");
 
     // 9. Présence des 24 premières photos de galerie (sans compter logo et couverture)
-    // Logo is inside header, cover is probably in a banner. Photos are in .media-item
-    await expect(guestPage.locator('.media-item')).toHaveCount(24);
+    // Logo is inside header, cover is probably in a banner. Photos are in gallery-photo
+    await expect(guestPage.getByTestId('gallery-photo')).toHaveCount(24);
 
     // 10. Présence du bouton Voir plus
     const seeMoreBtn = guestPage.locator('button:has-text("Voir plus")');
@@ -157,10 +156,11 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // 11. Clic et chargement de la 25e photo (24 + 1 vidéo + 1 photo = 26 items)
     await seeMoreBtn.click();
-    await expect(guestPage.locator('.media-item')).toHaveCount(26);
+    await expect(guestPage.getByTestId('gallery-photo')).toHaveCount(25);
 
     // 12. Présence vidéo invité avec controls
-    const guestVideo = guestPage.locator('video');
+    const guestVideo = guestPage.getByTestId('gallery-video').locator('video').first();
+    await expect(guestPage.getByTestId('gallery-video')).toHaveCount(1);
     await expect(guestVideo).toHaveCount(1);
     await expect(guestVideo).toHaveAttribute("controls", "");
 
@@ -188,9 +188,10 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // 14. Accès invité refusé en 404 aux médias mariés
     // Find couple media ID using API
-    const adminPhotosRes = await adminContext.request.get(`/api/admin/gallery-media/${galleryId}`);
-    const adminPhotos = await adminPhotosRes.json();
-    const coupleMediaId = adminPhotos.find((p: Record<string, unknown>) => p.visibility === "maries").id;
+    const mediaDb = new DatabaseSync(galleryDbPath);
+    const adminPhotos = mediaDb.prepare("SELECT id, original_name, type, visibility FROM gallery_media WHERE gallery_id = ?").all(galleryId) as Record<string, unknown>[];
+    mediaDb.close();
+    const coupleMediaId = adminPhotos.find((p: Record<string, unknown>) => p.visibility === "maries")!.id;
     const forbidRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/media/${coupleMediaId}`);
     expect(forbidRes.status()).toBe(404);
 
@@ -225,9 +226,10 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     // 18. Visibilité des médias invités et mariés
     // 25 guest photos + 1 couple photo + 1 guest video + 1 couple video = 28
     // Mariés sees all 28. Pagination is 24 items, so need to click see more.
-    await expect(couplePage.locator('.media-item')).toHaveCount(24);
+    await expect(couplePage.getByTestId('gallery-photo')).toHaveCount(24);
     await couplePage.locator('button:has-text("Voir plus")').click();
-    await expect(couplePage.locator('.media-item')).toHaveCount(28);
+    await expect(couplePage.getByTestId('gallery-photo')).toHaveCount(26);
+    await expect(couplePage.getByTestId('gallery-video')).toHaveCount(2);
 
     // 19. ZIP mariés contenant les 4 catégories
     const coupleZipRes = await coupleContext.request.get(`/api/gallery/${galleryPublicId}/download?type=all`);
@@ -237,7 +239,7 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // 20. Téléchargement original (SHA-256 identique)
     // Find guest photo 1 ID
-    const guestMediaId = adminPhotos.find((p: Record<string, unknown>) => p.original_name === "guest-photo-1.jpg").id;
+    const guestMediaId = adminPhotos.find((p: Record<string, unknown>) => p.original_name === "guest-photo-1.jpg")!.id;
     const origRes = await coupleContext.request.get(`/api/gallery/${galleryPublicId}/download/original/${guestMediaId}`);
     expect(origRes.status()).toBe(200);
     const origBuffer = await origRes.body();
@@ -258,10 +260,13 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // 26. Rotation du code invités
     await adminPage.goto(`/admin/galleries/${galleryId}`);
-    await adminPage.click("text=Générer un nouveau code");
+    const [rotationResponse] = await Promise.all([
+      adminPage.waitForResponse(res => res.url().includes('/admin/galleries') && res.request().method() === 'POST'),
+      adminPage.click('button:has-text("Régénérer auto le code invités")')
+    ]);
+    expect(rotationResponse.status()).toBe(200);
 
-    // Attendre la sauvegarde du code rotatif
-    const newGuestCodeInput = adminPage.locator('input[name="guestCode"]');
+    const newGuestCodeInput = adminPage.getByLabel("Code invités actuel");
     await expect(newGuestCodeInput).not.toHaveValue(originalGuestCode);
     const newGuestCode = await newGuestCodeInput.inputValue();
 
@@ -306,7 +311,7 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
 
     // 32. Archivage par l'admin
     await adminPage.selectOption('select[name="status"]', "archived");
-    await adminPage.click('button:has-text("Enregistrer les modifications")');
+    await adminPage.click('button:has-text("Enregistrer les informations")');
     await expect(adminPage.locator("text=Galerie mise à jour")).toBeVisible();
 
     // 33. Refus d'accès après archivage

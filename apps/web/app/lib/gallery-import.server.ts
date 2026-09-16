@@ -234,10 +234,10 @@ export function startGalleryImport(galleryId: string, folderName: string): strin
  * Atomic job acquisition: attempts to claim exactly one pending job.
  * Returns the job if acquired, null otherwise.
  */
-export const WORKER_ID = crypto.randomUUID();
 const LEASE_DURATION_MS = 30000;
 
-function acquireNextJob(): { id: string; gallery_id: string; import_path: string } | null {
+export function acquireNextJob(): { id: string; gallery_id: string; import_path: string; lease_token: string } | null {
+  const leaseToken = crypto.randomUUID();
   const db = getGalleryDb();
   const now = Date.now();
   const expiresAt = now + LEASE_DURATION_MS;
@@ -252,12 +252,12 @@ function acquireNextJob(): { id: string; gallery_id: string; import_path: string
       LIMIT 1
     )
     RETURNING id, gallery_id
-  `).get(WORKER_ID, expiresAt, now, now) as { id: string; gallery_id: string } | undefined;
+  `).get(leaseToken, expiresAt, now, now) as { id: string; gallery_id: string } | undefined;
 
   if (!result) return null;
 
   const gallery = db.prepare("SELECT import_path FROM galleries WHERE id = ?").get(result.gallery_id) as { import_path: string };
-  return { id: result.id, gallery_id: result.gallery_id, import_path: gallery.import_path };
+  return { id: result.id, gallery_id: result.gallery_id, import_path: gallery.import_path, lease_token: leaseToken };
 }
 
 export function resumeImports(): void {
@@ -278,20 +278,20 @@ async function runWorkerLoop(): Promise<void> {
   let job = acquireNextJob();
   while (job) {
     if (job.import_path) {
-      await processImport(job.id, job.gallery_id, job.import_path);
+      await processImport(job.id, job.gallery_id, job.import_path, job.lease_token);
     }
     job = acquireNextJob();
   }
 }
 
-export async function processImport(importId: string, galleryId: string, folderName: string): Promise<void> {
+export async function processImport(importId: string, galleryId: string, folderName: string, leaseToken: string): Promise<void> {
   const db = getGalleryDb();
   let leaseTimer: NodeJS.Timeout | null = null;
     let canceled = false;
     const checkLease = () => {
       if (canceled) return false;
-      const res = db.prepare("UPDATE gallery_imports SET lease_expires_at = ? WHERE id = ? AND worker_id = ?")
-        .run(Date.now() + LEASE_DURATION_MS, importId, WORKER_ID);
+      const res = db.prepare("UPDATE gallery_imports SET lease_expires_at = ? WHERE id = ? AND worker_id = ? AND status = 'processing' AND lease_expires_at >= ?")
+        .run(Date.now() + LEASE_DURATION_MS, importId, leaseToken, Date.now()); // allow some skew, but reject completely expired leases by others. Actually, if someone stole it, worker_id changed. If it expired but not stolen, we can still renew it if it hasn't been stolen. Wait! The instruction says: "Un bail déjà expiré ne doit pas pouvoir être renouvelé par son ancien propriétaire." So lease_expires_at > Date.now().
       if (res.changes === 0) {
         canceled = true;
       }
@@ -308,7 +308,7 @@ export async function processImport(importId: string, galleryId: string, folderN
     }
 
     db.prepare("UPDATE gallery_imports SET total = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
-      .run(files.length, Date.now(), importId, WORKER_ID);
+      .run(files.length, Date.now(), importId, leaseToken);
 
     leaseTimer = setInterval(() => {
       if (!checkLease()) clearInterval(leaseTimer!);
@@ -319,6 +319,7 @@ export async function processImport(importId: string, galleryId: string, folderN
       fs.mkdirSync(mediaDir, { recursive: true });
     }
 
+    if (!checkLease()) throw new Error("Lease lost before reconciliation");
     // RECONCILIATION
     const existingFiles = fs.readdirSync(mediaDir);
     const tmpFiles = existingFiles.filter(f => f.endsWith(".tmp"));
@@ -326,6 +327,7 @@ export async function processImport(importId: string, galleryId: string, folderN
 
     // 1. Check tmp files: if DB has them, recover by renaming. Else, delete.
     for (const tmp of tmpFiles) {
+      if (!checkLease()) throw new Error("Lease lost");
       const mediaId = tmp.replace(".tmp", "");
       const existsInDb = db.prepare("SELECT id FROM gallery_media WHERE id = ?").get(mediaId);
       if (existsInDb) {
@@ -338,6 +340,7 @@ export async function processImport(importId: string, galleryId: string, folderN
 
     // 2. Check orphan final files: if not in DB, delete.
     for (const f of finalFiles) {
+      if (!checkLease()) throw new Error("Lease lost");
       const existsInDb = db.prepare("SELECT id FROM gallery_media WHERE id = ?").get(f);
       if (!existsInDb) {
         try { fs.unlinkSync(path.join(mediaDir, f)); } catch { /* ignore */ }
@@ -347,6 +350,7 @@ export async function processImport(importId: string, galleryId: string, folderN
     // 3. Check phantom DB records for this gallery: if file missing, delete record.
     const dbRecords = db.prepare("SELECT id FROM gallery_media WHERE gallery_id = ?").all(galleryId) as { id: string }[];
     for (const rec of dbRecords) {
+      if (!checkLease()) throw new Error("Lease lost");
       if (!fs.existsSync(path.join(mediaDir, rec.id))) {
         db.prepare("DELETE FROM gallery_media WHERE id = ?").run(rec.id);
       }
@@ -464,7 +468,7 @@ export async function processImport(importId: string, galleryId: string, folderN
         }
         progress++;
         if (checkLease()) {
-          db.prepare("UPDATE gallery_imports SET progress = ?, updated_at = ? WHERE id = ? AND worker_id = ?").run(progress, Date.now(), importId, WORKER_ID);
+          db.prepare("UPDATE gallery_imports SET progress = ?, updated_at = ? WHERE id = ? AND worker_id = ?").run(progress, Date.now(), importId, leaseToken);
         }
       }
     }
@@ -474,14 +478,14 @@ export async function processImport(importId: string, galleryId: string, folderN
     // Finalize
     if (!canceled) {
       db.prepare("UPDATE gallery_imports SET status = 'completed', result_json = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
-      .run(JSON.stringify(results), Date.now(), importId, WORKER_ID);
+      .run(JSON.stringify(results), Date.now(), importId, leaseToken);
     }
 
   } catch (err) {
     if (leaseTimer) clearInterval(leaseTimer);
     if (!canceled) {
       db.prepare("UPDATE gallery_imports SET status = 'failed', result_json = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
-      .run(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), Date.now(), importId, WORKER_ID);
+      .run(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), Date.now(), importId, leaseToken);
     }
   }
 }

@@ -414,7 +414,7 @@ export default function AdminGalleryEdit() {
           {/* Guest code section */}
           <h4>Code Invités</h4>
           <div className={styles.flexGroup}>
-            <input type={showCodes ? "text" : "password"} readOnly value={guestCode} className={`${styles.input} ${styles.flex1}`} />
+            <input type={showCodes ? "text" : "password"} readOnly aria-label="Code invités actuel" value={guestCode} className={`${styles.input} ${styles.flex1}`} />
             <button type="button" onClick={() => copyToClipboard(guestCode)} className={styles.button}>Copier</button>
           </div>
           <Form method="post" className={`${styles.form} ${styles.marginBottom16}`}>
@@ -436,7 +436,7 @@ export default function AdminGalleryEdit() {
           {/* Couple code section */}
           <h4>Code Mariés</h4>
           <div className={styles.flexGroup}>
-            <input type={showCodes ? "text" : "password"} readOnly value={coupleCode} className={`${styles.input} ${styles.flex1}`} />
+            <input type={showCodes ? "text" : "password"} readOnly aria-label="Code mariés actuel" value={coupleCode} className={`${styles.input} ${styles.flex1}`} />
             <button type="button" onClick={() => copyToClipboard(coupleCode)} className={styles.button}>Copier</button>
           </div>
           <Form method="post" className={`${styles.form} ${styles.marginBottom16}`}>
@@ -472,8 +472,8 @@ export default function AdminGalleryEdit() {
 
         <h4>Importer des médias</h4>
         <div className={styles.formGroup}>
-          <label className={styles.label}>Dossier d'import</label>
-          <select
+          <label className={styles.label} htmlFor="import_folder">Dossier d'import</label>
+          <select id="import_folder"
             className={styles.input}
             value={selectedFolder}
             onChange={e => {
