@@ -95,8 +95,24 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await adminPage.fill('input[name="location"]', "Château");
     await adminPage.click('button[type="submit"]');
 
-    await adminPage.waitForURL(/\/admin\/galleries\/.+/);
-    const galleryId = adminPage.url().split("/admin/galleries/")[1];
+    await adminPage.waitForURL(url => {
+      const match = url.pathname.match(/^\/admin\/galleries\/([^/]+)$/);
+      return Boolean(match && match[1] !== "new");
+    });
+
+    const galleryPathMatch = new URL(adminPage.url()).pathname.match(
+      /^\/admin\/galleries\/([^/]+)$/
+    );
+
+    if (!galleryPathMatch) {
+      throw new Error(
+        `Impossible d'extraire l'identifiant de galerie depuis ${adminPage.url()}`
+      );
+    }
+
+    const galleryId = galleryPathMatch[1];
+
+    expect(galleryId).not.toBe("new");
     expect(galleryId).toBeTruthy();
 
     await adminPage.click("text=Afficher les codes");
