@@ -236,11 +236,17 @@ interface LoaderData {
   galleryPhotos: { id: string; original_name: string; width: number | null; height: number | null }[];
 }
 
+type ImportActionData = {
+  importId?: string;
+  status?: "pending";
+  error?: string;
+};
+
 export default function AdminGalleryEdit() {
   const { gallery, stats, imports, folders, guestCode, coupleCode, csrfToken, galleryPhotos } = useLoaderData<LoaderData>();
   const actionData = useActionData<ActionData>();
   const revalidator = useRevalidator();
-  const importFetcher = useFetcher();
+  const importFetcher = useFetcher<ImportActionData>();
 
   const [showCodes, setShowCodes] = useState(false);
   const [previewData, setPreviewData] = useState<{
@@ -291,14 +297,6 @@ export default function AdminGalleryEdit() {
     } finally {
       setPreviewLoading(false);
     }
-  };
-
-  const launchImport = () => {
-    if (!selectedFolder || importBusy) return;
-    importFetcher.submit(
-      { csrfToken, folderName: selectedFolder },
-      { method: "post", action: `/api/admin/gallery-import/${gallery.id}` }
-    );
   };
 
   const copyToClipboard = (text: string) => {
@@ -517,24 +515,42 @@ export default function AdminGalleryEdit() {
         )}
 
         {importFetcher.data?.error && (
-          <p className={`${styles.errorText} ${styles.marginTop16}`}>
+          <p
+            role="alert"
+            data-testid="gallery-import-error"
+            className={`${styles.errorText} ${styles.marginTop16}`}
+          >
             {importFetcher.data.error}
           </p>
         )}
 
-        {previewData && !previewData.error && !previewLoading && (
-          <button
-            type="button"
-            className={styles.submitButton}
-            disabled={importBusy}
-            onClick={() => {
-              if (confirm(`Lancer l'import de ${String(previewData.total)} fichiers ?`)) {
-                launchImport();
-              }
-            }}
+        {importFetcher.data?.status === "pending" && (
+          <p
+            role="status"
+            data-testid="gallery-import-status"
+            className={`${styles.successMessage} ${styles.marginTop16}`}
           >
-            {importBusy ? "Import en cours..." : "Confirmer et lancer l'import"}
-          </button>
+            Import lancé.
+          </p>
+        )}
+
+        {previewData && !previewData.error && !previewLoading && (
+          <importFetcher.Form
+            method="post"
+            action={`/api/admin/gallery-import/${gallery.id}`}
+            encType="application/x-www-form-urlencoded"
+          >
+            <input type="hidden" name="csrfToken" value={csrfToken} />
+            <input type="hidden" name="folderName" value={selectedFolder} />
+
+            <button
+              type="submit"
+              className={styles.submitButton}
+              disabled={importBusy || !selectedFolder}
+            >
+              {importBusy ? "Import en cours..." : "Confirmer et lancer l'import"}
+            </button>
+          </importFetcher.Form>
         )}
 
         <h4>Historique d'importation</h4>

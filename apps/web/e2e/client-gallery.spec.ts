@@ -120,12 +120,18 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await expect(adminPage.getByText("Invités : 25 photos, 1 vidéos", { exact: false })).toBeVisible();
     await expect(adminPage.getByText("Mariés : 1 photos, 1 vidéos", { exact: false })).toBeVisible();
 
-    adminPage.once("dialog", dialog => dialog.accept());
-
     await adminPage.getByRole("button", {
       name: "Confirmer et lancer l'import",
       exact: true,
     }).click();
+
+    await expect(
+      adminPage.getByTestId("gallery-import-status")
+    ).toHaveText("Import lancé.", { timeout: 10_000 });
+
+    await expect(
+      adminPage.getByTestId("gallery-import-error")
+    ).toHaveCount(0);
 
     // 5. Attente de la fin réelle de l'import (polling state API)
     await expect(async () => {

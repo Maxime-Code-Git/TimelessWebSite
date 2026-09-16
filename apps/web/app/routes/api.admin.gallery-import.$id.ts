@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { requireValidAdminSession, createAdminHeaders } from "~/lib/admin-auth.server";
 import { getGalleryDb } from "~/lib/gallery-db.server";
 import { getImportPreview, startGalleryImport } from "~/lib/gallery-import.server";
@@ -28,7 +28,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 import { validateAdminFormData, ActionSecurityError } from "~/lib/admin-auth.server";
 
-export async function action({ request, params }: LoaderFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {
   let formData: FormData;
   try {
     formData = await validateAdminFormData(request);
