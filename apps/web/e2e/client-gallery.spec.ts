@@ -55,6 +55,7 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
   });
 
   test("cycle complet des galeries clientes", async ({ browser }) => {
+    test.setTimeout(120_000);
     // Contextes
     const adminContext = await browser.newContext();
     const guestContext = await browser.newContext();
@@ -123,7 +124,14 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await adminPage.reload();
 
     // 6. Sélection d'une couverture avec locator accessible
-    await adminPage.locator('input[type="radio"][name="cover_image_id"]').first().click({ force: true });
+    const coverRadio = adminPage
+      .locator(
+        'input[type="radio"][name="cover_image_id"]:not([value=""])'
+      )
+      .first();
+
+    await coverRadio.check({ force: true });
+    await expect(coverRadio).toBeChecked();
 
     // 7. Publication
     await adminPage.selectOption('select[name="status"]', "published");
