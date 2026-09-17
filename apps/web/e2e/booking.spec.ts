@@ -111,18 +111,40 @@ test.describe('Visio Booking Flow', () => {
     await adminPage.waitForLoadState('networkidle');
     await expect(adminPage.getByText(winnerName).first()).toBeVisible({ timeout: 10000 });
 
-    // 6. Acceptation avec un lien visio
+    // 6. Acceptation avec un lien visio (Invalid first)
     const acceptBtn = adminPage.locator('button:has-text("Accepter")').first();
     await expect(acceptBtn).toBeVisible();
     await expect(acceptBtn).toBeEnabled();
     await acceptBtn.click();
     await expect(adminPage.locator('[role="dialog"]')).toBeVisible();
 
-    await adminPage.locator('input[name="meeting_url"]').fill('https://meet.google.com/abc-defg-hij');
+    await adminPage.locator('input[name="meeting_url"]').fill('https://example.com/fake');
+    const badResponsePromise = adminPage.waitForResponse(r => (r.url().includes('/admin/bookings') || r.url().includes('_data')) && r.request().method() === 'POST');
     await adminPage.locator('[role="dialog"] button[type="submit"]').click();
+    const badRes = await badResponsePromise;
+    expect(badRes.status()).toBe(400);
+
+    await expect(adminPage.locator('[role="dialog"]')).toBeVisible();
+    await expect(adminPage.locator('[role="alert"]')).toBeVisible();
+
+    // 7. Acceptation réussie
+    await adminPage.locator('input[name="meeting_url"]').fill('https://meet.google.com/abc-defg-hij');
+    const goodResponsePromise = adminPage.waitForResponse(r => (r.url().includes('/admin/bookings') || r.url().includes('_data')) && r.request().method() === 'POST');
+    await adminPage.locator('[role="dialog"] button[type="submit"]').click();
+    
+    // La modale reste visible pendant l'envoi
+    await expect(adminPage.locator('[role="dialog"]')).toBeVisible();
+    
+    const goodRes = await goodResponsePromise;
+    expect(goodRes.status()).toBe(200);
 
     // Attendre la fermeture de la modale
     await expect(adminPage.locator('[role="dialog"]')).toBeHidden();
+
+    // Vérifier onglet Confirmés
+    await adminPage.locator('button:has-text("Confirmés")').click();
+    await expect(adminPage.getByText(winnerName).first()).toBeVisible();
+    await expect(adminPage.locator('a[href="https://meet.google.com/abc-defg-hij"]')).toBeVisible();
 
     // 11. Affichage mobile correct
     await page1.setViewportSize({ width: 375, height: 667 });

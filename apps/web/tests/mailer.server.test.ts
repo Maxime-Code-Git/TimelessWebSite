@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { sendContactEmail } from "../app/lib/mailer.server";
+import { sendContactEmail, sendBookingConfirmedEmail } from "../app/lib/mailer.server";
 import nodemailer from "nodemailer";
 
 vi.mock("../app/lib/env.server", () => {
@@ -16,11 +16,11 @@ vi.mock("../app/lib/env.server", () => {
 });
 
 describe("Mailer Server", () => {
-  let sendMailMock: import("vitest").Mock;
+  const sendMailMock = vi.fn().mockResolvedValue({ accepted: ["to@example.com"] });
 
   beforeEach(() => {
     vi.clearAllMocks();
-    sendMailMock = vi.fn().mockResolvedValue({ accepted: ["to@example.com"] });
+    sendMailMock.mockClear();
     vi.spyOn(nodemailer, "createTransport").mockReturnValue({
       sendMail: sendMailMock
     } as unknown as nodemailer.Transporter);
@@ -52,5 +52,39 @@ describe("Mailer Server", () => {
     const callArgs = sendMailMock.mock.calls[0][0];
     expect(callArgs.from).not.toContain(data.email);
     expect(callArgs.from).not.toContain(data.names);
+  });
+
+  describe("sendBookingConfirmedEmail", () => {
+    it("should include admin note for FR emails", async () => {
+      const data = {
+        names: "Alice",
+        email: "alice@example.com",
+        local_date: "2027-01-01",
+        local_time: "10:00",
+        language: "fr",
+        meeting_url: "https://meet.google.com/abc",
+        admin_note: "Ceci est une note"
+      };
+      await sendBookingConfirmedEmail(data as unknown as import("../app/lib/booking.server").Booking);
+      expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
+        text: expect.stringContaining("Note de Sempra : Ceci est une note")
+      }));
+    });
+
+    it("should include admin note for EN emails", async () => {
+      const data = {
+        names: "Bob",
+        email: "bob@example.com",
+        local_date: "2027-01-01",
+        local_time: "10:00",
+        language: "en",
+        meeting_url: "https://meet.google.com/abc",
+        admin_note: "This is a note"
+      };
+      await sendBookingConfirmedEmail(data as unknown as import("../app/lib/booking.server").Booking);
+      expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
+        text: expect.stringContaining("Note from Sempra: This is a note")
+      }));
+    });
   });
 });

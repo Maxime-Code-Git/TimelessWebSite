@@ -139,9 +139,12 @@ export async function sendBookingConfirmedEmail(data: Booking) {
 
   const formattedDate = formatDate(data.local_date, data.language);
 
+  const noteTextFr = data.admin_note ? `\n\nNote de Sempra : ${data.admin_note}` : "";
+  const noteTextEn = data.admin_note ? `\n\nNote from Sempra: ${data.admin_note}` : "";
+
   const textClient = data.language === 'en'
-    ? `Hello ${data.names},\n\nYour video appointment on ${formattedDate} at ${data.local_time} (Brussels time) has been confirmed!\n\nPlease use the following link to join the meeting at the scheduled time:\n${data.meeting_url}\n\nLooking forward to meeting you,\nSempra`
-    : `Bonjour ${data.names},\n\nVotre rendez-vous visio du ${formattedDate} à ${data.local_time} (Heure de Bruxelles) est confirmé !\n\nVeuillez utiliser le lien ci-dessous pour rejoindre la réunion à l'heure prévue :\n${data.meeting_url}\n\nÀ très vite,\nSempra`;
+    ? `Hello ${data.names},\n\nYour video appointment on ${formattedDate} at ${data.local_time} (Brussels time) has been confirmed!\n\nPlease use the following link to join the meeting at the scheduled time:\n${data.meeting_url}${noteTextEn}\n\nLooking forward to meeting you,\nSempra`
+    : `Bonjour ${data.names},\n\nVotre rendez-vous visio du ${formattedDate} à ${data.local_time} (Heure de Bruxelles) est confirmé !\n\nVeuillez utiliser le lien ci-dessous pour rejoindre la réunion à l'heure prévue :\n${data.meeting_url}${noteTextFr}\n\nÀ très vite,\nSempra`;
 
   try {
     await mailer.sendMail({

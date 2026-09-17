@@ -2,7 +2,7 @@ import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from "react-router";
-import { data, Form, Link, useLoaderData, useNavigation, useSubmit } from "react-router";
+import { data, Form, Link, useLoaderData, useNavigation, useSubmit, useFetcher } from "react-router";
 import { requireValidAdminSession, validateAdminFormData, ActionSecurityError } from "../lib/admin-auth.server";
 import {
   getAllBookings, getWeeklySlots, getBlockedDates, updateBookingStatus,
@@ -57,15 +57,27 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     if (intent === "confirm_booking") {
       const id = String(formData.get("id"));
-      const meetingUrl = String(formData.get("meeting_url"));
-      const adminNote = formData.get("admin_note") ? String(formData.get("admin_note")) : undefined;
+      const meetingUrl = String(formData.get("meeting_url")).trim();
+      const adminNote = formData.get("admin_note") ? String(formData.get("admin_note")).trim() : undefined;
 
       if (!isValidVisioUrl(meetingUrl)) {
-        return Response.json({ error: "Invalid meeting URL. Must be HTTPS and from Google Meet, Zoom, or Teams." }, { status: 400 });
+        return Response.json({ error: "Le lien doit être une URL HTTPS Google Meet, Zoom ou Microsoft Teams." }, { status: 400 });
       }
 
-      const booking = updateBookingStatus(id, "confirmed", meetingUrl, adminNote);
-      await sendBookingConfirmedEmail(booking);
+      const oldBooking = getBooking(id);
+      if (!oldBooking || oldBooking.status !== "pending") {
+        return Response.json({ error: "Demande introuvable ou n'est plus en attente." }, { status: 400 });
+      }
+
+      const bookingForEmail = { ...oldBooking, meeting_url: meetingUrl, admin_note: adminNote || null };
+
+      try {
+        await sendBookingConfirmedEmail(bookingForEmail);
+      } catch {
+        return Response.json({ error: "L’e-mail n’a pas pu être envoyé. La demande reste en attente. Vous pouvez réessayer." }, { status: 502 });
+      }
+
+      updateBookingStatus(id, "confirmed", meetingUrl, adminNote);
       return Response.json({ success: true });
     }
 
@@ -171,10 +183,9 @@ export default function AdminBookings() {
     }
   }, [confirmModalData, rejectModalData]);
 
-  const confirmSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const rejectSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     submit(e.currentTarget);
-    setConfirmModalData(null);
     setRejectModalData(null);
   };
 
@@ -310,27 +321,12 @@ export default function AdminBookings() {
 
       {/* Confirmation Modal */}
       {confirmModalData && (
-        <div role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" className={styles.modalOverlay}>
-          <div ref={confirmModalRef} className={`${styles.dashboardCard} ${styles.modalContent}`} tabIndex={-1}>
-            <h3 id="confirm-dialog-title">Confirmer le rendez-vous</h3>
-            <Form method="post" onSubmit={confirmSubmit}>
-              <input type="hidden" name="csrfToken" value={csrfToken} />
-              <input type="hidden" name="intent" value="confirm_booking" />
-              <input type="hidden" name="id" value={confirmModalData.id} />
-
-              <label className={styles.label}>Lien visio (Google Meet, Zoom, Teams)</label>
-              <input type="url" name="meeting_url" required className={`${styles.input} ${styles.inputMargin}`} />
-
-              <label className={styles.label}>Note (optionnel - sera envoyée au client)</label>
-              <textarea name="admin_note" className={`${styles.input} ${styles.textareaMargin}`}></textarea>
-
-              <div className={styles.modalActions}>
-                <button type="button" onClick={closeModal} className={styles.logoutButton}>Annuler</button>
-                <button type="submit" className={styles.submitButton}>Envoyer la confirmation</button>
-              </div>
-            </Form>
-          </div>
-        </div>
+        <ConfirmBookingModal
+          id={confirmModalData.id}
+          csrfToken={csrfToken}
+          closeModal={closeModal}
+          modalRef={confirmModalRef}
+        />
       )}
 
       {/* Reject Modal */}
@@ -338,7 +334,7 @@ export default function AdminBookings() {
         <div role="dialog" aria-modal="true" aria-labelledby="reject-dialog-title" className={styles.modalOverlay}>
           <div ref={rejectModalRef} className={`${styles.dashboardCard} ${styles.modalContent}`} tabIndex={-1}>
             <h3 id="reject-dialog-title">{rejectModalData.action === 'reject' ? 'Refuser la demande' : 'Annuler le rendez-vous'}</h3>
-            <Form method="post" onSubmit={confirmSubmit}>
+            <Form method="post" onSubmit={rejectSubmit}>
               <input type="hidden" name="csrfToken" value={csrfToken} />
               <input type="hidden" name="intent" value={rejectModalData.action === 'reject' ? "reject_booking" : "cancel_booking"} />
               <input type="hidden" name="id" value={rejectModalData.id} />
@@ -354,6 +350,50 @@ export default function AdminBookings() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+
+function ConfirmBookingModal({ id, csrfToken, closeModal, modalRef }: { id: string, csrfToken: string, closeModal: () => void, modalRef: React.RefObject<HTMLDivElement | null> }) {
+  const fetcher = useFetcher<{ success?: boolean; error?: string }>();
+  const isSubmitting = fetcher.state !== "idle";
+
+  useEffect(() => {
+    if (fetcher.data?.success && fetcher.state === "idle") {
+      closeModal();
+    }
+  }, [fetcher.data, fetcher.state, closeModal]);
+
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" className={styles.modalOverlay}>
+      <div ref={modalRef} className={`${styles.dashboardCard} ${styles.modalContent}`} tabIndex={-1}>
+        <h3 id="confirm-dialog-title">Confirmer le rendez-vous</h3>
+        <fetcher.Form method="post">
+          <input type="hidden" name="csrfToken" value={csrfToken} />
+          <input type="hidden" name="intent" value="confirm_booking" />
+          <input type="hidden" name="id" value={id} />
+
+          {fetcher.data?.error && (
+            <div role="alert" style={{ color: '#ff4d4f', marginBottom: '16px', fontSize: '14px', fontWeight: 'bold' }}>
+              {fetcher.data.error}
+            </div>
+          )}
+
+          <label className={styles.label}>Lien visio (Google Meet, Zoom, Teams)</label>
+          <input type="url" name="meeting_url" required className={`${styles.input} ${styles.inputMargin}`} disabled={isSubmitting} />
+
+          <label className={styles.label}>Note (optionnel - sera envoyée au client)</label>
+          <textarea name="admin_note" className={`${styles.input} ${styles.textareaMargin}`} disabled={isSubmitting}></textarea>
+
+          <div className={styles.modalActions}>
+            <button type="button" onClick={closeModal} className={styles.logoutButton} disabled={isSubmitting}>Annuler</button>
+            <button type="submit" className={styles.submitButton} disabled={isSubmitting}>
+              {isSubmitting ? "Envoi…" : "Envoyer la confirmation"}
+            </button>
+          </div>
+        </fetcher.Form>
+      </div>
     </div>
   );
 }

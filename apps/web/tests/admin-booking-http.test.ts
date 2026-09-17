@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { action, loader } from "../app/routes/admin.bookings";
 import { requireValidAdminSession } from "../app/lib/admin-auth.server";
+import { getBooking, updateBookingStatus } from "../app/lib/booking.server";
+import { sendBookingConfirmedEmail } from "../app/lib/mailer.server";
 import type { Session } from "react-router";
 
 vi.mock("../app/lib/env.server", () => ({
@@ -89,6 +91,7 @@ describe("Admin Booking HTTP", () => {
   });
 
   it("should process confirm_booking intent", async () => {
+    vi.mocked(getBooking).mockReturnValueOnce({ id: "booking-123", status: "pending" } as unknown as import("../app/lib/booking.server").Booking);
     const req = createRequest("confirm_booking", {
       id: "booking-123",
       meeting_url: "https://meet.google.com/abc"
@@ -103,8 +106,29 @@ describe("Admin Booking HTTP", () => {
       id: "booking-123",
       admin_note: "Sorry"
     });
+    vi.mocked(getBooking).mockReturnValueOnce({ id: "booking-123", status: "pending" } as unknown as import("../app/lib/booking.server").Booking);
     const res = await action({ request: req } as Parameters<typeof action>[0]) as Response;
     const status = res.status;
     expect(status).toBe(200);
+  });
+
+  it("should rollback confirmation and return 502 if SMTP fails", async () => {
+    vi.mocked(sendBookingConfirmedEmail).mockRejectedValueOnce(new Error("SMTP_FAILURE"));
+    
+    vi.mocked(getBooking).mockReturnValueOnce({ id: "booking-123", status: "pending" } as unknown as import("../app/lib/booking.server").Booking);
+    const updateSpy = vi.mocked(updateBookingStatus);
+    updateSpy.mockClear();
+
+    const req = createRequest("confirm_booking", {
+      id: "booking-123",
+      meeting_url: "https://meet.google.com/abc"
+    });
+
+    const res = await action({ request: req } as Parameters<typeof action>[0]) as Response;
+    expect(res.status).toBe(502);
+    
+    const body = await res.json();
+    expect(body.error).toContain("L’e-mail n’a pas pu être envoyé");
+    expect(updateSpy).not.toHaveBeenCalled(); // Ensures booking remains pending
   });
 });
