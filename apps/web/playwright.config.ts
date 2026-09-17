@@ -82,7 +82,7 @@ export default defineConfig({
       SMTP_PASS: 'test',
       SMTP_FROM: 'test@example.com',
       SMTP_TO: 'test@example.com',
-      SMTP_HOST: 'localhost',
+      SMTP_HOST: '127.0.0.1',
       SMTP_CA_CERT: fs.readFileSync(path.join(__dirname, 'e2e/certs/test-cert.pem'), 'utf-8'),
       CONTACT_RATE_LIMIT_SECRET: 'testsecret',
       CONTACT_RATE_LIMIT_MAX: '100',
