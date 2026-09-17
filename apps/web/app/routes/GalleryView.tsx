@@ -336,7 +336,7 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
                 {t.lightboxLoadingMsg}
               </div>
             )}
-            
+
             {lightboxError && (
               <div className={styles.lightboxError} role="alert">
                 {t.lightboxErrorMsg}
