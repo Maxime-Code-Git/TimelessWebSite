@@ -157,7 +157,11 @@
 }
 
 .videoElement {
+  display: block;
   width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #000;
   border-radius: 10px;
 }
 
