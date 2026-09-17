@@ -2,7 +2,15 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Visio Booking Flow', () => {
 
-  test('should complete the entire booking lifecycle: create, admin accept, verify, conflict, and mobile', async ({ browser }) => {
+  test('should complete the entire booking lifecycle: create, admin accept, verify, conflict, and mobile', async ({ browser }, testInfo) => {
+
+    const projectSlug = testInfo.project.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    const meetingUrl =
+      `https://meet.google.com/e2e-${projectSlug}-${testInfo.retry}`;
 
     // Complete isolation per user: User 1 and User 2
     const context1 = await browser.newContext();
@@ -129,7 +137,7 @@ test.describe('Visio Booking Flow', () => {
     await expect(adminPage.locator("[style]")).toHaveCount(0);
 
     // 7. Acceptation réussie
-    await adminPage.locator('input[name="meeting_url"]').fill('https://meet.google.com/abc-defg-hij');
+    await adminPage.locator('input[name="meeting_url"]').fill(meetingUrl);
     const goodResponsePromise = adminPage.waitForResponse(r => (r.url().includes('/admin/bookings') || r.url().includes('_data')) && r.request().method() === 'POST');
     await adminPage.locator('[role="dialog"] button[type="submit"]').click();
 
@@ -144,8 +152,14 @@ test.describe('Visio Booking Flow', () => {
 
     // Vérifier onglet Confirmés
     await adminPage.locator('button:has-text("Confirmés")').click();
-    await expect(adminPage.getByText(winnerName).first()).toBeVisible();
-    await expect(adminPage.locator('a[href="https://meet.google.com/abc-defg-hij"]')).toBeVisible();
+    
+    const confirmedLink = adminPage.locator(`a[href="${meetingUrl}"]`);
+
+    await expect(confirmedLink).toHaveCount(1);
+    await expect(confirmedLink).toBeVisible();
+
+    const confirmedCard = confirmedLink.locator("xpath=ancestor::div[1]");
+    await expect(confirmedCard).toContainText(winnerName);
 
     // 11. Affichage mobile correct
     await page1.setViewportSize({ width: 375, height: 667 });
