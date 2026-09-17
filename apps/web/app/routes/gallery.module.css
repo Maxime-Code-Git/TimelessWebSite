@@ -1,5 +1,5 @@
 .container {
-  background: var(--bg);
+  background: var(--ivory);
   color: var(--forest);
   line-height: 1.6;
 }
@@ -31,7 +31,7 @@
 .heroOverlay {
   position: absolute;
   inset: 0;
-  background: rgba(7, 36, 33, 0.85);
+  background: rgba(10, 24, 18, 0.5);
   z-index: 1;
 }
 
@@ -45,6 +45,7 @@
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--gold-light);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   margin: 0 0 20px;
 }
 
@@ -52,13 +53,22 @@
   font-family: var(--font-serif);
   font-weight: 500;
   font-size: clamp(30px, 5.5vw, 50px);
-  color: var(--bg);
+  color: var(--ivory);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   margin: 0 0 14px;
 }
 
-.heroText {
+.heroDate {
   font-size: 14px;
-  color: var(--grey);
+  color: var(--ivory);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.introText {
+  font-size: 14px;
+  color: var(--forest);
   max-width: 440px;
   margin: 0 auto;
 }
@@ -94,7 +104,7 @@
 
 .shortcutCard:hover {
   transform: translateY(-4px);
-  color: var(--forest-dark);
+  color: var(--forest-deep);
 }
 
 .shortcutIcon {
@@ -117,7 +127,7 @@
   font-family: var(--font-serif);
   font-weight: 500;
   font-size: 20px;
-  color: var(--forest-dark);
+  color: var(--forest-deep);
 }
 
 /* ── Downloads ────────────────────────────────────────────── */
@@ -143,7 +153,7 @@
 }
 
 .sectionTitleLight {
-  color: var(--bg);
+  color: var(--ivory);
 }
 
 .videoElement {
@@ -169,7 +179,7 @@
 }
 
 .btnPrimary {
-  background: var(--forest-dark);
+  background: var(--forest-deep);
   color: var(--gold-light);
   border: 0.5px solid var(--gold);
   padding: 15px 36px;
@@ -267,7 +277,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--forest-light);
+  color: var(--sage);
   font-size: 14px;
   font-style: italic;
 }
@@ -281,7 +291,7 @@
   border-radius: 50%;
   border: 0.5px solid var(--gold-light);
   background: rgba(7, 36, 33, 0.55);
-  color: var(--bg);
+  color: var(--ivory);
   font-size: 14px;
   display: flex;
   align-items: center;
@@ -321,13 +331,13 @@
 
 .photoCount {
   font-size: 11.5px;
-  color: var(--grey);
+  color: var(--forest);
   margin: 12px 0 0;
 }
 
 /* ── Video Gallery ────────────────────────────────────────── */
 .videoSection {
-  background: var(--forest-dark);
+  background: var(--forest-deep);
   padding: 90px 0 100px;
 }
 
@@ -377,7 +387,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--forest-light);
+  color: var(--sage);
   font-size: 14px;
   font-style: italic;
   background: rgba(186, 153, 107, 0.1);
@@ -393,7 +403,7 @@
   border-radius: 50%;
   border: 1px solid var(--gold);
   background: rgba(7, 36, 33, 0.55);
-  color: var(--bg);
+  color: var(--ivory);
   font-size: 19px;
   display: flex;
   align-items: center;
@@ -471,6 +481,7 @@
 .videoCard {
   border-radius: 12px;
   overflow: hidden;
+  background: #000;
 }
 
 /* ── Lightbox ────────────────────────────────────────────── */
@@ -593,4 +604,64 @@
   }
   .lightboxPrev { left: 8px; }
   .lightboxNext { right: 8px; }
+}
+
+/* ── Gap-less Layout ──────────────────────────────────────── */
+.photoRow {
+  display: grid;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.photoRowUnits1 { grid-template-columns: 1fr; }
+.photoRowUnits2 { grid-template-columns: repeat(2, 1fr); }
+.photoRowUnits3 { grid-template-columns: repeat(3, 1fr); }
+.photoRowUnits4 { grid-template-columns: repeat(4, 1fr); }
+.photoRowSinglePortrait {
+  grid-template-columns: minmax(auto, 600px);
+  justify-content: center;
+}
+@media (max-width: 720px) {
+  .photoRow {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.lightboxSpinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--ivory);
+  font-size: 14px;
+  z-index: 10001;
+}
+
+.lightboxError {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #ff4d4f;
+  font-size: 14px;
+  z-index: 10001;
+}
+
+.lightboxImageHd {
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 4px;
+  transition: opacity 0.3s ease;
+  position: relative;
+  z-index: 2;
+}
+
+.lightboxImagePreview {
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 4px;
+  position: absolute;
+  z-index: 1;
+  filter: blur(8px);
 }
