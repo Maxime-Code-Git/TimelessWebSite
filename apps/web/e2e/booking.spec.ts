@@ -152,7 +152,7 @@ test.describe('Visio Booking Flow', () => {
 
     // Vérifier onglet Confirmés
     await adminPage.locator('button:has-text("Confirmés")').click();
-    
+
     const confirmedLink = adminPage.locator(`a[href="${meetingUrl}"]`);
 
     await expect(confirmedLink).toHaveCount(1);

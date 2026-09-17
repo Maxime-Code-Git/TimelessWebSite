@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { SMTPServer } from 'smtp-server';
+import crypto from 'crypto';
 
 const currentDir = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 const certsDir = path.resolve(currentDir, '../e2e/certs');
@@ -57,6 +58,14 @@ async function run() {
     generateCerts();
     e2eTempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'timeless-e2e-'));
 
+    const smtpInboxPath = path.join(e2eTempDir, 'smtp-inbox');
+    const smtpModePath = path.join(e2eTempDir, 'smtp-mode.txt');
+
+    fs.mkdirSync(smtpInboxPath, { recursive: true });
+    fs.writeFileSync(smtpModePath, 'accept');
+
+    process.env.E2E_SMTP_INBOX_PATH = smtpInboxPath;
+    process.env.E2E_SMTP_MODE_PATH = smtpModePath;
     process.env.SITE_CONTENT_PATH = path.join(e2eTempDir, 'site-content.json');
     process.env.PORTFOLIO_CONTENT_PATH = path.join(e2eTempDir, 'portfolio.json');
     process.env.PORTFOLIO_MEDIA_PATH = path.join(e2eTempDir, 'portfolio-media');
@@ -84,9 +93,27 @@ async function run() {
           return callback(new Error('Invalid username or password'));
         }
       },
+      onRcptTo(address, session, callback) {
+        const mode = fs.readFileSync(smtpModePath, 'utf8').trim();
+        if (mode === 'reject') {
+          return callback(new Error('Simulated SMTP rejection'));
+        }
+        callback();
+      },
       onData(stream, session, callback) {
-        stream.on('data', () => {}); // Consume stream
-        stream.on('end', callback);
+        let rawData = '';
+        stream.on('data', (chunk) => {
+          rawData += chunk.toString();
+        });
+        stream.on('end', () => {
+          const mode = fs.readFileSync(smtpModePath, 'utf8').trim();
+          if (mode === 'accept') {
+            const emlPath = path.join(smtpInboxPath, `${crypto.randomUUID()}.eml`);
+            fs.writeFileSync(emlPath, rawData);
+          }
+          callback();
+        });
+        stream.on('error', callback);
       }
     });
 
@@ -116,7 +143,7 @@ async function run() {
 
   } finally {
     if (smtpServer) {
-      smtpServer.close();
+      await new Promise(resolve => smtpServer.close(resolve));
     }
     cleanupCerts();
     if (e2eTempDir && fs.existsSync(e2eTempDir)) {

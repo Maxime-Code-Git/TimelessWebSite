@@ -1,64 +1,42 @@
 import { test, expect } from '@playwright/test';
-import { SMTPServer } from 'smtp-server';
 import { DatabaseSync } from 'node:sqlite';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-let smtpServer: SMTPServer;
-let receivedEmails: { session: unknown; buffer: string }[] = [];
-let smtpReject = false;
-let smtpTimeout = false;
+const inboxPath = process.env.E2E_SMTP_INBOX_PATH as string;
+const modePath = process.env.E2E_SMTP_MODE_PATH as string;
 
-// eslint-disable-next-line no-empty-pattern
-test.beforeAll(async ({}, workerInfo) => {
-  if (workerInfo.project.name !== 'chromium') return;
+if (!inboxPath || !modePath) {
+  throw new Error("E2E_SMTP_INBOX_PATH and E2E_SMTP_MODE_PATH must be defined");
+}
 
-  smtpServer = new SMTPServer({
-    secure: false,
-    key: fs.readFileSync('./e2e/certs/test-key.pem'),
-    cert: fs.readFileSync('./e2e/certs/test-cert.pem'),
-    authOptional: true, // Allow auth without checking password strictly for tests
-    onAuth(auth, session, callback) {
-      // Accept any auth credentials for tests
-      return callback(null, { user: auth.username });
-    },
-    onData(stream, session, callback) {
-      if (smtpTimeout) {
-        // intentionally hang
-        return;
-      }
-      if (smtpReject) {
-        return callback(new Error("Intentional SMTP rejection"));
-      }
-      let buffer = '';
-      stream.on('data', (chunk) => (buffer += chunk));
-      stream.on('end', () => {
-        receivedEmails.push({ session, buffer });
-        callback();
-      });
-    },
-    onRcptTo(address, session, callback) {
-      if (smtpReject) {
-        return callback(new Error("Intentional recipient rejection"));
-      }
-      callback();
-    },
+function clearInbox() {
+  const files = fs.readdirSync(inboxPath);
+  for (const file of files) {
+    if (file.endsWith('.eml')) {
+      fs.unlinkSync(path.join(inboxPath, file));
+    }
+  }
+}
+
+function setSmtpMode(mode: 'accept' | 'reject') {
+  fs.writeFileSync(modePath, mode);
+}
+
+function readReceivedEmails(): string[] {
+  const files = fs.readdirSync(inboxPath).filter(f => f.endsWith('.eml'));
+  // Sort by modification time to ensure deterministic order
+  files.sort((a, b) => {
+    const statA = fs.statSync(path.join(inboxPath, a));
+    const statB = fs.statSync(path.join(inboxPath, b));
+    return statA.mtimeMs - statB.mtimeMs;
   });
-
-  await new Promise<void>((resolve) => {
-    smtpServer.listen(2525, () => resolve());
-  });
-});
-
-// eslint-disable-next-line no-empty-pattern
-test.afterAll(async ({}, workerInfo) => {
-  if (workerInfo.project.name !== 'chromium') return;
-  smtpServer?.close();
-});
+  return files.map(f => fs.readFileSync(path.join(inboxPath, f), 'utf-8'));
+}
 
 test.beforeEach(() => {
-  receivedEmails = [];
-  smtpReject = false;
-  smtpTimeout = false;
+  clearInbox();
+  setSmtpMode('accept');
 
   // Wipe rate-limit db
   try {
@@ -72,10 +50,13 @@ test.beforeEach(() => {
   }
 });
 
+test.afterEach(() => {
+  setSmtpMode('accept');
+});
+
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Contact Form (Phase 3 Backend)', () => {
-  test.skip(({ browserName, isMobile }) => browserName !== 'chromium' || !!isMobile, 'SMTP server can only run in one project to avoid port conflicts');
   test('should successfully submit form, clear it, and allow a second submission (FR)', async ({ page }) => {
     await page.goto('/fr/contact');
 
@@ -97,7 +78,8 @@ test.describe('Contact Form (Phase 3 Backend)', () => {
     // Expect success message and form cleared
     await expect(page.getByRole('status')).toContainText('Votre message a bien été envoyé');
     await expect(page.locator('#names')).toBeEmpty();
-    expect(receivedEmails.length).toBe(1);
+
+    await expect.poll(() => readReceivedEmails().length).toBe(1);
 
     // Second submission
     await page.fill('#names', 'Jane Second');
@@ -111,12 +93,16 @@ test.describe('Contact Form (Phase 3 Backend)', () => {
     // Expect success message and form cleared again
     await expect(page.getByRole('status')).toContainText('Votre message a bien été envoyé');
     await expect(page.locator('#names')).toBeEmpty();
-    expect(receivedEmails.length).toBe(2);
-    expect(receivedEmails[1].buffer).toContain('Jane Second');
+
+    await expect.poll(() => readReceivedEmails().length).toBe(2);
+
+    const emails = readReceivedEmails();
+    expect(emails[1]).toContain('Jane Second');
   });
 
   test('should keep values, show error on SMTP failure, and focus error (EN)', async ({ page }) => {
-    smtpReject = true; // Mock rejection
+    setSmtpMode('reject');
+
     const randomIp = `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
     await page.setExtraHTTPHeaders({ 'x-forwarded-for': randomIp });
 
@@ -143,6 +129,6 @@ test.describe('Contact Form (Phase 3 Backend)', () => {
     await expect(page.locator('#email')).toHaveValue('jane@example.com');
 
     // Expect no email sent
-    expect(receivedEmails.length).toBe(0);
+    expect(readReceivedEmails().length).toBe(0);
   });
 });
