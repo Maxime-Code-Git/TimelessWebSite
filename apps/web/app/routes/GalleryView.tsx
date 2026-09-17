@@ -355,9 +355,8 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
                   srcSet={`${mediaUrl(photos[lightboxIndex].id)}?width=960&format=webp 960w, ${mediaUrl(photos[lightboxIndex].id)}?width=1440&format=webp 1440w, ${mediaUrl(photos[lightboxIndex].id)}?width=1920&format=webp 1920w`}
                   sizes="90vw"
                   alt={`${t.photoOf} ${gallery.bride_names}`}
-                  className={styles.lightboxImageHd}
+                  className={`${styles.lightboxImageHd} ${lightboxLoading ? styles.lightboxImageHidden : ""}`}
                   data-testid="lightbox-full-image"
-                  style={{ opacity: lightboxLoading ? 0 : 1 }}
                   onLoad={() => setLightboxLoading(false)}
                   onError={() => {
                     setLightboxLoading(false);
