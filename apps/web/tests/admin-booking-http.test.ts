@@ -114,7 +114,7 @@ describe("Admin Booking HTTP", () => {
 
   it("should rollback confirmation and return 502 if SMTP fails", async () => {
     vi.mocked(sendBookingConfirmedEmail).mockRejectedValueOnce(new Error("SMTP_FAILURE"));
-    
+
     vi.mocked(getBooking).mockReturnValueOnce({ id: "booking-123", status: "pending" } as unknown as import("../app/lib/booking.server").Booking);
     const updateSpy = vi.mocked(updateBookingStatus);
     updateSpy.mockClear();
@@ -126,7 +126,7 @@ describe("Admin Booking HTTP", () => {
 
     const res = await action({ request: req } as Parameters<typeof action>[0]) as Response;
     expect(res.status).toBe(502);
-    
+
     const body = await res.json();
     expect(body.error).toContain("L’e-mail n’a pas pu être envoyé");
     expect(updateSpy).not.toHaveBeenCalled(); // Ensures booking remains pending

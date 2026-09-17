@@ -374,8 +374,8 @@ function ConfirmBookingModal({ id, csrfToken, closeModal, modalRef }: { id: stri
           <input type="hidden" name="intent" value="confirm_booking" />
           <input type="hidden" name="id" value={id} />
 
-          {fetcher.data?.error && (
-            <div role="alert" style={{ color: '#ff4d4f', marginBottom: '16px', fontSize: '14px', fontWeight: 'bold' }}>
+          {fetcher.state === "idle" && fetcher.data?.error && (
+            <div role="alert" className={styles.bookingErrorMessage}>
               {fetcher.data.error}
             </div>
           )}

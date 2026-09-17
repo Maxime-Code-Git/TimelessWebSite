@@ -619,6 +619,12 @@
 .hiddenText { color: red; font-size: 12px; font-weight: bold; }
 
 /* Booking Admin Styles */
+.bookingErrorMessage {
+  margin-bottom: 16px;
+  color: #c62828;
+  font-size: 14px;
+  font-weight: 700;
+}
 .tabsContainer { display: flex; gap: 10px; margin-bottom: 20px; }
 .tabBtn { font-weight: normal; }
 .activeTabBtn { font-weight: bold; }

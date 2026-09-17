@@ -126,15 +126,16 @@ test.describe('Visio Booking Flow', () => {
 
     await expect(adminPage.locator('[role="dialog"]')).toBeVisible();
     await expect(adminPage.locator('[role="alert"]')).toBeVisible();
+    await expect(adminPage.locator("[style]")).toHaveCount(0);
 
     // 7. Acceptation réussie
     await adminPage.locator('input[name="meeting_url"]').fill('https://meet.google.com/abc-defg-hij');
     const goodResponsePromise = adminPage.waitForResponse(r => (r.url().includes('/admin/bookings') || r.url().includes('_data')) && r.request().method() === 'POST');
     await adminPage.locator('[role="dialog"] button[type="submit"]').click();
-    
+
     // La modale reste visible pendant l'envoi
     await expect(adminPage.locator('[role="dialog"]')).toBeVisible();
-    
+
     const goodRes = await goodResponsePromise;
     expect(goodRes.status()).toBe(200);
 
