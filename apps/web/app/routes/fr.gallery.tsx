@@ -1,6 +1,6 @@
 import { redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/fr.gallery";
-import { getGallerySession, GALLERY_PRIVATE_HEADERS, sanitizeGalleryCover } from "~/lib/gallery-auth.server";
+import { getGallerySession, GALLERY_PRIVATE_HEADERS, getAuthorizedGalleryCoverId } from "~/lib/gallery-auth.server";
 import type { GalleryAccessLevel } from "~/lib/gallery-auth.server";
 import { getGalleryByPublicId, getGalleryMedia } from "~/lib/gallery.server";
 import { getGalleryDb } from "~/lib/gallery-db.server";
@@ -39,10 +39,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const accessLevel = session.get("accessLevel") as GalleryAccessLevel | undefined;
   const codeVersion = session.get("codeVersion") as number | undefined;
 
-  const { requireAdminSession } = await import("~/lib/auth.server");
-  const { isValid: isAdmin } = await requireAdminSession(request);
-
-  if (!isAdmin && (!galleryId || !accessLevel || codeVersion === undefined)) {
+  if (!galleryId || !accessLevel || codeVersion === undefined) {
     throw redirect("/fr/espace-clients?status=unauthorized", {
       headers: GALLERY_PRIVATE_HEADERS,
     });
@@ -56,26 +53,23 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     });
   }
 
-  if (!isAdmin && gallery.id !== galleryId) {
+  if (gallery.id !== galleryId) {
     throw redirect("/fr/espace-clients?status=unavailable", {
       headers: GALLERY_PRIVATE_HEADERS,
     });
   }
 
   // Validate session against code version from gallery_codes (source of truth)
-  if (!isAdmin) {
-    const db = getGalleryDb();
-    const codeRow = db.prepare("SELECT version FROM gallery_codes WHERE gallery_id = ? AND level = ?").get(galleryId!, accessLevel!) as { version: number } | undefined;
-    if (!codeRow || codeRow.version !== codeVersion) {
-      throw redirect("/fr/espace-clients?status=expired", {
-        headers: GALLERY_PRIVATE_HEADERS,
-      });
-    }
+  const db = getGalleryDb();
+  const codeRow = db.prepare("SELECT version FROM gallery_codes WHERE gallery_id = ? AND level = ?").get(galleryId, accessLevel) as { version: number } | undefined;
+  if (!codeRow || codeRow.version !== codeVersion) {
+    throw redirect("/fr/espace-clients?status=expired", {
+      headers: GALLERY_PRIVATE_HEADERS,
+    });
   }
 
-  const finalAccessLevel = isAdmin ? "maries" : accessLevel!;
-  const media = getGalleryMedia(gallery.id, finalAccessLevel);
-  sanitizeGalleryCover(gallery, finalAccessLevel);
+  const media = getGalleryMedia(gallery.id, accessLevel);
+  const cover_image_id = getAuthorizedGalleryCoverId(gallery.id, gallery.cover_image_id, accessLevel);
 
   return Response.json({
     gallery: {
@@ -87,9 +81,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       intro_en: gallery.intro_en,
       signature_fr: gallery.signature_fr,
       signature_en: gallery.signature_en,
-      cover_image_id: gallery.cover_image_id
+      cover_image_id
     },
-    accessLevel: finalAccessLevel,
+    accessLevel,
     media: media as GalleryMedia[]
   }, {
     headers: GALLERY_PRIVATE_HEADERS

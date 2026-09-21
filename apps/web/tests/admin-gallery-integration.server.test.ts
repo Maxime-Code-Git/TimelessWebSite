@@ -5,6 +5,19 @@ import fs from "node:fs";
 import os from "node:os";
 import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
+import AdmZip from "adm-zip";
+import http from "node:http";
+
+function fetchBuffer(url: string, cookie: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    http.get(url, { headers: { Cookie: cookie } }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => resolve(Buffer.concat(chunks)));
+      res.on("error", reject);
+    }).on("error", reject);
+  });
+}
 
 const requireModule = createRequire(import.meta.url);
 const servePkgPath = requireModule.resolve("@react-router/serve/package.json");
@@ -55,18 +68,18 @@ describe("Admin Gallery Integration Lifecycle", () => {
     fs.mkdirSync(path.join(importPath, "maries", "photos"), { recursive: true });
     fs.mkdirSync(path.join(importPath, "maries", "videos"), { recursive: true });
 
-    // Valid 1x1 JPEG base64
-    const validJpeg = Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64");
+    // Valid 1x1 JPEG base64 (padded to be larger)
+    const validJpeg = Buffer.concat([Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64"), Buffer.alloc(10000, 0)]);
 
-    // Valid 1x1 PNG base64
-    const validPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+    // Valid 1x1 PNG base64 (padded to be larger)
+    const validPng = Buffer.concat([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64"), Buffer.alloc(10000, 0)]);
 
     fs.writeFileSync(path.join(importPath, "invites", "photos", "test.jpg"), validJpeg);
     fs.writeFileSync(path.join(importPath, "maries", "photos", "couple.png"), validPng);
 
-    // Valid mp4 header: length (4 bytes), 'ftyp' (4 bytes), 'mp42' (4 bytes)
-    const validMp4_1 = Buffer.concat([Buffer.from([0,0,0,0x18]), Buffer.from("ftypmp42"), Buffer.from("video1")]);
-    const validMp4_2 = Buffer.concat([Buffer.from([0,0,0,0x18]), Buffer.from("ftypmp42"), Buffer.from("video2")]);
+    // Valid mp4 header: length (4 bytes), 'ftyp' (4 bytes), 'mp42' (4 bytes), padded
+    const validMp4_1 = Buffer.concat([Buffer.from([0,0,0,0x18]), Buffer.from("ftypmp42"), Buffer.from("video1"), Buffer.alloc(20000, 0)]);
+    const validMp4_2 = Buffer.concat([Buffer.from([0,0,0,0x18]), Buffer.from("ftypmp42"), Buffer.from("video2"), Buffer.alloc(20000, 0)]);
 
     fs.writeFileSync(path.join(importPath, "invites", "videos", "vid.mp4"), validMp4_1);
     fs.writeFileSync(path.join(importPath, "maries", "videos", "couple-vid.mp4"), validMp4_2);
@@ -231,11 +244,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
     const mariesVideoRow = mediaDb.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND visibility = 'maries' AND type = 'video'").get(galleryId!) as { id: string } | undefined;
     const cover_image_id = mariesPhotoRow?.id || "";
     const couple_video_id = mariesVideoRow?.id || "";
-
-    console.log("COVER IMAGE ID:", cover_image_id);
-    if (!cover_image_id) {
-      console.log("ALL MEDIA:", mediaDb.prepare("SELECT * FROM gallery_media WHERE gallery_id = ?").all(galleryId!));
-    }
+    mediaDb.close();
 
     // 8. Publish successfully
     const pubRes = await fetch(`${BASE_URL}/admin/galleries/${galleryId}?_data=routes/admin.galleries.$id`, {
@@ -335,20 +344,33 @@ describe("Admin Gallery Integration Lifecycle", () => {
     const guestZipAllRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download?type=all`, { headers: { "Cookie": guestCookie! } });
 
     expect(guestZipPhotosRes.status).toBe(200);
-    const photosZipStr = Buffer.from(await guestZipPhotosRes.arrayBuffer()).toString("utf8");
-    expect(photosZipStr).toContain("Photos/test.jpg");
-    expect(photosZipStr).not.toContain("couple.png"); // maries photo shouldn't be there
+    const photosBuf = await fetchBuffer(`${BASE_URL}/api/gallery/${public_id}/download?type=photos`, guestCookie!);
+    const tempPhotosPath = path.join(tempDir, "temp-photos.zip");
+    fs.writeFileSync(tempPhotosPath, photosBuf);
+    const photosZip = new AdmZip(tempPhotosPath);
+    const photosZipEntries = photosZip.getEntries().map(e => e.entryName);
+    expect(photosZipEntries).toContain("Photos/test.jpg");
+    expect(photosZipEntries).not.toContain("Photos/couple.png"); // maries photo shouldn't be there
 
     expect(guestZipVideosRes.status).toBe(200);
-    const videosZipStr = Buffer.from(await guestZipVideosRes.arrayBuffer()).toString("utf8");
-    expect(videosZipStr).toContain("Videos/vid.mp4");
-    expect(videosZipStr).not.toContain("couple-vid.mp4");
+    const videosBuf = await fetchBuffer(`${BASE_URL}/api/gallery/${public_id}/download?type=videos`, guestCookie!);
+    const tempVideosPath = path.join(tempDir, "temp-videos.zip");
+    fs.writeFileSync(tempVideosPath, videosBuf);
+    const videosZip = new AdmZip(tempVideosPath);
+    const videosZipEntries = videosZip.getEntries().map(e => e.entryName);
+    expect(videosZipEntries).toContain("Videos/vid.mp4");
+    expect(videosZipEntries).not.toContain("Videos/couple-vid.mp4");
 
     expect(guestZipAllRes.status).toBe(200);
-    const allZipStr = Buffer.from(await guestZipAllRes.arrayBuffer()).toString("utf8");
-    expect(allZipStr).toContain("Photos/test.jpg");
-    expect(allZipStr).toContain("Videos/vid.mp4");
-    expect(allZipStr).not.toContain("couple");
+    const allBuf = await fetchBuffer(`${BASE_URL}/api/gallery/${public_id}/download?type=all`, guestCookie!);
+    const tempAllPath = path.join(tempDir, "temp-all.zip");
+    fs.writeFileSync(tempAllPath, allBuf);
+    const allZip = new AdmZip(tempAllPath);
+    const allZipEntries = allZip.getEntries().map(e => e.entryName);
+    expect(allZipEntries).toContain("Photos/test.jpg");
+    expect(allZipEntries).toContain("Videos/vid.mp4");
+    expect(allZipEntries).not.toContain("Photos/couple.png");
+    expect(allZipEntries).not.toContain("Videos/couple-vid.mp4");
 
 
     // Verify guest photos API pagination
@@ -366,6 +388,8 @@ describe("Admin Gallery Integration Lifecycle", () => {
     expect(forbidVideoRes.status).toBe(404);
     const forbidDownloadRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download/original/${cover_image_id}`, { headers: { "Cookie": guestCookie! } });
     expect(forbidDownloadRes.status).toBe(404);
+    const forbidDownloadVideoRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download/original/${couple_video_id}`, { headers: { "Cookie": guestCookie! } });
+    expect(forbidDownloadVideoRes.status).toBe(404);
     // 10. Verify couple access and ZIP download
     const couple_code = "myCoupleCode456";
     await fetch(`${BASE_URL}/admin/galleries/${galleryId}?_data=routes/admin.galleries.$id`, {
@@ -403,14 +427,17 @@ describe("Admin Gallery Integration Lifecycle", () => {
     const coupleCookie = coupleLoginRes.headers.get("Set-Cookie");
 
     // Verify ZIP download API works for couples
-    const zipRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download?type=all`, {
+    const coupleZipRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download?type=all`, {
       headers: { "Cookie": coupleCookie! }
     });
-    expect(zipRes.status).toBe(200);
-    expect(zipRes.headers.get("Content-Type")).toBe("application/zip");
+    expect(coupleZipRes.status).toBe(200);
+    expect(coupleZipRes.headers.get("Content-Type")).toBe("application/zip");
 
-    const zipBuffer = await zipRes.arrayBuffer();
-    expect(zipBuffer.byteLength).toBeGreaterThan(100);
+    const coupleAllBuf = await fetchBuffer(`${BASE_URL}/api/gallery/${public_id}/download?type=all`, coupleCookie!);
+    const tempCoupleAllPath = path.join(tempDir, "temp-couple-all.zip");
+    fs.writeFileSync(tempCoupleAllPath, coupleAllBuf);
+    const coupleAllZip = new AdmZip(tempCoupleAllPath);
+    expect(coupleAllZip.getEntries().length).toBeGreaterThan(0);
 
     // 11. Verify Expiration
     // Expire the gallery by updating the expiration date to the past in DB

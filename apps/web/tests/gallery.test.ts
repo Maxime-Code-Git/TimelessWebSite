@@ -1,5 +1,15 @@
 import { describe, expect, test } from "vitest";
-import { hashGalleryCode, generateGalleryCode, encryptGalleryCode, decryptGalleryCode, isMediaAuthorized } from "../app/lib/gallery-auth.server";
+import { hashGalleryCode, generateGalleryCode, encryptGalleryCode, decryptGalleryCode, isMediaAuthorized, getAuthorizedGalleryCoverId } from "../app/lib/gallery-auth.server";
+import { vi } from "vitest";
+
+const mockGet = vi.fn();
+vi.mock("../app/lib/gallery-db.server", () => ({
+  getGalleryDb: () => ({
+    prepare: vi.fn(() => ({
+      get: mockGet
+    }))
+  })
+}));
 
 describe("hashGalleryCode", () => {
   test("generates consistent hashes", () => {
@@ -122,5 +132,38 @@ describe("isMediaAuthorized", () => {
     expect(isMediaAuthorized("invites", "unknown" as "invites")).toBe(false);
     expect(isMediaAuthorized(null, "invites")).toBe(false);
     expect(isMediaAuthorized(undefined, "maries")).toBe(false);
+  });
+});
+
+describe("getAuthorizedGalleryCoverId", () => {
+  const galleryId = "gallery-123";
+
+  test("returns null if coverImageId is null", () => {
+    expect(getAuthorizedGalleryCoverId(galleryId, null, "invites")).toBeNull();
+  });
+
+  test("returns coverImageId if authorized", () => {
+    mockGet.mockReturnValueOnce({ visibility: "invites", type: "photo" });
+    expect(getAuthorizedGalleryCoverId(galleryId, "photo-1", "invites")).toBe("photo-1");
+  });
+
+  test("returns null if media type is not photo", () => {
+    mockGet.mockReturnValueOnce({ visibility: "invites", type: "video" });
+    expect(getAuthorizedGalleryCoverId(galleryId, "video-1", "invites")).toBeNull();
+  });
+
+  test("returns null if visibility is not authorized for access level", () => {
+    mockGet.mockReturnValueOnce({ visibility: "maries", type: "photo" });
+    expect(getAuthorizedGalleryCoverId(galleryId, "photo-2", "invites")).toBeNull();
+  });
+
+  test("returns null if media belongs to another gallery (get returns undefined)", () => {
+    mockGet.mockReturnValueOnce(undefined);
+    expect(getAuthorizedGalleryCoverId(galleryId, "photo-3", "invites")).toBeNull();
+  });
+
+  test("passes unknown access level correctly to isMediaAuthorized", () => {
+    mockGet.mockReturnValueOnce({ visibility: "invites", type: "photo" });
+    expect(getAuthorizedGalleryCoverId(galleryId, "photo-4", "corrupted_level")).toBeNull();
   });
 });

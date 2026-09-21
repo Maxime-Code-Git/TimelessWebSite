@@ -69,7 +69,7 @@ export const gallerySessionStorage = createCookieSessionStorage({
 
 export type GalleryAccessLevel = "invites" | "maries";
 
-export function isMediaAuthorized(visibility: unknown, accessLevel: "maries" | "invites"): boolean {
+export function isMediaAuthorized(visibility: unknown, accessLevel: unknown): boolean {
   if (visibility !== "invites" && visibility !== "maries") return false;
   if (accessLevel === "maries") return true;
   if (accessLevel === "invites") return visibility === "invites";
@@ -155,14 +155,18 @@ export const GALLERY_PRIVATE_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff"
 };
 
-export function sanitizeGalleryCover(gallery: { cover_image_id: string | null }, accessLevel: GalleryAccessLevel) {
-  if (gallery.cover_image_id) {
-    const db = getGalleryDb();
-    const coverMedia = db.prepare("SELECT visibility, type FROM gallery_media WHERE id = ?").get(gallery.cover_image_id) as { visibility: string, type: string } | undefined;
-    if (!coverMedia || coverMedia.type !== "photo" || !isMediaAuthorized(coverMedia.visibility, accessLevel)) {
-      gallery.cover_image_id = null;
-    }
+export function getAuthorizedGalleryCoverId(
+  galleryId: string,
+  coverImageId: string | null,
+  accessLevel: unknown
+): string | null {
+  if (!coverImageId) return null;
+  const db = getGalleryDb();
+  const coverMedia = db.prepare("SELECT visibility, type FROM gallery_media WHERE id = ? AND gallery_id = ?").get(coverImageId, galleryId) as { visibility: string, type: string } | undefined;
+  if (!coverMedia || coverMedia.type !== "photo" || !isMediaAuthorized(coverMedia.visibility, accessLevel)) {
+    return null;
   }
+  return coverImageId;
 }
 
 export async function requireGalleryAccess(request: Request, publicId: string, requiredMediaId?: string, isApi = false) {
@@ -185,8 +189,6 @@ export async function requireGalleryAccess(request: Request, publicId: string, r
       media = db.prepare("SELECT * FROM gallery_media WHERE id = ? AND gallery_id = ?").get(requiredMediaId, gallery.id as string) as Record<string, unknown> | undefined;
       if (!media) throw new Response("Not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
     }
-
-    sanitizeGalleryCover(gallery as { cover_image_id: string | null }, "maries");
 
     return { gallery, accessLevel: "maries" as GalleryAccessLevel, codeVersion: 0, media };
   }
@@ -226,8 +228,6 @@ export async function requireGalleryAccess(request: Request, publicId: string, r
       throw new Response("Not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
     }
   }
-
-  sanitizeGalleryCover(gallery as { cover_image_id: string | null }, accessLevel);
 
   return { gallery, accessLevel, codeVersion, media };
 }

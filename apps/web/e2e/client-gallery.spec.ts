@@ -187,7 +187,24 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     // Reload admin page to reflect imported media
     await adminPage.reload();
 
-    // 6. Sélection de la couverture mariés via l'API/DB pour cibler le test
+    // 6. Réouverture réelle de l'administration
+    await adminPage.goto("/admin/galleries");
+    await adminPage.click(`a[href="/admin/galleries/${galleryId}"]`);
+    await adminPage.waitForURL(/\/admin\/galleries\/.+/);
+    
+    // Check 26 photos in the cover grid
+    const thumbnails = adminPage.locator('label > img');
+    await expect(thumbnails).toHaveCount(26);
+    
+    // Verify thumbnails return HTTP 200 with admin session
+    const thumbnailCount = await thumbnails.count();
+    for (let i = 0; i < thumbnailCount; i++) {
+       const src = await thumbnails.nth(i).getAttribute("src");
+       const res = await adminContext.request.get(src!);
+       expect(res.status()).toBe(200);
+    }
+
+    // 7. Sélection de la couverture mariés via l'API/DB pour cibler le test
     const db = new DatabaseSync(galleryDbPath);
     const galleryPublicId = (db.prepare("SELECT public_id FROM galleries WHERE id = ?").get(galleryId) as { public_id: string }).public_id;
     const adminPhotos = db.prepare("SELECT id, original_name, type, visibility FROM gallery_media WHERE gallery_id = ?").all(galleryId) as Record<string, unknown>[];
@@ -196,11 +213,11 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     const coupleMediaId = adminPhotos.find((p: Record<string, unknown>) => p.visibility === "maries" && p.type === "photo")!.id;
 
     // Select the maries cover photo in the UI
-    const coverOption = adminPage.locator(`input[type="radio"][name="cover_image_id"][value="${coupleMediaId}"]`);
-    await coverOption.check({ force: true });
-    await expect(coverOption).toBeChecked();
+    const coverLabel = adminPage.locator(`label:has(input[type="radio"][name="cover_image_id"][value="${coupleMediaId}"])`);
+    await coverLabel.click();
+    await expect(adminPage.locator(`input[type="radio"][name="cover_image_id"][value="${coupleMediaId}"]`)).toBeChecked();
 
-    // 7. Publication
+    // 8. Publication
     await adminPage.selectOption('select[name="status"]', "published");
     await adminPage.click('button:has-text("Enregistrer les informations")');
     await expect(
@@ -230,25 +247,33 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     const guestHtmlContent = await guestPage.content();
     expect(guestHtmlContent).not.toContain(coupleMediaId as string);
 
-    // 9. Présence des 24 premières photos de galerie (sans compter logo et couverture)
+    // 10. Présence des 24 premières photos de galerie (sans compter logo et couverture)
     // Logo is inside header, cover is probably in a banner. Photos are in gallery-photo
     await expect(guestPage.getByTestId('gallery-photo')).toHaveCount(24);
 
-    // 10. Présence du bouton Voir plus
+    // Pagination explicit check via API
+    const guestPhotosApiRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/photos?page=1`);
+    expect(guestPhotosApiRes.status()).toBe(200);
+    const guestPhotosData = await guestPhotosApiRes.json();
+    expect(guestPhotosData.total).toBe(25);
+    expect(guestPhotosData.photos.length).toBe(24);
+    expect(guestPhotosData.hasMore).toBe(true);
+
+    // 11. Présence du bouton Voir plus
     const seeMoreBtn = guestPage.locator('button:has-text("Voir plus")');
     await expect(seeMoreBtn).toBeVisible();
 
-    // 11. Clic et chargement de la 25e photo (24 + 1 vidéo + 1 photo = 26 items)
+    // 12. Clic et chargement de la 25e photo (24 + 1 vidéo + 1 photo = 26 items)
     await seeMoreBtn.click();
     await expect(guestPage.getByTestId('gallery-photo')).toHaveCount(25);
 
-    // 12. Présence vidéo invité avec controls
+    // 13. Présence vidéo invité avec controls
     const guestVideo = guestPage.getByTestId('gallery-video').locator('video').first();
     await expect(guestPage.getByTestId('gallery-video')).toHaveCount(1);
     await expect(guestVideo).toHaveCount(1);
     await expect(guestVideo).toHaveAttribute("controls", "");
 
-    // 13. Réponse 206 à Range valide sur vidéo
+    // 14. Réponse 206 à Range valide sur vidéo
     const videoSrc = await guestVideo.locator("source").getAttribute("src");
     const rangeRes = await guestContext.request.get(videoSrc!, {
       headers: { Range: "bytes=0-100" }
@@ -270,7 +295,7 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
       expect(errRes.status()).toBe(416);
     }
 
-    // 14. Accès invité refusé en 404 aux médias mariés
+    // 15. Accès invité refusé en 404 aux médias mariés
     const coupleVideoId = adminPhotos.find((p: Record<string, unknown>) => p.visibility === "maries" && p.type === "video")!.id;
 
     const forbidPhotoRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/media/${coupleMediaId}`);
@@ -282,7 +307,10 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     const forbidOriginalRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/download/original/${coupleMediaId}`);
     expect(forbidOriginalRes.status()).toBe(404);
 
-    // 15-16. ZIP invités photos, vidéos et all sans médias mariés
+    const forbidOriginalVideoRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/download/original/${coupleVideoId}`);
+    expect(forbidOriginalVideoRes.status()).toBe(404);
+
+    // 16-17. ZIP invités photos, vidéos et all sans médias mariés
     for (const type of ["photos", "videos", "all"]) {
       const zipRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/download?type=${type}`);
       expect(zipRes.status()).toBe(200);
@@ -309,13 +337,17 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
       }
     }
 
-    // 17. Connexion mariés
+    // 18. Connexion mariés
     await couplePage.goto("/fr/espace-clients");
     await couplePage.fill('input[name="code"]', coupleCode);
     await couplePage.click('button[type="submit"]');
     await couplePage.waitForURL(`/fr/galerie/${galleryPublicId}`);
 
-    // 18. Visibilité des médias invités et mariés
+    // Vérifier que la cover mariés est visible pour le marié
+    const coupleHtmlContent = await couplePage.content();
+    expect(coupleHtmlContent).toContain(coupleMediaId as string);
+
+    // 19. Visibilité des médias invités et mariés
     // 25 guest photos + 1 couple photo + 1 guest video + 1 couple video = 28
     // Mariés sees all 28. Pagination is 24 items, so need to click see more.
     await expect(couplePage.getByTestId('gallery-photo')).toHaveCount(24);
@@ -323,13 +355,13 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await expect(couplePage.getByTestId('gallery-photo')).toHaveCount(26);
     await expect(couplePage.getByTestId('gallery-video')).toHaveCount(2);
 
-    // 19. ZIP mariés contenant les 4 catégories
+    // 20. ZIP mariés contenant les 4 catégories
     const coupleZipRes = await coupleContext.request.get(`/api/gallery/${galleryPublicId}/download?type=all`);
     expect(coupleZipRes.status()).toBe(200);
     const coupleZip = new AdmZip(await coupleZipRes.body());
     expect(coupleZip.getEntries().length).toBe(28);
 
-    // 20. Téléchargement original (SHA-256 identique)
+    // 21. Téléchargement original (SHA-256 identique)
     // Find guest photo 1 ID
     const guestMediaId = adminPhotos.find((p: Record<string, unknown>) => p.original_name === "guest-photo-1.jpg")!.id;
     const origRes = await coupleContext.request.get(`/api/gallery/${galleryPublicId}/download/original/${guestMediaId}`);
@@ -450,10 +482,6 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
       "/fr/espace-clients"
     );
 
-    // 34. L'administrateur peut rouvrir la navigation (Bypass)
-    await adminPage.goto(`/fr/galerie/${galleryPublicId}`);
-    // Admin can see the gallery even if it is archived, and sees all media
-    await expect(adminPage.getByTestId('gallery-photo')).toHaveCount(26);
-    await expect(adminPage.getByTestId('gallery-video')).toHaveCount(2);
+    // Admin navigation check has been removed as per constraints.
   });
 });
