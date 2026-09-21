@@ -24,7 +24,10 @@ export default function AdminGalleries({ loaderData }: Route.ComponentProps) {
     <div className={styles.adminPage}>
       <div className={styles.headerRow}>
         <h2>Galeries Clients</h2>
-        <Link to="/admin/galleries/new" className={styles.button}>Nouvelle Galerie</Link>
+        <div className={styles.headerActions}>
+          <Link to="/admin" className={styles.button}>Retour à l’administration</Link>
+          <Link to="/admin/galleries/new" className={styles.button}>Nouvelle Galerie</Link>
+        </div>
       </div>
 
       <div className={`${styles.card} ${styles.galleryTableCard}`}>

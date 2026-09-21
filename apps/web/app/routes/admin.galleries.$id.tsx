@@ -9,8 +9,10 @@ import { getAvailableImportFolders } from "../lib/gallery-import.server";
 import styles from "./admin.module.css";
 import { commitSession } from "../lib/session.server";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { ENV } from "../lib/env.server";
 import { useEffect, useState } from "react";
-
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const session = await requireValidAdminSession(request);
   const gallery = getGalleryById(params.id!);
@@ -34,11 +36,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   // Get gallery photos for cover selection
   const db = getGalleryDb();
-  const galleryPhotos = db.prepare(
-    "SELECT id, original_name, width, height FROM gallery_media WHERE gallery_id = ? AND type = 'photo' ORDER BY created_at ASC"
-  ).all(gallery.id) as Pick<GalleryMediaRow, "id" | "original_name" | "width" | "height">[];
+  const allMedia = db.prepare(
+    "SELECT id, type, visibility, original_name, width, height FROM gallery_media WHERE gallery_id = ? ORDER BY created_at ASC"
+  ).all(gallery.id) as Pick<GalleryMediaRow, "id" | "type" | "visibility" | "original_name" | "width" | "height">[];
+  
+  const galleryPhotos = allMedia.filter(m => m.type === "photo");
 
-  return Response.json({ gallery, stats, imports, folders, guestCode, coupleCode, csrfToken, galleryPhotos }, { headers });
+  return Response.json({ gallery, stats, imports, folders, guestCode, coupleCode, csrfToken, allMedia, galleryPhotos }, { headers });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -203,6 +207,82 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return Response.json({ error: "Impossible de générer un code unique.", intent }, { status: 500 });
   }
 
+  if (intent === "delete_media") {
+    const mediaIds = formData.getAll("mediaIds").map(String);
+    if (!mediaIds || mediaIds.length === 0) {
+      return Response.json({ error: "Aucun média sélectionné.", intent }, { status: 400 });
+    }
+    if (mediaIds.length > 1000) {
+      return Response.json({ error: "Impossible de supprimer plus de 1000 médias à la fois.", intent }, { status: 400 });
+    }
+
+    const pendingImports = getGalleryImports(gallery.id).filter(i => i.status === "pending" || i.status === "processing");
+    if (pendingImports.length > 0) {
+      return Response.json({ error: "Une galerie ne peut pas être modifiée si un import est en cours.", intent }, { status: 400 });
+    }
+
+    const db = getGalleryDb();
+    const placeholders = mediaIds.map(() => '?').join(',');
+    const validMedia = db.prepare(`SELECT id, type FROM gallery_media WHERE gallery_id = ? AND id IN (${placeholders})`).all(gallery.id, ...mediaIds) as { id: string }[];
+    
+    if (validMedia.length !== mediaIds.length) {
+      return Response.json({ error: "Certains médias n'appartiennent pas à cette galerie ou sont introuvables.", intent }, { status: 400 });
+    }
+    
+    const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, gallery.id);
+    const quarantineDir = path.join(mediaDir, '.quarantine');
+    
+    if (!fs.existsSync(quarantineDir)) {
+      fs.mkdirSync(quarantineDir, { recursive: true });
+    }
+
+    const quarantined: string[] = [];
+    
+    try {
+      for (const id of mediaIds) {
+        const src = path.join(mediaDir, id);
+        const dest = path.join(quarantineDir, id);
+        if (fs.existsSync(src)) {
+          fs.renameSync(src, dest);
+          quarantined.push(id);
+        }
+      }
+
+      db.exec('BEGIN TRANSACTION');
+      try {
+        db.prepare(`DELETE FROM gallery_media WHERE gallery_id = ? AND id IN (${placeholders})`).run(gallery.id, ...mediaIds);
+        
+        if (gallery.cover_image_id && mediaIds.includes(gallery.cover_image_id)) {
+          db.prepare("UPDATE galleries SET cover_image_id = NULL WHERE id = ?").run(gallery.id);
+        }
+
+        if (gallery.status === "published") {
+          const count = (db.prepare("SELECT COUNT(*) as c FROM gallery_media WHERE gallery_id = ?").get(gallery.id) as { c: number }).c;
+          if (count === 0) {
+            db.prepare("UPDATE galleries SET status = 'draft' WHERE id = ?").run(gallery.id);
+          }
+        }
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+      
+      for (const id of quarantined) {
+        try { fs.unlinkSync(path.join(quarantineDir, id)); } catch { /* ignore */ }
+      }
+      
+      return Response.json({ success: true, intent, deletedCount: mediaIds.length });
+    } catch {
+      for (const id of quarantined) {
+        const src = path.join(quarantineDir, id);
+        const dest = path.join(mediaDir, id);
+        try { if (fs.existsSync(src)) fs.renameSync(src, dest); } catch { /* ignore */ }
+      }
+      return Response.json({ error: "Erreur lors de la suppression.", intent }, { status: 500 });
+    }
+  }
+
   return Response.json({ error: "Intent inconnu.", intent }, { status: 400 });
 }
 
@@ -210,6 +290,7 @@ interface ActionData {
   error?: string;
   success?: boolean;
   intent?: string;
+  deletedCount?: number;
 }
 
 interface LoaderData {
@@ -233,6 +314,7 @@ interface LoaderData {
   guestCode: string;
   coupleCode: string;
   csrfToken: string;
+  allMedia: { id: string; type: string; visibility: string; original_name: string; width: number | null; height: number | null }[];
   galleryPhotos: { id: string; original_name: string; width: number | null; height: number | null }[];
 }
 
@@ -243,10 +325,11 @@ type ImportActionData = {
 };
 
 export default function AdminGalleryEdit() {
-  const { gallery, stats, imports, folders, guestCode, coupleCode, csrfToken, galleryPhotos } = useLoaderData<LoaderData>();
+  const { gallery, stats, imports, folders, guestCode, coupleCode, csrfToken, galleryPhotos, allMedia } = useLoaderData<LoaderData>();
   const actionData = useActionData<ActionData>();
   const revalidator = useRevalidator();
   const importFetcher = useFetcher<ImportActionData>();
+  const deleteFetcher = useFetcher<ActionData>();
 
   const [showCodes, setShowCodes] = useState(false);
   const [previewData, setPreviewData] = useState<{
@@ -260,9 +343,45 @@ export default function AdminGalleryEdit() {
   } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState("");
+  
+  const [mediaFilter, setMediaFilter] = useState<"all" | "invites-photo" | "invites-video" | "maries-photo" | "maries-video">("all");
+  const [selectedMedia, setSelectedMedia] = useState<Set<string>>(new Set());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const filteredMedia = (allMedia || []).filter(m => {
+    if (mediaFilter === "all") return true;
+    if (mediaFilter === "invites-photo") return m.visibility === "invites" && m.type === "photo";
+    if (mediaFilter === "invites-video") return m.visibility === "invites" && m.type === "video";
+    if (mediaFilter === "maries-photo") return m.visibility === "maries" && m.type === "photo";
+    if (mediaFilter === "maries-video") return m.visibility === "maries" && m.type === "video";
+    return true;
+  });
+
+  const toggleMediaSelection = (id: string) => {
+    const next = new Set(selectedMedia);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedMedia(next);
+  };
+
+  const toggleSelectAllFiltered = () => {
+    if (selectedMedia.size === filteredMedia.length && filteredMedia.length > 0) {
+      setSelectedMedia(new Set());
+    } else {
+      setSelectedMedia(new Set(filteredMedia.map(m => m.id)));
+    }
+  };
+
+  useEffect(() => {
+    if (deleteFetcher.data?.success && deleteFetcher.data?.intent === "delete_media") {
+      setSelectedMedia(new Set());
+      setShowDeleteModal(false);
+    }
+  }, [deleteFetcher.data]);
 
   const hasActiveImport = imports.some(i => i.status === "pending" || i.status === "processing");
   const importBusy = importFetcher.state !== "idle" || hasActiveImport;
+  const deleteBusy = deleteFetcher.state !== "idle";
 
   // Auto-reload when import is active
   useEffect(() => {
@@ -589,6 +708,88 @@ export default function AdminGalleryEdit() {
           </ul>
         )}
       </div>
+
+      <div className={styles.card}>
+        <h3>Gestion des médias</h3>
+        <p className={styles.helperText}>
+          Les médias importés sont des copies indépendantes. Supprimer un fichier du dossier d'import ne le retire pas de la galerie. Utilisez cette section pour supprimer les médias déjà importés.
+        </p>
+        
+        <div className={`${styles.formGroup} ${styles.marginTop16}`}>
+          <label className={styles.label}>Filtrer par catégorie</label>
+          <select className={styles.input} value={mediaFilter} onChange={e => setMediaFilter(e.target.value as "all" | "invites-photo" | "invites-video" | "maries-photo" | "maries-video")}>
+            <option value="all">Tous les médias ({allMedia?.length || 0})</option>
+            <option value="invites-photo">Photos Invités ({stats.invitesPhotos})</option>
+            <option value="invites-video">Vidéos Invités ({stats.invitesVideos})</option>
+            <option value="maries-photo">Photos Mariés ({stats.mariesPhotos})</option>
+            <option value="maries-video">Vidéos Mariés ({stats.mariesVideos})</option>
+          </select>
+        </div>
+
+        <div className={styles.flexGroup}>
+          <button type="button" onClick={toggleSelectAllFiltered} className={styles.button}>
+            {selectedMedia.size === filteredMedia.length && filteredMedia.length > 0 ? "Désélectionner tout" : "Sélectionner tout"}
+          </button>
+          {selectedMedia.size > 0 && (
+            <button type="button" onClick={() => setShowDeleteModal(true)} className={styles.buttonDanger}>
+              Supprimer la sélection ({selectedMedia.size})
+            </button>
+          )}
+        </div>
+
+        {deleteFetcher.data?.error && deleteFetcher.data?.intent === "delete_media" && (
+          <p className={`${styles.errorText} ${styles.marginTop16}`} role="alert">
+            {deleteFetcher.data.error}
+          </p>
+        )}
+        {deleteFetcher.data?.success && deleteFetcher.data?.intent === "delete_media" && (
+          <p className={`${styles.successMessage} ${styles.marginTop16}`} role="status">
+            {deleteFetcher.data.deletedCount} média(s) supprimé(s).
+          </p>
+        )}
+
+        <div className={styles.mediaGrid}>
+          {filteredMedia.map(m => (
+            <div key={m.id} className={`${styles.mediaItem} ${selectedMedia.has(m.id) ? styles.selected : ''}`} onClick={() => toggleMediaSelection(m.id)}>
+              <input type="checkbox" className={styles.mediaCheckbox} checked={selectedMedia.has(m.id)} readOnly onClick={e => e.stopPropagation()} onChange={() => toggleMediaSelection(m.id)} />
+              {m.type === "photo" ? (
+                <img className={styles.mediaItemImage} src={`/api/gallery/${gallery.public_id}/media/${m.id}?width=300`} alt={m.original_name} loading="lazy" />
+              ) : (
+                <div className={styles.coverThumbPlaceholder}>
+                  Vidéo
+                </div>
+              )}
+            </div>
+          ))}
+          {filteredMedia.length === 0 && (
+            <p className={styles.helperText}>Aucun média trouvé.</p>
+          )}
+        </div>
+      </div>
+
+      {showDeleteModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3 className={styles.modalTitle}>Confirmer la suppression</h3>
+            <p>Voulez-vous vraiment supprimer {selectedMedia.size} média(s) ? Cette action est irréversible.</p>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.button} onClick={() => setShowDeleteModal(false)} disabled={deleteBusy}>
+                Annuler
+              </button>
+              <deleteFetcher.Form method="post">
+                <input type="hidden" name="csrfToken" value={csrfToken} />
+                <input type="hidden" name="intent" value="delete_media" />
+                {Array.from(selectedMedia).map(id => (
+                  <input key={id} type="hidden" name="mediaIds" value={id} />
+                ))}
+                <button type="submit" className={styles.buttonDanger} disabled={deleteBusy}>
+                  {deleteBusy ? "Suppression..." : "Supprimer définitivement"}
+                </button>
+              </deleteFetcher.Form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

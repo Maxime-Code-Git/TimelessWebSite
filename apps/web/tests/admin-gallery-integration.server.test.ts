@@ -104,6 +104,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
         }
       });
       serverProcess.stderr?.on("data", (d) => {
+        console.error(`[Server Error] ${d.toString()}`);
         if (d.toString().includes("EADDRINUSE")) reject(new Error("PORT IN USE"));
       });
       setTimeout(() => {
@@ -446,5 +447,98 @@ describe("Admin Gallery Integration Lifecycle", () => {
 
     // Should be unauthorized
     expect(expiredLoginRes.status).toBe(401);
+
+    // 12. Test media deletion from admin
+    const actionUrl = `${BASE_URL}/admin/galleries/${galleryId}?_data=routes/admin.galleries.$id`;
+    
+    // We already have `db` instantiated at top maybe? Or we can just get it.
+    const db = new DatabaseSync(galleryDbPath);
+    const initialPhotos = db.prepare("SELECT * FROM gallery_media WHERE gallery_id = ? AND type = 'photo'").all(galleryId as string) as { id: string }[];
+    expect(initialPhotos.length).toBeGreaterThan(0);
+    
+    const mediaToDelete = initialPhotos[0];
+    const mediaToKeep = initialPhotos.find(p => p.id !== mediaToDelete.id);
+    
+    // Set cover_image_id to mediaToDelete
+    db.prepare("UPDATE galleries SET cover_image_id = ? WHERE id = ?").run(mediaToDelete.id, galleryId as string);
+    
+    const delFormData = new URLSearchParams();
+    delFormData.append("csrfToken", newCsrfToken);
+    delFormData.append("intent", "delete_media");
+    delFormData.append("mediaIds", mediaToDelete.id);
+
+    const delRes = await fetch(actionUrl, {
+      method: "POST",
+      body: delFormData,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Origin": BASE_URL,
+        "Cookie": authCookie,
+        "x-forwarded-for": "127.0.0.1",
+      }
+    });
+
+    await delRes.text();
+    expect(delRes.status).toBe(200);
+
+    const remaining = db.prepare("SELECT * FROM gallery_media WHERE gallery_id = ?").all(galleryId as string) as { id: string }[];
+    expect(remaining.some(r => r.id === mediaToDelete.id)).toBe(false);
+    
+    const mediaDir = path.join(mediaPath, galleryId as string);
+    expect(fs.existsSync(path.join(mediaDir, mediaToDelete.id))).toBe(false);
+    
+    if (mediaToKeep) {
+      expect(remaining.some(r => r.id === mediaToKeep.id)).toBe(true);
+      expect(fs.existsSync(path.join(mediaDir, mediaToKeep.id))).toBe(true);
+    }
+    
+    const gal = db.prepare("SELECT cover_image_id, status FROM galleries WHERE id = ?").get(galleryId as string) as { cover_image_id: string | null, status: string };
+    expect(gal.cover_image_id).toBeNull();
+    
+    const failData = new URLSearchParams();
+    failData.append("csrfToken", newCsrfToken);
+    failData.append("intent", "delete_media");
+    failData.append("mediaIds", "unknown-id");
+    
+    const failRes = await fetch(actionUrl, {
+      method: "POST",
+      body: failData,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Origin": BASE_URL,
+        "Cookie": authCookie,
+        "x-forwarded-for": "127.0.0.1",
+      }
+    });
+    await failRes.text();
+    expect(failRes.status).toBe(400);
+
+    // Empty the gallery to test auto-draft
+    if (remaining.length > 0) {
+      const allForm = new URLSearchParams();
+      allForm.append("csrfToken", newCsrfToken);
+      allForm.append("intent", "delete_media");
+      for (const r of remaining) {
+        allForm.append("mediaIds", r.id);
+      }
+      
+      const resAll = await fetch(actionUrl, {
+        method: "POST",
+        body: allForm,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Origin": BASE_URL,
+          "Cookie": authCookie,
+          "x-forwarded-for": "127.0.0.1",
+        }
+      });
+      await resAll.text();
+      expect(resAll.status).toBe(200);
+      
+      const emptyGal = db.prepare("SELECT status FROM galleries WHERE id = ?").get(galleryId as string) as { status: string };
+      expect(emptyGal.status).toBe("draft");
+    }
+    db.close();
   }, 15000);
 });
+

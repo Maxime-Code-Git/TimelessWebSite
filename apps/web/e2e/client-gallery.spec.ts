@@ -483,5 +483,38 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     );
 
     // Admin navigation check has been removed as per constraints.
+
+    // 34. Test de suppression d'un média depuis l'administration
+    await adminPage.selectOption('select[name="status"]', "published");
+    const republishResponsePromise = adminPage.waitForResponse(
+      response => response.request().method() === "POST" && response.url().includes(`/admin/galleries/${galleryId}`)
+    );
+    await adminPage.getByRole("button", { name: "Enregistrer les informations", exact: true }).click();
+    await republishResponsePromise;
+
+    const mediaItems = adminPage.locator('.mediaItem');
+    const mediaCountBefore = await mediaItems.count();
+    expect(mediaCountBefore).toBeGreaterThan(0);
+
+    const firstMediaImg = mediaItems.first().locator('.mediaItemImage');
+    const firstMediaSrc = await firstMediaImg.getAttribute('src');
+    const firstMediaIdMatch = firstMediaSrc?.match(/\/media\/([a-zA-Z0-9_-]+)/);
+    const deletedMediaId = firstMediaIdMatch ? firstMediaIdMatch[1] : null;
+    expect(deletedMediaId).not.toBeNull();
+
+    await mediaItems.first().click();
+    await adminPage.getByRole("button", { name: /Supprimer la sélection/ }).click();
+
+    const deleteResponsePromise = adminPage.waitForResponse(
+      response => response.request().method() === "POST" && response.url().includes(`/admin/galleries/${galleryId}`)
+    );
+    await adminPage.getByRole("button", { name: "Supprimer définitivement" }).click();
+    const deleteResponse = await deleteResponsePromise;
+    expect(deleteResponse.status()).toBe(200);
+
+    await expect(adminPage.locator('.mediaItem')).toHaveCount(mediaCountBefore - 1);
+
+    const deletedMediaRes = await newGuestContext.request.get(`/api/gallery/${galleryPublicId}/media/${deletedMediaId}`);
+    expect(deletedMediaRes.status()).toBe(404);
   });
 });
