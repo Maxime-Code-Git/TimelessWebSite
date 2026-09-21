@@ -39,7 +39,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const allMedia = db.prepare(
     "SELECT id, type, visibility, original_name, width, height FROM gallery_media WHERE gallery_id = ? ORDER BY created_at ASC"
   ).all(gallery.id) as Pick<GalleryMediaRow, "id" | "type" | "visibility" | "original_name" | "width" | "height">[];
-  
+
   const galleryPhotos = allMedia.filter(m => m.type === "photo");
 
   return Response.json({ gallery, stats, imports, folders, guestCode, coupleCode, csrfToken, allMedia, galleryPhotos }, { headers });
@@ -208,7 +208,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   if (intent === "delete_media") {
-    const mediaIds = formData.getAll("mediaIds").map(String);
+    const mediaIds = [...new Set(formData.getAll("mediaIds").map(String))];
     if (!mediaIds || mediaIds.length === 0) {
       return Response.json({ error: "Aucun média sélectionné.", intent }, { status: 400 });
     }
@@ -224,22 +224,24 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const db = getGalleryDb();
     const placeholders = mediaIds.map(() => '?').join(',');
     const validMedia = db.prepare(`SELECT id, type FROM gallery_media WHERE gallery_id = ? AND id IN (${placeholders})`).all(gallery.id, ...mediaIds) as { id: string }[];
-    
+
     if (validMedia.length !== mediaIds.length) {
       return Response.json({ error: "Certains médias n'appartiennent pas à cette galerie ou sont introuvables.", intent }, { status: 400 });
     }
     
+    const validMediaIds = validMedia.map(m => m.id);
+
     const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, gallery.id);
-    const quarantineDir = path.join(mediaDir, '.quarantine');
-    
+    const quarantineDir = path.join(mediaDir, '.quarantine', crypto.randomUUID());
+
     if (!fs.existsSync(quarantineDir)) {
       fs.mkdirSync(quarantineDir, { recursive: true });
     }
 
     const quarantined: string[] = [];
-    
+
     try {
-      for (const id of mediaIds) {
+      for (const id of validMediaIds) {
         const src = path.join(mediaDir, id);
         const dest = path.join(quarantineDir, id);
         if (fs.existsSync(src)) {
@@ -251,8 +253,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       db.exec('BEGIN TRANSACTION');
       try {
         db.prepare(`DELETE FROM gallery_media WHERE gallery_id = ? AND id IN (${placeholders})`).run(gallery.id, ...mediaIds);
-        
-        if (gallery.cover_image_id && mediaIds.includes(gallery.cover_image_id)) {
+
+        if (gallery.cover_image_id && validMediaIds.includes(gallery.cover_image_id)) {
           db.prepare("UPDATE galleries SET cover_image_id = NULL WHERE id = ?").run(gallery.id);
         }
 
@@ -267,18 +269,20 @@ export async function action({ request, params }: ActionFunctionArgs) {
         db.exec('ROLLBACK');
         throw e;
       }
-      
+
       for (const id of quarantined) {
         try { fs.unlinkSync(path.join(quarantineDir, id)); } catch { /* ignore */ }
       }
-      
-      return Response.json({ success: true, intent, deletedCount: mediaIds.length });
+      try { fs.rmdirSync(quarantineDir); } catch { /* ignore */ }
+
+      return Response.json({ success: true, intent, deletedCount: validMediaIds.length });
     } catch {
       for (const id of quarantined) {
         const src = path.join(quarantineDir, id);
         const dest = path.join(mediaDir, id);
         try { if (fs.existsSync(src)) fs.renameSync(src, dest); } catch { /* ignore */ }
       }
+      try { fs.rmdirSync(quarantineDir); } catch { /* ignore */ }
       return Response.json({ error: "Erreur lors de la suppression.", intent }, { status: 500 });
     }
   }
@@ -343,7 +347,7 @@ export default function AdminGalleryEdit() {
   } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState("");
-  
+
   const [mediaFilter, setMediaFilter] = useState<"all" | "invites-photo" | "invites-video" | "maries-photo" | "maries-video">("all");
   const [selectedMedia, setSelectedMedia] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -714,10 +718,13 @@ export default function AdminGalleryEdit() {
         <p className={styles.helperText}>
           Les médias importés sont des copies indépendantes. Supprimer un fichier du dossier d'import ne le retire pas de la galerie. Utilisez cette section pour supprimer les médias déjà importés.
         </p>
-        
+
         <div className={`${styles.formGroup} ${styles.marginTop16}`}>
           <label className={styles.label}>Filtrer par catégorie</label>
-          <select className={styles.input} value={mediaFilter} onChange={e => setMediaFilter(e.target.value as "all" | "invites-photo" | "invites-video" | "maries-photo" | "maries-video")}>
+          <select className={styles.input} value={mediaFilter} onChange={e => {
+            setMediaFilter(e.target.value as "all" | "invites-photo" | "invites-video" | "maries-photo" | "maries-video");
+            setSelectedMedia(new Set());
+          }}>
             <option value="all">Tous les médias ({allMedia?.length || 0})</option>
             <option value="invites-photo">Photos Invités ({stats.invitesPhotos})</option>
             <option value="invites-video">Vidéos Invités ({stats.invitesVideos})</option>
@@ -728,7 +735,7 @@ export default function AdminGalleryEdit() {
 
         <div className={styles.flexGroup}>
           <button type="button" onClick={toggleSelectAllFiltered} className={styles.button}>
-            {selectedMedia.size === filteredMedia.length && filteredMedia.length > 0 ? "Désélectionner tout" : "Sélectionner tout"}
+            {filteredMedia.length > 0 && filteredMedia.every(media => selectedMedia.has(media.id)) ? "Désélectionner tout" : "Sélectionner tout"}
           </button>
           {selectedMedia.size > 0 && (
             <button type="button" onClick={() => setShowDeleteModal(true)} className={styles.buttonDanger}>
@@ -750,16 +757,16 @@ export default function AdminGalleryEdit() {
 
         <div className={styles.mediaGrid}>
           {filteredMedia.map(m => (
-            <div key={m.id} className={`${styles.mediaItem} ${selectedMedia.has(m.id) ? styles.selected : ''}`} onClick={() => toggleMediaSelection(m.id)}>
-              <input type="checkbox" className={styles.mediaCheckbox} checked={selectedMedia.has(m.id)} readOnly onClick={e => e.stopPropagation()} onChange={() => toggleMediaSelection(m.id)} />
+            <label key={m.id} className={`${styles.mediaItem} ${selectedMedia.has(m.id) ? styles.selected : ''}`} data-testid="gallery-media-item" data-media-id={m.id} data-media-type={m.type} data-media-visibility={m.visibility}>
+              <input type="checkbox" className={styles.mediaCheckbox} checked={selectedMedia.has(m.id)} onChange={() => toggleMediaSelection(m.id)} aria-label={`Sélectionner ${m.original_name}`} />
               {m.type === "photo" ? (
-                <img className={styles.mediaItemImage} src={`/api/gallery/${gallery.public_id}/media/${m.id}?width=300`} alt={m.original_name} loading="lazy" />
+                <img className={styles.mediaItemImage} src={`/api/gallery/${gallery.public_id}/media/${m.id}?width=300`} alt={m.original_name} loading="lazy" data-testid="gallery-media-image" />
               ) : (
                 <div className={styles.coverThumbPlaceholder}>
                   Vidéo
                 </div>
               )}
-            </div>
+            </label>
           ))}
           {filteredMedia.length === 0 && (
             <p className={styles.helperText}>Aucun média trouvé.</p>
@@ -768,11 +775,23 @@ export default function AdminGalleryEdit() {
       </div>
 
       {showDeleteModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <h3 className={styles.modalTitle}>Confirmer la suppression</h3>
+        <div className={styles.galleryDeleteModalOverlay}>
+          <div 
+            className={styles.galleryDeleteModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gallery-delete-title"
+            tabIndex={-1}
+            ref={(el) => { if (el && !deleteBusy) el.focus(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && !deleteBusy) {
+                setShowDeleteModal(false);
+              }
+            }}
+          >
+            <h3 id="gallery-delete-title" className={styles.modalTitle}>Confirmer la suppression</h3>
             <p>Voulez-vous vraiment supprimer {selectedMedia.size} média(s) ? Cette action est irréversible.</p>
-            <div className={styles.modalActions}>
+            <div className={styles.galleryDeleteModalActions}>
               <button type="button" className={styles.button} onClick={() => setShowDeleteModal(false)} disabled={deleteBusy}>
                 Annuler
               </button>

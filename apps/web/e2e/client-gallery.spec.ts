@@ -492,17 +492,20 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await adminPage.getByRole("button", { name: "Enregistrer les informations", exact: true }).click();
     await republishResponsePromise;
 
-    const mediaItems = adminPage.locator('.mediaItem');
+    const mediaItems = adminPage.getByTestId("gallery-media-item");
     const mediaCountBefore = await mediaItems.count();
     expect(mediaCountBefore).toBeGreaterThan(0);
 
-    const firstMediaImg = mediaItems.first().locator('.mediaItemImage');
-    const firstMediaSrc = await firstMediaImg.getAttribute('src');
-    const firstMediaIdMatch = firstMediaSrc?.match(/\/media\/([a-zA-Z0-9_-]+)/);
-    const deletedMediaId = firstMediaIdMatch ? firstMediaIdMatch[1] : null;
+    const guestPhotoItem = adminPage.locator('[data-testid="gallery-media-item"][data-media-type="photo"][data-media-visibility="invites"]').first();
+
+    const deletedMediaId = await guestPhotoItem.getAttribute("data-media-id");
     expect(deletedMediaId).not.toBeNull();
 
-    await mediaItems.first().click();
+    const beforeDeleteRes = await newGuestContext.request.get(`/api/gallery/${galleryPublicId}/media/${deletedMediaId}`);
+    expect(beforeDeleteRes.status()).toBe(200);
+
+    await guestPhotoItem.locator('input[type="checkbox"]').check();
+
     await adminPage.getByRole("button", { name: /Supprimer la sélection/ }).click();
 
     const deleteResponsePromise = adminPage.waitForResponse(
@@ -512,7 +515,7 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     const deleteResponse = await deleteResponsePromise;
     expect(deleteResponse.status()).toBe(200);
 
-    await expect(adminPage.locator('.mediaItem')).toHaveCount(mediaCountBefore - 1);
+    await expect(adminPage.getByTestId("gallery-media-item")).toHaveCount(mediaCountBefore - 1);
 
     const deletedMediaRes = await newGuestContext.request.get(`/api/gallery/${galleryPublicId}/media/${deletedMediaId}`);
     expect(deletedMediaRes.status()).toBe(404);

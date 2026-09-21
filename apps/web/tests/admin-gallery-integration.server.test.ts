@@ -104,7 +104,6 @@ describe("Admin Gallery Integration Lifecycle", () => {
         }
       });
       serverProcess.stderr?.on("data", (d) => {
-        console.error(`[Server Error] ${d.toString()}`);
         if (d.toString().includes("EADDRINUSE")) reject(new Error("PORT IN USE"));
       });
       setTimeout(() => {
@@ -232,9 +231,9 @@ describe("Admin Gallery Integration Lifecycle", () => {
     const mediaDb = new DatabaseSync(galleryDbPath);
     const mariesPhotoRow = mediaDb.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND visibility = 'maries' AND type = 'photo'").get(galleryId!) as { id: string } | undefined;
     const mariesVideoRow = mediaDb.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND visibility = 'maries' AND type = 'video'").get(galleryId!) as { id: string } | undefined;
+    mediaDb.close();
     const cover_image_id = mariesPhotoRow?.id || "";
     const couple_video_id = mariesVideoRow?.id || "";
-    mediaDb.close();
 
     // 8. Publish successfully
     const pubRes = await fetch(`${BASE_URL}/admin/galleries/${galleryId}?_data=routes/admin.galleries.$id`, {
@@ -450,18 +449,18 @@ describe("Admin Gallery Integration Lifecycle", () => {
 
     // 12. Test media deletion from admin
     const actionUrl = `${BASE_URL}/admin/galleries/${galleryId}?_data=routes/admin.galleries.$id`;
-    
+
     // We already have `db` instantiated at top maybe? Or we can just get it.
     const db = new DatabaseSync(galleryDbPath);
     const initialPhotos = db.prepare("SELECT * FROM gallery_media WHERE gallery_id = ? AND type = 'photo'").all(galleryId as string) as { id: string }[];
     expect(initialPhotos.length).toBeGreaterThan(0);
-    
+
     const mediaToDelete = initialPhotos[0];
     const mediaToKeep = initialPhotos.find(p => p.id !== mediaToDelete.id);
-    
+
     // Set cover_image_id to mediaToDelete
     db.prepare("UPDATE galleries SET cover_image_id = ? WHERE id = ?").run(mediaToDelete.id, galleryId as string);
-    
+
     const delFormData = new URLSearchParams();
     delFormData.append("csrfToken", newCsrfToken);
     delFormData.append("intent", "delete_media");
@@ -483,23 +482,23 @@ describe("Admin Gallery Integration Lifecycle", () => {
 
     const remaining = db.prepare("SELECT * FROM gallery_media WHERE gallery_id = ?").all(galleryId as string) as { id: string }[];
     expect(remaining.some(r => r.id === mediaToDelete.id)).toBe(false);
-    
+
     const mediaDir = path.join(mediaPath, galleryId as string);
     expect(fs.existsSync(path.join(mediaDir, mediaToDelete.id))).toBe(false);
-    
+
     if (mediaToKeep) {
       expect(remaining.some(r => r.id === mediaToKeep.id)).toBe(true);
       expect(fs.existsSync(path.join(mediaDir, mediaToKeep.id))).toBe(true);
     }
-    
+
     const gal = db.prepare("SELECT cover_image_id, status FROM galleries WHERE id = ?").get(galleryId as string) as { cover_image_id: string | null, status: string };
     expect(gal.cover_image_id).toBeNull();
-    
+
     const failData = new URLSearchParams();
     failData.append("csrfToken", newCsrfToken);
     failData.append("intent", "delete_media");
     failData.append("mediaIds", "unknown-id");
-    
+
     const failRes = await fetch(actionUrl, {
       method: "POST",
       body: failData,
@@ -513,6 +512,102 @@ describe("Admin Gallery Integration Lifecycle", () => {
     await failRes.text();
     expect(failRes.status).toBe(400);
 
+    // Test deletion of media from another gallery
+    const otherGalleryId = "other_gallery_for_test";
+    db.prepare(`
+      INSERT INTO galleries (
+        id, public_id, bride_names, wedding_date, status, expires_at, created_at, 
+        guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      otherGalleryId, "otherpub", "other", Date.now().toString(), "published", Date.now() + 100000, Date.now(),
+      "hash1", "hash2", "enc1", "enc2"
+    );
+    const otherMediaId = "other_media_id_1";
+    db.prepare(`
+      INSERT INTO gallery_media (
+        id, gallery_id, type, visibility, original_name, mime_type, size, hash, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      otherMediaId, otherGalleryId, "photo", "invites", "test.jpg", "image/jpeg", 100, "hash", Date.now()
+    );
+    const otherGalleryPath = path.join(mediaPath, otherGalleryId);
+    fs.mkdirSync(otherGalleryPath, { recursive: true });
+    fs.writeFileSync(path.join(otherGalleryPath, otherMediaId), "dummy_content");
+
+    const otherData = new URLSearchParams();
+    otherData.append("csrfToken", newCsrfToken);
+    otherData.append("intent", "delete_media");
+    otherData.append("mediaIds", otherMediaId);
+
+    const otherRes = await fetch(actionUrl, {
+      method: "POST",
+      body: otherData,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Origin": BASE_URL,
+        "Cookie": authCookie,
+        "x-forwarded-for": "127.0.0.1",
+      }
+    });
+    expect(otherRes.status).toBe(400);
+    const otherExists = db.prepare("SELECT 1 FROM gallery_media WHERE id = ?").get(otherMediaId);
+    expect(otherExists).toBeDefined();
+    expect(fs.existsSync(path.join(otherGalleryPath, otherMediaId))).toBe(true);
+
+    // Test deletion when import is pending
+    if (mediaToKeep) {
+      db.prepare("INSERT INTO gallery_imports (id, gallery_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run("test_import", galleryId as string, "pending", Date.now(), Date.now());
+      
+      const pendingData = new URLSearchParams();
+      pendingData.append("csrfToken", newCsrfToken);
+      pendingData.append("intent", "delete_media");
+      pendingData.append("mediaIds", mediaToKeep.id);
+  
+      const pendingRes = await fetch(actionUrl, {
+        method: "POST",
+        body: pendingData,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Origin": BASE_URL,
+          "Cookie": authCookie,
+          "x-forwarded-for": "127.0.0.1",
+        }
+      });
+      expect(pendingRes.status).toBe(400);
+      const pendingExists = db.prepare("SELECT 1 FROM gallery_media WHERE id = ?").get(mediaToKeep.id);
+      expect(pendingExists).toBeDefined();
+      expect(fs.existsSync(path.join(mediaDir, mediaToKeep.id))).toBe(true);
+      
+      db.prepare("DELETE FROM gallery_imports WHERE id = ?").run("test_import");
+
+      // Test SQLite transaction rollback
+      db.prepare("CREATE TRIGGER fail_delete BEFORE DELETE ON gallery_media BEGIN SELECT RAISE(ABORT, 'Simulated failure'); END;").run();
+      try {
+        const rollbackData = new URLSearchParams();
+        rollbackData.append("csrfToken", newCsrfToken);
+        rollbackData.append("intent", "delete_media");
+        rollbackData.append("mediaIds", mediaToKeep.id);
+  
+        const rollbackRes = await fetch(actionUrl, {
+          method: "POST",
+          body: rollbackData,
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Origin": BASE_URL,
+            "Cookie": authCookie,
+            "x-forwarded-for": "127.0.0.1",
+          }
+        });
+        expect(rollbackRes.status).toBe(500);
+        const stillExists = db.prepare("SELECT 1 FROM gallery_media WHERE id = ?").get(mediaToKeep.id);
+        expect(stillExists).toBeDefined();
+        expect(fs.existsSync(path.join(mediaDir, mediaToKeep.id))).toBe(true);
+      } finally {
+        db.prepare("DROP TRIGGER fail_delete").run();
+      }
+    }
+
     // Empty the gallery to test auto-draft
     if (remaining.length > 0) {
       const allForm = new URLSearchParams();
@@ -521,7 +616,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       for (const r of remaining) {
         allForm.append("mediaIds", r.id);
       }
-      
+
       const resAll = await fetch(actionUrl, {
         method: "POST",
         body: allForm,
@@ -534,11 +629,10 @@ describe("Admin Gallery Integration Lifecycle", () => {
       });
       await resAll.text();
       expect(resAll.status).toBe(200);
-      
+
       const emptyGal = db.prepare("SELECT status FROM galleries WHERE id = ?").get(galleryId as string) as { status: string };
       expect(emptyGal.status).toBe("draft");
     }
     db.close();
   }, 15000);
 });
-
