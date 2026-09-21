@@ -3,6 +3,7 @@ import { getGalleryDb } from "~/lib/gallery-db.server";
 import type { Route } from "./+types/admin.galleries";
 import { Link } from "react-router";
 import styles from "./admin.module.css";
+import { formatEuropeanDate } from "~/lib/date";
 
 export function meta() {
   return [{ title: "Sempra Admin — Galeries" }];
@@ -26,8 +27,9 @@ export default function AdminGalleries({ loaderData }: Route.ComponentProps) {
         <Link to="/admin/galleries/new" className={styles.button}>Nouvelle Galerie</Link>
       </div>
 
-      <div className={styles.card}>
-        <table className={styles.galleryTable}>
+      <div className={`${styles.card} ${styles.galleryTableCard}`}>
+        <div className={styles.galleryTableWrapper}>
+          <table className={styles.galleryTable}>
           <thead>
             <tr>
               <th className={styles.galleryTh}>Mariés</th>
@@ -42,7 +44,7 @@ export default function AdminGalleries({ loaderData }: Route.ComponentProps) {
               <tr key={g.id}>
                 <td className={styles.galleryTd}>{g.bride_names}</td>
                 <td className={styles.galleryTd}>{g.public_id}</td>
-                <td className={styles.galleryTd}>{new Date(g.wedding_date).toLocaleDateString()}</td>
+                <td className={styles.galleryTd}>{formatEuropeanDate(g.wedding_date, "fr")}</td>
                 <td className={styles.galleryTd}>
                   <span className={`${styles.statusBadge} ${
                     g.status === 'draft' ? styles.statusDraft :
@@ -66,6 +68,7 @@ export default function AdminGalleries({ loaderData }: Route.ComponentProps) {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

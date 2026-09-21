@@ -173,6 +173,14 @@
   .grid {
     grid-template-columns: 1fr;
   }
+  .headerRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .headerRow .button {
+    width: 100%;
+    box-sizing: border-box;
+  }
 }
 
 .card {
@@ -922,8 +930,56 @@
 }
 
 /* Admin galleries table */
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 0.375rem;
+  background: #111827;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: #374151;
+}
+
+.button:focus-visible {
+  outline: 2px solid #111827;
+  outline-offset: 2px;
+}
+
+.galleryTableCard {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.galleryTableWrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .galleryTable {
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   text-align: left;
 }
