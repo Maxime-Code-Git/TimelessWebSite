@@ -1,6 +1,6 @@
 import { redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/fr.gallery";
-import { getGallerySession, GALLERY_PRIVATE_HEADERS } from "~/lib/gallery-auth.server";
+import { getGallerySession, GALLERY_PRIVATE_HEADERS, sanitizeGalleryCover } from "~/lib/gallery-auth.server";
 import type { GalleryAccessLevel } from "~/lib/gallery-auth.server";
 import { getGalleryByPublicId, getGalleryMedia } from "~/lib/gallery.server";
 import { getGalleryDb } from "~/lib/gallery-db.server";
@@ -55,7 +55,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       headers: GALLERY_PRIVATE_HEADERS,
     });
   }
-  
+
   if (!isAdmin && gallery.id !== galleryId) {
     throw redirect("/fr/espace-clients?status=unavailable", {
       headers: GALLERY_PRIVATE_HEADERS,
@@ -75,6 +75,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const finalAccessLevel = isAdmin ? "maries" : accessLevel!;
   const media = getGalleryMedia(gallery.id, finalAccessLevel);
+  sanitizeGalleryCover(gallery, finalAccessLevel);
 
   return Response.json({
     gallery: {

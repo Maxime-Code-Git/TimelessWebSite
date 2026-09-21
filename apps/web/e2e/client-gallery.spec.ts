@@ -187,24 +187,18 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     // Reload admin page to reflect imported media
     await adminPage.reload();
 
-    // 6. Sélection d'une couverture avec locator accessible
-    const coverOption = adminPage
-      .locator("label")
-      .filter({
-        has: adminPage.locator(
-          'input[type="radio"][name="cover_image_id"]:not([value=""])'
-        ),
-      })
-      .first();
+    // 6. Sélection de la couverture mariés via l'API/DB pour cibler le test
+    const db = new DatabaseSync(galleryDbPath);
+    const galleryPublicId = (db.prepare("SELECT public_id FROM galleries WHERE id = ?").get(galleryId) as { public_id: string }).public_id;
+    const adminPhotos = db.prepare("SELECT id, original_name, type, visibility FROM gallery_media WHERE gallery_id = ?").all(galleryId) as Record<string, unknown>[];
+    db.close();
 
-    await expect(coverOption).toBeVisible();
-    await coverOption.click();
+    const coupleMediaId = adminPhotos.find((p: Record<string, unknown>) => p.visibility === "maries" && p.type === "photo")!.id;
 
-    const coverRadio = coverOption.locator(
-      'input[type="radio"][name="cover_image_id"]'
-    );
-
-    await expect(coverRadio).toBeChecked();
+    // Select the maries cover photo in the UI
+    const coverOption = adminPage.locator(`input[type="radio"][name="cover_image_id"][value="${coupleMediaId}"]`);
+    await coverOption.check({ force: true });
+    await expect(coverOption).toBeChecked();
 
     // 7. Publication
     await adminPage.selectOption('select[name="status"]', "published");
@@ -212,10 +206,6 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await expect(
       adminPage.getByRole("status")
     ).toHaveText("Enregistré.");
-
-    const db = new DatabaseSync(galleryDbPath);
-    const galleryPublicId = (db.prepare("SELECT public_id FROM galleries WHERE id = ?").get(galleryId) as { public_id: string }).public_id;
-    db.close();
 
     // 8. Connexion invités (old guest context as well)
     await guestPage.goto("/fr/espace-clients");
@@ -235,6 +225,10 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     expect(headers["x-robots-tag"]).toContain("noindex");
     expect(headers["x-robots-tag"]).toContain("nofollow");
     expect(headers["referrer-policy"]).toContain("no-referrer");
+
+    // Vérifier que la cover mariés est invisible pour l'invité (ni src, ni data-id)
+    const guestHtmlContent = await guestPage.content();
+    expect(guestHtmlContent).not.toContain(coupleMediaId as string);
 
     // 9. Présence des 24 premières photos de galerie (sans compter logo et couverture)
     // Logo is inside header, cover is probably in a banner. Photos are in gallery-photo
@@ -277,13 +271,16 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     }
 
     // 14. Accès invité refusé en 404 aux médias mariés
-    // Find couple media ID using API
-    const mediaDb = new DatabaseSync(galleryDbPath);
-    const adminPhotos = mediaDb.prepare("SELECT id, original_name, type, visibility FROM gallery_media WHERE gallery_id = ?").all(galleryId) as Record<string, unknown>[];
-    mediaDb.close();
-    const coupleMediaId = adminPhotos.find((p: Record<string, unknown>) => p.visibility === "maries")!.id;
-    const forbidRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/media/${coupleMediaId}`);
-    expect(forbidRes.status()).toBe(404);
+    const coupleVideoId = adminPhotos.find((p: Record<string, unknown>) => p.visibility === "maries" && p.type === "video")!.id;
+
+    const forbidPhotoRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/media/${coupleMediaId}`);
+    expect(forbidPhotoRes.status()).toBe(404);
+
+    const forbidVideoRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/media/${coupleVideoId}`);
+    expect(forbidVideoRes.status()).toBe(404);
+
+    const forbidOriginalRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/download/original/${coupleMediaId}`);
+    expect(forbidOriginalRes.status()).toBe(404);
 
     // 15-16. ZIP invités photos, vidéos et all sans médias mariés
     for (const type of ["photos", "videos", "all"]) {
@@ -304,6 +301,11 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
       for (const entry of entries) {
         expect(entry).not.toContain("maries");
         expect(entry).not.toContain("couple");
+        if (entry.endsWith(".jpg")) {
+          expect(entry.startsWith("Photos/")).toBe(true);
+        } else if (entry.endsWith(".mp4")) {
+          expect(entry.startsWith("Videos/")).toBe(true);
+        }
       }
     }
 
@@ -447,5 +449,11 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     expect(archivedRes.headers()["location"]).toContain(
       "/fr/espace-clients"
     );
+
+    // 34. L'administrateur peut rouvrir la navigation (Bypass)
+    await adminPage.goto(`/fr/galerie/${galleryPublicId}`);
+    // Admin can see the gallery even if it is archived, and sees all media
+    await expect(adminPage.getByTestId('gallery-photo')).toHaveCount(26);
+    await expect(adminPage.getByTestId('gallery-video')).toHaveCount(2);
   });
 });

@@ -51,9 +51,25 @@ describe("Admin Gallery Integration Lifecycle", () => {
 
     // Create a mock import folder structure
     fs.mkdirSync(path.join(importPath, "invites", "photos"), { recursive: true });
+    fs.mkdirSync(path.join(importPath, "invites", "videos"), { recursive: true });
+    fs.mkdirSync(path.join(importPath, "maries", "photos"), { recursive: true });
+    fs.mkdirSync(path.join(importPath, "maries", "videos"), { recursive: true });
+
     // Valid 1x1 JPEG base64
     const validJpeg = Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64");
+
+    // Valid 1x1 PNG base64
+    const validPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+
     fs.writeFileSync(path.join(importPath, "invites", "photos", "test.jpg"), validJpeg);
+    fs.writeFileSync(path.join(importPath, "maries", "photos", "couple.png"), validPng);
+
+    // Valid mp4 header: length (4 bytes), 'ftyp' (4 bytes), 'mp42' (4 bytes)
+    const validMp4_1 = Buffer.concat([Buffer.from([0,0,0,0x18]), Buffer.from("ftypmp42"), Buffer.from("video1")]);
+    const validMp4_2 = Buffer.concat([Buffer.from([0,0,0,0x18]), Buffer.from("ftypmp42"), Buffer.from("video2")]);
+
+    fs.writeFileSync(path.join(importPath, "invites", "videos", "vid.mp4"), validMp4_1);
+    fs.writeFileSync(path.join(importPath, "maries", "videos", "couple-vid.mp4"), validMp4_2);
 
     return new Promise((resolve, reject) => {
       serverProcess = spawn(process.execPath, [serveBin, "./build/server/index.js"], {
@@ -209,11 +225,17 @@ describe("Admin Gallery Integration Lifecycle", () => {
     }
     expect(imported).toBe(true);
 
-    // Get the imported media ID for the cover image
-    const pageRes = await fetch(`${BASE_URL}/admin/galleries/${galleryId}`, { headers: { Cookie: authCookie } });
-    const pageHtml = await pageRes.text();
-    const mediaIdMatch = pageHtml.match(/name="cover_image_id" value="([a-f0-9-]{36})"/);
-    const cover_image_id = mediaIdMatch ? mediaIdMatch[1] : "";
+    // Get the imported media ID for the cover image (specifically the maries photo)
+    const mediaDb = new DatabaseSync(galleryDbPath);
+    const mariesPhotoRow = mediaDb.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND visibility = 'maries' AND type = 'photo'").get(galleryId!) as { id: string } | undefined;
+    const mariesVideoRow = mediaDb.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND visibility = 'maries' AND type = 'video'").get(galleryId!) as { id: string } | undefined;
+    const cover_image_id = mariesPhotoRow?.id || "";
+    const couple_video_id = mariesVideoRow?.id || "";
+
+    console.log("COVER IMAGE ID:", cover_image_id);
+    if (!cover_image_id) {
+      console.log("ALL MEDIA:", mediaDb.prepare("SELECT * FROM gallery_media WHERE gallery_id = ?").all(galleryId!));
+    }
 
     // 8. Publish successfully
     const pubRes = await fetch(`${BASE_URL}/admin/galleries/${galleryId}?_data=routes/admin.galleries.$id`, {
@@ -236,12 +258,23 @@ describe("Admin Gallery Integration Lifecycle", () => {
       redirect: "manual",
     });
     const pubText = await pubRes.text();
-            expect(pubRes.status).toBe(200);
+    expect(pubRes.status).toBe(200);
     expect(pubText).toContain("success");
 
     const publicIdDb = new DatabaseSync(galleryDbPath);
     const public_id = (publicIdDb.prepare("SELECT public_id FROM galleries WHERE id = ?").get(galleryId as string) as { public_id: string }).public_id;
     publicIdDb.close();
+
+    // Verify Admin can load a thumbnail directly without a gallery session
+    const adminThumbnailRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${cover_image_id}?variant=thumbnail`, {
+      headers: { "Cookie": authCookie }
+    });
+    expect(adminThumbnailRes.status).toBe(200);
+
+    // Verify Public session cannot bypass
+    const publicThumbnailRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${cover_image_id}?variant=thumbnail`);
+    expect(publicThumbnailRes.status).toBe(401);
+
     // Rotate guest code to a known value
     const guest_code = "myGuestCode123";
     await fetch(`${BASE_URL}/admin/galleries/${galleryId}?_data=routes/admin.galleries.$id`, {
@@ -292,6 +325,47 @@ describe("Admin Gallery Integration Lifecycle", () => {
       headers: { "Cookie": guestCookie! }
     });
     expect(guestRes.status).toBe(200);
+    const guestHtml = await guestRes.text();
+    // Verify guest doesn't see cover ID
+    expect(guestHtml).not.toContain(cover_image_id);
+
+    // Verify Guest API responses
+    const guestZipPhotosRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download?type=photos`, { headers: { "Cookie": guestCookie! } });
+    const guestZipVideosRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download?type=videos`, { headers: { "Cookie": guestCookie! } });
+    const guestZipAllRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download?type=all`, { headers: { "Cookie": guestCookie! } });
+
+    expect(guestZipPhotosRes.status).toBe(200);
+    const photosZipStr = Buffer.from(await guestZipPhotosRes.arrayBuffer()).toString("utf8");
+    expect(photosZipStr).toContain("Photos/test.jpg");
+    expect(photosZipStr).not.toContain("couple.png"); // maries photo shouldn't be there
+
+    expect(guestZipVideosRes.status).toBe(200);
+    const videosZipStr = Buffer.from(await guestZipVideosRes.arrayBuffer()).toString("utf8");
+    expect(videosZipStr).toContain("Videos/vid.mp4");
+    expect(videosZipStr).not.toContain("couple-vid.mp4");
+
+    expect(guestZipAllRes.status).toBe(200);
+    const allZipStr = Buffer.from(await guestZipAllRes.arrayBuffer()).toString("utf8");
+    expect(allZipStr).toContain("Photos/test.jpg");
+    expect(allZipStr).toContain("Videos/vid.mp4");
+    expect(allZipStr).not.toContain("couple");
+
+
+    // Verify guest photos API pagination
+    const guestPhotosApiRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/photos`, { headers: { "Cookie": guestCookie! } });
+    expect(guestPhotosApiRes.status).toBe(200);
+    const guestPhotosJson = await guestPhotosApiRes.json();
+    expect(guestPhotosJson.total).toBe(1); // Only 1 guest photo ("test.jpg")
+    expect(guestPhotosJson.hasMore).toBe(false);
+    expect(guestPhotosJson.photos.length).toBe(1);
+
+    // Verify 404 for direct accesses
+    const forbidPhotoRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${cover_image_id}`, { headers: { "Cookie": guestCookie! } });
+    expect(forbidPhotoRes.status).toBe(404);
+    const forbidVideoRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${couple_video_id}`, { headers: { "Cookie": guestCookie! } });
+    expect(forbidVideoRes.status).toBe(404);
+    const forbidDownloadRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download/original/${cover_image_id}`, { headers: { "Cookie": guestCookie! } });
+    expect(forbidDownloadRes.status).toBe(404);
     // 10. Verify couple access and ZIP download
     const couple_code = "myCoupleCode456";
     await fetch(`${BASE_URL}/admin/galleries/${galleryId}?_data=routes/admin.galleries.$id`, {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { addCalendarMonths } from "../app/lib/date";
+import { addCalendarMonths, formatEuropeanDate } from "../app/lib/date";
 
 describe("addCalendarMonths", () => {
   it("handles normal month addition", () => {
@@ -23,6 +23,22 @@ describe("addCalendarMonths", () => {
     expect(addCalendarMonths(new Date("2024-01-01T00:00:00Z"), 24).toISOString()).toBe("2026-01-01T00:00:00.000Z");
     // March 31 -> March 31 two years later (use UTC noon to avoid DST shifts)
     expect(addCalendarMonths(new Date("2024-03-31T12:00:00Z"), 24).toISOString()).toBe("2026-03-31T12:00:00.000Z");
+  });
+});
+
+describe("formatEuropeanDate", () => {
+  it("formats dates to JJ/MM/AAAA for fr", () => {
+    expect(formatEuropeanDate("2023-12-25", "fr")).toBe("25/12/2023");
+    expect(formatEuropeanDate("2024-02-29", "fr")).toBe("29/02/2024");
+  });
+
+  it("formats dates to DD/MM/YYYY for en", () => {
+    expect(formatEuropeanDate("2023-12-25", "en")).toBe("25/12/2023");
+  });
+
+  it("handles empty or invalid strings gracefully", () => {
+    expect(formatEuropeanDate("", "fr")).toBe("");
+    expect(formatEuropeanDate("invalid", "en")).toBe("invalid");
   });
 });
 

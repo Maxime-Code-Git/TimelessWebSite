@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { hashGalleryCode, generateGalleryCode, encryptGalleryCode, decryptGalleryCode } from "../app/lib/gallery-auth.server";
+import { hashGalleryCode, generateGalleryCode, encryptGalleryCode, decryptGalleryCode, isMediaAuthorized } from "../app/lib/gallery-auth.server";
 
 describe("hashGalleryCode", () => {
   test("generates consistent hashes", () => {
@@ -96,5 +96,31 @@ describe("encryptGalleryCode / decryptGalleryCode", () => {
     expect(() => decryptGalleryCode("invalid")).toThrow("Invalid encrypted format");
     expect(() => decryptGalleryCode("a:b")).toThrow("Invalid encrypted format");
     expect(() => decryptGalleryCode("a:b:c:d")).toThrow("Invalid encrypted format");
+  });
+});
+
+describe("isMediaAuthorized", () => {
+  test('isMediaAuthorized("invites", "invites") is allowed', () => {
+    expect(isMediaAuthorized("invites", "invites")).toBe(true);
+  });
+
+  test('isMediaAuthorized("maries", "invites") is denied', () => {
+    expect(isMediaAuthorized("maries", "invites")).toBe(false);
+  });
+
+  test('isMediaAuthorized("invites", "maries") is allowed', () => {
+    expect(isMediaAuthorized("invites", "maries")).toBe(true);
+  });
+
+  test('isMediaAuthorized("maries", "maries") is allowed', () => {
+    expect(isMediaAuthorized("maries", "maries")).toBe(true);
+  });
+
+  test("unknown visibility or access level is denied by default", () => {
+    expect(isMediaAuthorized("unknown", "invites")).toBe(false);
+    expect(isMediaAuthorized("unknown", "maries")).toBe(false);
+    expect(isMediaAuthorized("invites", "unknown" as "invites")).toBe(false);
+    expect(isMediaAuthorized(null, "invites")).toBe(false);
+    expect(isMediaAuthorized(undefined, "maries")).toBe(false);
   });
 });
