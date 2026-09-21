@@ -174,7 +174,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!galleryId || !mediaId) return jsonError("Missing parameters", 400);
 
   const db = getGalleryDb();
-  
+
   // Verify gallery exists
   const gallery = db.prepare("SELECT id FROM galleries WHERE id = ?").get(galleryId);
   if (!gallery) return jsonError("Gallery not found", 404);
@@ -187,7 +187,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const contentType = request.headers.get("Content-Type") ?? "";
 
   const isFormUrlEncoded = contentType.includes("application/x-www-form-urlencoded");
-  
+
   if (isFormUrlEncoded) {
     // Delete poster logic
     const formData = await request.formData();
@@ -195,7 +195,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (!csrfToken || csrfToken !== session.get("csrfToken")) {
       return jsonError("Forbidden", 403);
     }
-    
+
     const intent = formData.get("intent");
     if (intent !== "delete_poster") {
       return jsonError("Invalid intent", 400);
@@ -207,7 +207,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     const postersDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".posters", mediaId);
     const quarantineDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".quarantine", mediaId + "_poster_" + crypto.randomUUID());
-    
+
     let quarantined = false;
     try {
       if (fs.existsSync(postersDir)) {
@@ -215,7 +215,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         fs.renameSync(postersDir, quarantineDir);
         quarantined = true;
       }
-      
+
       db.exec("BEGIN TRANSACTION");
       try {
         db.prepare("UPDATE gallery_media SET poster_revision = NULL WHERE id = ?").run(mediaId);
@@ -224,12 +224,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
         db.exec("ROLLBACK");
         throw dbErr;
       }
-      
+
       // Cleanup quarantine
       if (quarantined) {
         fs.rmSync(quarantineDir, { recursive: true, force: true });
       }
-      
+
       return Response.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
     } catch {
       // Rollback file move

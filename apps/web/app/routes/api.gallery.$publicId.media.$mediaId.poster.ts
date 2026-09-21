@@ -18,7 +18,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!media) {
     return new Response("Not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
   }
-  
+
   if (media.type !== "video" || !media.poster_revision) {
     return new Response("Not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
   }
