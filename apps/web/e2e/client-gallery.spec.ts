@@ -191,11 +191,11 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await adminPage.goto("/admin/galleries");
     await adminPage.click(`a[href="/admin/galleries/${galleryId}"]`);
     await adminPage.waitForURL(/\/admin\/galleries\/.+/);
-    
+
     // Check 26 photos in the cover grid
     const thumbnails = adminPage.locator('label > img');
     await expect(thumbnails).toHaveCount(26);
-    
+
     // Verify thumbnails return HTTP 200 with admin session
     const thumbnailCount = await thumbnails.count();
     for (let i = 0; i < thumbnailCount; i++) {
@@ -252,7 +252,7 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await expect(guestPage.getByTestId('gallery-photo')).toHaveCount(24);
 
     // Pagination explicit check via API
-    const guestPhotosApiRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/photos?page=1`);
+    const guestPhotosApiRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/photos?skip=0`);
     expect(guestPhotosApiRes.status()).toBe(200);
     const guestPhotosData = await guestPhotosApiRes.json();
     expect(guestPhotosData.total).toBe(25);
