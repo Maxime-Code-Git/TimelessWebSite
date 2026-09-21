@@ -208,9 +208,7 @@ export async function action({ request }: ActionFunctionArgs) {
     // Rotate CSRF token after login
     session.set("csrfToken", crypto.randomUUID());
 
-    console.log("LOGIN SUCCESS! Session data:", session.data);
     const cookieString = await commitSession(session);
-    console.log("LOGIN SUCCESS! Cookie string:", cookieString);
 
     return redirect("/admin", {
       headers: {

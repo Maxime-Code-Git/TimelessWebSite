@@ -20,12 +20,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const { gallery, accessLevel } = await requireGalleryAccess(request, publicId, undefined, true);
   const db = getGalleryDb();
 
-  let query = "SELECT * FROM gallery_media WHERE gallery_id = ?";
-  const queryParams: string[] = [gallery.id as string];
-
-  if (accessLevel !== "maries") {
-    query += " AND visibility = 'invites'";
+  let visCondition = " AND 1=0";
+  if (accessLevel === "maries") {
+    visCondition = " AND visibility IN ('invites', 'maries')";
+  } else if (accessLevel === "invites") {
+    visCondition = " AND visibility = 'invites'";
   }
+
+  let query = "SELECT * FROM gallery_media WHERE gallery_id = ?" + visCondition;
+  const queryParams: string[] = [gallery.id as string];
 
   if (typeParam === "photos") {
     query += " AND type = 'photo'";
@@ -33,12 +36,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     query += " AND type = 'video'";
   }
 
-  const media = db.prepare(query).all(...queryParams) as { id: string; original_name: string }[];
+  const media = db.prepare(query).all(...queryParams) as { id: string; original_name: string; type: string }[];
 
   if (media.length === 0) {
     return new Response("No media to download", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
   }
-
 
   const filesToAdd: { filePath: string; safeName: string }[] = [];
   const usedNames = new Set<string>();
@@ -46,18 +48,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   for (const m of media) {
     const filePath = path.join(ENV.GALLERY_MEDIA_PATH, String(gallery.id), String(m.id));
     if (fs.existsSync(filePath)) {
+      const folderName = m.type === "photo" ? "Photos" : "Videos";
       const rawName = m.original_name ? String(m.original_name) : "media";
       let safeName = path.basename(rawName).replace(/[\r\n]/g, "").replace(/[^\x20-\x7E]/g, "_").replace(/"/g, '');
 
-      if (usedNames.has(safeName)) {
+      if (usedNames.has(`${folderName}/${safeName}`)) {
         const ext = path.extname(safeName);
         const name = path.basename(safeName, ext);
         let i = 1;
-        while (usedNames.has(`${name}-${i}${ext}`)) i++;
+        while (usedNames.has(`${folderName}/${name}-${i}${ext}`)) i++;
         safeName = `${name}-${i}${ext}`;
       }
-      usedNames.add(safeName);
-      filesToAdd.push({ filePath, safeName });
+      usedNames.add(`${folderName}/${safeName}`);
+      filesToAdd.push({ filePath, safeName: `${folderName}/${safeName}` });
     }
   }
 

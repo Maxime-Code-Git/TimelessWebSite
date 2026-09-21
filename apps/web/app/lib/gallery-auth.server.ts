@@ -69,6 +69,13 @@ export const gallerySessionStorage = createCookieSessionStorage({
 
 export type GalleryAccessLevel = "invites" | "maries";
 
+export function isMediaAuthorized(visibility: unknown, accessLevel: "maries" | "invites"): boolean {
+  if (visibility !== "invites" && visibility !== "maries") return false;
+  if (accessLevel === "maries") return true;
+  if (accessLevel === "invites") return visibility === "invites";
+  return false;
+}
+
 export async function getGallerySession(request: Request) {
   const cookie = request.headers.get("Cookie");
   return gallerySessionStorage.getSession(cookie);
@@ -198,11 +205,12 @@ export async function requireGalleryAccess(request: Request, publicId: string, r
     throw unauthorized();
   }
 
+
   let media = null;
   if (requiredMediaId) {
     media = db.prepare("SELECT * FROM gallery_media WHERE id = ? AND gallery_id = ?").get(requiredMediaId, galleryId) as Record<string, unknown> | undefined;
     if (!media) throw new Response("Not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
-    if (media.visibility === "maries" && accessLevel === "invites") {
+    if (!isMediaAuthorized(media.visibility, accessLevel)) {
       throw new Response("Not found", { status: 404, headers: GALLERY_PRIVATE_HEADERS });
     }
   }

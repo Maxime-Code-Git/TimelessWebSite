@@ -2,6 +2,7 @@ import { Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { requireValidAdminSession, createAdminHeaders } from "../lib/admin-auth.server";
 import { getGalleries } from "../lib/gallery.server";
+import { formatEuropeanDate } from "../lib/date";
 import styles from "./admin.module.css";
 import { commitSession } from "../lib/session.server";
 import crypto from "node:crypto";
@@ -42,7 +43,7 @@ export default function AdminGalleries() {
         {galleries.map(g => (
           <div key={g.id} className={styles.card}>
             <h3>{g.bride_names}</h3>
-            <p><strong>Date :</strong> {g.wedding_date}</p>
+            <p><strong>Date :</strong> {formatEuropeanDate(g.wedding_date, "fr")}</p>
             <p>
               <strong>Statut :</strong> {g.status === 'published' ? "Publié" : g.status === 'archived' ? "Archivé" : "Brouillon"}
             </p>

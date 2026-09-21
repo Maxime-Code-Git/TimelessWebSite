@@ -1,6 +1,7 @@
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
+import { formatEuropeanDate } from "~/lib/date";
 import styles from "./gallery.module.css";
 import { useState, useCallback, useEffect } from "react";
 
@@ -165,7 +166,7 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
         <div className={styles.heroContent}>
           <p className={styles.heroSubtitle}>{gallery.location || (isFr ? "Mariage" : "Wedding")}</p>
           <h1 className={styles.heroTitle}>{gallery.bride_names}</h1>
-          <p className={styles.heroDate}>{gallery.wedding_date}</p>
+          <p className={styles.heroDate}>{formatEuropeanDate(gallery.wedding_date, lang)}</p>
         </div>
       </section>
 

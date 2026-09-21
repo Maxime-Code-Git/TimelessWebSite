@@ -39,7 +39,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const accessLevel = session.get("accessLevel") as GalleryAccessLevel | undefined;
   const codeVersion = session.get("codeVersion") as number | undefined;
 
-  if (!galleryId || !accessLevel || codeVersion === undefined) {
+  const { requireAdminSession } = await import("~/lib/auth.server");
+  const { isValid: isAdmin } = await requireAdminSession(request);
+
+  if (!isAdmin && (!galleryId || !accessLevel || codeVersion === undefined)) {
     throw redirect("/en/client-area?status=unauthorized", {
       headers: GALLERY_PRIVATE_HEADERS,
     });
@@ -47,22 +50,31 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const gallery = getGalleryByPublicId(params.id);
 
-  if (!gallery || gallery.id !== galleryId || gallery.status !== "published" || gallery.expires_at < Date.now()) {
+  if (!gallery || gallery.status !== "published" || gallery.expires_at < Date.now()) {
+    throw redirect("/en/client-area?status=unavailable", {
+      headers: GALLERY_PRIVATE_HEADERS,
+    });
+  }
+
+  if (!isAdmin && gallery.id !== galleryId) {
     throw redirect("/en/client-area?status=unavailable", {
       headers: GALLERY_PRIVATE_HEADERS,
     });
   }
 
   // Validate session against code version from gallery_codes (source of truth)
-  const db = getGalleryDb();
-  const codeRow = db.prepare("SELECT version FROM gallery_codes WHERE gallery_id = ? AND level = ?").get(galleryId, accessLevel) as { version: number } | undefined;
-  if (!codeRow || codeRow.version !== codeVersion) {
-    throw redirect("/en/client-area?status=expired", {
-      headers: GALLERY_PRIVATE_HEADERS,
-    });
+  if (!isAdmin) {
+    const db = getGalleryDb();
+    const codeRow = db.prepare("SELECT version FROM gallery_codes WHERE gallery_id = ? AND level = ?").get(galleryId!, accessLevel!) as { version: number } | undefined;
+    if (!codeRow || codeRow.version !== codeVersion) {
+      throw redirect("/en/client-area?status=expired", {
+        headers: GALLERY_PRIVATE_HEADERS,
+      });
+    }
   }
 
-  const media = getGalleryMedia(gallery.id, accessLevel);
+  const finalAccessLevel = isAdmin ? "maries" : accessLevel!;
+  const media = getGalleryMedia(gallery.id, finalAccessLevel);
 
   return Response.json({
     gallery: {
@@ -76,7 +88,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       signature_en: gallery.signature_en,
       cover_image_id: gallery.cover_image_id
     },
-    accessLevel,
+    accessLevel: finalAccessLevel,
     media: media as GalleryMedia[]
   }, {
     headers: GALLERY_PRIVATE_HEADERS

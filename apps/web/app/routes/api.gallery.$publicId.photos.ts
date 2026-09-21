@@ -15,17 +15,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const { gallery, accessLevel } = await requireGalleryAccess(request, publicId, undefined, true);
   const db = getGalleryDb();
 
-  const countQuery = "SELECT COUNT(*) as total FROM gallery_media WHERE gallery_id = ? AND type = 'photo'" + (accessLevel !== "maries" ? " AND visibility = 'invites'" : "");
+  let visCondition = " AND 1=0";
+  if (accessLevel === "maries") {
+    visCondition = " AND visibility IN ('invites', 'maries')";
+  } else if (accessLevel === "invites") {
+    visCondition = " AND visibility = 'invites'";
+  }
+
+  const countQuery = "SELECT COUNT(*) as total FROM gallery_media WHERE gallery_id = ? AND type = 'photo'" + visCondition;
   const galleryId = gallery.id as string;
   const totalRow = db.prepare(countQuery).get(galleryId) as { total: number };
   const total = totalRow.total;
 
-  let query = "SELECT id, type, mime_type, width, height FROM gallery_media WHERE gallery_id = ? AND type = 'photo'";
+  let query = "SELECT id, type, mime_type, width, height FROM gallery_media WHERE gallery_id = ? AND type = 'photo'" + visCondition;
   const queryParams: (string | number)[] = [gallery.id as string];
-
-  if (accessLevel !== "maries") {
-    query += " AND visibility = 'invites'";
-  }
 
   query += " ORDER BY created_at ASC LIMIT ? OFFSET ?";
   queryParams.push(take, skip);

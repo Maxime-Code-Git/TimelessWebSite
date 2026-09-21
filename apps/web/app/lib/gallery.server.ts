@@ -70,7 +70,12 @@ export function getGalleryByPublicId(publicId: string): Gallery | undefined {
 export function getGalleryMedia(galleryId: string, accessLevel: "invites" | "maries") {
   const db = getGalleryDb();
 
-  const visCondition = accessLevel === "maries" ? "" : " AND visibility = 'invites'";
+  let visCondition = " AND 1=0";
+  if (accessLevel === "maries") {
+    visCondition = " AND visibility IN ('invites', 'maries')";
+  } else if (accessLevel === "invites") {
+    visCondition = " AND visibility = 'invites'";
+  }
 
   const videoQuery = "SELECT id, type, width, height, mime_type FROM gallery_media WHERE gallery_id = ? AND type = 'video'" + visCondition + " ORDER BY created_at ASC";
   const videos = db.prepare(videoQuery).all(galleryId) as unknown as GalleryMediaRow[];

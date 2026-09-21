@@ -316,7 +316,7 @@ export default function AdminGalleryEdit() {
     <div className={styles.adminPage}>
       <div className={styles.headerRow}>
         <h2>Gérer la galerie : {gallery.bride_names}</h2>
-        <Link to="/admin/galleries" className={styles.button}>Retour</Link>
+        <Link to="/admin/galleries" className={styles.button}>Retour aux galeries</Link>
       </div>
 
       <div className={styles.grid}>
