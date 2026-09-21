@@ -787,17 +787,14 @@ export default function AdminGalleryEdit() {
 
         <div className={styles.mediaGrid}>
           {filteredMedia.map(m => (
-            <label key={m.id} className={`${styles.mediaItem} ${selectedMedia.has(m.id) ? styles.selected : ''}`} data-testid="gallery-media-item" data-media-id={m.id} data-media-type={m.type} data-media-visibility={m.visibility}>
-              <input type="checkbox" className={styles.mediaCheckbox} checked={selectedMedia.has(m.id)} onChange={() => toggleMediaSelection(m.id)} aria-label={`Sélectionner ${m.original_name}`} />
+            <div key={m.id} className={`${styles.mediaItem} ${selectedMedia.has(m.id) ? styles.selected : ''}`} data-testid="gallery-media-item" data-media-id={m.id} data-media-type={m.type} data-media-visibility={m.visibility}>
+              <label>
+                <input type="checkbox" className={styles.mediaCheckbox} checked={selectedMedia.has(m.id)} onChange={() => toggleMediaSelection(m.id)} aria-label={`Sélectionner ${m.original_name}`} />
+              </label>
               {m.type === "photo" ? (
                 <img className={styles.mediaItemImage} src={`/api/gallery/${gallery.public_id}/media/${m.id}?width=480`} alt={m.original_name} loading="lazy" data-testid="gallery-media-image" />
               ) : (
-                <div className={styles.videoPosterContainer} onClick={(e) => {
-                  // Prevent clicking inner elements from selecting the media
-                  if ((e.target as HTMLElement).tagName !== "DIV" && (e.target as HTMLElement).tagName !== "IMG") {
-                    e.stopPropagation();
-                  }
-                }}>
+                <div className={styles.videoPosterContainer}>
                   {m.poster_revision ? (
                     <img className={styles.mediaItemImage} src={`/api/gallery/${gallery.public_id}/media/${m.id}/poster?v=${m.poster_revision}&width=480`} alt="Cover" loading="lazy" data-testid="gallery-media-image" />
                   ) : (
@@ -816,7 +813,7 @@ export default function AdminGalleryEdit() {
                   </div>
                 </div>
               )}
-            </label>
+            </div>
           ))}
           {filteredMedia.length === 0 && (
             <p className={styles.helperText}>Aucun média trouvé.</p>
@@ -874,9 +871,10 @@ function VideoPosterManager({ galleryId, mediaId, hasPoster, csrfToken, clearDel
     clearDeleteMessages();
     const formData = new FormData();
     formData.append("file", e.target.files[0]);
+    formData.append("csrfToken", csrfToken);
     fetcher.submit(formData, {
       method: "post",
-      action: `/api/admin/gallery/${galleryId}/media/${mediaId}/poster?csrfToken=${csrfToken}`,
+      action: `/api/admin/gallery/${galleryId}/media/${mediaId}/poster`,
       encType: "multipart/form-data",
     });
     if (fileInputRef.current) fileInputRef.current.value = "";

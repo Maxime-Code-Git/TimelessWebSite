@@ -7,12 +7,13 @@ import { once } from "node:events";
 import { finished } from "node:stream/promises";
 import busboy from "busboy";
 import sharp from "sharp";
-import { requireValidAdminSession } from "../lib/admin-auth.server";
+import { requireValidAdminSession, createAdminHeaders } from "../lib/admin-auth.server";
 import { validateOrigin } from "../lib/security.server";
 import { getGalleryDb } from "../lib/gallery-db.server";
 import { ENV } from "../lib/env.server";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+const MAX_PAYLOAD_SIZE = MAX_FILE_SIZE + 1024 * 1024; // 26 MB
 const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 
 class UploadRequestError extends Error {
@@ -25,14 +26,15 @@ class UploadRequestError extends Error {
 function jsonError(message: string, status: number): Response {
   return Response.json({ error: message }, {
     status,
-    headers: { "Cache-Control": "no-store" },
+    headers: createAdminHeaders(),
   });
 }
 
 async function parseSingleUpload(
   request: Request,
   contentType: string,
-  tempDirectory: string
+  tempDirectory: string,
+  expectedCsrfToken: string
 ): Promise<string> {
   if (!request.body) throw new UploadRequestError("Upload body is missing.", 400);
 
@@ -44,6 +46,8 @@ async function parseSingleUpload(
   let settled = false;
   let resolveParser!: () => void;
   let rejectParser!: (error: Error) => void;
+  let receivedCsrf = "";
+  let totalBytes = 0;
 
   const parserDone = new Promise<void>((resolve, reject) => {
     resolveParser = resolve;
@@ -55,8 +59,7 @@ async function parseSingleUpload(
     headers: { "content-type": contentType },
     limits: {
       files: 1,
-      fields: 0,
-      parts: 2,
+      fields: 1,
       fileSize: MAX_FILE_SIZE,
     },
   });
@@ -72,6 +75,14 @@ async function parseSingleUpload(
   const waitForFileWrite = async () => {
     if (fileWritePromise) await fileWritePromise.catch(() => undefined);
   };
+
+  parser.on("field", (name, value) => {
+    if (name === "csrfToken") {
+      receivedCsrf = value;
+    } else {
+      fail(new UploadRequestError("Unexpected form fields.", 400));
+    }
+  });
 
   parser.on("file", (fieldName, file, info) => {
     fileCount += 1;
@@ -126,6 +137,9 @@ async function parseSingleUpload(
         if (fileCount !== 1 || !uploadedFilePath) {
           throw new UploadRequestError("The upload must contain exactly one file.", 400);
         }
+        if (receivedCsrf !== expectedCsrfToken) {
+          throw new UploadRequestError("Forbidden", 403);
+        }
         if (!settled) {
           settled = true;
           resolveParser();
@@ -142,6 +156,13 @@ async function parseSingleUpload(
     while (!settled) {
       const { done, value } = await reader.read();
       if (done) break;
+
+      totalBytes += value.length;
+      if (totalBytes > MAX_PAYLOAD_SIZE) {
+        fail(new UploadRequestError("Payload too large", 413));
+        break;
+      }
+
       if (!parser.write(Buffer.from(value))) {
         await Promise.race([once(parser, "drain"), parserDone]);
       }
@@ -163,7 +184,7 @@ async function parseSingleUpload(
 
 export async function action({ request, params }: ActionFunctionArgs) {
   if (request.method !== "POST") {
-    return new Response(null, { status: 405, headers: { Allow: "POST" } });
+    return new Response(null, { status: 405, headers: Object.assign({ Allow: "POST" }, createAdminHeaders()) });
   }
 
   const session = await requireValidAdminSession(request);
@@ -185,7 +206,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (media.type !== "video") return jsonError("Media is not a video", 400);
 
   const contentType = request.headers.get("Content-Type") ?? "";
-
   const isFormUrlEncoded = contentType.includes("application/x-www-form-urlencoded");
 
   if (isFormUrlEncoded) {
@@ -222,38 +242,41 @@ export async function action({ request, params }: ActionFunctionArgs) {
         db.exec("COMMIT");
       } catch (dbErr) {
         db.exec("ROLLBACK");
+        if (quarantined) {
+          try { fs.renameSync(quarantineDir, postersDir); } catch { /* best effort */ }
+        }
         throw dbErr;
       }
 
-      // Cleanup quarantine
+      // Cleanup quarantine - Best effort after COMMIT
       if (quarantined) {
-        fs.rmSync(quarantineDir, { recursive: true, force: true });
+        try {
+          fs.rmSync(quarantineDir, { recursive: true, force: true });
+        } catch (e) {
+          console.error("Failed to delete quarantine after commit:", e);
+        }
       }
 
-      return Response.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
+      return Response.json({ success: true }, { headers: createAdminHeaders() });
     } catch {
-      // Rollback file move
-      if (quarantined) {
-        try { fs.renameSync(quarantineDir, postersDir); } catch { /* best effort */ }
-      }
       return jsonError("Failed to delete poster", 500);
     }
   }
 
   // Upload/Replace logic
-  const url = new URL(request.url);
-  const csrfTokenHeader = request.headers.get("x-csrf-token") || url.searchParams.get("csrfToken");
-  if (!csrfTokenHeader || csrfTokenHeader !== session.get("csrfToken")) {
-    return jsonError("Forbidden", 403);
-  }
-
   if (!/^multipart\/form-data\s*;[^\r\n]*boundary=/i.test(contentType)) {
     return jsonError("Unsupported Media Type", 415);
   }
 
-  const contentLength = parseInt(request.headers.get("Content-Length") ?? "0", 10);
-  if (contentLength > MAX_FILE_SIZE) {
-    return jsonError("File too large", 413);
+  const contentLengthHeader = request.headers.get("Content-Length");
+  if (contentLengthHeader !== null) {
+    const contentLength = parseInt(contentLengthHeader, 10);
+    if (isNaN(contentLength) || contentLength < 0) {
+      return jsonError("Invalid Content-Length", 400);
+    }
+    if (contentLength > MAX_PAYLOAD_SIZE) {
+      return jsonError("File too large", 413);
+    }
   }
 
   let tempDirectory: string | null = null;
@@ -261,10 +284,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-gallery-poster-"));
     fs.chmodSync(tempDirectory, 0o700);
 
-    const uploadedFilePath = await parseSingleUpload(request, contentType, tempDirectory);
+    const uploadedFilePath = await parseSingleUpload(request, contentType, tempDirectory, session.get("csrfToken") as string);
 
     // Validate real content with sharp
-    const metadata = await sharp(uploadedFilePath).metadata();
+    const metadata = await sharp(uploadedFilePath, { limitInputPixels: 40_000_000 }).metadata();
     if (!metadata.format || !["jpeg", "png", "webp", "avif"].includes(metadata.format)) {
       return jsonError("Invalid image content", 415);
     }
@@ -276,13 +299,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const tempAvifPath = path.join(tempDirectory, newRevision + ".avif");
     const tempWebpPath = path.join(tempDirectory, newRevision + ".webp");
 
-    await sharp(uploadedFilePath)
+    await sharp(uploadedFilePath, { limitInputPixels: 40_000_000 })
       .rotate() // Apply EXIF rotation
       .resize({ width: 1920, withoutEnlargement: true })
       .avif({ effort: 6 })
       .toFile(tempAvifPath);
 
-    await sharp(uploadedFilePath)
+    await sharp(uploadedFilePath, { limitInputPixels: 40_000_000 })
       .rotate()
       .resize({ width: 1920, withoutEnlargement: true })
       .webp({ effort: 6 })
@@ -294,16 +317,20 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const finalAvifPath = path.join(postersDir, newRevision + ".avif");
     const finalWebpPath = path.join(postersDir, newRevision + ".webp");
 
-    fs.renameSync(tempAvifPath, finalAvifPath);
-    fs.renameSync(tempWebpPath, finalWebpPath);
-    fs.chmodSync(finalAvifPath, 0o600);
-    fs.chmodSync(finalWebpPath, 0o600);
-
-    const oldRevision = media.poster_revision;
-
     try {
       db.exec("BEGIN TRANSACTION");
       try {
+        fs.renameSync(tempAvifPath, finalAvifPath);
+        try {
+          fs.renameSync(tempWebpPath, finalWebpPath);
+        } catch (e) {
+          fs.unlinkSync(finalAvifPath);
+          throw e;
+        }
+
+        fs.chmodSync(finalAvifPath, 0o600);
+        fs.chmodSync(finalWebpPath, 0o600);
+
         db.prepare("UPDATE gallery_media SET poster_revision = ? WHERE id = ?").run(newRevision, mediaId);
         db.exec("COMMIT");
       } catch (dbErr) {
@@ -311,19 +338,20 @@ export async function action({ request, params }: ActionFunctionArgs) {
         throw dbErr;
       }
     } catch {
-      // Rollback files
+      // Rollback files if DB commit failed or fs rename failed
       try { fs.unlinkSync(finalAvifPath); } catch { /* ignore */ }
       try { fs.unlinkSync(finalWebpPath); } catch { /* ignore */ }
       return jsonError("Database error during poster update", 500);
     }
 
+    const oldRevision = media.poster_revision;
     // Cleanup old revision
     if (oldRevision) {
       try { fs.unlinkSync(path.join(postersDir, oldRevision + ".avif")); } catch { /* ignore */ }
       try { fs.unlinkSync(path.join(postersDir, oldRevision + ".webp")); } catch { /* ignore */ }
     }
 
-    return Response.json({ success: true, revision: newRevision }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ success: true, revision: newRevision }, { headers: createAdminHeaders() });
 
   } catch (error: unknown) {
     if (error instanceof UploadRequestError) return jsonError(error.message, error.status);

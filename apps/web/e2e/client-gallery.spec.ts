@@ -193,7 +193,7 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     await adminPage.waitForURL(/\/admin\/galleries\/.+/);
 
     // Check 26 photos in the cover grid
-    const thumbnails = adminPage.locator('label > img');
+    const thumbnails = adminPage.locator('[data-testid="gallery-media-image"]');
     await expect(thumbnails).toHaveCount(26);
 
     // Verify thumbnails return HTTP 200 with admin session
@@ -207,8 +207,11 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
        expect(res.status()).toBe(200);
        expect(res.status()).not.toBe(400);
 
-       const isLoaded = await img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0);
-       expect(isLoaded).toBe(true);
+       await img.scrollIntoViewIfNeeded();
+       await expect(async () => {
+         const isLoaded = await img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0);
+         expect(isLoaded).toBe(true);
+       }).toPass({ timeout: 5000 });
     }
 
     // 7. Sélection de la couverture mariés via l'API/DB pour cibler le test

@@ -686,9 +686,13 @@ describe("Admin Gallery Integration Lifecycle", () => {
     }).jpeg().toBuffer();
 
     // Form builder
-    const buildMultipart = (file: Buffer, filename: string, mime: string) => {
+    const buildMultipart = (file: Buffer, filename: string, mime: string, csrfToken?: string) => {
       const boundary = "----WebKitFormBoundary" + crypto.randomUUID().replace(/-/g, "").substring(0, 16);
       const parts: Buffer[] = [];
+
+      if (csrfToken) {
+        parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="csrfToken"\r\n\r\n${csrfToken}\r\n`));
+      }
 
       parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`));
       parts.push(file);
@@ -724,22 +728,26 @@ describe("Admin Gallery Integration Lifecycle", () => {
     const adminDashText = await adminDashRes.text();
     const activeCsrfToken = adminDashText.match(/name="csrfToken" value="([^"]+)"/)?.[1] || "";
 
+    const { body: noCsrfBody, boundary: noCsrfBoundary } = buildMultipart(fakeJpg, "test.jpg", "image/jpeg");
     const noCsrfRes = await fetch(actionUrl, {
       method: "POST",
-      headers: { "Origin": BASE_URL, "Cookie": authCookie }
+      body: noCsrfBody,
+      headers: { "Origin": BASE_URL, "Cookie": authCookie, "Content-Type": `multipart/form-data; boundary=${noCsrfBoundary}` }
     });
     expect(noCsrfRes.status).toBe(403);
 
     // 3. Origin invalide
-    const noOriginRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+    const { body: originBody, boundary: originBoundary } = buildMultipart(fakeJpg, "test.jpg", "image/jpeg", activeCsrfToken);
+    const noOriginRes = await fetch(actionUrl, {
+      body: originBody,
       method: "POST",
-      headers: { "Origin": "http://evil.com", "Cookie": authCookie }
+      headers: { "Origin": "http://evil.com", "Cookie": authCookie, "Content-Type": `multipart/form-data; boundary=${originBoundary}` }
     });
     expect(noOriginRes.status).toBe(403);
 
     // 4. Média d'une autre galerie / Photo
-    const { body: jpgBody, boundary: jpgBoundary } = buildMultipart(fakeJpg, "test.jpg", "image/jpeg");
-    const photoRes = await fetch(`${BASE_URL}/api/admin/gallery/${testGalleryId}/media/${photoId}/poster?csrfToken=${activeCsrfToken}`, {
+    const { body: jpgBody, boundary: jpgBoundary } = buildMultipart(fakeJpg, "test.jpg", "image/jpeg", activeCsrfToken);
+    const photoRes = await fetch(`${BASE_URL}/api/admin/gallery/${testGalleryId}/media/${photoId}/poster`, {
       method: "POST",
       body: jpgBody,
       headers: {
@@ -750,7 +758,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
     });
     expect(photoRes.status).toBe(400);
 
-    const wrongGalleryRes = await fetch(`${BASE_URL}/api/admin/gallery/${crypto.randomUUID()}/media/${videoId}/poster?csrfToken=${activeCsrfToken}`, {
+    const wrongGalleryRes = await fetch(`${BASE_URL}/api/admin/gallery/${crypto.randomUUID()}/media/${videoId}/poster`, {
       method: "POST",
       body: jpgBody,
       headers: {
@@ -762,7 +770,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
     expect(wrongGalleryRes.status).toBe(404);
 
     // 5. Upload JPEG valide
-    const validJpgRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+    const validJpgRes = await fetch(actionUrl, {
       method: "POST",
       body: jpgBody,
       headers: {
@@ -837,8 +845,8 @@ describe("Admin Gallery Integration Lifecycle", () => {
     expect(adminReadRes.headers.get("Content-Type")).toBe("image/webp");
 
     // 8. Fichier > 25MB
-    const bigFileBody = buildMultipart(Buffer.alloc(26 * 1024 * 1024), "big.jpg", "image/jpeg");
-    const bigFileRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+    const bigFileBody = buildMultipart(Buffer.alloc(26 * 1024 * 1024), "big.jpg", "image/jpeg", activeCsrfToken);
+    const bigFileRes = await fetch(actionUrl, {
       method: "POST",
       body: bigFileBody.body,
       headers: {
@@ -854,9 +862,9 @@ describe("Admin Gallery Integration Lifecycle", () => {
     const fakePng = await sharp({
       create: { width: 50, height: 50, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } }
     }).png().toBuffer();
-    const { body: pngBody, boundary: pngBoundary } = buildMultipart(fakePng, "test.png", "image/png");
+    const { body: pngBody, boundary: pngBoundary } = buildMultipart(fakePng, "test.png", "image/png", activeCsrfToken);
 
-    const replaceRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+    const replaceRes = await fetch(actionUrl, {
       method: "POST",
       body: pngBody,
       headers: {
@@ -893,7 +901,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
 
     // 11. Rollback test (SQLite fail on replace)
     // First, upload a new poster
-    const upRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+    const upRes = await fetch(actionUrl, {
       method: "POST", body: jpgBody,
       headers: { "Content-Type": `multipart/form-data; boundary=${jpgBoundary}`, "Origin": BASE_URL, "Cookie": authCookie }
     });
@@ -904,7 +912,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
     db2.prepare("CREATE TRIGGER fail_poster_update BEFORE UPDATE ON gallery_media BEGIN SELECT RAISE(ABORT, 'Simulated failure'); END;").run();
     db2.close();
 
-    const failRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+    const failRes = await fetch(actionUrl, {
       method: "POST", body: pngBody,
       headers: { "Content-Type": `multipart/form-data; boundary=${pngBoundary}`, "Origin": BASE_URL, "Cookie": authCookie }
     });
