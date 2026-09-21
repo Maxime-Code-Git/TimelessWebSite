@@ -1171,3 +1171,103 @@
   gap: var(--spacing-md);
   margin-top: var(--spacing-xl);
 }
+
+.videoPosterContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.videoPosterControls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mediaItem:hover .videoPosterControls,
+.videoPosterControls:focus-within {
+  opacity: 1;
+}
+
+.posterManagerWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.posterManagerButtons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.posterActionBtn {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.posterActionBtn:hover:not(:disabled) {
+  background-color: var(--color-border);
+}
+
+.posterActionBtnDanger {
+  background-color: rgba(220, 38, 38, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.posterActionBtnDanger:hover:not(:disabled) {
+  background-color: rgba(220, 38, 38, 0.2);
+}
+
+.posterActionBtn:disabled,
+.posterActionBtnDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.posterStatusIndicator {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.posterStatus {
+  color: #fff;
+}
+
+.posterStatusSuccess {
+  color: #22c55e;
+}
+
+.posterStatusError {
+  color: #ef4444;
+}

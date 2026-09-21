@@ -267,6 +267,14 @@ export function openGalleryDb(dbPath: string): DatabaseSync {
       currentVersion = 6;
     }
 
+    if (currentVersion < 7) {
+      db.exec(`
+        ALTER TABLE gallery_media ADD COLUMN poster_revision TEXT NULL;
+      `);
+      db.prepare("INSERT INTO gallery_migrations (version, applied_at) VALUES (7, ?)").run(Date.now());
+      currentVersion = 7;
+    }
+
     db.exec("COMMIT;");
   } catch (err) {
     db.exec("ROLLBACK;");

@@ -9,8 +9,10 @@ export interface GalleryMedia {
   id: string;
   type: "photo" | "video";
   mime_type: string;
+  visibility: "invites" | "maries";
   width: number | null;
   height: number | null;
+  poster_revision: string | null;
 }
 
 export function packRows(photos: GalleryMedia[]) {
@@ -207,7 +209,13 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
             <div className={styles.videoGrid}>
               {videos.map(v => (
                 <div key={v.id} className={styles.videoCard} data-testid="gallery-video">
-                  <video controls playsInline preload="metadata" className={styles.videoElement}>
+                  <video 
+                    controls 
+                    playsInline 
+                    preload="metadata" 
+                    className={styles.videoElement}
+                    poster={v.poster_revision ? `${mediaUrl(v.id)}/poster?v=${v.poster_revision}` : undefined}
+                  >
                     <source src={mediaUrl(v.id)} type={v.mime_type} />
                   </video>
                   <a

@@ -14,10 +14,12 @@ export default [
   route("portfolio/media/:photoId/:variant", "routes/portfolio.media.$photoId.$variant.tsx"),
   route("media/home/:section/:imageId/:variant/:ext", "routes/media.home.$section.$imageId.$variant.$ext.tsx"),
   route("api/gallery/:publicId/media/:mediaId", "routes/api.gallery.$publicId.media.$mediaId.ts"),
+  route("api/gallery/:publicId/media/:mediaId/poster", "routes/api.gallery.$publicId.media.$mediaId.poster.ts"),
   route("api/gallery/:publicId/download", "routes/api.gallery.$publicId.download.ts"),
   route("api/gallery/:publicId/download/original/:mediaId", "routes/api.gallery.$publicId.download.original.$mediaId.ts"),
   route("api/gallery/:publicId/photos", "routes/api.gallery.$publicId.photos.ts"),
   route("api/admin/gallery-import/:id", "routes/api.admin.gallery-import.$id.ts"),
+  route("api/admin/gallery/:id/media/:mediaId/poster", "routes/api.admin.gallery.$id.media.$mediaId.poster.ts"),
 
   // ── French routes ─────────────────────────────────────────
   ...prefix("fr", [

@@ -12,7 +12,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { ENV } from "../lib/env.server";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const session = await requireValidAdminSession(request);
   const gallery = getGalleryById(params.id!);
@@ -37,8 +37,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   // Get gallery photos for cover selection
   const db = getGalleryDb();
   const allMedia = db.prepare(
-    "SELECT id, type, visibility, original_name, width, height FROM gallery_media WHERE gallery_id = ? ORDER BY created_at ASC"
-  ).all(gallery.id) as Pick<GalleryMediaRow, "id" | "type" | "visibility" | "original_name" | "width" | "height">[];
+    "SELECT id, type, visibility, original_name, width, height, poster_revision FROM gallery_media WHERE gallery_id = ? ORDER BY created_at ASC"
+  ).all(gallery.id) as Pick<GalleryMediaRow, "id" | "type" | "visibility" | "original_name" | "width" | "height" | "poster_revision">[];
 
   const galleryPhotos = allMedia.filter(m => m.type === "photo");
 
@@ -228,7 +228,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (validMedia.length !== mediaIds.length) {
       return Response.json({ error: "Certains médias n'appartiennent pas à cette galerie ou sont introuvables.", intent }, { status: 400 });
     }
-    
+
     const validMediaIds = validMedia.map(m => m.id);
 
     const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, gallery.id);
@@ -239,6 +239,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     const quarantined: string[] = [];
+    const quarantinedPosters: string[] = [];
 
     try {
       for (const id of validMediaIds) {
@@ -247,6 +248,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
         if (fs.existsSync(src)) {
           fs.renameSync(src, dest);
           quarantined.push(id);
+        }
+
+        const posterSrc = path.join(mediaDir, ".posters", id);
+        const posterDest = path.join(quarantineDir, ".posters_" + id);
+        if (fs.existsSync(posterSrc)) {
+          fs.renameSync(posterSrc, posterDest);
+          quarantinedPosters.push(id);
         }
       }
 
@@ -273,6 +281,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
       for (const id of quarantined) {
         try { fs.unlinkSync(path.join(quarantineDir, id)); } catch { /* ignore */ }
       }
+      for (const id of quarantinedPosters) {
+        try { fs.rmSync(path.join(quarantineDir, ".posters_" + id), { recursive: true, force: true }); } catch { /* ignore */ }
+      }
       try { fs.rmdirSync(quarantineDir); } catch { /* ignore */ }
 
       return Response.json({ success: true, intent, deletedCount: validMediaIds.length });
@@ -281,6 +292,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const src = path.join(quarantineDir, id);
         const dest = path.join(mediaDir, id);
         try { if (fs.existsSync(src)) fs.renameSync(src, dest); } catch { /* ignore */ }
+      }
+      for (const id of quarantinedPosters) {
+        const src = path.join(quarantineDir, ".posters_" + id);
+        const dest = path.join(mediaDir, ".posters", id);
+        try {
+          if (fs.existsSync(src)) {
+            fs.mkdirSync(path.dirname(dest), { recursive: true });
+            fs.renameSync(src, dest);
+          }
+        } catch { /* ignore */ }
       }
       try { fs.rmdirSync(quarantineDir); } catch { /* ignore */ }
       return Response.json({ error: "Erreur lors de la suppression.", intent }, { status: 500 });
@@ -318,7 +339,7 @@ interface LoaderData {
   guestCode: string;
   coupleCode: string;
   csrfToken: string;
-  allMedia: { id: string; type: string; visibility: string; original_name: string; width: number | null; height: number | null }[];
+  allMedia: { id: string; type: string; visibility: string; original_name: string; width: number | null; height: number | null; poster_revision: string | null }[];
   galleryPhotos: { id: string; original_name: string; width: number | null; height: number | null }[];
 }
 
@@ -360,6 +381,15 @@ export default function AdminGalleryEdit() {
     if (mediaFilter === "maries-video") return m.visibility === "maries" && m.type === "video";
     return true;
   });
+
+  const [hideDeleteMessages, setHideDeleteMessages] = useState(false);
+
+  useEffect(() => {
+    // Reset hide state when a new delete starts
+    if (deleteFetcher.state !== "idle") {
+      setHideDeleteMessages(false);
+    }
+  }, [deleteFetcher.state]);
 
   const toggleMediaSelection = (id: string) => {
     const next = new Set(selectedMedia);
@@ -744,12 +774,12 @@ export default function AdminGalleryEdit() {
           )}
         </div>
 
-        {deleteFetcher.data?.error && deleteFetcher.data?.intent === "delete_media" && (
+        {!hideDeleteMessages && deleteFetcher.data?.error && deleteFetcher.data?.intent === "delete_media" && (
           <p className={`${styles.errorText} ${styles.marginTop16}`} role="alert">
             {deleteFetcher.data.error}
           </p>
         )}
-        {deleteFetcher.data?.success && deleteFetcher.data?.intent === "delete_media" && (
+        {!hideDeleteMessages && deleteFetcher.data?.success && deleteFetcher.data?.intent === "delete_media" && (
           <p className={`${styles.successMessage} ${styles.marginTop16}`} role="status">
             {deleteFetcher.data.deletedCount} média(s) supprimé(s).
           </p>
@@ -760,10 +790,30 @@ export default function AdminGalleryEdit() {
             <label key={m.id} className={`${styles.mediaItem} ${selectedMedia.has(m.id) ? styles.selected : ''}`} data-testid="gallery-media-item" data-media-id={m.id} data-media-type={m.type} data-media-visibility={m.visibility}>
               <input type="checkbox" className={styles.mediaCheckbox} checked={selectedMedia.has(m.id)} onChange={() => toggleMediaSelection(m.id)} aria-label={`Sélectionner ${m.original_name}`} />
               {m.type === "photo" ? (
-                <img className={styles.mediaItemImage} src={`/api/gallery/${gallery.public_id}/media/${m.id}?width=300`} alt={m.original_name} loading="lazy" data-testid="gallery-media-image" />
+                <img className={styles.mediaItemImage} src={`/api/gallery/${gallery.public_id}/media/${m.id}?width=480`} alt={m.original_name} loading="lazy" data-testid="gallery-media-image" />
               ) : (
-                <div className={styles.coverThumbPlaceholder}>
-                  Vidéo
+                <div className={styles.videoPosterContainer} onClick={(e) => {
+                  // Prevent clicking inner elements from selecting the media
+                  if ((e.target as HTMLElement).tagName !== "DIV" && (e.target as HTMLElement).tagName !== "IMG") {
+                    e.stopPropagation();
+                  }
+                }}>
+                  {m.poster_revision ? (
+                    <img className={styles.mediaItemImage} src={`/api/gallery/${gallery.public_id}/media/${m.id}/poster?v=${m.poster_revision}&width=480`} alt="Cover" loading="lazy" data-testid="gallery-media-image" />
+                  ) : (
+                    <div className={styles.coverThumbPlaceholder}>Vidéo</div>
+                  )}
+                  <div className={styles.videoPosterControls}>
+                    <VideoPosterManager
+                      galleryId={gallery.id}
+                      mediaId={m.id}
+                      hasPoster={!!m.poster_revision}
+                      csrfToken={csrfToken}
+                      clearDeleteMessages={() => {
+                        setHideDeleteMessages(true);
+                      }}
+                    />
+                  </div>
                 </div>
               )}
             </label>
@@ -776,7 +826,7 @@ export default function AdminGalleryEdit() {
 
       {showDeleteModal && (
         <div className={styles.galleryDeleteModalOverlay}>
-          <div 
+          <div
             className={styles.galleryDeleteModal}
             role="dialog"
             aria-modal="true"
@@ -809,6 +859,84 @@ export default function AdminGalleryEdit() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function VideoPosterManager({ galleryId, mediaId, hasPoster, csrfToken, clearDeleteMessages }: { galleryId: string, mediaId: string, hasPoster: boolean, csrfToken: string, clearDeleteMessages: () => void }) {
+  const fetcher = useFetcher();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isUploading = fetcher.state !== "idle";
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    clearDeleteMessages();
+    const formData = new FormData();
+    formData.append("file", e.target.files[0]);
+    fetcher.submit(formData, {
+      method: "post",
+      action: `/api/admin/gallery/${galleryId}/media/${mediaId}/poster?csrfToken=${csrfToken}`,
+      encType: "multipart/form-data",
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    clearDeleteMessages();
+    const formData = new FormData();
+    formData.append("intent", "delete_poster");
+    formData.append("csrfToken", csrfToken);
+    fetcher.submit(formData, {
+      method: "post",
+      action: `/api/admin/gallery/${galleryId}/media/${mediaId}/poster`,
+    });
+  };
+
+  return (
+    <div className={styles.posterManagerWrapper}>
+      <input
+        type="file"
+        accept="image/jpeg, image/png, image/webp, image/avif"
+        className={styles.hiddenInput}
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        aria-label="Upload poster"
+        tabIndex={-1}
+      />
+
+      <div className={styles.posterManagerButtons}>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+          className={styles.posterActionBtn}
+          disabled={isUploading}
+        >
+          {hasPoster ? "Remplacer la couverture" : "Ajouter une couverture"}
+        </button>
+
+        {hasPoster && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            className={styles.posterActionBtnDanger}
+            disabled={isUploading}
+          >
+            Supprimer la couverture
+          </button>
+        )}
+      </div>
+
+      <div className={styles.posterStatusIndicator}>
+        {isUploading && <span className={styles.posterStatus}>Envoi en cours...</span>}
+        {!isUploading && fetcher.data && (fetcher.data as { success?: boolean }).success && (
+          <span className={styles.posterStatusSuccess}>Succès</span>
+        )}
+        {!isUploading && fetcher.data && (fetcher.data as { error?: string }).error && (
+          <span className={styles.posterStatusError}>{(fetcher.data as { error?: string }).error}</span>
+        )}
+      </div>
     </div>
   );
 }

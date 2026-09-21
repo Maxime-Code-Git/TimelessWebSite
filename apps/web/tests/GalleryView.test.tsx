@@ -9,8 +9,8 @@ vi.mock("~/components/layout/Footer", () => ({ Footer: () => null }));
 
 
 describe("packRows layout logic", () => {
-  const p = (id: string): GalleryMedia => ({ id, type: "photo", mime_type: "image/jpeg", width: 800, height: 1200 }); // Portrait (1 unit)
-  const l = (id: string): GalleryMedia => ({ id, type: "photo", mime_type: "image/jpeg", width: 1200, height: 800 }); // Landscape (2 units)
+  const p = (id: string): GalleryMedia => ({ id, type: "photo", mime_type: "image/jpeg", width: 800, height: 1200, visibility: "maries", poster_revision: null }); // Portrait (1 unit)
+  const l = (id: string): GalleryMedia => ({ id, type: "photo", mime_type: "image/jpeg", width: 1200, height: 800, visibility: "maries", poster_revision: null }); // Landscape (2 units)
 
   test("1. répartition sans trou: portrait, portrait, portrait, paysage", () => {
     const photos = [p("1"), p("2"), p("3"), l("4")];
@@ -50,7 +50,7 @@ describe("packRows layout logic", () => {
 });
 
 describe("Lightbox interactions", () => {
-  const p = (id: string): GalleryMedia => ({ id, type: "photo", mime_type: "image/jpeg", width: 800, height: 1200 });
+  const p = (id: string): GalleryMedia => ({ id, type: "photo", mime_type: "image/jpeg", width: 800, height: 1200, visibility: "maries", poster_revision: null });
 
   const galleryProps = {
     public_id: "test",

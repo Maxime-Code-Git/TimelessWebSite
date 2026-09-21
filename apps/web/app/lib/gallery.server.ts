@@ -38,6 +38,7 @@ export interface GalleryMediaRow {
   hash: string;
   width: number | null;
   height: number | null;
+  poster_revision: string | null;
   created_at: number;
 }
 
@@ -77,10 +78,10 @@ export function getGalleryMedia(galleryId: string, accessLevel: "invites" | "mar
     visCondition = " AND visibility = 'invites'";
   }
 
-  const videoQuery = "SELECT id, type, width, height, mime_type FROM gallery_media WHERE gallery_id = ? AND type = 'video'" + visCondition + " ORDER BY created_at ASC";
+  const videoQuery = "SELECT id, type, width, height, mime_type, poster_revision FROM gallery_media WHERE gallery_id = ? AND type = 'video'" + visCondition + " ORDER BY created_at ASC";
   const videos = db.prepare(videoQuery).all(galleryId) as unknown as GalleryMediaRow[];
 
-  const photoQuery = "SELECT id, type, width, height, mime_type FROM gallery_media WHERE gallery_id = ? AND type = 'photo'" + visCondition + " ORDER BY created_at ASC LIMIT 24";
+  const photoQuery = "SELECT id, type, width, height, mime_type, poster_revision FROM gallery_media WHERE gallery_id = ? AND type = 'photo'" + visCondition + " ORDER BY created_at ASC LIMIT 24";
   const photos = db.prepare(photoQuery).all(galleryId) as unknown as GalleryMediaRow[];
 
   return [...videos, ...photos];

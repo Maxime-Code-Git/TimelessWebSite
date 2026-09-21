@@ -199,9 +199,16 @@ test.describe("Client Gallery E2E — Full Cycle", () => {
     // Verify thumbnails return HTTP 200 with admin session
     const thumbnailCount = await thumbnails.count();
     for (let i = 0; i < thumbnailCount; i++) {
-       const src = await thumbnails.nth(i).getAttribute("src");
+       const img = thumbnails.nth(i);
+       const src = await img.getAttribute("src");
+       expect(src).toContain("?width=480");
+
        const res = await adminContext.request.get(src!);
        expect(res.status()).toBe(200);
+       expect(res.status()).not.toBe(400);
+
+       const isLoaded = await img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0);
+       expect(isLoaded).toBe(true);
     }
 
     // 7. Sélection de la couverture mariés via l'API/DB pour cibler le test

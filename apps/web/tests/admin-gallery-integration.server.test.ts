@@ -7,6 +7,9 @@ import os from "node:os";
 import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
 import AdmZip from "adm-zip";
+import sharp from "sharp";
+import crypto from "node:crypto";
+import { hashGalleryCode } from "../app/lib/gallery-auth.server";
 
 const requireModule = createRequire(import.meta.url);
 const servePkgPath = requireModule.resolve("@react-router/serve/package.json");
@@ -92,7 +95,8 @@ describe("Admin Gallery Integration Lifecycle", () => {
           ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$xDSx00u+uSs9AcMqypmthw$ubmjWhg1XWL+Yp496qb5LLlTx0FK4lwqy9pvKa5ills",
           ADMIN_SESSION_SECRET: "12345678901234567890123456789012",
           GALLERY_SESSION_SECRET: "01234567890123456789012345678901",
-          GALLERY_JWT_SECRET: "01234567890123456789012345678901"
+          GALLERY_JWT_SECRET: "01234567890123456789012345678901",
+          GALLERY_SECRET: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
         },
       });
 
@@ -516,7 +520,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
     const otherGalleryId = "other_gallery_for_test";
     db.prepare(`
       INSERT INTO galleries (
-        id, public_id, bride_names, wedding_date, status, expires_at, created_at, 
+        id, public_id, bride_names, wedding_date, status, expires_at, created_at,
         guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
@@ -558,12 +562,12 @@ describe("Admin Gallery Integration Lifecycle", () => {
     // Test deletion when import is pending
     if (mediaToKeep) {
       db.prepare("INSERT INTO gallery_imports (id, gallery_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run("test_import", galleryId as string, "pending", Date.now(), Date.now());
-      
+
       const pendingData = new URLSearchParams();
       pendingData.append("csrfToken", newCsrfToken);
       pendingData.append("intent", "delete_media");
       pendingData.append("mediaIds", mediaToKeep.id);
-  
+
       const pendingRes = await fetch(actionUrl, {
         method: "POST",
         body: pendingData,
@@ -578,7 +582,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       const pendingExists = db.prepare("SELECT 1 FROM gallery_media WHERE id = ?").get(mediaToKeep.id);
       expect(pendingExists).toBeDefined();
       expect(fs.existsSync(path.join(mediaDir, mediaToKeep.id))).toBe(true);
-      
+
       db.prepare("DELETE FROM gallery_imports WHERE id = ?").run("test_import");
 
       // Test SQLite transaction rollback
@@ -588,7 +592,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
         rollbackData.append("csrfToken", newCsrfToken);
         rollbackData.append("intent", "delete_media");
         rollbackData.append("mediaIds", mediaToKeep.id);
-  
+
         const rollbackRes = await fetch(actionUrl, {
           method: "POST",
           body: rollbackData,
@@ -635,4 +639,302 @@ describe("Admin Gallery Integration Lifecycle", () => {
     }
     db.close();
   }, 15000);
+
+  it("Video Poster Management", async () => {
+    const db = new DatabaseSync(galleryDbPath);
+    // Migration Tests
+
+
+    // Check if poster_revision exists
+    const tableInfo = db.prepare("PRAGMA table_info(gallery_media)").all() as { name: string }[];
+    const hasPosterRevision = tableInfo.some(c => c.name === "poster_revision");
+    expect(hasPosterRevision).toBe(true); // Should be there because we migrated on app start
+
+    // Create a mock video
+    const testGalleryId = crypto.randomUUID();
+    const testPublicId = "poster-test-gallery";
+    const guestCodeHash = hashGalleryCode("guest_code");
+    const marieCodeHash = hashGalleryCode("marie_code");
+
+
+
+    db.prepare(`
+      INSERT INTO galleries (id, public_id, bride_names, wedding_date, status, expires_at, created_at, guest_code_hash, couple_code_hash, guest_code_version, couple_code_version, guest_code_encrypted, couple_code_encrypted)
+      VALUES (?, ?, 'Poster Test', '2024-01-01', 'published', 9999999999999, ?, ?, ?, 1, 1, 'enc_guest', 'enc_couple')
+    `).run(testGalleryId, testPublicId, Date.now(), guestCodeHash, marieCodeHash);
+
+    // Need a code in gallery_codes
+    db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(guestCodeHash, testGalleryId, 'invites', 1, Date.now());
+    db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(marieCodeHash, testGalleryId, 'maries', 1, Date.now());
+
+    const videoId = crypto.randomUUID();
+    db.prepare(`
+      INSERT INTO gallery_media (id, gallery_id, type, visibility, sort_order, original_name, mime_type, size, hash, created_at)
+      VALUES (?, ?, 'video', 'maries', 1, 'video.mp4', 'video/mp4', 1000, 'hash', ?)
+    `).run(videoId, testGalleryId, Date.now());
+
+    const photoId = crypto.randomUUID();
+    db.prepare(`
+      INSERT INTO gallery_media (id, gallery_id, type, visibility, sort_order, original_name, mime_type, size, hash, created_at)
+      VALUES (?, ?, 'photo', 'invites', 2, 'photo.jpg', 'image/jpeg', 1000, 'hash2', ?)
+    `).run(photoId, testGalleryId, Date.now());
+    db.close();
+
+    // Create fake JPG
+    const fakeJpg = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 0, b: 0 } }
+    }).jpeg().toBuffer();
+
+    // Form builder
+    const buildMultipart = (file: Buffer, filename: string, mime: string) => {
+      const boundary = "----WebKitFormBoundary" + crypto.randomUUID().replace(/-/g, "").substring(0, 16);
+      const parts: Buffer[] = [];
+
+      parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`));
+      parts.push(file);
+      parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+
+      return { body: Buffer.concat(parts), boundary };
+    };
+
+    const actionUrl = `${BASE_URL}/api/admin/gallery/${testGalleryId}/media/${videoId}/poster`;
+
+    // 1. Session admin requise
+    const noAuthRes = await fetch(actionUrl, { method: "POST", redirect: "manual" });
+    expect(noAuthRes.status).toBe(302); // Redirects to login
+
+    // 2. CSRF manquant
+    // We need to fetch the admin dashboard to extract a valid CSRF token and anonymous cookie
+    const adminDashResInit = await fetch(`${BASE_URL}/admin`, { redirect: "manual" });
+    const anonCookie = adminDashResInit.headers.get("Set-Cookie") || "";
+    const adminDashTextInit = await adminDashResInit.text();
+    const validCsrfToken = adminDashTextInit.match(/name="csrfToken" value="([^"]+)"/)?.[1] || "";
+
+    const adminLoginRes = await fetch(`${BASE_URL}/admin`, {
+      method: "POST",
+      body: new URLSearchParams({ intent: "login", password: "test", csrfToken: validCsrfToken }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cookie": anonCookie, "Origin": BASE_URL, "x-forwarded-for": "127.0.0.1" },
+      redirect: "manual"
+    });
+    expect(adminLoginRes.status).toBe(302);
+    const authCookie = adminLoginRes.headers.get("Set-Cookie") || "";
+
+    // Fetch the admin dashboard again to get the NEW csrfToken (it is rotated upon login)
+    const adminDashRes = await fetch(`${BASE_URL}/admin`, { headers: { Cookie: authCookie } });
+    const adminDashText = await adminDashRes.text();
+    const activeCsrfToken = adminDashText.match(/name="csrfToken" value="([^"]+)"/)?.[1] || "";
+
+    const noCsrfRes = await fetch(actionUrl, {
+      method: "POST",
+      headers: { "Origin": BASE_URL, "Cookie": authCookie }
+    });
+    expect(noCsrfRes.status).toBe(403);
+
+    // 3. Origin invalide
+    const noOriginRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+      method: "POST",
+      headers: { "Origin": "http://evil.com", "Cookie": authCookie }
+    });
+    expect(noOriginRes.status).toBe(403);
+
+    // 4. Média d'une autre galerie / Photo
+    const { body: jpgBody, boundary: jpgBoundary } = buildMultipart(fakeJpg, "test.jpg", "image/jpeg");
+    const photoRes = await fetch(`${BASE_URL}/api/admin/gallery/${testGalleryId}/media/${photoId}/poster?csrfToken=${activeCsrfToken}`, {
+      method: "POST",
+      body: jpgBody,
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${jpgBoundary}`,
+        "Origin": BASE_URL,
+        "Cookie": authCookie
+      }
+    });
+    expect(photoRes.status).toBe(400);
+
+    const wrongGalleryRes = await fetch(`${BASE_URL}/api/admin/gallery/${crypto.randomUUID()}/media/${videoId}/poster?csrfToken=${activeCsrfToken}`, {
+      method: "POST",
+      body: jpgBody,
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${jpgBoundary}`,
+        "Origin": BASE_URL,
+        "Cookie": authCookie
+      }
+    });
+    expect(wrongGalleryRes.status).toBe(404);
+
+    // 5. Upload JPEG valide
+    const validJpgRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+      method: "POST",
+      body: jpgBody,
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${jpgBoundary}`,
+        "Origin": BASE_URL,
+        "Cookie": authCookie,
+        "Content-Length": jpgBody.length.toString()
+      }
+    });
+    expect(validJpgRes.status).toBe(200);
+    const validJpgJson = await validJpgRes.json();
+    expect(validJpgJson.success).toBe(true);
+    const revision = validJpgJson.revision;
+    expect(revision).toBeDefined();
+
+    // 6. Verification des fichiers stockés (sans orphelins temporaires)
+    const posterDir = path.join(mediaPath, testGalleryId, ".posters", videoId);
+    expect(fs.existsSync(path.join(posterDir, revision + ".avif"))).toBe(true);
+    expect(fs.existsSync(path.join(posterDir, revision + ".webp"))).toBe(true);
+
+    const tmpFiles = fs.readdirSync(os.tmpdir()).filter(f => f.startsWith("timeless-gallery-poster-"));
+    expect(tmpFiles.length).toBe(0);
+
+    // 7. Lecture AVIF
+    const readUrl = `${BASE_URL}/api/gallery/${testPublicId}/media/${videoId}/poster?v=${revision}`;
+
+    const guestDashRes = await fetch(`${BASE_URL}/fr/espace-clients`);
+    const guestAnonCookie = guestDashRes.headers.get("Set-Cookie") || "";
+    const guestDashText = await guestDashRes.text();
+    const guestCsrf = guestDashText.match(/name="csrf" value="([^"]+)"/)?.[1] || "";
+
+    const guestLoginRes = await fetch(`${BASE_URL}/fr/espace-clients?index`, {
+      method: "POST", body: new URLSearchParams({ code: "guest_code", csrf: guestCsrf }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cookie": guestAnonCookie, "Origin": BASE_URL, "x-forwarded-for": "127.0.0.1" },
+      redirect: "manual"
+    });
+    expect(guestLoginRes.status).toBe(302);
+    const guestSessionCookie = guestLoginRes.headers.get("Set-Cookie") || "";
+
+    const marieDashRes = await fetch(`${BASE_URL}/fr/espace-clients`);
+    const marieAnonCookie = marieDashRes.headers.get("Set-Cookie") || "";
+    const marieDashText = await marieDashRes.text();
+    const marieCsrf = marieDashText.match(/name="csrf" value="([^"]+)"/)?.[1] || "";
+
+    const marieLoginRes = await fetch(`${BASE_URL}/fr/espace-clients?index`, {
+      method: "POST", body: new URLSearchParams({ code: "marie_code", csrf: marieCsrf }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cookie": marieAnonCookie, "Origin": BASE_URL, "x-forwarded-for": "127.0.0.1" },
+      redirect: "manual"
+    });
+    expect(marieLoginRes.status).toBe(302);
+    const marieSessionCookie = marieLoginRes.headers.get("Set-Cookie") || "";
+
+    // Invité n'a pas accès à la vidéo "maries"
+    const guestReadRes = await fetch(readUrl, {
+      headers: { "Cookie": guestSessionCookie, "Accept": "image/avif" }
+    });
+    expect(guestReadRes.status).toBe(404);
+
+    // Mariés ont accès
+    const marieReadRes = await fetch(readUrl, {
+      headers: { "Cookie": marieSessionCookie, "Accept": "image/avif" }
+    });
+    expect(marieReadRes.status).toBe(200);
+    expect(marieReadRes.headers.get("Content-Type")).toBe("image/avif");
+    expect(marieReadRes.headers.get("Cache-Control")).toBe("no-store");
+
+    // Admin a accès
+    const adminReadRes = await fetch(readUrl, {
+      headers: { "Cookie": authCookie, "Accept": "image/webp" }
+    });
+    expect(adminReadRes.status).toBe(200);
+    expect(adminReadRes.headers.get("Content-Type")).toBe("image/webp");
+
+    // 8. Fichier > 25MB
+    const bigFileBody = buildMultipart(Buffer.alloc(26 * 1024 * 1024), "big.jpg", "image/jpeg");
+    const bigFileRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+      method: "POST",
+      body: bigFileBody.body,
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${bigFileBody.boundary}`,
+        "Origin": BASE_URL,
+        "Cookie": authCookie,
+        "Content-Length": bigFileBody.body.length.toString()
+      }
+    });
+    expect(bigFileRes.status).toBe(413);
+
+    // 9. Remplacement
+    const fakePng = await sharp({
+      create: { width: 50, height: 50, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } }
+    }).png().toBuffer();
+    const { body: pngBody, boundary: pngBoundary } = buildMultipart(fakePng, "test.png", "image/png");
+
+    const replaceRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+      method: "POST",
+      body: pngBody,
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${pngBoundary}`,
+        "Origin": BASE_URL,
+        "Cookie": authCookie,
+        "Content-Length": pngBody.length.toString()
+      }
+    });
+    expect(replaceRes.status).toBe(200);
+    const replaceJson = await replaceRes.json();
+    const newRevision = replaceJson.revision;
+    expect(newRevision).not.toBe(revision);
+
+    expect(fs.existsSync(path.join(posterDir, revision + ".avif"))).toBe(false); // old removed
+    expect(fs.existsSync(path.join(posterDir, newRevision + ".avif"))).toBe(true);
+
+    // 10. Suppression poster
+    const deleteData = new URLSearchParams();
+    deleteData.append("intent", "delete_poster");
+    deleteData.append("csrfToken", activeCsrfToken);
+
+    const deletePosterRes = await fetch(actionUrl, {
+      method: "POST",
+      body: deleteData,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Origin": BASE_URL,
+        "Cookie": authCookie
+      }
+    });
+    expect(deletePosterRes.status).toBe(200);
+    expect(fs.existsSync(posterDir)).toBe(false);
+
+    // 11. Rollback test (SQLite fail on replace)
+    // First, upload a new poster
+    const upRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+      method: "POST", body: jpgBody,
+      headers: { "Content-Type": `multipart/form-data; boundary=${jpgBoundary}`, "Origin": BASE_URL, "Cookie": authCookie }
+    });
+    const upJson = await upRes.json();
+    const currentRev = upJson.revision;
+
+    const db2 = new DatabaseSync(galleryDbPath);
+    db2.prepare("CREATE TRIGGER fail_poster_update BEFORE UPDATE ON gallery_media BEGIN SELECT RAISE(ABORT, 'Simulated failure'); END;").run();
+    db2.close();
+
+    const failRes = await fetch(`${actionUrl}?csrfToken=${activeCsrfToken}`, {
+      method: "POST", body: pngBody,
+      headers: { "Content-Type": `multipart/form-data; boundary=${pngBoundary}`, "Origin": BASE_URL, "Cookie": authCookie }
+    });
+    expect(failRes.status).toBe(500);
+
+    // Verify old revision remains
+    expect(fs.existsSync(path.join(posterDir, currentRev + ".avif"))).toBe(true);
+
+    const db3 = new DatabaseSync(galleryDbPath);
+    db3.prepare("DROP TRIGGER fail_poster_update").run();
+    db3.close();
+
+    // 12. Suppression complète d'une vidéo avec poster via delete_media
+    const delMediaData = new URLSearchParams();
+    delMediaData.append("intent", "delete_media");
+    delMediaData.append("csrfToken", activeCsrfToken);
+    delMediaData.append("mediaIds", videoId);
+
+    const delMediaRes = await fetch(`${BASE_URL}/admin/galleries/${testGalleryId}`, {
+      method: "POST",
+      body: delMediaData,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Origin": BASE_URL,
+        "Cookie": authCookie
+      }
+    });
+    expect(delMediaRes.status).toBe(200);
+
+    // Verify video and poster are completely deleted
+    expect(fs.existsSync(posterDir)).toBe(false);
+  });
 });
