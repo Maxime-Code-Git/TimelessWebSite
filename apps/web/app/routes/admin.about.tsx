@@ -163,7 +163,7 @@ export default function AdminAbout({ loaderData, actionData }: Route.ComponentPr
   const revisionRef = useRef(data.revision);
   const [removedImages, setRemovedImages] = useState<{section: string, imageId: string}[]>([]);
   const [isGlobalUploading, setIsGlobalUploading] = useState(false);
-  const [imageToDelete, setImageToDelete] = useState<{section: string, imageId: string} | null>(null);
+  const [imageToDelete, setImageToDelete] = useState<{section: string, imageId: string, index?: number} | null>(null);
 
   React.useEffect(() => {
     if (action?.success && action.newRevision) {
@@ -187,8 +187,12 @@ export default function AdminAbout({ loaderData, actionData }: Route.ComponentPr
     setContent(prev => ({ ...prev, hero: { ...prev.hero, ...updates } }));
   };
 
-  const updateTeam = (updates: Partial<typeof content.team>) => {
-    setContent(prev => ({ ...prev, team: { ...prev.team, ...updates } }));
+  const updateTeamMember = (index: number, updates: Partial<typeof content.team.members[0]>) => {
+    setContent(prev => {
+      const newMembers = [...prev.team.members];
+      newMembers[index] = { ...newMembers[index], ...updates };
+      return { ...prev, team: { members: newMembers } };
+    });
   };
 
   const updateDifference = (updates: Partial<typeof content.difference>) => {
@@ -214,8 +218,8 @@ export default function AdminAbout({ loaderData, actionData }: Route.ComponentPr
       return [...prev, { section, imageId }];
     });
 
-    if (section === "about-team") {
-      updateTeam({ image: { imageId: null, variants: [], alt: content.team.image.alt, width: 0, height: 0 } });
+    if (section === "about-team" && typeof imageToDelete.index === "number") {
+      updateTeamMember(imageToDelete.index, { image: { imageId: null, variants: [], alt: content.team.members[imageToDelete.index].image.alt, width: 0, height: 0 } });
     }
     setImageToDelete(null);
   };
@@ -359,67 +363,70 @@ export default function AdminAbout({ loaderData, actionData }: Route.ComponentPr
 
           <section className={`${styles.dashboardCard} ${styles.sectionCard}`}>
             <h2>L'équipe</h2>
-            <div className={styles.grid}>
-              <div className={styles.card}>
-                <h3>Image de l'équipe</h3>
-                <ImageUploader
-                  csrfToken={data.csrfToken}
-                  revision={revision}
-                  section="about-team"
-                  currentImageId={content.team.image.imageId}
-                  alt={content.team.image.alt?.[lang] || "Preview"}
-                  _isGlobalUploading={isGlobalUploading}
-                  setIsGlobalUploading={setIsGlobalUploading}
-                  disabled={disabled}
-                  onSuccess={(newRevision, newId, variants, width, height) => {
-                    setRevision(newRevision);
-                    revisionRef.current = newRevision;
-                    updateTeam({ image: { ...content.team.image, imageId: newId, variants, width, height } });
-                  }}
-                  onDelete={() => {
-                    if (content.team.image.imageId) { setImageToDelete({ section: "about-team", imageId: content.team.image.imageId as string }); }
-                  }}
-                />
-                <div className={styles.marginTopSmall}>
-                  <label htmlFor={`team-alt-${lang}`}>Texte alternatif ({lang})</label>
-                  <input id={`team-alt-${lang}`}
+            {content.team.members.map((member, i) => (
+              <div key={i} className={styles.grid} style={{ marginBottom: i === 0 ? "40px" : 0 }}>
+                <div className={styles.card}>
+                  <h3>Image ({i === 0 ? "Photographe" : "Vidéaste"})</h3>
+                  <ImageUploader
+                    csrfToken={data.csrfToken}
+                    revision={revision}
+                    section="about-team"
+                    index={i}
+                    currentImageId={member.image.imageId}
+                    alt={member.image.alt?.[lang] || "Preview"}
+                    _isGlobalUploading={isGlobalUploading}
+                    setIsGlobalUploading={setIsGlobalUploading}
+                    disabled={disabled}
+                    onSuccess={(newRevision, newId, variants, width, height) => {
+                      setRevision(newRevision);
+                      revisionRef.current = newRevision;
+                      updateTeamMember(i, { image: { ...member.image, imageId: newId, variants, width, height } });
+                    }}
+                    onDelete={() => {
+                      if (member.image.imageId) { setImageToDelete({ section: "about-team", imageId: member.image.imageId as string, index: i }); }
+                    }}
+                  />
+                  <div className={styles.marginTopSmall}>
+                    <label htmlFor={`team-alt-${i}-${lang}`}>Texte alternatif ({lang})</label>
+                    <input id={`team-alt-${i}-${lang}`}
+                      type="text"
+                      value={member.image.alt?.[lang] || ""}
+                      onChange={(e) => updateTeamMember(i, { image: { ...member.image, alt: { ...member.image.alt, [lang]: e.target.value } } })}
+                      className={styles.input}
+                      disabled={disabled}
+                    />
+                  </div>
+                </div>
+                <div className={`${styles.formGroup} ${styles.flex1}`}>
+                  <label htmlFor={`team-name-${i}-${lang}`}>Nom ({lang})</label>
+                  <input id={`team-name-${i}-${lang}`}
                     type="text"
-                    value={content.team.image.alt?.[lang] || ""}
-                    onChange={(e) => updateTeam({ image: { ...content.team.image, alt: { ...content.team.image.alt, [lang]: e.target.value } } })}
+                    value={member.name[lang]}
+                    onChange={(e) => updateTeamMember(i, { name: { ...member.name, [lang]: e.target.value } })}
                     className={styles.input}
+                    disabled={disabled}
+                  />
+  
+                  <label htmlFor={`team-role-${i}-${lang}`} className={styles.marginTopSmall}>Rôle ({lang})</label>
+                  <input id={`team-role-${i}-${lang}`}
+                    type="text"
+                    value={member.role[lang]}
+                    onChange={(e) => updateTeamMember(i, { role: { ...member.role, [lang]: e.target.value } })}
+                    className={styles.input}
+                    disabled={disabled}
+                  />
+  
+                  <label htmlFor={`team-bio-${i}-${lang}`} className={styles.marginTopSmall}>Biographie ({lang})</label>
+                  <textarea id={`team-bio-${i}-${lang}`}
+                    value={member.bio[lang]}
+                    onChange={(e) => updateTeamMember(i, { bio: { ...member.bio, [lang]: e.target.value } })}
+                    className={styles.input}
+                    rows={6}
                     disabled={disabled}
                   />
                 </div>
               </div>
-              <div className={`${styles.formGroup} ${styles.flex1}`}>
-                <label htmlFor={`team-name-${lang}`}>Nom ({lang})</label>
-                <input id={`team-name-${lang}`}
-                  type="text"
-                  value={content.team.name[lang]}
-                  onChange={(e) => updateTeam({ name: { ...content.team.name, [lang]: e.target.value } })}
-                  className={styles.input}
-                  disabled={disabled}
-                />
-
-                <label htmlFor={`team-role-${lang}`} className={styles.marginTopSmall}>Rôle ({lang})</label>
-                <input id={`team-role-${lang}`}
-                  type="text"
-                  value={content.team.role[lang]}
-                  onChange={(e) => updateTeam({ role: { ...content.team.role, [lang]: e.target.value } })}
-                  className={styles.input}
-                  disabled={disabled}
-                />
-
-                <label htmlFor={`team-bio-${lang}`} className={styles.marginTopSmall}>Biographie ({lang})</label>
-                <textarea id={`team-bio-${lang}`}
-                  value={content.team.bio[lang]}
-                  onChange={(e) => updateTeam({ bio: { ...content.team.bio, [lang]: e.target.value } })}
-                  className={styles.input}
-                  rows={6}
-                  disabled={disabled}
-                />
-              </div>
-            </div>
+            ))}
           </section>
 
           <div className={styles.formActions}>

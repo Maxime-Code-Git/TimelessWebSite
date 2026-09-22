@@ -9,19 +9,23 @@ import busboy from "busboy";
 import { requireValidAdminSession } from "../lib/admin-auth.server";
 import { validateOrigin } from "../lib/security.server";
 import {
+  assertPortfolioRevision,
+  getPortfolioMediaPath,
+  getRawPortfolioContent,
+  savePortfolio
+} from "../lib/portfolio-content.server";
+import {
   CorruptedContentError,
   RevisionConflictError,
   ValidationError,
-  getRawSiteContent,
-  saveHomeSettings,
-  saveAboutPageSettings,
-  type HomeContent,
-  type AboutPageContent
 } from "../lib/site-content.server";
-import { processHomeImage, prepareHomeImageDeletion, MediaTransactionError } from "../lib/home-media.server";
-import { SafeImageError } from "../lib/portfolio-image.server";
+import {
+  processImage,
+  removeProcessedImage,
+  SafeImageError,
+} from "../lib/portfolio-image.server";
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 class UploadRequestError extends Error {
@@ -34,11 +38,7 @@ class UploadRequestError extends Error {
 function jsonError(message: string, status: number): Response {
   return Response.json({ error: message }, {
     status,
-    headers: {
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'",
-    },
+    headers: { "Cache-Control": "no-store" },
   });
 }
 
@@ -141,18 +141,10 @@ async function parseSingleUpload(
     })();
   });
 
-  let bytesRead = 0;
   try {
     while (!settled) {
       const { done, value } = await reader.read();
       if (done) break;
-
-      bytesRead += value.length;
-      if (bytesRead > MAX_FILE_SIZE) {
-        fail(new UploadRequestError("Payload too large.", 413));
-        break;
-      }
-
       if (!parser.write(Buffer.from(value))) {
         await Promise.race([once(parser, "drain"), parserDone]);
       }
@@ -173,12 +165,12 @@ async function parseSingleUpload(
 }
 
 export async function loader() {
-  return new Response(null, { status: 405, headers: { Allow: "POST", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+  return new Response(null, { status: 405, headers: { Allow: "POST" } });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
-    return new Response(null, { status: 405, headers: { Allow: "POST", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+    return new Response(null, { status: 405, headers: { Allow: "POST" } });
   }
 
   const session = await requireValidAdminSession(request);
@@ -194,148 +186,74 @@ export async function action({ request }: ActionFunctionArgs) {
     return jsonError("Unsupported Media Type", 415);
   }
 
-  const previousRevision = request.headers.get("x-home-revision");
+  const previousRevision = request.headers.get("x-portfolio-revision");
   if (!previousRevision || !/^[0-9a-f]{32}$/.test(previousRevision)) {
     return jsonError("Invalid revision", 400);
   }
 
-  const section = request.headers.get("x-home-section");
-  if (!section || !["hero", "portfolio-photo", "portfolio-video", "studio", "about-team"].includes(section)) {
-    return jsonError("Invalid section", 400);
+  try {
+    assertPortfolioRevision(previousRevision);
+  } catch (error: unknown) {
+    if (error instanceof RevisionConflictError || error instanceof CorruptedContentError) {
+      return jsonError("Revision conflict", 409);
+    }
+    return jsonError("Internal Server Error", 500);
   }
 
-  const indexStr = request.headers.get("x-home-index");
-  let heroIndex: number | null = null;
-  if (section === "hero") {
-    if (!indexStr || !["0", "1", "2"].includes(indexStr)) {
-      return jsonError("Invalid index for hero", 400);
-    }
-    heroIndex = parseInt(indexStr, 10);
-  }
-  
-  let aboutTeamIndex: number | null = null;
-  if (section === "about-team") {
-    if (!indexStr || !["0", "1"].includes(indexStr)) {
-      return jsonError("Invalid index for about-team", 400);
-    }
-    aboutTeamIndex = parseInt(indexStr, 10);
+  const { content, isCorrupted } = getRawPortfolioContent();
+  if (isCorrupted || !content.video) {
+    return jsonError("Video not found or corrupted", 400);
   }
 
-  const current = getRawSiteContent();
-  if (current.isCorrupted) {
-    return jsonError("Corrupted site content", 500);
-  }
-  if (current.content.revision !== previousRevision) {
-    return jsonError("Revision conflict", 409);
-  }
+  const photoId = crypto.randomUUID();
 
   let tempDirectory: string | null = null;
   try {
-    tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-home-upload-"));
+    tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-portfolio-video-cover-"));
     fs.chmodSync(tempDirectory, 0o700);
 
     const uploadedFilePath = await parseSingleUpload(request, contentType, tempDirectory);
-
-    const processed = await processHomeImage(
+    
+    // We do NOT want watermark on video cover
+    const processed = await processImage(
       uploadedFilePath,
       tempDirectory,
-      section as "hero" | "portfolio-photo" | "portfolio-video" | "studio" | "about-team",
+      photoId,
+      getPortfolioMediaPath(),
       "",
       ""
     );
 
-    // Atomically save to JSON
-    let oldImageId: string | null = null;
-    const newHome: HomeContent = structuredClone(current.content.home);
-
-    if (section === "hero" && heroIndex !== null) {
-      oldImageId = newHome.hero.images[heroIndex].imageId;
-      newHome.hero.images[heroIndex].imageId = processed.imageId;
-      newHome.hero.images[heroIndex].width = processed.originalWidth;
-      newHome.hero.images[heroIndex].height = processed.originalHeight;
-      newHome.hero.images[heroIndex].variants = processed.variants;
-    } else if (section === "portfolio-photo") {
-      oldImageId = newHome.portfolioCards.photo.imageId;
-      newHome.portfolioCards.photo.imageId = processed.imageId;
-      newHome.portfolioCards.photo.width = processed.originalWidth;
-      newHome.portfolioCards.photo.height = processed.originalHeight;
-      newHome.portfolioCards.photo.variants = processed.variants;
-    } else if (section === "portfolio-video") {
-      oldImageId = newHome.portfolioCards.video.imageId;
-      newHome.portfolioCards.video.imageId = processed.imageId;
-      newHome.portfolioCards.video.width = processed.originalWidth;
-      newHome.portfolioCards.video.height = processed.originalHeight;
-      newHome.portfolioCards.video.variants = processed.variants;
-    } else if (section === "studio") {
-      oldImageId = newHome.studio.imageId;
-      newHome.studio.imageId = processed.imageId;
-      newHome.studio.width = processed.originalWidth;
-      newHome.studio.height = processed.originalHeight;
-      newHome.studio.variants = processed.variants;
-    } else if (section === "about-team" && aboutTeamIndex !== null) {
-      const newAbout: AboutPageContent = structuredClone(current.content.aboutPage);
-      const member = newAbout.team.members[aboutTeamIndex];
-      oldImageId = member.image.imageId;
-      member.image.imageId = processed.imageId;
-      member.image.width = processed.originalWidth;
-      member.image.height = processed.originalHeight;
-      member.image.variants = processed.variants;
-
-      const transaction = oldImageId ? prepareHomeImageDeletion(section, oldImageId) : null;
-      try {
-        const newRevision = saveAboutPageSettings(newAbout, previousRevision);
-        if (transaction) transaction.commit();
-        return Response.json({
-          success: true,
-          newRevision,
-          imageId: processed.imageId,
-          variants: processed.variants,
-          width: processed.originalWidth,
-          height: processed.originalHeight
-        }, { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'" } });
-      } catch (error: unknown) {
-        if (transaction) transaction.rollback();
-        const newImageCleanup = prepareHomeImageDeletion(section, processed.imageId);
-        newImageCleanup.commit();
-        throw error;
-      }
-    }
-
-    const transaction = oldImageId ? prepareHomeImageDeletion(section, oldImageId) : null;
-
     try {
-      const newRevision = saveHomeSettings(newHome, previousRevision);
+      const oldCoverId = content.video.cover?.imageId;
+      
+      content.video.cover = {
+        imageId: processed.fileId,
+        variants: processed.variants,
+        width: processed.originalWidth,
+        height: processed.originalHeight
+      };
 
-      // Cleanup old image quarantine if save succeeds
-      if (transaction) {
-        transaction.commit();
+      const newRevision = savePortfolio(content, previousRevision);
+
+      // Clean up old cover if it existed
+      if (oldCoverId) {
+        try {
+          fs.rmSync(path.join(getPortfolioMediaPath(), oldCoverId), { recursive: true, force: true });
+        } catch { /* ignore */ }
       }
 
       return Response.json({
         success: true,
         newRevision,
-        imageId: processed.imageId,
-        variants: processed.variants,
-        width: processed.originalWidth,
-        height: processed.originalHeight
-      }, { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'" } });
+        cover: content.video.cover
+      }, { headers: { "Cache-Control": "no-store" } });
     } catch (error: unknown) {
-      // Rollback processed files
       try {
-        if (transaction) {
-          transaction.rollback();
-        }
-        // Then delete the newly created image since JSON save failed
-        const newImageCleanup = prepareHomeImageDeletion(section, processed.imageId);
-        newImageCleanup.commit();
-      } catch (e) {
-        // Un échec de rollback doit produire une erreur spécifique, avec cause, sans être masqué.
-        if (e instanceof MediaTransactionError) {
-          throw e;
-        }
-        throw new MediaTransactionError("Rollback failed for " + section, { cause: e });
+        removeProcessedImage(photoId, getPortfolioMediaPath(), processed);
+      } catch {
+        return jsonError("Generated media cleanup failed.", 500);
       }
-
       if (error instanceof RevisionConflictError || error instanceof CorruptedContentError) {
         return jsonError("Revision conflict", 409);
       }

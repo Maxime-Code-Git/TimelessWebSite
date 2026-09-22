@@ -68,10 +68,10 @@ export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
           <p className={styles.subtitle}>{t.subtitle}</p>
           {hasVideo && (
             <div className={styles.tabs}>
-              <a href="#galerie-photo" className={styles.tabBtn + " " + styles.active}>
+              <a href={lang === "fr" ? "#galerie-photo" : "#photo-gallery"} className={styles.tabBtn + " " + styles.active}>
                 {t.tabPhoto}
               </a>
-              <a href="#galerie-video" className={styles.tabBtn}>
+              <a href={lang === "fr" ? "#galerie-video" : "#video-gallery"} className={styles.tabBtn}>
                 {t.tabVideo}
               </a>
             </div>
@@ -94,7 +94,7 @@ export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
           </div>
         </section>
 
-        <section id="galerie-photo" className={styles.photoSection}>
+        <section id={lang === "fr" ? "galerie-photo" : "photo-gallery"} className={styles.photoSection}>
           <div className={styles.photoInner}>
             {visiblePhotos.length === 0 ? (
               <p className={styles.emptyState}>
@@ -130,20 +130,37 @@ export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
         </section>
 
         {hasVideo && portfolio.video && (
-          <section id="galerie-video" className={styles.videoSection}>
+          <section id={lang === "fr" ? "galerie-video" : "video-gallery"} className={styles.videoSection}>
             <p className={styles.videoEyebrow}>{t.videoEyebrow}</p>
             <h2 className={styles.videoTitle}>{t.videoTitle}</h2>
             <div className={styles.videoList}>
               <div className={styles.videoPlayerWrap}>
                 {!videoPlaying ? (
-                  <button
-                    type="button"
-                    className={styles.videoPlayBtn}
-                    onClick={() => setVideoPlaying(true)}
-                    aria-label={lang === "fr" ? "Lire la vidéo" : "Play video"}
-                  >
-                    {lang === "fr" ? "Lire la vidéo" : "Play video"}
-                  </button>
+                  <>
+                    {portfolio.video.cover && (
+                      <picture className={styles.videoCoverPicture}>
+                        <source
+                          type="image/webp"
+                          srcSet={portfolio.video.cover.variants.map(v => `/portfolio/media/${portfolio.video!.cover!.imageId}/${v.name} ${v.width}w`).join(', ')}
+                          sizes="(max-width: 720px) 100vw, 1080px"
+                        />
+                        <img
+                          src={`/portfolio/media/${portfolio.video.cover.imageId}/960p`}
+                          alt="Video Cover"
+                          className={styles.videoCoverImage}
+                          loading="lazy"
+                        />
+                      </picture>
+                    )}
+                    <button
+                      type="button"
+                      className={styles.videoPlayBtn}
+                      onClick={() => setVideoPlaying(true)}
+                      aria-label={lang === "fr" ? "Lire la vidéo" : "Play video"}
+                    >
+                      {lang === "fr" ? "Lire la vidéo" : "Play video"}
+                    </button>
+                  </>
                 ) : (
                   <iframe
                     src={getVideoEmbedUrl(portfolio.video)!}

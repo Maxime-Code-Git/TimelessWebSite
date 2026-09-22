@@ -78,14 +78,14 @@
   margin: 0 auto;
 }
 
-.bookingGrid {
-  display: grid;
-  grid-template-columns: 1.15fr 1fr;
-  gap: 40px;
+.bookingContainer {
+  max-width: 640px;
+  margin: 0 auto;
 }
 
 .bookingIntro {
   margin-bottom: 34px;
+  text-align: center;
 }
 
 .bookingTitle {
@@ -433,7 +433,6 @@
 
 /* ── Responsive ────────────────────────────────────────── */
 @media (max-width: 760px) {
-  .bookingGrid,
   .formGrid {
     grid-template-columns: 1fr;
     gap: 44px;

@@ -67,9 +67,7 @@ export interface FormulesStrings {
     film: string;
     duo: string;
   };
-  promo: string;
-  promoBold: string;
-  caveat: string;
+
   customEyebrow: string;
   customTitle: string;
   customText: string;
@@ -127,7 +125,6 @@ export interface ContactStrings {
   coordResponseTime: string;
   bannerText: string;
   bannerLink: string;
-  submitUnavailable: string;
   weekdays: string[];
   months: string[];
 }
@@ -245,12 +242,7 @@ const FR: I18nStrings = {
       film: "Film",
       duo: "Photo & Film",
     },
-    promo:
-      "Photo et film réunis sous un même studio\u00a0: ",
-    promoBold:
-      "une cohérence — et un tarif — impossibles à obtenir avec deux prestataires séparés.",
-    caveat:
-      "* Photos et vidéos conservées et disponibles pendant 24 mois",
+
     customEyebrow: "Sur-mesure",
     customTitle:
       "Un très grand projet, un mariage sur plusieurs jours, des envies particulières\u00a0?",
@@ -312,7 +304,6 @@ const FR: I18nStrings = {
     coordResponseTime: "Nous répondons sous 48h.",
     bannerText: "Envie d'en savoir plus sur nos formules\u00a0?",
     bannerLink: "Voir nos formules",
-    submitUnavailable: "La réservation en ligne est temporairement indisponible. Veuillez nous écrire directement via le formulaire ou par e-mail.",
     weekdays: ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"],
     months: [
       "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
@@ -418,12 +409,7 @@ const EN: I18nStrings = {
       film: "Film",
       duo: "Photo & Film",
     },
-    promo:
-      "Photo and film united under one studio: ",
-    promoBold:
-      "a consistency — and a price — impossible to achieve with two separate providers.",
-    caveat:
-      "* Photos and videos stored and available for 24 months",
+
     customEyebrow: "Bespoke",
     customTitle:
       "A grand project, a multi-day wedding, or unique wishes?",
@@ -485,7 +471,6 @@ const EN: I18nStrings = {
     coordResponseTime: "We reply within 48h.",
     bannerText: "Want to learn more about our packages?",
     bannerLink: "View our packages",
-    submitUnavailable: "Online booking is temporarily unavailable. Please contact us directly via the form or by email.",
     weekdays: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
     months: [
       "January", "February", "March", "April", "May", "June",

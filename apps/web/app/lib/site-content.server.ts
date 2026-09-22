@@ -85,6 +85,9 @@ export interface PricingFaqItem {
 export interface PricingPageContent {
   faqTitle: LocalizedString;
   faqs: PricingFaqItem[];
+  promoText: LocalizedString;
+  promoTextBold: LocalizedString;
+  caveat: LocalizedString;
 }
 
 export interface AboutPageContent {
@@ -97,10 +100,12 @@ export interface AboutPageContent {
     subtitle: LocalizedString;
   };
   team: {
-    name: LocalizedString;
-    role: LocalizedString;
-    bio: LocalizedString;
-    image: HomeImageMetadata;
+    members: Array<{
+      name: LocalizedString;
+      role: LocalizedString;
+      bio: LocalizedString;
+      image: HomeImageMetadata;
+    }>;
   };
   approach: {
     title: LocalizedString;
@@ -153,7 +158,7 @@ export interface HomeContent {
 }
 
 export interface SiteContent {
-  schemaVersion: 5;
+  schemaVersion: 7;
   revision: string;
   updatedAt: string;
   business: BusinessContent;
@@ -655,7 +660,7 @@ function validatePricingFaqItem(data: unknown, context: string): PricingFaqItem 
 }
 
 function validatePricingPageContent(data: unknown): PricingPageContent {
-  assertExactKeys(data, ["faqTitle", "faqs"], "pricingPage");
+  assertExactKeys(data, ["faqTitle", "faqs", "promoText", "promoTextBold", "caveat"], "pricingPage");
   const obj = data as Record<string, unknown>;
 
   if (!Array.isArray(obj.faqs)) {
@@ -673,7 +678,10 @@ function validatePricingPageContent(data: unknown): PricingPageContent {
 
   return {
     faqTitle: validateLocalizedString(obj.faqTitle, "pricingPage.faqTitle", 255),
-    faqs
+    faqs,
+    promoText: validateLocalizedString(obj.promoText, "pricingPage.promoText", 255),
+    promoTextBold: validateLocalizedString(obj.promoTextBold, "pricingPage.promoTextBold", 255),
+    caveat: validateLocalizedString(obj.caveat, "pricingPage.caveat", 255)
   };
 }
 
@@ -699,13 +707,26 @@ function validateAboutPageContent(data: unknown): AboutPageContent {
   };
 
   // Team
-  assertExactKeys(obj.team, ["name", "role", "bio", "image"], "aboutPage.team");
+  assertExactKeys(obj.team, ["members"], "aboutPage.team");
   const team = obj.team as Record<string, unknown>;
+  if (!Array.isArray(team.members)) {
+    throw new ValidationError("aboutPage.team.members must be an array");
+  }
+  if (team.members.length !== 2) {
+    throw new ValidationError("aboutPage.team.members must contain exactly 2 members");
+  }
+  
   const validTeam = {
-    name: validateLocalizedString(team.name, "aboutPage.team.name", 255),
-    role: validateLocalizedString(team.role, "aboutPage.team.role", 255),
-    bio: validateLocalizedString(team.bio, "aboutPage.team.bio", 3000),
-    image: validateHomeImageMetadata(team.image, "aboutPage.team.image")
+    members: team.members.map((m, i) => {
+      assertExactKeys(m, ["name", "role", "bio", "image"], `aboutPage.team.members[${i}]`);
+      const mObj = m as Record<string, unknown>;
+      return {
+        name: validateLocalizedString(mObj.name, `aboutPage.team.members[${i}].name`, 255),
+        role: validateLocalizedString(mObj.role, `aboutPage.team.members[${i}].role`, 255),
+        bio: validateLocalizedString(mObj.bio, `aboutPage.team.members[${i}].bio`, 3000),
+        image: validateHomeImageMetadata(mObj.image, `aboutPage.team.members[${i}].image`)
+      };
+    })
   };
 
   // Approach
@@ -759,7 +780,7 @@ export function validateSiteContent(data: unknown): SiteContent {
   }
   const obj = data as Record<string, unknown>;
 
-  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5) {
+  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5 && obj.schemaVersion !== 6 && obj.schemaVersion !== 7) {
     throw new ValidationError("Unsupported schemaVersion");
   }
 
@@ -928,13 +949,58 @@ export function validateSiteContent(data: unknown): SiteContent {
     objRef = { ...objRef, aboutPage: aboutPageData };
   }
 
+  if ((obj.schemaVersion as number) < 6) {
+    const defaultPricingPage = JSON.parse(JSON.stringify(defaultContent.pricingPage));
+    const currentPricingPage = objRef.pricingPage as Record<string, unknown>;
+    objRef = {
+      ...objRef,
+      pricingPage: {
+        ...currentPricingPage,
+        promoText: currentPricingPage.promoText || defaultPricingPage.promoText,
+        promoTextBold: currentPricingPage.promoTextBold || defaultPricingPage.promoTextBold,
+        caveat: currentPricingPage.caveat || defaultPricingPage.caveat
+      }
+    };
+  }
+
+  if ((obj.schemaVersion as number) < 7) {
+    const defaultAboutPage = JSON.parse(JSON.stringify(defaultContent.aboutPage));
+    const currentAboutPage = objRef.aboutPage as Record<string, unknown>;
+    
+    let migratedTeam = defaultAboutPage.team;
+    
+    // Attempt to migrate the single member to the first slot if data exists
+    if (currentAboutPage.team && (currentAboutPage.team as Record<string, unknown>).name && !(currentAboutPage.team as Record<string, unknown>).members) {
+      const oldTeam = currentAboutPage.team as Record<string, unknown>;
+      migratedTeam = {
+        members: [
+          {
+            name: oldTeam.name,
+            role: oldTeam.role,
+            bio: oldTeam.bio,
+            image: oldTeam.image,
+          },
+          defaultAboutPage.team.members[1]
+        ]
+      };
+    }
+    
+    objRef = {
+      ...objRef,
+      aboutPage: {
+        ...currentAboutPage,
+        team: migratedTeam
+      }
+    };
+  }
+
   assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage", "aboutPage"], "root");
 
   const pricing = validatePricing(rawPricing);
   const home = validateHomeContent(objRef.home);
 
   return {
-    schemaVersion: 5,
+    schemaVersion: 7,
     revision: obj.revision,
     updatedAt: updatedAtStr,
     business,

@@ -80,14 +80,27 @@ export const photoSchema = z.object({
 
 export type Photo = z.infer<typeof photoSchema>;
 
+const mediaRefSchema = z.object({
+  imageId: z.string().uuid().nullable(),
+  variants: z.array(z.object({
+    name: z.string(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  })),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
+});
+
 const youtubeVideoSchema = z.object({
   provider: z.literal("youtube"),
   videoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
+  cover: mediaRefSchema.optional(),
 }).strict();
 
 const vimeoVideoSchema = z.object({
   provider: z.literal("vimeo"),
   videoId: z.string().regex(/^\d{5,15}$/),
+  cover: mediaRefSchema.optional(),
 }).strict();
 
 export const watermarkConfigSchema = z.object({
@@ -428,7 +441,7 @@ export function assertPortfolioRevision(previousRevision: string): void {
   }
 }
 
-function savePortfolio(portfolio: Portfolio, previousRevision: string) {
+export function savePortfolio(portfolio: Portfolio, previousRevision: string) {
   const current = getRawPortfolioContent();
   if (current.isCorrupted) {
     throw new CorruptedContentError();
@@ -779,7 +792,16 @@ export interface PublicCategory {
 export type PublicPortfolio = {
   categories: PublicCategory[];
   photos: PublicPortfolioPhoto[];
-  video: { provider: "youtube" | "vimeo"; videoId: string } | null;
+  video: {
+    provider: "youtube" | "vimeo";
+    videoId: string;
+    cover?: {
+      imageId: string | null;
+      variants: Array<{ name: string; width: number; height: number }>;
+      width?: number;
+      height?: number;
+    }
+  } | null;
 };
 
 export function getPublicPortfolio(): PublicPortfolio {

@@ -106,10 +106,10 @@ export function FormulesPage({ lang }: FormulesPageProps) {
           </div>
 
           <p className={styles.promo}>
-            {t.promo}
-            <b className={styles.promoBold}>{t.promoBold}</b>
+            {siteContent?.pricingPage.promoText[lang]}
+            <b className={styles.promoBold}>{siteContent?.pricingPage.promoTextBold[lang]}</b>
           </p>
-          <p className={styles.caveat}>{t.caveat}</p>
+          <p className={styles.caveat}>{siteContent?.pricingPage.caveat[lang]}</p>
         </div>
       </section>
 

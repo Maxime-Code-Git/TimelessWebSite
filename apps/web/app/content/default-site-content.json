@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "revision": "00000000000000000000000000000000",
   "updatedAt": "1970-01-01T00:00:00.000Z",
   "business": {
@@ -681,6 +681,18 @@
       "fr": "Questions fréquentes",
       "en": "Frequently asked questions"
     },
+    "promoText": {
+      "fr": "Photo et film réunis sous un même studio : ",
+      "en": "Photo and film united under one studio: "
+    },
+    "promoTextBold": {
+      "fr": "une cohérence — et un tarif — impossibles à obtenir avec deux prestataires séparés.",
+      "en": "a consistency — and a price — impossible to achieve with two separate providers."
+    },
+    "caveat": {
+      "fr": "* Photos et vidéos conservées et disponibles pendant 24 mois",
+      "en": "* Photos and videos stored and available for 24 months"
+    },
     "faqs": [
       {
         "id": "travel",
@@ -754,26 +766,52 @@
       }
     },
     "team": {
-      "name": {
-        "fr": "L'équipe Sempra",
-        "en": "The Sempra Team"
-      },
-      "role": {
-        "fr": "Photographe & Vidéaste",
-        "en": "Photographer & Videographer"
-      },
-      "bio": {
-        "fr": "Nous sommes un studio spécialisé dans la photographie et la vidéo de mariage. Notre objectif est de capturer votre journée de manière authentique, avec deux regards complémentaires.",
-        "en": "We are a studio specialized in wedding photography and videography. Our goal is to capture your day authentically, with two complementary perspectives."
-      },
-      "image": {
-        "imageId": null,
-        "variants": [],
-        "alt": {
-          "fr": "L'équipe Sempra, studio de photographie et de vidéo",
-          "en": "The Sempra team, photography and videography studio"
+      "members": [
+        {
+          "name": {
+            "fr": "Maxime",
+            "en": "Maxime"
+          },
+          "role": {
+            "fr": "Photographe",
+            "en": "Photographer"
+          },
+          "bio": {
+            "fr": "Passionné par l'image depuis toujours...",
+            "en": "Always passionate about the image..."
+          },
+          "image": {
+            "imageId": null,
+            "variants": [],
+            "alt": {
+              "fr": "Maxime, photographe",
+              "en": "Maxime, photographer"
+            }
+          }
+        },
+        {
+          "name": {
+            "fr": "Partenaire",
+            "en": "Partner"
+          },
+          "role": {
+            "fr": "Vidéaste",
+            "en": "Videographer"
+          },
+          "bio": {
+            "fr": "L'œil cinématographique de notre duo...",
+            "en": "The cinematic eye of our duo..."
+          },
+          "image": {
+            "imageId": null,
+            "variants": [],
+            "alt": {
+              "fr": "Partenaire, vidéaste",
+              "en": "Partner, videographer"
+            }
+          }
         }
-      }
+      ]
     },
     "approach": {
       "title": {

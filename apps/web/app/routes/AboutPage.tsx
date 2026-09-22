@@ -29,42 +29,44 @@ export function AboutPage({ lang }: AboutPageProps) {
       <section className={styles.duoSection}>
         <div className={styles.duoInner}>
           <div className={styles.duoGrid}>
-            <div className={styles.personCard}>
-              {content.team.image.imageId ? (
-                <div className={styles.personPhoto}>
-                  <picture>
-                    <source
-                      type="image/avif"
-                      srcSet={`/media/home/about-team/${content.team.image.imageId}/640p/avif 640w, /media/home/about-team/${content.team.image.imageId}/960p/avif 960w, /media/home/about-team/${content.team.image.imageId}/1440p/avif 1440w, /media/home/about-team/${content.team.image.imageId}/1920p/avif 1920w`}
-                      sizes="(max-width: 720px) 100vw, 50vw"
-                    />
-                    <source
-                      type="image/webp"
-                      srcSet={`/media/home/about-team/${content.team.image.imageId}/640p/webp 640w, /media/home/about-team/${content.team.image.imageId}/960p/webp 960w, /media/home/about-team/${content.team.image.imageId}/1440p/webp 1440w, /media/home/about-team/${content.team.image.imageId}/1920p/webp 1920w`}
-                      sizes="(max-width: 720px) 100vw, 50vw"
-                    />
-                    <img
-                      src={`/media/home/about-team/${content.team.image.imageId}/640p/webp`}
-                      alt={content.team.image.alt?.[lang] || content.team.name[lang]}
-                      className={styles.personImage}
-                      loading="lazy"
-                      decoding="async"
-                      width={content.team.image.width}
-                      height={content.team.image.height}
-                    />
-                  </picture>
-                </div>
-              ) : (
-                <div className={styles.personPhoto} />
-              )}
-              <h2 className={styles.personName}>
-                {content.team.name[lang]}
-              </h2>
-              <p className={styles.personRole}>{content.team.role[lang]}</p>
-              <p className={styles.personBio}>
-                {content.team.bio[lang]}
-              </p>
-            </div>
+            {content.team.members.map((member, index) => (
+              <div key={index} className={styles.personCard}>
+                {member.image.imageId ? (
+                  <div className={styles.personPhoto}>
+                    <picture>
+                      <source
+                        type="image/avif"
+                        srcSet={`/media/home/about-team/${member.image.imageId}/640p/avif 640w, /media/home/about-team/${member.image.imageId}/960p/avif 960w, /media/home/about-team/${member.image.imageId}/1440p/avif 1440w, /media/home/about-team/${member.image.imageId}/1920p/avif 1920w`}
+                        sizes="(max-width: 720px) 100vw, 50vw"
+                      />
+                      <source
+                        type="image/webp"
+                        srcSet={`/media/home/about-team/${member.image.imageId}/640p/webp 640w, /media/home/about-team/${member.image.imageId}/960p/webp 960w, /media/home/about-team/${member.image.imageId}/1440p/webp 1440w, /media/home/about-team/${member.image.imageId}/1920p/webp 1920w`}
+                        sizes="(max-width: 720px) 100vw, 50vw"
+                      />
+                      <img
+                        src={`/media/home/about-team/${member.image.imageId}/640p/webp`}
+                        alt={member.image.alt?.[lang] || member.name[lang]}
+                        className={styles.personImage}
+                        loading="lazy"
+                        decoding="async"
+                        width={member.image.width}
+                        height={member.image.height}
+                      />
+                    </picture>
+                  </div>
+                ) : (
+                  <div className={styles.personPhoto} />
+                )}
+                <h2 className={styles.personName}>
+                  {member.name[lang]}
+                </h2>
+                <p className={styles.personRole}>{member.role[lang]}</p>
+                <p className={styles.personBio}>
+                  {member.bio[lang]}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

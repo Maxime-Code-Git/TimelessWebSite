@@ -87,8 +87,7 @@ export function ContactPage({ lang }: ContactPageProps) {
 
       {/* Booking UI */}
       <section className={styles.bookingSection}>
-        <div className={styles.bookingGrid}>
-          <div>
+          <div className={styles.bookingContainer}>
             <div className={styles.bookingIntro}>
               <p className={styles.bookingTitle}>{t.bookingTitle}</p>
               <h3 className={styles.bookingSubtitle}>{t.bookingSubtitle}</h3>
@@ -98,11 +97,6 @@ export function ContactPage({ lang }: ContactPageProps) {
 
             <VisioBooking language={lang} />
           </div>
-
-          <div role="alert" className={styles.unavailableAlert}>
-            {t.submitUnavailable}
-          </div>
-        </div>
       </section>
 
         {/* Main Form */}

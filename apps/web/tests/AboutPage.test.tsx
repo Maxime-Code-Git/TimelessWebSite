@@ -24,14 +24,28 @@ const mockContent = {
       subtitle: { fr: "Hero Sub FR", en: "Hero Sub EN" },
     },
     team: {
-      name: { fr: "Team Name FR", en: "Team Name EN" },
-      role: { fr: "Role FR", en: "Role EN" },
-      bio: { fr: "Bio FR", en: "Bio EN" },
-      image: {
-        imageId: null,
-        alt: { fr: "Alt FR", en: "Alt EN" },
-        variants: [],
-      },
+      members: [
+        {
+          name: { fr: "Team Name FR", en: "Team Name EN" },
+          role: { fr: "Role FR", en: "Role EN" },
+          bio: { fr: "Bio FR", en: "Bio EN" },
+          image: {
+            imageId: null,
+            alt: { fr: "Alt FR", en: "Alt EN" },
+            variants: [],
+          },
+        },
+        {
+          name: { fr: "Team Name 2 FR", en: "Team Name 2 EN" },
+          role: { fr: "Role 2 FR", en: "Role 2 EN" },
+          bio: { fr: "Bio 2 FR", en: "Bio 2 EN" },
+          image: {
+            imageId: null,
+            alt: { fr: "Alt 2 FR", en: "Alt 2 EN" },
+            variants: [],
+          },
+        },
+      ]
     },
     approach: {
       title: { fr: "Approach FR", en: "Approach EN" },
@@ -89,10 +103,10 @@ describe("AboutPage Component", () => {
 
   it("renders the picture element when image is present", () => {
     const contentWithImage = JSON.parse(JSON.stringify(mockContent));
-    contentWithImage.aboutPage.team.image.imageId = "test-image-id";
-    contentWithImage.aboutPage.team.image.alt = { fr: "Alt FR Mod", en: "Alt EN Mod" };
-    contentWithImage.aboutPage.team.image.width = 800;
-    contentWithImage.aboutPage.team.image.height = 1000;
+    contentWithImage.aboutPage.team.members[0].image.imageId = "test-image-id";
+    contentWithImage.aboutPage.team.members[0].image.alt = { fr: "Alt FR Mod", en: "Alt EN Mod" };
+    contentWithImage.aboutPage.team.members[0].image.width = 800;
+    contentWithImage.aboutPage.team.members[0].image.height = 1000;
 
     vi.mocked(useRouteLoaderData).mockReturnValue({ siteContent: contentWithImage });
 

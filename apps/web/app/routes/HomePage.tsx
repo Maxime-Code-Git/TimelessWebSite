@@ -98,7 +98,7 @@ export function HomePage({ lang }: HomePageProps) {
               </div>
             </Link>
             <Link
-              to={lang === "fr" ? "/fr/portfolio" : "/en/portfolio"}
+              to={lang === "fr" ? "/fr/portfolio#galerie-video" : "/en/portfolio#video-gallery"}
               className={`${styles.portfolioCard} ${styles.portfolioCardFilm}`}
             >
               <div className={styles.portfolioCardBg}>
@@ -164,7 +164,7 @@ export function HomePage({ lang }: HomePageProps) {
           <p className={styles.formulesCaveat}>{homeContent.pricingPreview.caveat[lang]}</p>
           <div className={styles.formulesContactWrap}>
             <Link
-              to={lang === "fr" ? "/fr/contact" : "/en/contact"}
+              to={lang === "fr" ? "/fr/formules" : "/en/pricing"}
               className="btn btn--outline"
             >
               {homeContent.pricingPreview.buttonText[lang]}

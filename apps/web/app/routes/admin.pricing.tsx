@@ -148,6 +148,13 @@ function PricingEditor({ initialPricing, initialPricingPage, revision, error, su
     }));
   };
 
+  const handlePromoFieldChange = (field: "promoText" | "promoTextBold" | "caveat", lang: "fr"|"en", value: string) => {
+    setPricingPage((prev) => ({
+      ...prev,
+      [field]: { ...prev[field], [lang]: value }
+    }));
+  };
+
   const handleFaqItemChange = (index: number, field: "question" | "answer", lang: "fr"|"en", value: string) => {
     setPricingPage((prev) => {
       const newFaqs = [...prev.faqs];
@@ -350,6 +357,38 @@ function PricingEditor({ initialPricing, initialPricingPage, revision, error, su
         ))}
       </div>
 
+
+      <div className={styles.faqEditorSection}>
+        <h2 className={styles.faqEditorSectionTitle}>Bloc de mise en avant (Studio unique)</h2>
+        <div className={styles.formulaEditorCard}>
+          <div className={styles.formulaEditorGrid}>
+            <div className={styles.formGroup}>
+              <label htmlFor="promo-text-fr">Texte principal (FR)</label>
+              <input id="promo-text-fr" type="text" value={pricingPage.promoText.fr} onChange={(e) => handlePromoFieldChange("promoText", "fr", e.target.value)} className={styles.input} />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="promo-text-en">Texte principal (EN)</label>
+              <input id="promo-text-en" type="text" value={pricingPage.promoText.en} onChange={(e) => handlePromoFieldChange("promoText", "en", e.target.value)} className={styles.input} />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="promo-bold-fr">Texte mis en valeur (FR)</label>
+              <input id="promo-bold-fr" type="text" value={pricingPage.promoTextBold.fr} onChange={(e) => handlePromoFieldChange("promoTextBold", "fr", e.target.value)} className={styles.input} />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="promo-bold-en">Texte mis en valeur (EN)</label>
+              <input id="promo-bold-en" type="text" value={pricingPage.promoTextBold.en} onChange={(e) => handlePromoFieldChange("promoTextBold", "en", e.target.value)} className={styles.input} />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="caveat-fr">Note de conservation (FR)</label>
+              <input id="caveat-fr" type="text" value={pricingPage.caveat.fr} onChange={(e) => handlePromoFieldChange("caveat", "fr", e.target.value)} className={styles.input} />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="caveat-en">Note de conservation (EN)</label>
+              <input id="caveat-en" type="text" value={pricingPage.caveat.en} onChange={(e) => handlePromoFieldChange("caveat", "en", e.target.value)} className={styles.input} />
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className={styles.faqEditorSection}>
         <h2 className={styles.faqEditorSectionTitle}>Questions fréquentes</h2>

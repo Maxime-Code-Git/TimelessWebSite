@@ -13,10 +13,6 @@ describe("ContactPage Component", () => {
     ]);
     const { container } = render(<RouterProvider router={router} />);
 
-    // Unavailability message is shown (it appears twice on the page)
-    const msgs = screen.getAllByText(/La réservation en ligne est temporairement/i);
-    expect(msgs.length).toBeGreaterThan(0);
-
     // Check form is rendered
     expect(screen.getByLabelText("Prénom(s) des futurs mariés")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Envoyer" })).toBeInTheDocument();

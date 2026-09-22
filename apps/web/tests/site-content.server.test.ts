@@ -108,14 +108,14 @@ describe("site-content.server.ts", () => {
       const newAbout = JSON.parse(JSON.stringify(before.aboutPage));
 
       newAbout.seo.title.fr = "About Modifié";
-      newAbout.team.name.en = "Team Name";
+      newAbout.team.members[0].name.en = "Team Name";
 
       const newRev = saveAboutPageSettings(newAbout, before.revision);
       expect(newRev).not.toBe(before.revision);
 
       const loaded = getSiteContent();
       expect(loaded.aboutPage.seo.title.fr).toBe("About Modifié");
-      expect(loaded.aboutPage.team.name.en).toBe("Team Name");
+      expect(loaded.aboutPage.team.members[0].name.en).toBe("Team Name");
     });
 
     it("gère le conflit de révision", () => {

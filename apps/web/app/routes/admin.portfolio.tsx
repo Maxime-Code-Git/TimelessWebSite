@@ -396,6 +396,8 @@ export default function AdminPortfolio() {
   );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const [coverUploading, setCoverUploading] = useState(false);
 
   const revisionRef = useRef(loaderData.revision);
 
@@ -474,6 +476,41 @@ export default function AdminPortfolio() {
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
     revalidator.revalidate();
+  };
+
+  const handleUploadCover = async (files: FileList | null) => {
+    if (isGlobalSubmitting || coverUploading || !files || files.length === 0) return;
+    const file = files[0];
+    setCoverUploading(true);
+    
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("/admin/portfolio/video-cover", {
+        method: "POST",
+        headers: {
+          "x-csrf-token": csrfToken,
+          "x-portfolio-revision": revisionRef.current
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && typeof data.newRevision === "string") {
+          updateRevision(data.newRevision);
+        }
+      } else {
+        alert("Erreur lors de l'upload de la cover.");
+      }
+    } catch {
+      alert("Erreur de connexion.");
+    } finally {
+      setCoverUploading(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
+      revalidator.revalidate();
+    }
   };
 
   const moveCategory = (index: number, direction: -1 | 1) => {
@@ -557,6 +594,31 @@ export default function AdminPortfolio() {
               </button>
             )}
           </div>
+          
+          {portfolio.video && (
+            <div className={styles.marginTop2}>
+              <h3 className={styles.sectionTitleNoMargin}>Image de couverture</h3>
+              {portfolio.video.cover ? (
+                <div className={`${styles.flexRowGap5} ${styles.marginTop1}`}>
+                  <img src={`/portfolio/media/${portfolio.video.cover.imageId}/480p`} alt="Cover" style={{ width: 120, height: "auto", borderRadius: 4 }} />
+                  <div className={styles.flexColGap2}>
+                    <input type="file" accept="image/jpeg, image/png, image/webp" ref={coverInputRef} onChange={e => handleUploadCover(e.target.files)} className={styles.displayNone} />
+                    <button type="button" onClick={() => coverInputRef.current?.click()} className={styles.actionButtonSecondary} disabled={isGlobalSubmitting || coverUploading}>
+                      {coverUploading ? "Upload..." : "Changer"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.marginTop1}>
+                  <input type="file" accept="image/jpeg, image/png, image/webp" ref={coverInputRef} onChange={e => handleUploadCover(e.target.files)} className={styles.displayNone} />
+                  <button type="button" onClick={() => coverInputRef.current?.click()} className={styles.actionButton} disabled={isGlobalSubmitting || coverUploading}>
+                    {coverUploading ? "Upload..." : "Ajouter une cover"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {fetcher.data && "error" in fetcher.data && (
             <div className={styles.errorMessage}>{String(fetcher.data.error)}</div>
           )}
