@@ -167,9 +167,19 @@ export async function action({ request }: ActionFunctionArgs) {
         newRevision = deletePhotoTransactionally(actionPayload.photoId, actionPayload.revision).newRevision;
         break;
       }
-      case "updateGlobalVideo":
-        newRevision = updateGlobalVideo(actionPayload.videoUrl || null, actionPayload.revision);
+      case "updateGlobalVideo": {
+        const result = updateGlobalVideo(actionPayload.videoUrl || null, actionPayload.revision);
+        newRevision = result.newRevision;
+        if (result.deletedCoverId) {
+          try {
+            const fs = await import("node:fs");
+            const path = await import("node:path");
+            const { getPortfolioMediaPath } = await import("../lib/portfolio-content.server");
+            fs.rmSync(path.join(getPortfolioMediaPath(), "global-v2", "photos", result.deletedCoverId), { recursive: true, force: true });
+          } catch { /* ignore */ }
+        }
         break;
+      }
     }
     return data({ newRevision }, { headers });
   } catch (err: unknown) {
@@ -398,6 +408,7 @@ export default function AdminPortfolio() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
 
   const revisionRef = useRef(loaderData.revision);
 
@@ -482,6 +493,7 @@ export default function AdminPortfolio() {
     if (isGlobalSubmitting || coverUploading || !files || files.length === 0) return;
     const file = files[0];
     setCoverUploading(true);
+    setCoverError(null);
     
     const formData = new FormData();
     formData.append("file", file);
@@ -502,13 +514,43 @@ export default function AdminPortfolio() {
           updateRevision(data.newRevision);
         }
       } else {
-        alert("Erreur lors de l'upload de la cover.");
+        const errData = await response.json().catch(() => null);
+        setCoverError(errData?.error || response.statusText || "Erreur lors de l'upload.");
       }
     } catch {
-      alert("Erreur de connexion.");
+      setCoverError("Erreur de connexion.");
     } finally {
       setCoverUploading(false);
       if (coverInputRef.current) coverInputRef.current.value = "";
+      revalidator.revalidate();
+    }
+  };
+
+  const handleDeleteCover = async () => {
+    if (isGlobalSubmitting || coverUploading) return;
+    setCoverUploading(true);
+    setCoverError(null);
+    try {
+      const response = await fetch("/admin/portfolio/video-cover", {
+        method: "DELETE",
+        headers: {
+          "x-csrf-token": csrfToken,
+          "x-portfolio-revision": revisionRef.current
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && typeof data.newRevision === "string") {
+          updateRevision(data.newRevision);
+        }
+      } else {
+        const errData = await response.json().catch(() => null);
+        setCoverError(errData?.error || response.statusText || "Erreur lors de la suppression.");
+      }
+    } catch {
+      setCoverError("Erreur de connexion.");
+    } finally {
+      setCoverUploading(false);
       revalidator.revalidate();
     }
   };
@@ -600,12 +642,17 @@ export default function AdminPortfolio() {
               <h3 className={styles.sectionTitleNoMargin}>Image de couverture</h3>
               {portfolio.video.cover ? (
                 <div className={`${styles.flexRowGap5} ${styles.marginTop1}`}>
-                  <img src={`/portfolio/media/${portfolio.video.cover.imageId}/480p`} alt="Cover" style={{ width: 120, height: "auto", borderRadius: 4 }} />
+                  <img src={`/portfolio/video-cover/${portfolio.video.cover.imageId}/480p/webp`} alt="Cover" className={styles.coverThumbnail} />
                   <div className={styles.flexColGap2}>
                     <input type="file" accept="image/jpeg, image/png, image/webp" ref={coverInputRef} onChange={e => handleUploadCover(e.target.files)} className={styles.displayNone} />
-                    <button type="button" onClick={() => coverInputRef.current?.click()} className={styles.actionButtonSecondary} disabled={isGlobalSubmitting || coverUploading}>
-                      {coverUploading ? "Upload..." : "Changer"}
-                    </button>
+                    <div className={styles.flexRowGap5}>
+                      <button type="button" onClick={() => coverInputRef.current?.click()} className={styles.actionButtonSecondary} disabled={isGlobalSubmitting || coverUploading}>
+                        {coverUploading ? "Upload..." : "Remplacer la cover"}
+                      </button>
+                      <button type="button" onClick={handleDeleteCover} className={styles.logoutButton} disabled={isGlobalSubmitting || coverUploading}>
+                        Supprimer la cover
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -614,6 +661,11 @@ export default function AdminPortfolio() {
                   <button type="button" onClick={() => coverInputRef.current?.click()} className={styles.actionButton} disabled={isGlobalSubmitting || coverUploading}>
                     {coverUploading ? "Upload..." : "Ajouter une cover"}
                   </button>
+                </div>
+              )}
+              {coverError && (
+                <div role="alert" className={`${styles.errorMessage} ${styles.marginTop1}`}>
+                  {coverError}
                 </div>
               )}
             </div>

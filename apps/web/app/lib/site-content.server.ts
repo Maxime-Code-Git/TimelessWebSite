@@ -101,6 +101,7 @@ export interface AboutPageContent {
   };
   team: {
     members: Array<{
+      id: "photographer" | "videographer";
       name: LocalizedString;
       role: LocalizedString;
       bio: LocalizedString;
@@ -718,9 +719,13 @@ function validateAboutPageContent(data: unknown): AboutPageContent {
   
   const validTeam = {
     members: team.members.map((m, i) => {
-      assertExactKeys(m, ["name", "role", "bio", "image"], `aboutPage.team.members[${i}]`);
+      assertExactKeys(m, ["id", "name", "role", "bio", "image"], `aboutPage.team.members[${i}]`);
       const mObj = m as Record<string, unknown>;
+      if (mObj.id !== "photographer" && mObj.id !== "videographer") {
+        throw new ValidationError(`aboutPage.team.members[${i}].id is invalid`);
+      }
       return {
+        id: mObj.id as "photographer" | "videographer",
         name: validateLocalizedString(mObj.name, `aboutPage.team.members[${i}].name`, 255),
         role: validateLocalizedString(mObj.role, `aboutPage.team.members[${i}].role`, 255),
         bio: validateLocalizedString(mObj.bio, `aboutPage.team.members[${i}].bio`, 3000),
@@ -728,6 +733,11 @@ function validateAboutPageContent(data: unknown): AboutPageContent {
       };
     })
   };
+
+  const teamIds = new Set(validTeam.members.map(m => m.id));
+  if (teamIds.size !== 2 || !teamIds.has("photographer") || !teamIds.has("videographer")) {
+    throw new ValidationError("aboutPage.team.members must contain exactly 'photographer' and 'videographer'");
+  }
 
   // Approach
   assertExactKeys(obj.approach, ["title", "principles"], "aboutPage.approach");
@@ -975,12 +985,16 @@ export function validateSiteContent(data: unknown): SiteContent {
       migratedTeam = {
         members: [
           {
+            id: "photographer",
             name: oldTeam.name,
             role: oldTeam.role,
             bio: oldTeam.bio,
             image: oldTeam.image,
           },
-          defaultAboutPage.team.members[1]
+          {
+            ...defaultAboutPage.team.members[1],
+            id: "videographer"
+          }
         ]
       };
     }

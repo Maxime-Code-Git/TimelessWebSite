@@ -758,20 +758,30 @@ export function trashPhoto(photoId: string, previousRevision: string): { newRevi
 }
 
 // Global Video
-export function updateGlobalVideo(videoUrl: string | null, previousRevision: string): string {
+export function updateGlobalVideo(videoUrl: string | null, previousRevision: string): { newRevision: string; deletedCoverId?: string } {
   const raw = getRawPortfolioContent();
   if (raw.isLegacy) {
     throw new ValidationError("Cannot update video on legacy portfolio. Please migrate first.");
   }
   const portfolio = raw.content;
+  let deletedCoverId: string | undefined = undefined;
+
   if (videoUrl !== null) {
     const video = parseVideoUrl(videoUrl);
     if (!video) throw new ValidationError("L'URL doit être un lien valide vers une vidéo YouTube ou Vimeo.");
-    portfolio.video = video;
+    const newVideo: NonNullable<typeof portfolio.video> = { ...video };
+    if (portfolio.video && portfolio.video.cover) {
+      newVideo.cover = portfolio.video.cover;
+    }
+    portfolio.video = newVideo;
   } else {
+    if (portfolio.video && portfolio.video.cover && portfolio.video.cover.imageId) {
+      deletedCoverId = portfolio.video.cover.imageId;
+    }
     portfolio.video = null;
   }
-  return savePortfolio(portfolio, previousRevision);
+  const newRevision = savePortfolio(portfolio, previousRevision);
+  return { newRevision, deletedCoverId };
 }
 
 export interface PublicPortfolioPhoto {

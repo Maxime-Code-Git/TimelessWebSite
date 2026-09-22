@@ -137,20 +137,31 @@ export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
               <div className={styles.videoPlayerWrap}>
                 {!videoPlaying ? (
                   <>
-                    {portfolio.video.cover && (
+                    {portfolio.video.cover ? (
                       <picture className={styles.videoCoverPicture}>
                         <source
+                          type="image/avif"
+                          srcSet={portfolio.video.cover.variants.map(v => `/portfolio/video-cover/${portfolio.video!.cover!.imageId}/${v.name}/avif ${v.width}w`).join(', ')}
+                          sizes="(max-width: 720px) 100vw, 1080px"
+                        />
+                        <source
                           type="image/webp"
-                          srcSet={portfolio.video.cover.variants.map(v => `/portfolio/media/${portfolio.video!.cover!.imageId}/${v.name} ${v.width}w`).join(', ')}
+                          srcSet={portfolio.video.cover.variants.map(v => `/portfolio/video-cover/${portfolio.video!.cover!.imageId}/${v.name}/webp ${v.width}w`).join(', ')}
                           sizes="(max-width: 720px) 100vw, 1080px"
                         />
                         <img
-                          src={`/portfolio/media/${portfolio.video.cover.imageId}/960p`}
-                          alt="Video Cover"
+                          src={`/portfolio/video-cover/${portfolio.video.cover.imageId}/960p/webp`}
+                          srcSet={portfolio.video.cover.variants.map(v => `/portfolio/video-cover/${portfolio.video!.cover!.imageId}/${v.name}/webp ${v.width}w`).join(', ')}
+                          sizes="(max-width: 720px) 100vw, 1080px"
+                          width={portfolio.video.cover.width || 1920}
+                          height={portfolio.video.cover.height || 1080}
+                          alt=""
                           className={styles.videoCoverImage}
                           loading="lazy"
                         />
                       </picture>
+                    ) : (
+                      <div className={styles.videoCoverFallback} />
                     )}
                     <button
                       type="button"

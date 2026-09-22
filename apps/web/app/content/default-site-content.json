@@ -768,6 +768,7 @@
     "team": {
       "members": [
         {
+          "id": "photographer",
           "name": {
             "fr": "Maxime",
             "en": "Maxime"
@@ -790,6 +791,7 @@
           }
         },
         {
+          "id": "videographer",
           "name": {
             "fr": "Partenaire",
             "en": "Partner"

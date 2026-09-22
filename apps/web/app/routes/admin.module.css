@@ -1020,6 +1020,9 @@
   margin-top: 16px;
 }
 
+.teamMemberGap {
+  margin-bottom: 40px;
+}
 .previewBox {
   margin: 12px 0;
   padding: 12px;
@@ -1270,4 +1273,10 @@
 
 .posterStatusError {
   color: #ef4444;
+}
+
+.coverThumbnail {
+  width: 120px;
+  height: auto;
+  border-radius: 4px;
 }

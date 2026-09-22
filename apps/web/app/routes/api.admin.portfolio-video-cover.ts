@@ -20,7 +20,7 @@ import {
   ValidationError,
 } from "../lib/site-content.server";
 import {
-  processImage,
+  processVideoCover,
   removeProcessedImage,
   SafeImageError,
 } from "../lib/portfolio-image.server";
@@ -165,12 +165,12 @@ async function parseSingleUpload(
 }
 
 export async function loader() {
-  return new Response(null, { status: 405, headers: { Allow: "POST" } });
+  return new Response(null, { status: 405, headers: { Allow: "POST, DELETE" } });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  if (request.method !== "POST") {
-    return new Response(null, { status: 405, headers: { Allow: "POST" } });
+  if (request.method !== "POST" && request.method !== "DELETE") {
+    return new Response(null, { status: 405, headers: { Allow: "POST, DELETE" } });
   }
 
   const session = await requireValidAdminSession(request);
@@ -179,11 +179,6 @@ export async function action({ request }: ActionFunctionArgs) {
   const csrfToken = request.headers.get("x-csrf-token");
   if (!csrfToken || csrfToken !== session.get("csrfToken")) {
     return jsonError("Forbidden", 403);
-  }
-
-  const contentType = request.headers.get("Content-Type") ?? "";
-  if (!/^multipart\/form-data\s*;[^\r\n]*boundary=/i.test(contentType)) {
-    return jsonError("Unsupported Media Type", 415);
   }
 
   const previousRevision = request.headers.get("x-portfolio-revision");
@@ -205,6 +200,34 @@ export async function action({ request }: ActionFunctionArgs) {
     return jsonError("Video not found or corrupted", 400);
   }
 
+  if (request.method === "DELETE") {
+    if (!content.video.cover) {
+      return Response.json({ success: true, newRevision: previousRevision }, { headers: { "Cache-Control": "no-store" } });
+    }
+    const oldCoverId = content.video.cover.imageId;
+    content.video.cover = undefined;
+    
+    try {
+      const newRevision = savePortfolio(content, previousRevision);
+      if (oldCoverId) {
+        try {
+          fs.rmSync(path.join(getPortfolioMediaPath(), "global-v2", "photos", oldCoverId), { recursive: true, force: true });
+        } catch { /* ignore */ }
+      }
+      return Response.json({ success: true, newRevision }, { headers: { "Cache-Control": "no-store" } });
+    } catch (error: unknown) {
+      if (error instanceof RevisionConflictError || error instanceof CorruptedContentError) {
+        return jsonError("Revision conflict", 409);
+      }
+      return jsonError("Internal Server Error", 500);
+    }
+  }
+
+  const contentType = request.headers.get("Content-Type") ?? "";
+  if (!/^multipart\/form-data\s*;[^\r\n]*boundary=/i.test(contentType)) {
+    return jsonError("Unsupported Media Type", 415);
+  }
+
   const photoId = crypto.randomUUID();
 
   let tempDirectory: string | null = null;
@@ -214,14 +237,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const uploadedFilePath = await parseSingleUpload(request, contentType, tempDirectory);
     
-    // We do NOT want watermark on video cover
-    const processed = await processImage(
+    const processed = await processVideoCover(
       uploadedFilePath,
       tempDirectory,
       photoId,
-      getPortfolioMediaPath(),
-      "",
-      ""
+      getPortfolioMediaPath()
     );
 
     try {
@@ -236,10 +256,9 @@ export async function action({ request }: ActionFunctionArgs) {
 
       const newRevision = savePortfolio(content, previousRevision);
 
-      // Clean up old cover if it existed
-      if (oldCoverId) {
+      if (oldCoverId && oldCoverId !== processed.fileId) {
         try {
-          fs.rmSync(path.join(getPortfolioMediaPath(), oldCoverId), { recursive: true, force: true });
+          fs.rmSync(path.join(getPortfolioMediaPath(), "global-v2", "photos", oldCoverId), { recursive: true, force: true });
         } catch { /* ignore */ }
       }
 

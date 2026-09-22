@@ -47,7 +47,8 @@ export async function openPortfolioVariant(
   mediaBasePath: string,
   photoId: string,
   variant: string,
-  variantFileId: string
+  variantFileId: string,
+  ext: string = "webp"
 ): Promise<OpenPortfolioVariantResult> {
   if (
     !uuidRegex.test(photoId) ||
@@ -83,7 +84,7 @@ export async function openPortfolioVariant(
     if (!isContained(projectPath, variantPath)) throw new PortfolioMediaNotFoundError();
     await assertRealDirectory(variantPath, realBasePath);
 
-    const targetPath = path.resolve(variantPath, `${variantFileId}.webp`);
+    const targetPath = path.resolve(variantPath, `${variantFileId}.${ext}`);
     if (!isContained(variantPath, targetPath)) throw new PortfolioMediaNotFoundError();
 
     const beforeOpen = await fsPromises.lstat(targetPath);

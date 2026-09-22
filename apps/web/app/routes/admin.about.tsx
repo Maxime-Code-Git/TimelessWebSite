@@ -364,9 +364,9 @@ export default function AdminAbout({ loaderData, actionData }: Route.ComponentPr
           <section className={`${styles.dashboardCard} ${styles.sectionCard}`}>
             <h2>L'équipe</h2>
             {content.team.members.map((member, i) => (
-              <div key={i} className={styles.grid} style={{ marginBottom: i === 0 ? "40px" : 0 }}>
+              <div key={member.id} className={`${styles.grid} ${i === 0 ? styles.teamMemberGap : ""}`}>
                 <div className={styles.card}>
-                  <h3>Image ({i === 0 ? "Photographe" : "Vidéaste"})</h3>
+                  <h3>Image ({member.id === "photographer" ? "Photographe" : "Vidéaste"})</h3>
                   <ImageUploader
                     csrfToken={data.csrfToken}
                     revision={revision}

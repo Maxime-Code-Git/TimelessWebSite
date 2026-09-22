@@ -29,8 +29,8 @@ export function AboutPage({ lang }: AboutPageProps) {
       <section className={styles.duoSection}>
         <div className={styles.duoInner}>
           <div className={styles.duoGrid}>
-            {content.team.members.map((member, index) => (
-              <div key={index} className={styles.personCard}>
+            {content.team.members.map((member) => (
+              <div key={member.id} className={styles.personCard} id={member.id}>
                 {member.image.imageId ? (
                   <div className={styles.personPhoto}>
                     <picture>

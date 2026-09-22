@@ -672,3 +672,113 @@ export function restorePhotoMedia(
   }
   try { fs.rmdirSync(trashProjectDir); } catch { /* Ignore if not empty */ }
 }
+
+export async function processVideoCover(
+  tempFilePath: string,
+  allowedTempDir: string,
+  photoId: string,
+  mediaBasePath: string
+): Promise<ImageProcessingResult> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(photoId)) {
+    throw new SafeImageError("Invalid photo ID.");
+  }
+
+  const { format, width, height } = await validateImageFile(tempFilePath, allowedTempDir);
+
+  const fileId = generateFileId();
+  const createdFiles: string[] = [];
+  const createdDirs: string[] = [];
+
+  try {
+    const resolvedMediaBasePath = path.resolve(mediaBasePath);
+    ensureStrictDirectoryCreated(resolvedMediaBasePath, path.resolve(resolvedMediaBasePath, ".."));
+
+    const globalV2Dir = path.resolve(resolvedMediaBasePath, "global-v2");
+    const photosDir = path.resolve(globalV2Dir, "photos");
+    const projectDir = path.resolve(photosDir, photoId);
+    const originalsDir = path.resolve(projectDir, "originals");
+
+    for (const dir of [globalV2Dir, photosDir, projectDir, originalsDir]) {
+      if (!fs.existsSync(dir)) {
+        ensureStrictDirectoryCreated(dir, resolvedMediaBasePath);
+        createdDirs.push(dir);
+      } else {
+        ensureStrictDirectory(dir, resolvedMediaBasePath);
+      }
+    }
+
+    const originalPath = path.resolve(originalsDir, `${fileId}.${format}`);
+    validateConfinement(originalPath, resolvedMediaBasePath);
+
+    const originalBuffer = fs.readFileSync(tempFilePath);
+    atomicWriteFile(originalPath, originalBuffer, 0o600);
+    createdFiles.push(originalPath);
+
+    const variants: VariantResult[] = [];
+
+    const AVIF_QUALITY = 65;
+    const AVIF_EFFICIENCY = 4;
+
+    for (const breakpoint of VARIANT_BREAKPOINTS) {
+      if (breakpoint.name !== "480p" && width <= breakpoint.maxWidth && height <= breakpoint.maxWidth) {
+        continue;
+      }
+
+      const variantDir = path.resolve(projectDir, breakpoint.name);
+
+      if (!fs.existsSync(variantDir)) {
+        ensureStrictDirectoryCreated(variantDir, resolvedMediaBasePath);
+        createdDirs.push(variantDir);
+      } else {
+        ensureStrictDirectory(variantDir, resolvedMediaBasePath);
+      }
+
+      const variantFileId = `${fileId}-${breakpoint.name}`;
+      const webpPath = path.resolve(variantDir, `${variantFileId}.webp`);
+      validateConfinement(webpPath, resolvedMediaBasePath);
+      const avifPath = path.resolve(variantDir, `${variantFileId}.avif`);
+      validateConfinement(avifPath, resolvedMediaBasePath);
+
+      const rawBuffer = await sharp(tempFilePath, { limitInputPixels: MAX_PIXELS })
+        .rotate()
+        .resize(breakpoint.maxWidth, breakpoint.maxWidth, { fit: "inside", withoutEnlargement: true })
+        .toColorspace("srgb")
+        .ensureAlpha();
+
+      const webpBuffer = await rawBuffer.clone().webp({ quality: WEBP_QUALITY }).toBuffer();
+      atomicWriteFile(webpPath, webpBuffer, 0o600);
+      createdFiles.push(webpPath);
+
+      const avifBuffer = await rawBuffer.clone().avif({ quality: AVIF_QUALITY, effort: AVIF_EFFICIENCY }).toBuffer();
+      atomicWriteFile(avifPath, avifBuffer, 0o600);
+      createdFiles.push(avifPath);
+
+      const info = await sharp(webpBuffer).metadata();
+
+      variants.push({
+        name: breakpoint.name,
+        width: info.width!,
+        height: info.height!,
+        sizeBytes: webpBuffer.length,
+        fileId: variantFileId,
+      });
+    }
+
+    return {
+      originalFormat: format,
+      originalWidth: width,
+      originalHeight: height,
+      fileId,
+      variants,
+      appliedWatermarkRevision: "",
+    };
+  } catch (err) {
+    for (const file of createdFiles.reverse()) {
+      try { fs.unlinkSync(file); } catch { /* ignore */ }
+    }
+    for (const d of createdDirs.reverse()) {
+      try { fs.rmdirSync(d); } catch { /* ignore */ }
+    }
+    throw err;
+  }
+}
