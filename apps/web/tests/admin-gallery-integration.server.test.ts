@@ -899,6 +899,25 @@ describe("Admin Gallery Integration Lifecycle", () => {
     expect(deletePosterRes.status).toBe(200);
     expect(fs.existsSync(posterDir)).toBe(false);
 
+    // 10.1 CSRF incorrect
+    const { body: wrongCsrfBody, boundary: wrongCsrfBoundary } = buildMultipart(fakePng, "test.png", "image/png", "wrong_csrf");
+    const wrongCsrfRes = await fetch(actionUrl, {
+      method: "POST", body: wrongCsrfBody,
+      headers: { "Content-Type": `multipart/form-data; boundary=${wrongCsrfBoundary}`, "Origin": BASE_URL, "Cookie": authCookie }
+    });
+    expect(wrongCsrfRes.status).toBe(403);
+
+    // 10.2 Content-Length syntaxiquement invalide
+    await expect(fetch(actionUrl, {
+      method: "POST", body: pngBody,
+      headers: { "Content-Type": `multipart/form-data; boundary=${pngBoundary}`, "Origin": BASE_URL, "Cookie": authCookie, "Content-Length": "123.45" }
+    })).rejects.toThrow();
+
+    await expect(fetch(actionUrl, {
+      method: "POST", body: pngBody,
+      headers: { "Content-Type": `multipart/form-data; boundary=${pngBoundary}`, "Origin": BASE_URL, "Cookie": authCookie, "Content-Length": "-100" }
+    })).rejects.toThrow();
+
     // 11. Rollback test (SQLite fail on replace)
     // First, upload a new poster
     const upRes = await fetch(actionUrl, {

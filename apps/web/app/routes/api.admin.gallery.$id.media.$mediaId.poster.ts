@@ -8,9 +8,11 @@ import { finished } from "node:stream/promises";
 import busboy from "busboy";
 import sharp from "sharp";
 import { requireValidAdminSession, createAdminHeaders } from "../lib/admin-auth.server";
+import { constantTimeEqual } from "../lib/auth.server";
 import { validateOrigin } from "../lib/security.server";
 import { getGalleryDb } from "../lib/gallery-db.server";
 import { ENV } from "../lib/env.server";
+import { fsSync } from "../lib/fs.server";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 const MAX_PAYLOAD_SIZE = MAX_FILE_SIZE + 1024 * 1024; // 26 MB
@@ -137,7 +139,7 @@ async function parseSingleUpload(
         if (fileCount !== 1 || !uploadedFilePath) {
           throw new UploadRequestError("The upload must contain exactly one file.", 400);
         }
-        if (receivedCsrf !== expectedCsrfToken) {
+        if (!receivedCsrf || !expectedCsrfToken || !constantTimeEqual(receivedCsrf, expectedCsrfToken)) {
           throw new UploadRequestError("Forbidden", 403);
         }
         if (!settled) {
@@ -184,7 +186,9 @@ async function parseSingleUpload(
 
 export async function action({ request, params }: ActionFunctionArgs) {
   if (request.method !== "POST") {
-    return new Response(null, { status: 405, headers: Object.assign({ Allow: "POST" }, createAdminHeaders()) });
+    const headers = createAdminHeaders();
+    headers.set("Allow", "POST");
+    return new Response(null, { status: 405, headers });
   }
 
   const session = await requireValidAdminSession(request);
@@ -212,7 +216,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     // Delete poster logic
     const formData = await request.formData();
     const csrfToken = formData.get("csrfToken");
-    if (!csrfToken || csrfToken !== session.get("csrfToken")) {
+    if (!csrfToken || typeof csrfToken !== "string" || !session.get("csrfToken") || typeof session.get("csrfToken") !== "string" || !constantTimeEqual(csrfToken, session.get("csrfToken") as string)) {
       return jsonError("Forbidden", 403);
     }
 
@@ -232,7 +236,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     try {
       if (fs.existsSync(postersDir)) {
         fs.mkdirSync(path.dirname(quarantineDir), { recursive: true });
-        fs.renameSync(postersDir, quarantineDir);
+        fsSync.renameSync(postersDir, quarantineDir);
         quarantined = true;
       }
 
@@ -243,7 +247,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       } catch (dbErr) {
         db.exec("ROLLBACK");
         if (quarantined) {
-          try { fs.renameSync(quarantineDir, postersDir); } catch { /* best effort */ }
+          try { fsSync.renameSync(quarantineDir, postersDir); } catch { /* best effort */ }
         }
         throw dbErr;
       }
@@ -251,7 +255,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       // Cleanup quarantine - Best effort after COMMIT
       if (quarantined) {
         try {
-          fs.rmSync(quarantineDir, { recursive: true, force: true });
+          fsSync.rmSync(quarantineDir, { recursive: true, force: true });
         } catch (e) {
           console.error("Failed to delete quarantine after commit:", e);
         }
@@ -270,8 +274,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const contentLengthHeader = request.headers.get("Content-Length");
   if (contentLengthHeader !== null) {
-    const contentLength = parseInt(contentLengthHeader, 10);
-    if (isNaN(contentLength) || contentLength < 0) {
+    if (!/^\d+$/.test(contentLengthHeader)) {
+      return jsonError("Invalid Content-Length", 400);
+    }
+    const contentLength = Number(contentLengthHeader);
+    if (!Number.isSafeInteger(contentLength) || contentLength < 0) {
       return jsonError("Invalid Content-Length", 400);
     }
     if (contentLength > MAX_PAYLOAD_SIZE) {
@@ -320,9 +327,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     try {
       db.exec("BEGIN TRANSACTION");
       try {
-        fs.renameSync(tempAvifPath, finalAvifPath);
+        fsSync.renameSync(tempAvifPath, finalAvifPath);
         try {
-          fs.renameSync(tempWebpPath, finalWebpPath);
+          fsSync.renameSync(tempWebpPath, finalWebpPath);
         } catch (e) {
           fs.unlinkSync(finalAvifPath);
           throw e;
