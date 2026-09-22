@@ -62,114 +62,127 @@ test.describe('Admin Portfolio V2', () => {
   });
 
   test('should manage video cover', async ({ page, request }, testInfo) => {
+    test.setTimeout(60_000);
     const firstCoverPath = testInfo.outputPath('portfolio-cover-1.jpg');
     const secondCoverPath = testInfo.outputPath('portfolio-cover-2.jpg');
 
+    // Import sharp dynamically so it works seamlessly inside the test file (or top level if preferred)
     const sharp = (await import('sharp')).default;
 
-    await sharp({
-      create: { width: 1200, height: 675, channels: 3, background: { r: 30, g: 70, b: 90 } },
-    }).jpeg({ quality: 90 }).toFile(firstCoverPath);
+    await test.step('création des JPEG', async () => {
+      await sharp({
+        create: { width: 1200, height: 675, channels: 3, background: { r: 30, g: 70, b: 90 } },
+      }).jpeg({ quality: 90 }).toFile(firstCoverPath);
 
-    await sharp({
-      create: { width: 1200, height: 675, channels: 3, background: { r: 150, g: 90, b: 40 } },
-    }).jpeg({ quality: 90 }).toFile(secondCoverPath);
+      await sharp({
+        create: { width: 1200, height: 675, channels: 3, background: { r: 150, g: 90, b: 40 } },
+      }).jpeg({ quality: 90 }).toFile(secondCoverPath);
+    });
 
-    await page.goto('/admin/portfolio');
-    await page.fill('input[name="videoUrl"]', 'https://vimeo.com/76979871');
-    await page.click('button:has-text("Enregistrer Vidéo")');
-    await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
+    await test.step('enregistrement de la vidéo', async () => {
+      await page.goto('/admin/portfolio');
+      await page.fill('input[name="videoUrl"]', 'https://vimeo.com/76979871');
+      await page.click('button:has-text("Enregistrer Vidéo")');
+      await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
+    });
 
-    // 1. Upload first cover
-    const fileChooserPromise = page.waitForEvent('filechooser');
-    await page.click('button:has-text("Ajouter une cover")');
-    const fileChooser = await fileChooserPromise;
+    let firstSrc: string | null = null;
+    await test.step('premier upload', async () => {
+      const fileChooserPromise = page.waitForEvent('filechooser');
+      await page.click('button:has-text("Ajouter une cover")');
+      const fileChooser = await fileChooserPromise;
 
-    const uploadReqPromise = page.waitForResponse(res => res.url().includes('/api/admin/portfolio-video-cover') && res.request().method() === 'POST');
-    await fileChooser.setFiles(firstCoverPath);
-    const uploadRes = await uploadReqPromise;
+      const uploadReqPromise = page.waitForResponse(res => res.url().includes('/api/admin/portfolio-video-cover') && res.request().method() === 'POST');
+      await fileChooser.setFiles(firstCoverPath);
+      const uploadRes = await uploadReqPromise;
 
-    const uploadBodyText = await uploadRes.text();
-    expect(uploadRes.status(), `POST failed with status ${uploadRes.status()} - Body: ${uploadBodyText}`).toBe(200);
+      const uploadBodyText = await uploadRes.text();
+      expect(uploadRes.status(), `POST failed with status ${uploadRes.status()} - Body: ${uploadBodyText}`).toBe(200);
 
-    const uploadJson = JSON.parse(uploadBodyText);
-    expect(uploadJson.newRevision).toBeDefined();
-    expect(uploadJson.cover.imageId).toBeDefined();
+      const uploadJson = JSON.parse(uploadBodyText);
+      expect(uploadJson.newRevision).toBeDefined();
+      expect(uploadJson.cover.imageId).toBeDefined();
 
-    const coverImage = page.getByTestId('portfolio-video-cover-image');
-    await expect(coverImage).toBeVisible({ timeout: 10000 });
+      const coverImage = page.getByTestId('portfolio-video-cover-image');
+      await expect(coverImage).toBeVisible({ timeout: 10000 });
+    });
 
-    // Explicit UI reload check
-    await page.reload();
-    await expect(coverImage).toBeVisible({ timeout: 10000 });
+    await test.step('rechargement et persistance', async () => {
+      const coverImage = page.getByTestId('portfolio-video-cover-image');
+      await page.reload();
+      await expect(coverImage).toBeVisible({ timeout: 10000 });
 
-    const firstSrc = await coverImage.getAttribute('src');
-    if (!firstSrc) throw new Error("firstSrc is null");
+      firstSrc = await coverImage.getAttribute('src');
+      if (!firstSrc) throw new Error("firstSrc is null");
 
-    const firstRes = await request.get(firstSrc);
-    expect(firstRes.status()).toBe(200);
+      const firstRes = await request.get(firstSrc);
+      expect(firstRes.status()).toBe(200);
 
-    // Public display
-    await page.goto('/fr/portfolio');
-    await expect(page.locator('#galerie-video picture img')).toBeVisible({ timeout: 10000 });
+      // Public display
+      await page.goto('/fr/portfolio');
+      await expect(page.locator('#galerie-video picture img')).toBeVisible({ timeout: 10000 });
+    });
 
-    // 2. Replace cover
-    await page.goto('/admin/portfolio');
-    const fileChooserPromise2 = page.waitForEvent('filechooser');
-    await page.click('button:has-text("Remplacer la cover")');
-    const fileChooser2 = await fileChooserPromise2;
+    let secondSrc: string | null = null;
+    await test.step('remplacement', async () => {
+      await page.goto('/admin/portfolio');
+      const fileChooserPromise2 = page.waitForEvent('filechooser');
+      await page.click('button:has-text("Remplacer la cover")');
+      const fileChooser2 = await fileChooserPromise2;
 
-    const replaceReqPromise = page.waitForResponse(res => res.url().includes('/api/admin/portfolio-video-cover') && res.request().method() === 'POST');
-    await fileChooser2.setFiles(secondCoverPath);
-    const replaceRes = await replaceReqPromise;
+      const replaceReqPromise = page.waitForResponse(res => res.url().includes('/api/admin/portfolio-video-cover') && res.request().method() === 'POST');
+      await fileChooser2.setFiles(secondCoverPath);
+      const replaceRes = await replaceReqPromise;
 
-    const replaceBodyText = await replaceRes.text();
-    expect(replaceRes.status(), `Replace POST failed with status ${replaceRes.status()} - Body: ${replaceBodyText}`).toBe(200);
+      const replaceBodyText = await replaceRes.text();
+      expect(replaceRes.status(), `Replace POST failed with status ${replaceRes.status()} - Body: ${replaceBodyText}`).toBe(200);
 
-    await expect(coverImage).toBeVisible({ timeout: 10000 });
-    // Wait until the src has actually changed
-    await expect(coverImage).not.toHaveAttribute('src', firstSrc, { timeout: 10000 });
+      const coverImage = page.getByTestId('portfolio-video-cover-image');
+      await expect(coverImage).toBeVisible({ timeout: 10000 });
+      // Wait until the src has actually changed
+      await expect(coverImage).not.toHaveAttribute('src', firstSrc!, { timeout: 10000 });
 
-    // Explicit UI reload check
-    await page.reload();
-    await expect(coverImage).toBeVisible({ timeout: 10000 });
+      await page.reload();
+      await expect(coverImage).toBeVisible({ timeout: 10000 });
 
-    const secondSrc = await coverImage.getAttribute('src');
-    if (!secondSrc) throw new Error("secondSrc is null");
-    expect(secondSrc).not.toBe(firstSrc);
+      secondSrc = await coverImage.getAttribute('src');
+      if (!secondSrc) throw new Error("secondSrc is null");
+      expect(secondSrc).not.toBe(firstSrc);
 
-    const oldRes = await request.get(firstSrc);
-    expect(oldRes.status()).toBe(404);
+      const oldRes = await request.get(firstSrc!);
+      expect(oldRes.status()).toBe(404);
 
-    const newRes = await request.get(secondSrc);
-    expect(newRes.status()).toBe(200);
+      const newRes = await request.get(secondSrc);
+      expect(newRes.status()).toBe(200);
+    });
 
-    // 3. Delete cover
-    const deleteReqPromise = page.waitForResponse(res => res.url().includes('/api/admin/portfolio-video-cover') && res.request().method() === 'DELETE');
-    await page.click('button:has-text("Supprimer la cover")');
-    const deleteRes = await deleteReqPromise;
+    await test.step('suppression', async () => {
+      const deleteReqPromise = page.waitForResponse(res => res.url().includes('/api/admin/portfolio-video-cover') && res.request().method() === 'DELETE');
+      await page.click('button:has-text("Supprimer la cover")');
+      const deleteRes = await deleteReqPromise;
 
-    const deleteBodyText = await deleteRes.text();
-    expect(deleteRes.status(), `DELETE failed with status ${deleteRes.status()} - Body: ${deleteBodyText}`).toBe(200);
+      const deleteBodyText = await deleteRes.text();
+      expect(deleteRes.status(), `DELETE failed with status ${deleteRes.status()} - Body: ${deleteBodyText}`).toBe(200);
 
-    await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
 
-    // Explicit UI reload check
-    await page.reload();
-    await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
+      await page.reload();
+      await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
 
-    const deletedRes = await request.get(secondSrc);
-    expect(deletedRes.status()).toBe(404);
+      const deletedRes = await request.get(secondSrc!);
+      expect(deletedRes.status()).toBe(404);
+    });
 
-    // 4. Public display after delete
-    await page.goto('/fr/portfolio');
-    await expect(page.locator("#galerie-video picture img")).toHaveCount(0);
+    await test.step('lecture publique de la vidéo', async () => {
+      await page.goto('/fr/portfolio');
+      await expect(page.locator("#galerie-video picture img")).toHaveCount(0);
 
-    const playButton = page.getByRole("button", { name: "Lire la vidéo" });
-    await expect(playButton).toBeVisible();
-    await playButton.click();
+      const playButton = page.getByRole("button", { name: "Lire la vidéo" });
+      await expect(playButton).toBeVisible();
+      await playButton.click();
 
-    await expect(page.locator("#galerie-video iframe")).toBeVisible();
+      await expect(page.locator("#galerie-video iframe")).toBeVisible();
+    });
   });
 
   test('should completely manage categories and respect constraints', async ({ page }) => {

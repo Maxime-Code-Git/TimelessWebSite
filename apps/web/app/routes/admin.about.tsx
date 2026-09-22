@@ -364,13 +364,14 @@ export default function AdminAbout({ loaderData, actionData }: Route.ComponentPr
           <section className={`${styles.dashboardCard} ${styles.sectionCard}`}>
             <h2>L'équipe</h2>
             {content.team.members.map((member, i) => (
-              <div key={member.id} className={`${styles.grid} ${i === 0 ? styles.teamMemberGap : ""}`}>
+              <div key={member.id} data-testid={`about-team-member-${member.id}`} className={`${styles.grid} ${i === 0 ? styles.teamMemberGap : ""}`}>
                 <div className={styles.card}>
                   <h3>Image ({member.id === "photographer" ? "Photographe" : "Vidéaste"})</h3>
                   <ImageUploader
                     csrfToken={data.csrfToken}
                     revision={revision}
                     section="about-team"
+                    testIdSuffix={member.id}
                     index={i}
                     currentImageId={member.image.imageId}
                     alt={member.image.alt?.[lang] || "Preview"}
@@ -471,7 +472,8 @@ function ImageUploader({
   setIsGlobalUploading,
   onSuccess,
   onDelete,
-  disabled
+  disabled,
+  testIdSuffix
 }: {
   csrfToken: string,
   revision: string,
@@ -483,7 +485,8 @@ function ImageUploader({
   setIsGlobalUploading: (val: boolean) => void,
   onSuccess: (newRevision: string, newImageId: string, variants: HomeVariantInfo[], width: number, height: number) => void,
   onDelete: () => void,
-  disabled?: boolean
+  disabled?: boolean,
+  testIdSuffix?: string
 }) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -551,7 +554,7 @@ function ImageUploader({
             <img
               src={`/media/home/${section}/${currentImageId}/640p/webp`}
               alt={alt}
-              data-testid={`about-image-preview-${section}`}
+              data-testid={`about-image-preview-${testIdSuffix || section}`}
               className={`${styles.photoImgCover} ${styles.aspect16_9}`}
               onError={() => setImgError(true)}
             />
