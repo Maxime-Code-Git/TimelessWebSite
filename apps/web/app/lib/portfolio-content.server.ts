@@ -80,13 +80,22 @@ export const photoSchema = z.object({
 
 export type Photo = z.infer<typeof photoSchema>;
 
+const variantNameSchema = z.enum(["480p", "960p", "1440p", "1920p"]);
+
 const mediaRefSchema = z.object({
-  imageId: z.string().uuid().nullable(),
+  imageId: z.string().uuid(),
   variants: z.array(z.object({
-    name: z.string(),
+    name: variantNameSchema,
     width: z.number().int().positive(),
     height: z.number().int().positive(),
-  })),
+    fileId: z.string().regex(variantFileIdRegex, "Invalid fileId format"),
+  })).refine(
+    (variants) => {
+      const names = new Set(variants.map(v => v.name));
+      return names.size === variants.length && names.has("480p");
+    },
+    "Variants must be unique and include at least '480p'"
+  ),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
 });

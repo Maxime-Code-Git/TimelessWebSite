@@ -72,14 +72,14 @@ describe("Watermark Policy Verification", () => {
   it("should NOT apply watermark on portfolio-photo", async () => {
     const file = await createTestImage();
     const renderSpy = vi.spyOn(portfolioMedia, "renderTextWatermark");
-    await portfolioMedia.processImage(file, mediaDir, "00000000-0000-4000-8000-000000000000", mediaDir, "wm", "wm-rev");
+    await homeMedia.processHomeImage(file, mediaDir, "portfolio-photo", "wm", "wm-rev");
     expect(renderSpy).not.toHaveBeenCalled();
   });
 
   it("should NOT apply watermark on portfolio-video", async () => {
     const file = await createTestImage();
     const renderSpy = vi.spyOn(portfolioMedia, "renderTextWatermark");
-    await portfolioMedia.processVideoCover(file, mediaDir, "00000000-0000-4000-8000-000000000000", mediaDir);
+    await homeMedia.processHomeImage(file, mediaDir, "portfolio-video", "wm", "wm-rev");
     expect(renderSpy).not.toHaveBeenCalled();
   });
 });

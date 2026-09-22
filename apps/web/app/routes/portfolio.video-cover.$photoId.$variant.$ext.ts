@@ -13,7 +13,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return new Response("Not Found", { status: 404 });
   }
 
-  const allowedExts = new Set(["avif", "webp", "jpeg", "png"]);
+  const allowedExts = new Set(["avif", "webp"]);
   if (!allowedExts.has(ext)) {
     return new Response("Not Found", { status: 404 });
   }
@@ -32,7 +32,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       getPortfolioMediaPath(),
       photoId,
       variant,
-      `${video.cover.imageId}-${variant}`,
+      photoVariant.fileId,
       ext
     );
 
@@ -45,7 +45,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     });
 
     if (request.method === "HEAD") {
-      fileHandle.close();
+      await fileHandle.close();
       return new Response(null, { status: 200, headers });
     }
 

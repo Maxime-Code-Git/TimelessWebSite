@@ -61,6 +61,44 @@ test.describe('Admin Portfolio V2', () => {
     await expect(page.locator('input[name="videoUrl"]')).toHaveValue('');
   });
 
+  test('should manage video cover', async ({ page }) => {
+    await page.goto('/admin/portfolio');
+    await page.fill('input[name="videoUrl"]', 'https://vimeo.com/76979871');
+    await page.click('button:has-text("Enregistrer Vidéo")');
+    await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
+
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    await page.click('button:has-text("Ajouter une cover")');
+    const fileChooser = await fileChooserPromise;
+    
+    const buf = await fs.promises.readFile(path.join(process.cwd(), 'public', 'favicon.ico'));
+    const tmpFile = path.join(os.tmpdir(), 'test-cover.jpg');
+    fs.writeFileSync(tmpFile, buf);
+    await fileChooser.setFiles(tmpFile);
+
+    await expect(page.locator('img[alt="Cover"]')).toBeVisible({ timeout: 10000 });
+
+    // Public display
+    await page.goto('/fr/portfolio');
+    await expect(page.locator('#galerie-video picture img')).toBeVisible({ timeout: 10000 });
+    
+    // Replace
+    await page.goto('/admin/portfolio');
+    const fileChooserPromise2 = page.waitForEvent('filechooser');
+    await page.click('button:has-text("Remplacer la cover")');
+    const fileChooser2 = await fileChooserPromise2;
+    await fileChooser2.setFiles(tmpFile);
+    await expect(page.locator('img[alt="Cover"]')).toBeVisible({ timeout: 10000 });
+
+    // Delete cover
+    await page.click('button:has-text("Supprimer la cover")');
+    await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
+
+    // Public display after delete
+    await page.goto('/fr/portfolio');
+    await expect(page.locator('#galerie-video picture img')).toHaveCount(0);
+  });
+
   test('should completely manage categories and respect constraints', async ({ page }) => {
     await page.goto('/admin/portfolio');
 
