@@ -212,7 +212,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     heroIndex = parseInt(indexStr, 10);
   }
-  
+
   let aboutTeamIndex: number | null = null;
   if (section === "about-team") {
     if (!indexStr || !["0", "1"].includes(indexStr)) {

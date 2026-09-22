@@ -206,7 +206,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     const oldCoverId = content.video.cover.imageId;
     content.video.cover = undefined;
-    
+
     try {
       const newRevision = savePortfolio(content, previousRevision);
       if (oldCoverId) {
@@ -236,7 +236,7 @@ export async function action({ request }: ActionFunctionArgs) {
     fs.chmodSync(tempDirectory, 0o700);
 
     const uploadedFilePath = await parseSingleUpload(request, contentType, tempDirectory);
-    
+
     const processed = await processVideoCover(
       uploadedFilePath,
       tempDirectory,
@@ -246,7 +246,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     try {
       const oldCoverId = content.video.cover?.imageId;
-      
+
       content.video.cover = {
         imageId: processed.fileId,
         variants: processed.variants,

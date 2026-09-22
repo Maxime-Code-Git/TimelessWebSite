@@ -406,7 +406,7 @@ export default function AdminAbout({ loaderData, actionData }: Route.ComponentPr
                     className={styles.input}
                     disabled={disabled}
                   />
-  
+
                   <label htmlFor={`team-role-${i}-${lang}`} className={styles.marginTopSmall}>Rôle ({lang})</label>
                   <input id={`team-role-${i}-${lang}`}
                     type="text"
@@ -415,7 +415,7 @@ export default function AdminAbout({ loaderData, actionData }: Route.ComponentPr
                     className={styles.input}
                     disabled={disabled}
                   />
-  
+
                   <label htmlFor={`team-bio-${i}-${lang}`} className={styles.marginTopSmall}>Biographie ({lang})</label>
                   <textarea id={`team-bio-${i}-${lang}`}
                     value={member.bio[lang]}

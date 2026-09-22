@@ -716,7 +716,7 @@ function validateAboutPageContent(data: unknown): AboutPageContent {
   if (team.members.length !== 2) {
     throw new ValidationError("aboutPage.team.members must contain exactly 2 members");
   }
-  
+
   const validTeam = {
     members: team.members.map((m, i) => {
       assertExactKeys(m, ["id", "name", "role", "bio", "image"], `aboutPage.team.members[${i}]`);
@@ -976,9 +976,9 @@ export function validateSiteContent(data: unknown): SiteContent {
   if ((obj.schemaVersion as number) < 7) {
     const defaultAboutPage = JSON.parse(JSON.stringify(defaultContent.aboutPage));
     const currentAboutPage = objRef.aboutPage as Record<string, unknown>;
-    
+
     let migratedTeam = defaultAboutPage.team;
-    
+
     // Attempt to migrate the single member to the first slot if data exists
     if (currentAboutPage.team && (currentAboutPage.team as Record<string, unknown>).name && !(currentAboutPage.team as Record<string, unknown>).members) {
       const oldTeam = currentAboutPage.team as Record<string, unknown>;
@@ -998,7 +998,7 @@ export function validateSiteContent(data: unknown): SiteContent {
         ]
       };
     }
-    
+
     objRef = {
       ...objRef,
       aboutPage: {

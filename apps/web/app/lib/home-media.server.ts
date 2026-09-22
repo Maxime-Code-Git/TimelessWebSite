@@ -122,7 +122,7 @@ export async function processHomeImage(
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      const watermarkedImg = section === "about-team" 
+      const watermarkedImg = section === "about-team"
         ? sharp(rawBuffer, { raw: { width: info.width, height: info.height, channels: 4 } })
             .composite([{ input: await renderTextWatermark({ text: watermarkText, watermarkRevision, width: info.width, height: info.height }), top: 0, left: 0 }])
         : sharp(rawBuffer, { raw: { width: info.width, height: info.height, channels: 4 } });

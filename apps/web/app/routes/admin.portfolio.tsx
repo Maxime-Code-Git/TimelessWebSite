@@ -494,7 +494,7 @@ export default function AdminPortfolio() {
     const file = files[0];
     setCoverUploading(true);
     setCoverError(null);
-    
+
     const formData = new FormData();
     formData.append("file", file);
 
@@ -636,7 +636,7 @@ export default function AdminPortfolio() {
               </button>
             )}
           </div>
-          
+
           {portfolio.video && (
             <div className={styles.marginTop2}>
               <h3 className={styles.sectionTitleNoMargin}>Image de couverture</h3>
