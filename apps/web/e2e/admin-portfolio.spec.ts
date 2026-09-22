@@ -65,25 +65,14 @@ test.describe('Admin Portfolio V2', () => {
     const firstCoverPath = testInfo.outputPath('portfolio-cover-1.jpg');
     const secondCoverPath = testInfo.outputPath('portfolio-cover-2.jpg');
 
-    // Import sharp dynamically so it works seamlessly inside the test file (or top level if preferred)
     const sharp = (await import('sharp')).default;
 
     await sharp({
-      create: {
-        width: 1200,
-        height: 675,
-        channels: 3,
-        background: { r: 30, g: 70, b: 90 },
-      },
+      create: { width: 1200, height: 675, channels: 3, background: { r: 30, g: 70, b: 90 } },
     }).jpeg({ quality: 90 }).toFile(firstCoverPath);
 
     await sharp({
-      create: {
-        width: 1200,
-        height: 675,
-        channels: 3,
-        background: { r: 150, g: 90, b: 40 },
-      },
+      create: { width: 1200, height: 675, channels: 3, background: { r: 150, g: 90, b: 40 } },
     }).jpeg({ quality: 90 }).toFile(secondCoverPath);
 
     await page.goto('/admin/portfolio');
@@ -91,13 +80,29 @@ test.describe('Admin Portfolio V2', () => {
     await page.click('button:has-text("Enregistrer Vidéo")');
     await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
 
+    // 1. Upload first cover
     const fileChooserPromise = page.waitForEvent('filechooser');
     await page.click('button:has-text("Ajouter une cover")');
     const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles(firstCoverPath);
 
-    const coverImage = page.locator('img[alt="Cover"]');
+    const uploadReqPromise = page.waitForResponse(res => res.url().includes('/api/admin/portfolio-video-cover') && res.request().method() === 'POST');
+    await fileChooser.setFiles(firstCoverPath);
+    const uploadRes = await uploadReqPromise;
+
+    const uploadBodyText = await uploadRes.text();
+    expect(uploadRes.status(), `POST failed with status ${uploadRes.status()} - Body: ${uploadBodyText}`).toBe(200);
+
+    const uploadJson = JSON.parse(uploadBodyText);
+    expect(uploadJson.newRevision).toBeDefined();
+    expect(uploadJson.cover.imageId).toBeDefined();
+
+    const coverImage = page.getByTestId('portfolio-video-cover-image');
     await expect(coverImage).toBeVisible({ timeout: 10000 });
+
+    // Explicit UI reload check
+    await page.reload();
+    await expect(coverImage).toBeVisible({ timeout: 10000 });
+
     const firstSrc = await coverImage.getAttribute('src');
     if (!firstSrc) throw new Error("firstSrc is null");
 
@@ -108,19 +113,29 @@ test.describe('Admin Portfolio V2', () => {
     await page.goto('/fr/portfolio');
     await expect(page.locator('#galerie-video picture img')).toBeVisible({ timeout: 10000 });
 
-    // Replace
+    // 2. Replace cover
     await page.goto('/admin/portfolio');
     const fileChooserPromise2 = page.waitForEvent('filechooser');
     await page.click('button:has-text("Remplacer la cover")');
     const fileChooser2 = await fileChooserPromise2;
-    await fileChooser2.setFiles(secondCoverPath);
-    await expect(page.locator('img[alt="Cover"]')).toBeVisible({ timeout: 10000 });
 
+    const replaceReqPromise = page.waitForResponse(res => res.url().includes('/api/admin/portfolio-video-cover') && res.request().method() === 'POST');
+    await fileChooser2.setFiles(secondCoverPath);
+    const replaceRes = await replaceReqPromise;
+
+    const replaceBodyText = await replaceRes.text();
+    expect(replaceRes.status(), `Replace POST failed with status ${replaceRes.status()} - Body: ${replaceBodyText}`).toBe(200);
+
+    await expect(coverImage).toBeVisible({ timeout: 10000 });
     // Wait until the src has actually changed
     await expect(coverImage).not.toHaveAttribute('src', firstSrc, { timeout: 10000 });
+
+    // Explicit UI reload check
+    await page.reload();
+    await expect(coverImage).toBeVisible({ timeout: 10000 });
+
     const secondSrc = await coverImage.getAttribute('src');
     if (!secondSrc) throw new Error("secondSrc is null");
-
     expect(secondSrc).not.toBe(firstSrc);
 
     const oldRes = await request.get(firstSrc);
@@ -129,14 +144,24 @@ test.describe('Admin Portfolio V2', () => {
     const newRes = await request.get(secondSrc);
     expect(newRes.status()).toBe(200);
 
-    // Delete cover
+    // 3. Delete cover
+    const deleteReqPromise = page.waitForResponse(res => res.url().includes('/api/admin/portfolio-video-cover') && res.request().method() === 'DELETE');
     await page.click('button:has-text("Supprimer la cover")');
+    const deleteRes = await deleteReqPromise;
+
+    const deleteBodyText = await deleteRes.text();
+    expect(deleteRes.status(), `DELETE failed with status ${deleteRes.status()} - Body: ${deleteBodyText}`).toBe(200);
+
+    await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
+
+    // Explicit UI reload check
+    await page.reload();
     await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
 
     const deletedRes = await request.get(secondSrc);
     expect(deletedRes.status()).toBe(404);
 
-    // Public display after delete
+    // 4. Public display after delete
     await page.goto('/fr/portfolio');
     await expect(page.locator("#galerie-video picture img")).toHaveCount(0);
 

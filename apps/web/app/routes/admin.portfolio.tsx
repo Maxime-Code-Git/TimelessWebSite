@@ -502,7 +502,7 @@ export default function AdminPortfolio() {
     formData.append("file", file);
 
     try {
-      const response = await fetch("/admin/portfolio/video-cover", {
+      const response = await fetch("/api/admin/portfolio-video-cover", {
         method: "POST",
         headers: {
           "x-csrf-token": csrfToken,
@@ -534,7 +534,7 @@ export default function AdminPortfolio() {
     setCoverUploading(true);
     setCoverError(null);
     try {
-      const response = await fetch("/admin/portfolio/video-cover", {
+      const response = await fetch("/api/admin/portfolio-video-cover", {
         method: "DELETE",
         headers: {
           "x-csrf-token": csrfToken,
@@ -645,7 +645,7 @@ export default function AdminPortfolio() {
               <h3 className={styles.sectionTitleNoMargin}>Image de couverture</h3>
               {portfolio.video.cover ? (
                 <div className={`${styles.flexRowGap5} ${styles.marginTop1}`}>
-                  <img src={`/portfolio/video-cover/${portfolio.video.cover.imageId}/480p/webp`} alt="Cover" className={styles.coverThumbnail} />
+                  <img src={`/portfolio/video-cover/${portfolio.video.cover.imageId}/480p/webp`} alt="Cover" data-testid="portfolio-video-cover-image" className={styles.coverThumbnail} />
                   <div className={styles.flexColGap2}>
                     <input type="file" accept="image/jpeg, image/png, image/webp" ref={coverInputRef} onChange={e => handleUploadCover(e.target.files)} className={styles.displayNone} />
                     <div className={styles.flexRowGap5}>
