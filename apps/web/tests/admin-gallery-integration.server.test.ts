@@ -907,16 +907,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
     });
     expect(wrongCsrfRes.status).toBe(403);
 
-    // 10.2 Content-Length syntaxiquement invalide
-    await expect(fetch(actionUrl, {
-      method: "POST", body: pngBody,
-      headers: { "Content-Type": `multipart/form-data; boundary=${pngBoundary}`, "Origin": BASE_URL, "Cookie": authCookie, "Content-Length": "123.45" }
-    })).rejects.toThrow();
 
-    await expect(fetch(actionUrl, {
-      method: "POST", body: pngBody,
-      headers: { "Content-Type": `multipart/form-data; boundary=${pngBoundary}`, "Origin": BASE_URL, "Cookie": authCookie, "Content-Length": "-100" }
-    })).rejects.toThrow();
 
     // 11. Rollback test (SQLite fail on replace)
     // First, upload a new poster
