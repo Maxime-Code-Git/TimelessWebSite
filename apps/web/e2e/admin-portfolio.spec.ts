@@ -138,9 +138,13 @@ test.describe('Admin Portfolio V2', () => {
 
     // Public display after delete
     await page.goto('/fr/portfolio');
-    await expect(page.locator('#galerie-video picture img')).toHaveCount(0);
-    // Ensure video is still configured
-    await expect(page.locator('#galerie-video iframe')).toBeVisible();
+    await expect(page.locator("#galerie-video picture img")).toHaveCount(0);
+
+    const playButton = page.getByRole("button", { name: "Lire la vidéo" });
+    await expect(playButton).toBeVisible();
+    await playButton.click();
+
+    await expect(page.locator("#galerie-video iframe")).toBeVisible();
   });
 
   test('should completely manage categories and respect constraints', async ({ page }) => {
