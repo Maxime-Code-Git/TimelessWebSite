@@ -172,18 +172,12 @@ export async function action({ request }: ActionFunctionArgs) {
         newRevision = result.newRevision;
         if (result.deletedCoverId) {
           try {
-            const fs = await import("node:fs");
-            const path = await import("node:path");
             const { getPortfolioMediaPath } = await import("../lib/portfolio-content.server");
+            const { prepareVideoCoverDeletion } = await import("../lib/portfolio-image.server");
             const mediaBasePath = getPortfolioMediaPath();
-            const trashBasePath = path.join(mediaBasePath, "global-v2", ".trash");
-            const trashDir = path.join(trashBasePath, result.deletedCoverId);
-            fs.mkdirSync(trashBasePath, { recursive: true });
-            
-            const oldProjectDir = path.join(mediaBasePath, "global-v2", "photos", result.deletedCoverId);
-            if (fs.existsSync(oldProjectDir)) {
-              fs.renameSync(oldProjectDir, trashDir);
-              fs.rmSync(trashDir, { recursive: true, force: true });
+            const transaction = prepareVideoCoverDeletion(result.deletedCoverId, mediaBasePath);
+            if (transaction.hasQuarantine) {
+              transaction.commit();
             }
           } catch { /* ignore */ }
         }

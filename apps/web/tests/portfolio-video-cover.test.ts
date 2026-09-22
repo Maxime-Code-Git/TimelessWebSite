@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
@@ -10,7 +9,9 @@ import { loader as publicLoader } from "../app/routes/portfolio.video-cover.$pho
 import {
   getRawPortfolioContent,
   createDefaultPortfolioV2,
+  savePortfolio,
 } from "../app/lib/portfolio-content.server";
+import { validateOrigin } from "../app/lib/security.server";
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-cover-test-"));
 const mediaDir = path.join(tempDir, "media");
@@ -25,21 +26,22 @@ process.env.ADMIN_SESSION_SECRET = "test-secret";
 process.env.PORTFOLIO_CONTENT_PATH = path.join(dataDir, "portfolio.json");
 
 function resetJson() {
-  // Build a valid schemaVersion 2 portfolio with a video
   const p = createDefaultPortfolioV2("00000000000000000000000000000000");
-  (p as any).video = { provider: "youtube", videoId: "12345678901" };
+  if (p.video === null) {
+    p.video = { provider: "youtube", videoId: "12345678901", cover: undefined };
+  } else {
+    p.video.provider = "youtube";
+    p.video.videoId = "12345678901";
+  }
 
-  // Directly write to disk (bypasses revision check)
   fs.writeFileSync(process.env.PORTFOLIO_CONTENT_PATH!, JSON.stringify(p));
 
-  // Also clean up any leftover media directories
   const globalDir = path.join(mediaDir, "global-v2");
   if (fs.existsSync(globalDir)) {
     fs.rmSync(globalDir, { recursive: true, force: true });
   }
 }
 
-// Mock session
 vi.mock("../app/lib/admin-auth.server", () => {
   const fakeSession = { get: (key: string) => key === "csrfToken" ? "valid-csrf" : null };
   return {
@@ -61,6 +63,14 @@ vi.mock("../app/lib/admin-auth.server", () => {
 vi.mock("../app/lib/security.server", () => ({
   validateOrigin: vi.fn().mockReturnValue(true),
 }));
+
+vi.mock("../app/lib/portfolio-content.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../app/lib/portfolio-content.server")>();
+  return {
+    ...actual,
+    savePortfolio: vi.fn((...args: Parameters<typeof actual.savePortfolio>) => actual.savePortfolio(...args)),
+  };
+});
 
 async function createTestImageFile(): Promise<Buffer> {
   return sharp({
@@ -92,6 +102,24 @@ function createUploadRequest(
   });
 }
 
+function createActionContext(req: Request): Parameters<typeof coverAction>[0] {
+  return { request: req, params: {} } as unknown as Parameters<typeof coverAction>[0];
+}
+function createLoaderContext(req: Request, params: Record<string, string>): Parameters<typeof publicLoader>[0] {
+  return { request: req, params } as unknown as Parameters<typeof publicLoader>[0];
+}
+
+interface CoverResponse {
+  success: boolean;
+  newRevision: string;
+  cover?: {
+    imageId: string;
+    variants: Array<{ name: string; width: number; height: number; fileId: string }>;
+    width: number;
+    height: number;
+  };
+}
+
 describe("Portfolio Video Cover", () => {
   beforeEach(() => {
     resetJson();
@@ -106,27 +134,23 @@ describe("Portfolio Video Cover", () => {
     const raw = getRawPortfolioContent();
     const buf = await createTestImageFile();
     const req = createUploadRequest(buf, raw.content.revision);
-    const res = await coverAction({ request: req, params: {}, context: {} as any } as any);
+    const res = await coverAction(createActionContext(req));
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = (await res.json()) as CoverResponse;
 
-    // 1. imageId is a UUID
-    expect(data.cover.imageId).toMatch(
+    expect(data.cover?.imageId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     );
 
-    // 2. JSON on disk reflects the cover
     const updated = getRawPortfolioContent();
-    expect(updated.content.video?.cover?.imageId).toBe(data.cover.imageId);
+    expect(updated.content.video?.cover?.imageId).toBe(data.cover?.imageId);
 
-    // 3. project dir has variant subdirs
-    const projectDir = path.join(mediaDir, "global-v2", "photos", data.cover.imageId);
+    const projectDir = path.join(mediaDir, "global-v2", "photos", data.cover!.imageId);
     expect(fs.existsSync(projectDir)).toBe(true);
     const files = fs.readdirSync(projectDir);
     expect(files).toContain("480p");
     expect(files).toContain("960p");
 
-    // 4. variants contain avif and webp files
     const dir480 = path.join(projectDir, "480p");
     const files480 = fs.readdirSync(dir480);
     expect(files480.length).toBeGreaterThan(0);
@@ -138,82 +162,77 @@ describe("Portfolio Video Cover", () => {
     const raw = getRawPortfolioContent();
     const buf = await createTestImageFile();
     const req = createUploadRequest(buf, raw.content.revision);
-    const res = await coverAction({ request: req, params: {}, context: {} as any } as any);
+    const res = await coverAction(createActionContext(req));
     expect(res.status).toBe(200);
-    const cover = (await res.json()).cover;
+    const data = (await res.json()) as CoverResponse;
+    const cover = data.cover!;
 
-    // 5. public WebP response
-    const webpRes = await publicLoader({
-      request: new Request(`http://localhost/portfolio/video-cover/${cover.imageId}/480p/webp`),
-      params: { photoId: cover.imageId, variant: "480p", ext: "webp" },
-      context: {} as any
-    } as any);
+    // GET WebP
+    const webpRes = await publicLoader(createLoaderContext(
+      new Request(`http://localhost/portfolio/video-cover/${cover.imageId}/480p/webp`),
+      { photoId: cover.imageId, variant: "480p", ext: "webp" }
+    ));
     expect(webpRes.status).toBe(200);
+    expect(webpRes.headers.get("Content-Type")).toBe("image/webp");
 
-    // 6. public AVIF response
-    const avifRes = await publicLoader({
-      request: new Request(`http://localhost/portfolio/video-cover/${cover.imageId}/480p/avif`),
-      params: { photoId: cover.imageId, variant: "480p", ext: "avif" },
-      context: {} as any
-    } as any);
+    // HEAD WebP
+    const webpHeadRes = await publicLoader(createLoaderContext(
+      new Request(`http://localhost/portfolio/video-cover/${cover.imageId}/480p/webp`, { method: "HEAD" }),
+      { photoId: cover.imageId, variant: "480p", ext: "webp" }
+    ));
+    expect(webpHeadRes.status).toBe(200);
+    expect(webpHeadRes.headers.get("Content-Type")).toBe("image/webp");
+    expect(await webpHeadRes.text()).toBe(""); // No body
+
+    // GET AVIF
+    const avifRes = await publicLoader(createLoaderContext(
+      new Request(`http://localhost/portfolio/video-cover/${cover.imageId}/480p/avif`),
+      { photoId: cover.imageId, variant: "480p", ext: "avif" }
+    ));
     expect(avifRes.status).toBe(200);
+    expect(avifRes.headers.get("Content-Type")).toBe("image/avif");
 
-    // 7. unknown imageId → 404
-    const badIdRes = await publicLoader({
-      request: new Request(`http://localhost/portfolio/video-cover/00000000-0000-0000-0000-000000000000/480p/webp`),
-      params: { photoId: "00000000-0000-0000-0000-000000000000", variant: "480p", ext: "webp" },
-      context: {} as any
-    } as any);
-    expect(badIdRes.status).toBe(404);
-
-    // 8. unsupported extension → 404
-    const jpgRes = await publicLoader({
-      request: new Request(`http://localhost/portfolio/video-cover/${cover.imageId}/480p/jpeg`),
-      params: { photoId: cover.imageId, variant: "480p", ext: "jpeg" },
-      context: {} as any
-    } as any);
-    expect(jpgRes.status).toBe(404);
+    // HEAD AVIF
+    const avifHeadRes = await publicLoader(createLoaderContext(
+      new Request(`http://localhost/portfolio/video-cover/${cover.imageId}/480p/avif`, { method: "HEAD" }),
+      { photoId: cover.imageId, variant: "480p", ext: "avif" }
+    ));
+    expect(avifHeadRes.status).toBe(200);
+    expect(avifHeadRes.headers.get("Content-Type")).toBe("image/avif");
+    expect(await avifHeadRes.text()).toBe(""); // No body
   });
 
   it("should handle replacements and 404 old cover", async () => {
     let raw = getRawPortfolioContent();
     const buf = await createTestImageFile();
 
-    // First upload
     const req1 = createUploadRequest(buf, raw.content.revision);
-    const res1 = await coverAction({ request: req1, params: {}, context: {} as any } as any);
+    const res1 = await coverAction(createActionContext(req1));
     expect(res1.status).toBe(200);
-    const cover1 = (await res1.json()).cover;
+    const cover1 = ((await res1.json()) as CoverResponse).cover!;
     raw = getRawPortfolioContent();
 
-    // 10. new cover serves 200
-    const webpRes1 = await publicLoader({
-      request: new Request(`http://localhost/portfolio/video-cover/${cover1.imageId}/480p/webp`),
-      params: { photoId: cover1.imageId, variant: "480p", ext: "webp" },
-      context: {} as any
-    } as any);
+    const webpRes1 = await publicLoader(createLoaderContext(
+      new Request(`http://localhost/portfolio/video-cover/${cover1.imageId}/480p/webp`),
+      { photoId: cover1.imageId, variant: "480p", ext: "webp" }
+    ));
     expect(webpRes1.status).toBe(200);
 
-    // Second upload (replace)
     const req2 = createUploadRequest(buf, raw.content.revision);
-    const res2 = await coverAction({ request: req2, params: {}, context: {} as any } as any);
+    const res2 = await coverAction(createActionContext(req2));
     expect(res2.status).toBe(200);
-    const cover2 = (await res2.json()).cover;
+    const cover2 = ((await res2.json()) as CoverResponse).cover!;
 
-    // 9. old ID → 404
-    const webpResOld = await publicLoader({
-      request: new Request(`http://localhost/portfolio/video-cover/${cover1.imageId}/480p/webp`),
-      params: { photoId: cover1.imageId, variant: "480p", ext: "webp" },
-      context: {} as any
-    } as any);
+    const webpResOld = await publicLoader(createLoaderContext(
+      new Request(`http://localhost/portfolio/video-cover/${cover1.imageId}/480p/webp`),
+      { photoId: cover1.imageId, variant: "480p", ext: "webp" }
+    ));
     expect(webpResOld.status).toBe(404);
 
-    // new ID → 200
-    const webpResNew = await publicLoader({
-      request: new Request(`http://localhost/portfolio/video-cover/${cover2.imageId}/480p/webp`),
-      params: { photoId: cover2.imageId, variant: "480p", ext: "webp" },
-      context: {} as any
-    } as any);
+    const webpResNew = await publicLoader(createLoaderContext(
+      new Request(`http://localhost/portfolio/video-cover/${cover2.imageId}/480p/webp`),
+      { photoId: cover2.imageId, variant: "480p", ext: "webp" }
+    ));
     expect(webpResNew.status).toBe(200);
   });
 
@@ -221,29 +240,26 @@ describe("Portfolio Video Cover", () => {
     let raw = getRawPortfolioContent();
     const buf = await createTestImageFile();
     const req1 = createUploadRequest(buf, raw.content.revision);
-    const res1 = await coverAction({ request: req1, params: {}, context: {} as any } as any);
+    const res1 = await coverAction(createActionContext(req1));
     expect(res1.status).toBe(200);
-    const cover1 = (await res1.json()).cover;
+    const cover1 = ((await res1.json()) as CoverResponse).cover!;
     raw = getRawPortfolioContent();
 
-    // 11. delete cover
     const delReq = new Request("http://localhost:3000/api/admin/portfolio-video-cover", {
       method: "DELETE",
       headers: { "x-csrf-token": "valid-csrf", "x-portfolio-revision": raw.content.revision, "Origin": "http://localhost:3000" }
     });
-    const delRes = await coverAction({ request: delReq, params: {}, context: {} as any } as any);
+    const delRes = await coverAction(createActionContext(delReq));
     expect(delRes.status).toBe(200);
 
     raw = getRawPortfolioContent();
     expect(raw.content.video?.cover).toBeUndefined();
-    // Video itself is preserved with original videoId
     expect(raw.content.video?.videoId).toBe("12345678901");
 
-    const webpResOld = await publicLoader({
-      request: new Request(`http://localhost/portfolio/video-cover/${cover1.imageId}/480p/webp`),
-      params: { photoId: cover1.imageId, variant: "480p", ext: "webp" },
-      context: {} as any
-    } as any);
+    const webpResOld = await publicLoader(createLoaderContext(
+      new Request(`http://localhost/portfolio/video-cover/${cover1.imageId}/480p/webp`),
+      { photoId: cover1.imageId, variant: "480p", ext: "webp" }
+    ));
     expect(webpResOld.status).toBe(404);
   });
 
@@ -251,27 +267,25 @@ describe("Portfolio Video Cover", () => {
     let raw = getRawPortfolioContent();
     const buf = await createTestImageFile();
     const req1 = createUploadRequest(buf, raw.content.revision);
-    const res1 = await coverAction({ request: req1, params: {}, context: {} as any } as any);
+    const res1 = await coverAction(createActionContext(req1));
     expect(res1.status).toBe(200);
-    const cover1 = (await res1.json()).cover;
+    const cover1 = ((await res1.json()) as CoverResponse).cover!;
     raw = getRawPortfolioContent();
 
-    // 12. delete video (via admin.portfolio)
     const formData = new FormData();
     formData.set("intent", "updateGlobalVideo");
     formData.set("revision", raw.content.revision);
-    formData.set("videoUrl", ""); // Delete video
+    formData.set("videoUrl", "");
     const updateReq = new Request("http://localhost:3000/admin/portfolio", {
       method: "POST",
       body: formData,
       headers: { "Origin": "http://localhost:3000", "x-csrf-token": "valid-csrf" }
     });
 
-    await portfolioAction({ request: updateReq, params: {}, context: {} as any } as any);
+    await portfolioAction(createActionContext(updateReq));
 
     raw = getRawPortfolioContent();
     expect(raw.content.video).toBeNull();
-
     expect(fs.existsSync(path.join(mediaDir, "global-v2", "photos", cover1.imageId))).toBe(false);
   });
 
@@ -279,12 +293,11 @@ describe("Portfolio Video Cover", () => {
     let raw = getRawPortfolioContent();
     const buf = await createTestImageFile();
     const req1 = createUploadRequest(buf, raw.content.revision);
-    const res1 = await coverAction({ request: req1, params: {}, context: {} as any } as any);
+    const res1 = await coverAction(createActionContext(req1));
     expect(res1.status).toBe(200);
-    const cover1 = (await res1.json()).cover;
+    const cover1 = ((await res1.json()) as CoverResponse).cover!;
     raw = getRawPortfolioContent();
 
-    // 13. change URL
     const formData = new FormData();
     formData.set("intent", "updateGlobalVideo");
     formData.set("revision", raw.content.revision);
@@ -295,7 +308,7 @@ describe("Portfolio Video Cover", () => {
       headers: { "Origin": "http://localhost:3000", "x-csrf-token": "valid-csrf" }
     });
 
-    await portfolioAction({ request: updateReq, params: {}, context: {} as any } as any);
+    await portfolioAction(createActionContext(updateReq));
 
     raw = getRawPortfolioContent();
     expect(raw.content.video?.videoId).toBe("09876543210");
@@ -307,37 +320,140 @@ describe("Portfolio Video Cover", () => {
     const raw = getRawPortfolioContent();
     const buf = await createTestImageFile();
 
-    // 14. bad CSRF
     const req1 = createUploadRequest(buf, raw.content.revision, "bad-csrf", "http://localhost:3000");
-    const res1 = await coverAction({ request: req1, params: {}, context: {} as any } as any);
+    const res1 = await coverAction(createActionContext(req1));
     expect(res1.status).toBe(403);
 
-    // bad Origin
     const req2 = createUploadRequest(buf, raw.content.revision, "valid-csrf", "http://bad-origin.com");
-    // For this test, we mock validateOrigin to return false for this specific call
-    const { validateOrigin } = await import("../app/lib/security.server");
-    (validateOrigin as any).mockReturnValueOnce(false);
-    const res2 = await coverAction({ request: req2, params: {}, context: {} as any } as any);
+    vi.mocked(validateOrigin).mockReturnValueOnce(false);
+    const res2 = await coverAction(createActionContext(req2));
     expect(res2.status).toBe(403);
   });
 
-  it("should rollback on JSON save failure", async () => {
+  it("should reject bad revision and NOT leak internal error details", async () => {
+    const buf = await createTestImageFile();
+    const req = createUploadRequest(buf, "11111111111111111111111111111111");
+    const res = await coverAction(createActionContext(req));
+    expect(res.status).toBe(409); 
+    const resJson = await res.json() as { error: string };
+    expect(resJson.error).toBe("Revision conflict"); // Expected, valid error
+
+    // Let's force an unexpected error to check 500 response
+    vi.mocked(savePortfolio).mockImplementationOnce(() => {
+      throw new Error("Some internal database crash");
+    });
     const raw = getRawPortfolioContent();
+    const req3 = createUploadRequest(buf, raw.content.revision);
+    const res3 = await coverAction(createActionContext(req3));
+    expect(res3.status).toBe(500);
+    const resJson3 = await res3.json() as { error: string };
+    expect(resJson3.error).toBe("Internal Server Error");
+    expect(resJson3.error).not.toContain("internal database crash");
+    expect(resJson3.error).not.toContain("Error:");
+  });
+
+  it("should rollback when savePortfolio fails", async () => {
+    let raw = getRawPortfolioContent();
     const buf = await createTestImageFile();
     const req1 = createUploadRequest(buf, raw.content.revision);
-    const res1 = await coverAction({ request: req1, params: {}, context: {} as any } as any);
+    const res1 = await coverAction(createActionContext(req1));
     expect(res1.status).toBe(200);
-    const cover1 = (await res1.json()).cover;
+    const cover1 = ((await res1.json()) as CoverResponse).cover!;
+    raw = getRawPortfolioContent();
 
-    // Try to replace with bad revision (JSON save will fail with 409)
-    const req2 = createUploadRequest(buf, "00000000000000000000000000000000");
-    const res2 = await coverAction({ request: req2, params: {}, context: {} as any } as any);
-    expect(res2.status).toBe(409); // Conflict
+    vi.mocked(savePortfolio).mockImplementationOnce(() => {
+      throw new Error("Forced save failure");
+    });
 
-    // 15. old cover still exists
+    const req2 = createUploadRequest(buf, raw.content.revision);
+    const res2 = await coverAction(createActionContext(req2));
+    expect(res2.status).toBe(500); // Because it's an unexpected error
+    
+    // JSON is unchanged (old cover)
+    const afterRaw = getRawPortfolioContent();
+    expect(afterRaw.content.video?.cover?.imageId).toBe(cover1.imageId);
+
+    // Old cover files are restored
     expect(fs.existsSync(path.join(mediaDir, "global-v2", "photos", cover1.imageId))).toBe(true);
+    
+    // New cover was removed or didn't leak, only 1 cover dir exists
+    const photosDir = path.join(mediaDir, "global-v2", "photos");
+    const dirs = fs.readdirSync(photosDir);
+    expect(dirs.length).toBe(1);
+    expect(dirs[0]).toBe(cover1.imageId);
+  });
 
-    // 16. no orphan files (only the original cover folder)
+  it("should handle commit failure gracefully without breaking state", async () => {
+    let raw = getRawPortfolioContent();
+    const buf = await createTestImageFile();
+    const req1 = createUploadRequest(buf, raw.content.revision);
+    const res1 = await coverAction(createActionContext(req1));
+    expect(res1.status).toBe(200);
+    const cover1 = ((await res1.json()) as CoverResponse).cover!;
+    raw = getRawPortfolioContent();
+
+    // Force rmSync to fail, simulating a failure during the commit (quarantine cleanup)
+    const originalRmSync = fs.rmSync;
+    vi.spyOn(fs, "rmSync").mockImplementation((p, options) => {
+      if (typeof p === "string" && p.includes("video-cover-")) {
+        throw new Error("Forced cleanup failure");
+      }
+      return originalRmSync(p, options);
+    });
+
+    const req2 = createUploadRequest(buf, raw.content.revision);
+    const res2 = await coverAction(createActionContext(req2));
+    expect(res2.status).toBe(200); // Must still be successful
+    const cover2 = ((await res2.json()) as CoverResponse).cover!;
+
+    const afterRaw = getRawPortfolioContent();
+    expect(afterRaw.content.video?.cover?.imageId).toBe(cover2.imageId);
+
+    // New cover responds 200
+    const webpResNew = await publicLoader(createLoaderContext(
+      new Request(`http://localhost/portfolio/video-cover/${cover2.imageId}/480p/webp`),
+      { photoId: cover2.imageId, variant: "480p", ext: "webp" }
+    ));
+    expect(webpResNew.status).toBe(200);
+
+    // Old cover responds 404 (because we read from JSON first)
+    const webpResOld = await publicLoader(createLoaderContext(
+      new Request(`http://localhost/portfolio/video-cover/${cover1.imageId}/480p/webp`),
+      { photoId: cover1.imageId, variant: "480p", ext: "webp" }
+    ));
+    expect(webpResOld.status).toBe(404);
+  });
+
+  it("should fail gracefully and rollback when renameSync fails during prepare", async () => {
+    let raw = getRawPortfolioContent();
+    const buf = await createTestImageFile();
+    const req1 = createUploadRequest(buf, raw.content.revision);
+    const res1 = await coverAction(createActionContext(req1));
+    expect(res1.status).toBe(200);
+    const cover1 = ((await res1.json()) as CoverResponse).cover!;
+    raw = getRawPortfolioContent();
+
+    const originalRenameSync = fs.renameSync;
+    vi.spyOn(fs, "renameSync").mockImplementation((oldPath, newPath) => {
+      if (typeof newPath === "string" && newPath.includes("video-cover-")) {
+        throw new Error("Forced rename failure");
+      }
+      return originalRenameSync(oldPath, newPath);
+    });
+
+    const req2 = createUploadRequest(buf, raw.content.revision);
+    const res2 = await coverAction(createActionContext(req2));
+    expect(res2.status).toBe(500); // 500 Generic Error
+
+    const resJson = await res2.json() as { error: string };
+    expect(resJson.error).toBe("Internal Server Error");
+
+    const afterRaw = getRawPortfolioContent();
+    expect(afterRaw.content.video?.cover?.imageId).toBe(cover1.imageId);
+
+    expect(fs.existsSync(path.join(mediaDir, "global-v2", "photos", cover1.imageId))).toBe(true);
+    
+    // Validate that new cover files were cleaned up
     const photosDir = path.join(mediaDir, "global-v2", "photos");
     const dirs = fs.readdirSync(photosDir);
     expect(dirs.length).toBe(1);

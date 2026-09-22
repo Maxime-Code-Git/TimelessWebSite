@@ -782,3 +782,72 @@ export async function processVideoCover(
     throw err;
   }
 }
+
+export interface VideoCoverTransaction {
+  commit: (injectedRmSync?: typeof fs.rmSync) => void;
+  rollback: (injectedRenameSync?: typeof fs.renameSync, injectedRmSync?: typeof fs.rmSync) => void;
+  hasQuarantine: boolean;
+}
+
+export function prepareVideoCoverDeletion(
+  imageId: string,
+  mediaBasePath: string,
+  injectedRenameSync: typeof fs.renameSync = fs.renameSync,
+  injectedLstatSync: typeof fs.lstatSync = fs.lstatSync,
+  _injectedRmSync: typeof fs.rmSync = fs.rmSync,
+  injectedExistsSync: typeof fs.existsSync = fs.existsSync
+): VideoCoverTransaction {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(imageId)) {
+    return { commit: () => {}, rollback: () => {}, hasQuarantine: false };
+  }
+
+  const resolvedMediaBasePath = path.resolve(mediaBasePath);
+  const globalV2Dir = path.resolve(resolvedMediaBasePath, "global-v2");
+  const photosDir = path.resolve(globalV2Dir, "photos");
+  const projectDir = path.resolve(photosDir, imageId);
+  const trashDir = path.resolve(globalV2Dir, ".trash");
+
+  validateConfinement(projectDir, resolvedMediaBasePath);
+  validateConfinement(trashDir, resolvedMediaBasePath);
+
+  if (!injectedExistsSync(projectDir)) {
+    return { commit: () => {}, rollback: () => {}, hasQuarantine: false };
+  }
+
+  const stat = injectedLstatSync(projectDir);
+  if (stat.isSymbolicLink()) {
+    throw new SafeImageError("Symlinks not allowed in media directory");
+  }
+
+  if (!injectedExistsSync(trashDir)) {
+    ensureStrictDirectoryCreated(trashDir, resolvedMediaBasePath);
+  }
+
+  const quarantinePath = path.resolve(trashDir, `video-cover-${imageId}-${crypto.randomUUID()}`);
+  if (injectedExistsSync(quarantinePath)) {
+    throw new SafeImageError("Quarantine path collision");
+  }
+
+  injectedRenameSync(projectDir, quarantinePath);
+
+  return {
+    hasQuarantine: true,
+    commit: (rmSync = fs.rmSync) => {
+      try {
+        rmSync(quarantinePath, { recursive: true, force: true });
+      } catch (e) {
+        console.warn("Non-critical cleanup failure in .trash directory.", e);
+      }
+    },
+    rollback: (renameSync = fs.renameSync, rmSync = fs.rmSync) => {
+      try {
+        if (injectedExistsSync(projectDir)) {
+          rmSync(projectDir, { recursive: true, force: true });
+        }
+        renameSync(quarantinePath, projectDir);
+      } catch (e) {
+        throw new SafeImageError(`Rollback failed for video-cover/${imageId}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  };
+}

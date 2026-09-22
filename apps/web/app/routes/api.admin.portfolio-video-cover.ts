@@ -21,7 +21,7 @@ import {
 } from "../lib/site-content.server";
 import {
   processVideoCover,
-  removeProcessedImage,
+  prepareVideoCoverDeletion,
   SafeImageError,
 } from "../lib/portfolio-image.server";
 
@@ -192,7 +192,7 @@ export async function action({ request }: ActionFunctionArgs) {
     if (error instanceof RevisionConflictError || error instanceof CorruptedContentError) {
       return jsonError("Revision conflict", 409);
     }
-    return jsonError(error instanceof Error ? error.stack || error.message : String(error), 500);
+    return jsonError("Internal Server Error", 500);
   }
 
   const { content, isCorrupted } = getRawPortfolioContent();
@@ -200,39 +200,35 @@ export async function action({ request }: ActionFunctionArgs) {
     return jsonError("Video not found or corrupted", 400);
   }
 
+  const mediaBasePath = getPortfolioMediaPath();
+
   if (request.method === "DELETE") {
     if (!content.video.cover) {
       return Response.json({ success: true, newRevision: previousRevision }, { headers: { "Cache-Control": "no-store" } });
     }
-    const oldCoverId = content.video.cover.imageId;
     
-    const mediaBasePath = getPortfolioMediaPath();
-    const trashBasePath = path.join(mediaBasePath, "global-v2", ".trash");
-    fs.mkdirSync(trashBasePath, { recursive: true });
-    
-    const oldProjectDir = path.join(mediaBasePath, "global-v2", "photos", oldCoverId);
-    const trashDir = path.join(trashBasePath, oldCoverId);
-    
-    if (fs.existsSync(oldProjectDir)) {
-      fs.renameSync(oldProjectDir, trashDir);
+    let transaction;
+    try {
+      transaction = prepareVideoCoverDeletion(content.video.cover.imageId, mediaBasePath);
+    } catch (e: unknown) {
+      if (e instanceof SafeImageError) {
+        return jsonError(e.message, 422);
+      }
+      return jsonError("Internal Server Error", 500);
     }
-    
+
     content.video.cover = undefined;
 
     try {
       const newRevision = savePortfolio(content, previousRevision);
-      if (fs.existsSync(trashDir)) {
-        fs.rmSync(trashDir, { recursive: true, force: true });
-      }
+      transaction.commit();
       return Response.json({ success: true, newRevision }, { headers: { "Cache-Control": "no-store" } });
     } catch (error: unknown) {
-      if (fs.existsSync(trashDir)) {
-        fs.renameSync(trashDir, oldProjectDir);
-      }
+      transaction.rollback();
       if (error instanceof RevisionConflictError || error instanceof CorruptedContentError) {
         return jsonError("Revision conflict", 409);
       }
-      return jsonError(error instanceof Error ? error.stack || error.message : String(error), 500);
+      return jsonError("Internal Server Error", 500);
     }
   }
 
@@ -242,8 +238,9 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const photoId = crypto.randomUUID();
-
   let tempDirectory: string | null = null;
+  let transaction: ReturnType<typeof prepareVideoCoverDeletion> | null = null;
+  
   try {
     tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-portfolio-video-cover-"));
     fs.chmodSync(tempDirectory, 0o700);
@@ -254,85 +251,66 @@ export async function action({ request }: ActionFunctionArgs) {
       uploadedFilePath,
       tempDirectory,
       photoId,
-      getPortfolioMediaPath()
+      mediaBasePath
     );
 
-    try {
-      const oldCoverId = content.video.cover?.imageId;
-      
-      const mediaBasePath = getPortfolioMediaPath();
-      const trashBasePath = path.join(mediaBasePath, "global-v2", ".trash");
-      fs.mkdirSync(trashBasePath, { recursive: true });
-      
-      if (oldCoverId) {
-        const oldProjectDir = path.join(mediaBasePath, "global-v2", "photos", oldCoverId);
-        const trashDir = path.join(trashBasePath, oldCoverId);
-        if (fs.existsSync(oldProjectDir)) {
-          fs.renameSync(oldProjectDir, trashDir);
-        }
-      }
-
-      content.video.cover = {
-        imageId: photoId,
-        variants: processed.variants.map(v => ({
-          name: v.name as "480p" | "960p" | "1440p" | "1920p",
-          width: v.width,
-          height: v.height,
-          fileId: v.fileId
-        })),
-        width: processed.originalWidth,
-        height: processed.originalHeight
-      };
-
-      try {
-        const newRevision = savePortfolio(content, previousRevision);
-
-        if (oldCoverId) {
-          const trashDir = path.join(trashBasePath, oldCoverId);
-          if (fs.existsSync(trashDir)) {
-            fs.rmSync(trashDir, { recursive: true, force: true });
-          }
-        }
-
-        return Response.json({
-          success: true,
-          newRevision,
-          cover: content.video.cover
-        }, { headers: { "Cache-Control": "no-store" } });
-      } catch (saveError) {
-        // Rollback JSON save error
-        if (oldCoverId) {
-          const oldProjectDir = path.join(mediaBasePath, "global-v2", "photos", oldCoverId);
-          const trashDir = path.join(trashBasePath, oldCoverId);
-          if (fs.existsSync(trashDir)) {
-            fs.renameSync(trashDir, oldProjectDir);
-          }
-        }
-        
-        // Remove newly generated cover
-        const newProjectDir = path.join(mediaBasePath, "global-v2", "photos", photoId);
-        if (fs.existsSync(newProjectDir)) {
-          fs.rmSync(newProjectDir, { recursive: true, force: true });
-        }
-        
-        throw saveError;
-      }
-    } catch (error: unknown) {
-      try {
-        removeProcessedImage(photoId, getPortfolioMediaPath(), processed);
-      } catch {
-        return jsonError("Generated media cleanup failed.", 500);
-      }
-      if (error instanceof RevisionConflictError || error instanceof CorruptedContentError) {
-        return jsonError("Revision conflict", 409);
-      }
-      if (error instanceof ValidationError) return jsonError(error.message, 422);
-      return jsonError(error instanceof Error ? error.stack || error.message : String(error), 500);
+    if (content.video.cover) {
+      transaction = prepareVideoCoverDeletion(content.video.cover.imageId, mediaBasePath);
     }
+
+    content.video.cover = {
+      imageId: photoId,
+      variants: processed.variants.map(v => ({
+        name: v.name as "480p" | "960p" | "1440p" | "1920p",
+        width: v.width,
+        height: v.height,
+        fileId: v.fileId
+      })),
+      width: processed.originalWidth,
+      height: processed.originalHeight
+    };
+
+    let newRevision: string;
+    try {
+      newRevision = savePortfolio(content, previousRevision);
+    } catch (saveError) {
+      if (transaction) {
+        transaction.rollback();
+      }
+      const newProjectDir = path.join(mediaBasePath, "global-v2", "photos", photoId);
+      try {
+        fs.rmSync(newProjectDir, { recursive: true, force: true });
+      } catch (e) {
+        console.warn("Non-critical cleanup failure for orphaned new cover", e);
+      }
+      throw saveError;
+    }
+    
+    if (transaction) {
+      transaction.commit();
+    }
+    return Response.json({
+      success: true,
+      newRevision,
+      cover: content.video.cover
+    }, { headers: { "Cache-Control": "no-store" } });
+
   } catch (error: unknown) {
+    const newProjectDir = path.join(mediaBasePath, "global-v2", "photos", photoId);
+    try {
+      if (fs.existsSync(newProjectDir)) {
+        fs.rmSync(newProjectDir, { recursive: true, force: true });
+      }
+    } catch { /* best-effort cleanup */ }
+
     if (error instanceof UploadRequestError) return jsonError(error.message, error.status);
-    if (error instanceof SafeImageError) return jsonError(error.message, 422);
-    return jsonError(error instanceof Error ? error.stack || error.message : String(error), 500);
+    if (error instanceof RevisionConflictError || error instanceof CorruptedContentError) {
+      return jsonError("Revision conflict", 409);
+    }
+    if (error instanceof SafeImageError || error instanceof ValidationError) {
+      return jsonError(error.message, 422);
+    }
+    return jsonError("Internal Server Error", 500);
   } finally {
     if (tempDirectory) {
       try { fs.rmSync(tempDirectory, { recursive: true, force: true }); } catch { /* best-effort */ }
