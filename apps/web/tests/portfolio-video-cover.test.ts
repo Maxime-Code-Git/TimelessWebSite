@@ -334,7 +334,7 @@ describe("Portfolio Video Cover", () => {
     const buf = await createTestImageFile();
     const req = createUploadRequest(buf, "11111111111111111111111111111111");
     const res = await coverAction(createActionContext(req));
-    expect(res.status).toBe(409); 
+    expect(res.status).toBe(409);
     const resJson = await res.json() as { error: string };
     expect(resJson.error).toBe("Revision conflict"); // Expected, valid error
 
@@ -368,14 +368,14 @@ describe("Portfolio Video Cover", () => {
     const req2 = createUploadRequest(buf, raw.content.revision);
     const res2 = await coverAction(createActionContext(req2));
     expect(res2.status).toBe(500); // Because it's an unexpected error
-    
+
     // JSON is unchanged (old cover)
     const afterRaw = getRawPortfolioContent();
     expect(afterRaw.content.video?.cover?.imageId).toBe(cover1.imageId);
 
     // Old cover files are restored
     expect(fs.existsSync(path.join(mediaDir, "global-v2", "photos", cover1.imageId))).toBe(true);
-    
+
     // New cover was removed or didn't leak, only 1 cover dir exists
     const photosDir = path.join(mediaDir, "global-v2", "photos");
     const dirs = fs.readdirSync(photosDir);
@@ -452,7 +452,7 @@ describe("Portfolio Video Cover", () => {
     expect(afterRaw.content.video?.cover?.imageId).toBe(cover1.imageId);
 
     expect(fs.existsSync(path.join(mediaDir, "global-v2", "photos", cover1.imageId))).toBe(true);
-    
+
     // Validate that new cover files were cleaned up
     const photosDir = path.join(mediaDir, "global-v2", "photos");
     const dirs = fs.readdirSync(photosDir);

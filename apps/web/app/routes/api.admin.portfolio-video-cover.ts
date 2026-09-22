@@ -206,7 +206,7 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!content.video.cover) {
       return Response.json({ success: true, newRevision: previousRevision }, { headers: { "Cache-Control": "no-store" } });
     }
-    
+
     let transaction;
     try {
       transaction = prepareVideoCoverDeletion(content.video.cover.imageId, mediaBasePath);
@@ -240,7 +240,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const photoId = crypto.randomUUID();
   let tempDirectory: string | null = null;
   let transaction: ReturnType<typeof prepareVideoCoverDeletion> | null = null;
-  
+
   try {
     tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-portfolio-video-cover-"));
     fs.chmodSync(tempDirectory, 0o700);
@@ -285,7 +285,7 @@ export async function action({ request }: ActionFunctionArgs) {
       }
       throw saveError;
     }
-    
+
     if (transaction) {
       transaction.commit();
     }

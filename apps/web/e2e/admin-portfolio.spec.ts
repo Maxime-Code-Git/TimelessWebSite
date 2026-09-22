@@ -61,7 +61,31 @@ test.describe('Admin Portfolio V2', () => {
     await expect(page.locator('input[name="videoUrl"]')).toHaveValue('');
   });
 
-  test('should manage video cover', async ({ page }) => {
+  test('should manage video cover', async ({ page, request }, testInfo) => {
+    const firstCoverPath = testInfo.outputPath('portfolio-cover-1.jpg');
+    const secondCoverPath = testInfo.outputPath('portfolio-cover-2.jpg');
+
+    // Import sharp dynamically so it works seamlessly inside the test file (or top level if preferred)
+    const sharp = (await import('sharp')).default;
+
+    await sharp({
+      create: {
+        width: 1200,
+        height: 675,
+        channels: 3,
+        background: { r: 30, g: 70, b: 90 },
+      },
+    }).jpeg({ quality: 90 }).toFile(firstCoverPath);
+
+    await sharp({
+      create: {
+        width: 1200,
+        height: 675,
+        channels: 3,
+        background: { r: 150, g: 90, b: 40 },
+      },
+    }).jpeg({ quality: 90 }).toFile(secondCoverPath);
+
     await page.goto('/admin/portfolio');
     await page.fill('input[name="videoUrl"]', 'https://vimeo.com/76979871');
     await page.click('button:has-text("Enregistrer Vidéo")');
@@ -70,33 +94,53 @@ test.describe('Admin Portfolio V2', () => {
     const fileChooserPromise = page.waitForEvent('filechooser');
     await page.click('button:has-text("Ajouter une cover")');
     const fileChooser = await fileChooserPromise;
-    
-    const buf = await fs.promises.readFile(path.join(process.cwd(), 'public', 'favicon.ico'));
-    const tmpFile = path.join(os.tmpdir(), 'test-cover.jpg');
-    fs.writeFileSync(tmpFile, buf);
-    await fileChooser.setFiles(tmpFile);
+    await fileChooser.setFiles(firstCoverPath);
 
-    await expect(page.locator('img[alt="Cover"]')).toBeVisible({ timeout: 10000 });
+    const coverImage = page.locator('img[alt="Cover"]');
+    await expect(coverImage).toBeVisible({ timeout: 10000 });
+    const firstSrc = await coverImage.getAttribute('src');
+    if (!firstSrc) throw new Error("firstSrc is null");
+
+    const firstRes = await request.get(firstSrc);
+    expect(firstRes.status()).toBe(200);
 
     // Public display
     await page.goto('/fr/portfolio');
     await expect(page.locator('#galerie-video picture img')).toBeVisible({ timeout: 10000 });
-    
+
     // Replace
     await page.goto('/admin/portfolio');
     const fileChooserPromise2 = page.waitForEvent('filechooser');
     await page.click('button:has-text("Remplacer la cover")');
     const fileChooser2 = await fileChooserPromise2;
-    await fileChooser2.setFiles(tmpFile);
+    await fileChooser2.setFiles(secondCoverPath);
     await expect(page.locator('img[alt="Cover"]')).toBeVisible({ timeout: 10000 });
+
+    // Wait until the src has actually changed
+    await expect(coverImage).not.toHaveAttribute('src', firstSrc, { timeout: 10000 });
+    const secondSrc = await coverImage.getAttribute('src');
+    if (!secondSrc) throw new Error("secondSrc is null");
+
+    expect(secondSrc).not.toBe(firstSrc);
+
+    const oldRes = await request.get(firstSrc);
+    expect(oldRes.status()).toBe(404);
+
+    const newRes = await request.get(secondSrc);
+    expect(newRes.status()).toBe(200);
 
     // Delete cover
     await page.click('button:has-text("Supprimer la cover")');
     await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
 
+    const deletedRes = await request.get(secondSrc);
+    expect(deletedRes.status()).toBe(404);
+
     // Public display after delete
     await page.goto('/fr/portfolio');
     await expect(page.locator('#galerie-video picture img')).toHaveCount(0);
+    // Ensure video is still configured
+    await expect(page.locator('#galerie-video iframe')).toBeVisible();
   });
 
   test('should completely manage categories and respect constraints', async ({ page }) => {
