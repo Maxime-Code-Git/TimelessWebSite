@@ -2,13 +2,22 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Admin Contact End-to-End', () => {
   test('authenticates, modifies content, verifies persistance and public visibility, then restores', async ({ page }) => {
-    await page.goto('/admin');
-    await page.fill('input[name="password"]', 'e2e_password');
-    await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/admin$/);
+    await page.goto("/admin");
+    await page.getByLabel("Mot de passe").fill("e2e_password");
+    await page.getByRole("button", { name: "Se connecter" }).click();
 
-    await page.goto('/admin/contact');
+    await expect(
+      page.getByRole("heading", { name: "Administration Sempra" })
+    ).toBeVisible();
+
+    await expect(page.getByText("Vous êtes connecté")).toBeVisible();
+
+    await page.getByRole("link", { name: /Page Contact/ }).click();
+
     await expect(page).toHaveURL(/\/admin\/contact$/);
+    await expect(
+      page.getByRole("heading", { name: "Page Contact" })
+    ).toBeVisible();
 
     // Read original values FR
     await page.click('button:has-text("Français")');
