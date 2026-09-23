@@ -3,7 +3,7 @@ import { useFetcher, useRouteLoaderData, Link, useSearchParams } from "react-rou
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
-import { getStrings } from "~/lib/i18n";
+
 import type { loader as rootLoader } from "../root";
 import { VisioBooking } from "~/components/booking/VisioBooking";
 import styles from "./contact.module.css";
@@ -13,8 +13,8 @@ interface ContactPageProps {
 }
 
 export function ContactPage({ lang }: ContactPageProps) {
-  const t = getStrings(lang).contact;
   const rootData = useRouteLoaderData<typeof rootLoader>("root");
+  const contactContent = rootData?.siteContent?.contactPage;
   const BUSINESS = rootData?.siteContent?.business;
   const [searchParams] = useSearchParams();
   const rawInitialFormula = searchParams.get("formula") || "";
@@ -70,17 +70,17 @@ export function ContactPage({ lang }: ContactPageProps) {
       {/* Hero Section */}
       <section className={styles.heroSection}>
         <div className={styles.heroDivider} />
-        <h1 className={styles.heroTitle}>{t.heroTitle}</h1>
-        <p className={styles.heroSubtitle}>{t.heroSubtitle}</p>
+        <h1 className={styles.heroTitle}>{contactContent?.hero.title[lang]}</h1>
+        <p className={styles.heroSubtitle}>{contactContent?.hero.subtitle[lang]}</p>
       </section>
 
       {/* Call Banner */}
       <section className={styles.callSection}>
-        <h2 className={styles.callTitle}>{t.callTitle}</h2>
-        <p className={styles.callSubtitle}>{t.callSubtitle}</p>
+        <h2 className={styles.callTitle}>{contactContent?.introBanner.title[lang]}</h2>
+        <p className={styles.callSubtitle}>{contactContent?.introBanner.subtitle[lang]}</p>
         <div className={styles.badges}>
-          {t.callBadges.map((badge, i) => (
-            <span key={i} className={styles.badge}>{badge}</span>
+          {contactContent?.introBanner.badges.map((badge) => (
+            <span key={badge.id} className={styles.badge}>{badge.label[lang]}</span>
           ))}
         </div>
       </section>
@@ -89,19 +89,19 @@ export function ContactPage({ lang }: ContactPageProps) {
       <section className={styles.bookingSection}>
           <div className={styles.bookingContainer}>
             <div className={styles.bookingIntro}>
-              <p className={styles.bookingTitle}>{t.bookingTitle}</p>
-              <h3 className={styles.bookingSubtitle}>{t.bookingSubtitle}</h3>
-              <p className={styles.bookingDesc}>{t.bookingDescription}</p>
-              <p className={styles.bookingNote}>{t.bookingNote}</p>
+              <p className={styles.bookingTitle}>{contactContent?.bookingIntro.overtitle[lang]}</p>
+              <h3 className={styles.bookingSubtitle}>{contactContent?.bookingIntro.title[lang]}</h3>
+              <p className={styles.bookingDesc}>{contactContent?.bookingIntro.description[lang]}</p>
+              <p className={styles.bookingNote}>{contactContent?.bookingIntro.note[lang]}</p>
             </div>
 
-            <VisioBooking language={lang} />
+            <VisioBooking language={lang} content={contactContent?.visioBooking} />
           </div>
       </section>
 
         {/* Main Form */}
       <section className={styles.formSection}>
-        <h3 className={styles.formPrompt}>{t.formPrompt}</h3>
+        <h3 className={styles.formPrompt}>{contactContent?.contactForm.formPrompt[lang]}</h3>
 
         <div className={styles.formGrid}>
           <fetcher.Form method="post" ref={formRef} action={lang === "fr" ? "/fr/contact" : "/en/contact"}>
@@ -124,40 +124,38 @@ export function ContactPage({ lang }: ContactPageProps) {
                 tabIndex={-1}
                 ref={successRef}
               >
-                {lang === "fr"
-                  ? "Votre message a bien été envoyé. Nous vous répondrons sous 48 h."
-                  : "Your message has been sent successfully. We will reply within 48 hours."}
+                {contactContent?.contactForm.successMsg[lang]}
               </div>
             )}
             <div className={styles.formGroup}>
-              <label htmlFor="names" className={styles.label}>{t.formLabels.names}</label>
-              <input type="text" id="names" name="names" required className={styles.input} placeholder={t.formPlaceholders.names} />
+              <label htmlFor="names" className={styles.label}>{contactContent?.contactForm.labels.names[lang]}</label>
+              <input type="text" id="names" name="names" required className={styles.input} placeholder={contactContent?.contactForm.placeholders.names[lang]} />
             </div>
 
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
-                <label htmlFor="email" className={styles.label}>{t.formLabels.email}</label>
-                <input type="email" id="email" name="email" required className={styles.input} placeholder={t.formPlaceholders.email} />
+                <label htmlFor="email" className={styles.label}>{contactContent?.contactForm.labels.email[lang]}</label>
+                <input type="email" id="email" name="email" required className={styles.input} placeholder={contactContent?.contactForm.placeholders.email[lang]} />
               </div>
               <div className={styles.formGroup}>
-                <label htmlFor="phone" className={styles.label}>{t.formLabels.phone}</label>
-                <input type="tel" id="phone" name="phone" className={styles.input} placeholder={t.formPlaceholders.phone} />
+                <label htmlFor="phone" className={styles.label}>{contactContent?.contactForm.labels.phone[lang]}</label>
+                <input type="tel" id="phone" name="phone" className={styles.input} placeholder={contactContent?.contactForm.placeholders.phone[lang]} />
               </div>
             </div>
 
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
-                <label htmlFor="date" className={styles.label}>{t.formLabels.date}</label>
+                <label htmlFor="date" className={styles.label}>{contactContent?.contactForm.labels.date[lang]}</label>
                 <input type="date" id="date" name="date" required className={styles.input} />
               </div>
               <div className={styles.formGroup}>
-                <label htmlFor="location" className={styles.label}>{t.formLabels.location}</label>
-                <input type="text" id="location" name="location" required className={styles.input} placeholder={t.formPlaceholders.location} />
+                <label htmlFor="location" className={styles.label}>{contactContent?.contactForm.labels.location[lang]}</label>
+                <input type="text" id="location" name="location" required className={styles.input} placeholder={contactContent?.contactForm.placeholders.location[lang]} />
               </div>
             </div>
 
             <div className={styles.formGroup}>
-              <label htmlFor="formula" className={styles.label}>{t.formLabels.formula}</label>
+              <label htmlFor="formula" className={styles.label}>{contactContent?.contactForm.labels.formula[lang]}</label>
               <select
                 id="formula"
                 name="formula"
@@ -166,9 +164,9 @@ export function ContactPage({ lang }: ContactPageProps) {
                 value={selectedFormula}
                 onChange={e => setSelectedFormula(e.target.value)}
               >
-                <option value="" disabled>{t.formPlaceholders.formulaDefault}</option>
+                <option value="" disabled>{contactContent?.contactForm.placeholders.formulaDefault[lang]}</option>
                 {rootData?.siteContent?.pricing && Object.entries(rootData.siteContent.pricing).map(([cat, formulas]) => (
-                  <optgroup key={cat} label={cat === 'photo' ? (lang === 'fr' ? 'Photographie' : 'Photography') : cat === 'film' ? 'Film' : 'Duo (Photo + Film)'}>
+                  <optgroup key={cat} label={cat === 'photo' ? (contactContent?.contactForm.groupLabels.photo[lang] || 'Photo') : cat === 'film' ? (contactContent?.contactForm.groupLabels.film[lang] || 'Film') : (contactContent?.contactForm.groupLabels.duo[lang] || 'Duo')}>
                     {formulas.map(f => f.enabled && (
                       <option key={`${cat}-${f.id}`} value={`${cat}-${f.id}`}>
                         {f.name[lang]}
@@ -176,28 +174,28 @@ export function ContactPage({ lang }: ContactPageProps) {
                     ))}
                   </optgroup>
                 ))}
-                <option value="custom">{t.formPlaceholders.formulaSurMesure}</option>
-                <option value="unknown">{t.formPlaceholders.formulaDontKnow}</option>
+                <option value="custom">{contactContent?.contactForm.options.custom[lang]}</option>
+                <option value="unknown">{contactContent?.contactForm.options.unknown[lang]}</option>
               </select>
             </div>
 
             <div className={styles.formGroup}>
-              <label htmlFor="message" className={styles.label}>{t.formLabels.message}</label>
-              <textarea id="message" name="message" required className={styles.textarea} placeholder={t.formPlaceholders.message} />
+              <label htmlFor="message" className={styles.label}>{contactContent?.contactForm.labels.message[lang]}</label>
+              <textarea id="message" name="message" required className={styles.textarea} placeholder={contactContent?.contactForm.placeholders.message[lang]} />
             </div>
 
             <button type="submit" className={`btn btn--primary ${styles.submitBtn}`} disabled={isSubmitting}>
-              {isSubmitting ? (lang === "fr" ? "Envoi..." : "Sending...") : t.formLabels.submit}
+              {isSubmitting ? contactContent?.contactForm.btnSubmitting[lang] : contactContent?.contactForm.labels.submit[lang]}
             </button>
           </fetcher.Form>
 
           {/* Info Card with Real Config */}
           <div className={styles.infoCard}>
-            <h4 className={styles.infoTitle}>{t.coordTitle}</h4>
+            <h4 className={styles.infoTitle}>{contactContent?.contactDetails.title[lang]}</h4>
 
             {BUSINESS?.email && (
               <div className={styles.infoBlock}>
-                <p className={styles.infoLabel}>{t.coordLabels.email}</p>
+                <p className={styles.infoLabel}>{contactContent?.contactDetails.labelEmail[lang]}</p>
                 <p className={styles.infoValue}>
                   <a href={`mailto:${BUSINESS.email}`} className={styles.infoLink}>{BUSINESS.email}</a>
                 </p>
@@ -206,7 +204,7 @@ export function ContactPage({ lang }: ContactPageProps) {
 
             {BUSINESS?.phoneDisplay && BUSINESS?.phoneE164 && (
               <div className={styles.infoBlock}>
-                <p className={styles.infoLabel}>{t.coordLabels.phone}</p>
+                <p className={styles.infoLabel}>{contactContent?.contactDetails.labelPhone[lang]}</p>
                 <p className={styles.infoValue}>
                   <a href={`tel:${BUSINESS.phoneE164}`} className={styles.infoLink}>{BUSINESS.phoneDisplay}</a>
                 </p>
@@ -215,36 +213,36 @@ export function ContactPage({ lang }: ContactPageProps) {
 
             {BUSINESS?.serviceArea && (
               <div className={styles.infoBlock}>
-                <p className={styles.infoLabel}>{t.coordLabels.area}</p>
+                <p className={styles.infoLabel}>{contactContent?.contactDetails.labelArea[lang]}</p>
                 <p className={styles.infoValue}>{BUSINESS.serviceArea[lang]}</p>
               </div>
             )}
 
             {(BUSINESS?.instagramUrl || BUSINESS?.linkedinUrl) && (
               <div className={styles.infoBlock}>
-                <p className={styles.infoLabel}>{t.coordLabels.social}</p>
+                <p className={styles.infoLabel}>{contactContent?.contactDetails.labelSocial[lang]}</p>
                 <p className={styles.infoValue}>
                   {BUSINESS.instagramUrl && (
-                    <a href={BUSINESS.instagramUrl} className={styles.infoLink} target="_blank" rel="noopener noreferrer">Instagram</a>
+                    <a href={BUSINESS.instagramUrl} className={styles.infoLink} target="_blank" rel="noopener noreferrer">{contactContent?.contactDetails.labelInstagram[lang]}</a>
                   )}
                   {BUSINESS.instagramUrl && BUSINESS.linkedinUrl && " — "}
                   {BUSINESS.linkedinUrl && (
-                    <a href={BUSINESS.linkedinUrl} className={styles.infoLink} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                    <a href={BUSINESS.linkedinUrl} className={styles.infoLink} target="_blank" rel="noopener noreferrer">{contactContent?.contactDetails.labelLinkedin[lang]}</a>
                   )}
                 </p>
               </div>
             )}
 
-            <p className={styles.responseTime}>{t.coordResponseTime}</p>
+            <p className={styles.responseTime}>{contactContent?.contactDetails.responseTime[lang]}</p>
           </div>
         </div>
       </section>
 
       {/* Bottom Banner */}
       <section className={styles.bannerSection}>
-        <p className={styles.bannerText}>{t.bannerText}</p>
+        <p className={styles.bannerText}>{contactContent?.bottomBanner.text[lang]}</p>
         <Link to={lang === "fr" ? "/fr/formules" : "/en/pricing"} className="btn btn--outline">
-          {t.bannerLink}
+          {contactContent?.bottomBanner.linkLabel[lang]}
         </Link>
       </section>
       </main>

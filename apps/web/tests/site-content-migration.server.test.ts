@@ -167,7 +167,7 @@ describe("Migration of intermediate V2 content", () => {
     const { content } = getRawSiteContent();
 
     // Check that it's migrated to V3
-    expect(content.schemaVersion).toBe(7);
+    expect(content.schemaVersion).toBe(8);
 
     // Check real fallbacks instead of generic "Description"
     const photoEssential = content.pricing.photo.find(f => f.id === "essential");
@@ -247,7 +247,7 @@ describe("Migration of intermediate V2 content", () => {
       const originalJson = JSON.stringify(v3Data);
 
       const migrated = validateSiteContent(v3Data);
-      expect(migrated.schemaVersion).toBe(7);
+      expect(migrated.schemaVersion).toBe(8);
       expect(migrated.business.email).toBe("v3@test.com");
       expect(migrated.pricingPage).toBeDefined();
       expect(migrated.pricingPage.faqs).toHaveLength(defaultContent.pricingPage.faqs.length);
@@ -278,7 +278,7 @@ describe("Migration of intermediate V2 content", () => {
       const originalJson = JSON.stringify(v4Data);
 
       const migrated = validateSiteContent(v4Data);
-      expect(migrated.schemaVersion).toBe(7);
+      expect(migrated.schemaVersion).toBe(8);
       expect(migrated.business.email).toBe("v4@test.com");
       expect(migrated.aboutPage).toBeDefined();
       expect(migrated.aboutPage.seo.title.fr).toBe(defaultContent.aboutPage.seo.title.fr);

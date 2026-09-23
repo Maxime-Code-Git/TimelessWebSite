@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import styles from "./VisioBooking.module.css";
 
-export function VisioBooking({ language }: { language: 'fr' | 'en' }) {
+import type { ContactPageContent } from "~/lib/site-content.server";
+
+export function VisioBooking({ language, content }: { language: 'fr' | 'en', content?: ContactPageContent['visioBooking'] }) {
   const [slots, setSlots] = useState<{ date: string, time: string, slot_key: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>("");
@@ -11,34 +13,40 @@ export function VisioBooking({ language }: { language: 'fr' | 'en' }) {
   const [error, setError] = useState<string | null>(null);
   const successRef = useRef<HTMLDivElement>(null);
 
+  // Fallback labels if content is not loaded
+  const fallback = {
+    fr: "Chargement...",
+    en: "Loading..."
+  };
+
   const t = {
-    title: language === 'en' ? "Book a video meeting" : "Réserver un rendez-vous visio",
-    unavailable: language === 'en' ? "No video meeting slots are available right now. Please use the contact form." : "Aucun créneau visio n'est disponible actuellement. N'hésitez pas à utiliser le formulaire de contact classique.",
-    selectDate: language === 'en' ? "Select a date:" : "Choisissez une date :",
-    selectTime: language === 'en' ? "Select a time:" : "Choisissez un horaire :",
-    timezone: language === 'en' ? "All times are in Brussels Time" : "Heure de Bruxelles",
-    formTitle: language === 'en' ? "Your details" : "Vos coordonnées",
-    names: language === 'en' ? "Full name *" : "Noms complets *",
-    email: language === 'en' ? "Email address *" : "Adresse email *",
-    phone: language === 'en' ? "Phone number" : "Numéro de téléphone",
-    weddingDate: language === 'en' ? "Wedding date (if applicable)" : "Date du mariage (si applicable)",
-    formula: language === 'en' ? "Interested in" : "Formule souhaitée",
+    title: content?.title[language] || fallback[language],
+    unavailable: content?.unavailableMsg[language] || fallback[language],
+    selectDate: content?.selectDate[language] || fallback[language],
+    selectTime: content?.selectTime[language] || fallback[language],
+    timezone: content?.timezone[language] || fallback[language],
+    formTitle: content?.formTitle[language] || fallback[language],
+    names: content?.labelNames[language] || fallback[language],
+    email: content?.labelEmail[language] || fallback[language],
+    phone: content?.labelPhone[language] || fallback[language],
+    weddingDate: content?.labelWeddingDate[language] || fallback[language],
+    formula: content?.labelFormula[language] || fallback[language],
     formulas: [
-      { value: "photo", label: language === 'en' ? "Photo" : "Photo" },
-      { value: "film", label: language === 'en' ? "Film" : "Film" },
-      { value: "duo", label: language === 'en' ? "Duo" : "Duo" },
-      { value: "custom", label: language === 'en' ? "Custom" : "Sur mesure" },
-      { value: "unknown", label: language === 'en' ? "I don't know yet" : "Je ne sais pas encore" }
+      { value: "photo", label: content?.formulas.photo[language] || fallback[language] },
+      { value: "film", label: content?.formulas.film[language] || fallback[language] },
+      { value: "duo", label: content?.formulas.duo[language] || fallback[language] },
+      { value: "custom", label: content?.formulas.custom[language] || fallback[language] },
+      { value: "unknown", label: content?.formulas.unknown[language] || fallback[language] }
     ],
-    message: language === 'en' ? "Message" : "Message",
-    submit: language === 'en' ? "Request appointment" : "Demander le rendez-vous",
-    submitting: language === 'en' ? "Sending..." : "Envoi en cours...",
-    successTitle: language === 'en' ? "Request recorded!" : "Demande enregistrée !",
-    successMsg: language === 'en' ? "Your request has been saved and is pending our validation. We will send you a confirmation email with the video link shortly." : "Votre demande a bien été enregistrée et est en attente de notre validation. Nous vous enverrons très vite un email de confirmation contenant le lien visio.",
-    newRequest: language === 'en' ? "Make another request" : "Faire une nouvelle demande",
-    errTaken: language === 'en' ? "This slot was just booked by someone else. Please choose another one." : "Ce créneau vient juste d'être réservé par quelqu'un d'autre. Veuillez en choisir un autre.",
-    errGeneric: language === 'en' ? "An error occurred. Please try again later." : "Une erreur est survenue. Veuillez réessayer plus tard.",
-    loading: language === 'en' ? "Loading available slots..." : "Chargement des créneaux disponibles..."
+    message: content?.labelMessage[language] || fallback[language],
+    submit: content?.btnSubmit[language] || fallback[language],
+    submitting: content?.btnSubmitting[language] || fallback[language],
+    successTitle: content?.successTitle[language] || fallback[language],
+    successMsg: content?.successMsg[language] || fallback[language],
+    newRequest: content?.btnNewRequest[language] || fallback[language],
+    errTaken: content?.errTaken[language] || fallback[language],
+    errGeneric: content?.errGeneric[language] || fallback[language],
+    loading: content?.loadingMsg[language] || fallback[language]
   };
 
   useEffect(() => {

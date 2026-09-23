@@ -77,58 +77,6 @@ export interface FormulesStrings {
 
 
 
-/* ── Contact page ───────────────────────────────────────── */
-export interface ContactStrings {
-  heroTitle: string;
-  heroSubtitle: string;
-  callTitle: string;
-  callSubtitle: string;
-  callBadges: string[];
-  bookingTitle: string;
-  bookingSubtitle: string;
-  bookingDescription: string;
-  bookingNote: string;
-  slotsTitle: string;
-  slotsEmpty: string;
-  confirmBtn: string;
-  recapPrefix: string;
-  recapNone: string;
-  recapChooseTime: string;
-  formPrompt: string;
-  formLabels: {
-    names: string;
-    email: string;
-    phone: string;
-    date: string;
-    location: string;
-    formula: string;
-    message: string;
-    submit: string;
-  };
-  formPlaceholders: {
-    names: string;
-    email: string;
-    phone: string;
-    location: string;
-    formulaDefault: string;
-    formulaSurMesure: string;
-    formulaDontKnow: string;
-    message: string;
-  };
-  coordTitle: string;
-  coordLabels: {
-    email: string;
-    phone: string;
-    area: string;
-    social: string;
-  };
-  coordResponseTime: string;
-  bannerText: string;
-  bannerLink: string;
-  weekdays: string[];
-  months: string[];
-}
-
 /* ── Clients page ───────────────────────────────────────── */
 export interface ClientsStrings {
   title: string;
@@ -163,7 +111,6 @@ export interface I18nStrings {
   home: HomeStrings;
   portfolio: PortfolioStrings;
   formules: FormulesStrings;
-  contact: ContactStrings;
   clients: ClientsStrings;
   footer: FooterStrings;
   notFound: NotFoundStrings;
@@ -250,65 +197,6 @@ const FR: I18nStrings = {
       "Composons ensemble une formule à la mesure de votre événement.",
     customCta: "Demander un devis sur-mesure",
     featuredBadge: "Le plus choisi",
-  },
-  contact: {
-    heroTitle: "Racontons votre jour.",
-    heroSubtitle:
-      "Écrivez-nous, sans engagement — nous prendrons le temps de vous répondre.",
-    callTitle: "Envie de nous parler de vive voix\u00a0?",
-    callSubtitle:
-      "Un appel découverte gratuit, sans engagement, pour faire connaissance et parler de votre mariage.",
-    callBadges: ["30 minutes", "Sans engagement", "En visio ou par téléphone"],
-    bookingTitle: "Rendez-vous",
-    bookingSubtitle: "Choisissez votre créneau",
-    bookingDescription:
-      "Sélectionnez le jour et l'heure qui vous conviennent pour un appel de 30 minutes.",
-    bookingNote: "Appels disponibles les mardis et jeudis.",
-    slotsTitle: "Créneaux disponibles",
-    slotsEmpty:
-      "Sélectionnez d'abord un mardi ou un jeudi dans le calendrier.",
-    confirmBtn: "Confirmer le rendez-vous",
-    recapPrefix: "Votre appel\u00a0: ",
-    recapNone: "aucun créneau sélectionné",
-    recapChooseTime: "— choisissez une heure",
-    formPrompt:
-      "Vous préférez écrire\u00a0? Remplissez le formulaire ci-dessous.",
-    formLabels: {
-      names: "Prénom(s) des futurs mariés",
-      email: "Adresse e-mail",
-      phone: "Téléphone (optionnel)",
-      date: "Date du mariage",
-      location: "Lieu / région du mariage",
-      formula: "Formule qui vous intéresse",
-      message: "Votre message",
-      submit: "Envoyer",
-    },
-    formPlaceholders: {
-      names: "Camille & Antoine",
-      email: "vous@exemple.com",
-      phone: "04XX XX XX XX",
-      location: "Bruxelles, Namur…",
-      formulaDefault: "Sélectionner…",
-      formulaSurMesure: "Sur-mesure",
-      formulaDontKnow: "Je ne sais pas encore",
-      message:
-        "Racontez-nous votre projet, vos envies, votre journée…",
-    },
-    coordTitle: "Coordonnées",
-    coordLabels: {
-      email: "E-mail",
-      phone: "Téléphone",
-      area: "Zone d'intervention",
-      social: "Réseaux",
-    },
-    coordResponseTime: "Nous répondons sous 48h.",
-    bannerText: "Envie d'en savoir plus sur nos formules\u00a0?",
-    bannerLink: "Voir nos formules",
-    weekdays: ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"],
-    months: [
-      "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
-    ],
   },
   clients: {
     title: "Votre galerie privée",
@@ -417,65 +305,6 @@ const EN: I18nStrings = {
       "Let's create a package tailored to your event together.",
     customCta: "Request a bespoke quote",
     featuredBadge: "Most popular",
-  },
-  contact: {
-    heroTitle: "Let's tell your day.",
-    heroSubtitle:
-      "Write to us, no commitment — we'll take the time to reply.",
-    callTitle: "Want to speak in person?",
-    callSubtitle:
-      "A free discovery call, no commitment, to get to know each other and discuss your wedding.",
-    callBadges: ["30 minutes", "No commitment", "Video call or phone"],
-    bookingTitle: "Appointment",
-    bookingSubtitle: "Choose your slot",
-    bookingDescription:
-      "Select the day and time that suit you for a 30-minute call.",
-    bookingNote: "Calls available on Tuesdays and Thursdays.",
-    slotsTitle: "Available slots",
-    slotsEmpty:
-      "First select a Tuesday or Thursday in the calendar.",
-    confirmBtn: "Confirm appointment",
-    recapPrefix: "Your call: ",
-    recapNone: "no slot selected",
-    recapChooseTime: "— choose a time",
-    formPrompt:
-      "Prefer to write? Fill out the form below.",
-    formLabels: {
-      names: "Names of the couple",
-      email: "Email address",
-      phone: "Phone (optional)",
-      date: "Wedding date",
-      location: "Wedding venue / region",
-      formula: "Package of interest",
-      message: "Your message",
-      submit: "Send",
-    },
-    formPlaceholders: {
-      names: "Camille & Antoine",
-      email: "you@example.com",
-      phone: "+32 4XX XX XX XX",
-      location: "Brussels, Namur…",
-      formulaDefault: "Select…",
-      formulaSurMesure: "Bespoke",
-      formulaDontKnow: "I don't know yet",
-      message:
-        "Tell us about your project, your wishes, your day…",
-    },
-    coordTitle: "Contact details",
-    coordLabels: {
-      email: "Email",
-      phone: "Phone",
-      area: "Service area",
-      social: "Social",
-    },
-    coordResponseTime: "We reply within 48h.",
-    bannerText: "Want to learn more about our packages?",
-    bannerLink: "View our packages",
-    weekdays: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
-    months: [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December",
-    ],
   },
   clients: {
     title: "Your private gallery",

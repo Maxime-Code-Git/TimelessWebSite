@@ -69,6 +69,7 @@ export default [
   route("admin/portfolio/media/:photoId/:variant", "routes/admin.portfolio.media.$photoId.$variant.tsx"),
   route("admin/home", "routes/admin.home.tsx"),
   route("admin/about", "routes/admin.about.tsx"),
+  route("admin/contact", "routes/admin.contact.tsx"),
   route("admin/galleries", "routes/admin.galleries.tsx"),
   route("admin/galleries/new", "routes/admin.galleries.new.tsx"),
   route("admin/galleries/:id", "routes/admin.galleries.$id.tsx"),

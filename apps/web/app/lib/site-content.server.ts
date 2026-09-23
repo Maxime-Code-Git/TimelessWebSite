@@ -158,8 +158,111 @@ export interface HomeContent {
   };
 }
 
+
+export interface ContactPageContent {
+  seo: {
+    title: LocalizedString;
+    description: LocalizedString;
+  };
+  hero: {
+    title: LocalizedString;
+    subtitle: LocalizedString;
+  };
+  introBanner: {
+    title: LocalizedString;
+    subtitle: LocalizedString;
+    badges: Array<{
+      id: string;
+      label: LocalizedString;
+    }>;
+  };
+  bookingIntro: {
+    overtitle: LocalizedString;
+    title: LocalizedString;
+    description: LocalizedString;
+    note: LocalizedString;
+  };
+  visioBooking: {
+    title: LocalizedString;
+    unavailableMsg: LocalizedString;
+    selectDate: LocalizedString;
+    selectTime: LocalizedString;
+    timezone: LocalizedString;
+    formTitle: LocalizedString;
+    labelNames: LocalizedString;
+    labelEmail: LocalizedString;
+    labelPhone: LocalizedString;
+    labelWeddingDate: LocalizedString;
+    labelFormula: LocalizedString;
+    labelMessage: LocalizedString;
+    formulas: {
+      photo: LocalizedString;
+      film: LocalizedString;
+      duo: LocalizedString;
+      custom: LocalizedString;
+      unknown: LocalizedString;
+    };
+    btnSubmit: LocalizedString;
+    btnSubmitting: LocalizedString;
+    successTitle: LocalizedString;
+    successMsg: LocalizedString;
+    btnNewRequest: LocalizedString;
+    errTaken: LocalizedString;
+    errGeneric: LocalizedString;
+    loadingMsg: LocalizedString;
+  };
+  contactForm: {
+    formPrompt: LocalizedString;
+    successMsg: LocalizedString;
+    btnSubmitting: LocalizedString;
+    labels: {
+      names: LocalizedString;
+      email: LocalizedString;
+      phone: LocalizedString;
+      date: LocalizedString;
+      location: LocalizedString;
+      formula: LocalizedString;
+      message: LocalizedString;
+      submit: LocalizedString;
+    };
+    placeholders: {
+      names: LocalizedString;
+      email: LocalizedString;
+      phone: LocalizedString;
+      location: LocalizedString;
+      formulaDefault: LocalizedString;
+      formulaSurMesure: LocalizedString;
+      formulaDontKnow: LocalizedString;
+      message: LocalizedString;
+    };
+    groupLabels: {
+      photo: LocalizedString;
+      film: LocalizedString;
+      duo: LocalizedString;
+    };
+    options: {
+      custom: LocalizedString;
+      unknown: LocalizedString;
+    };
+  };
+  contactDetails: {
+    title: LocalizedString;
+    labelEmail: LocalizedString;
+    labelPhone: LocalizedString;
+    labelArea: LocalizedString;
+    labelSocial: LocalizedString;
+    labelInstagram: LocalizedString;
+    labelLinkedin: LocalizedString;
+    responseTime: LocalizedString;
+  };
+  bottomBanner: {
+    text: LocalizedString;
+    linkLabel: LocalizedString;
+  };
+}
+
 export interface SiteContent {
-  schemaVersion: 7;
+  schemaVersion: 8;
   revision: string;
   updatedAt: string;
   business: BusinessContent;
@@ -167,6 +270,7 @@ export interface SiteContent {
   home: HomeContent;
   pricingPage: PricingPageContent;
   aboutPage: AboutPageContent;
+  contactPage: ContactPageContent;
 }
 
 export class RevisionConflictError extends Error {
@@ -784,13 +888,193 @@ function validateAboutPageContent(data: unknown): AboutPageContent {
   };
 }
 
+
+function validateContactPageContent(data: unknown): ContactPageContent {
+  assertExactKeys(data, ["seo", "hero", "introBanner", "bookingIntro", "visioBooking", "contactForm", "contactDetails", "bottomBanner"], "contactPage");
+  const obj = data as Record<string, unknown>;
+
+  // SEO
+  assertExactKeys(obj.seo, ["title", "description"], "contactPage.seo");
+  const seo = obj.seo as Record<string, unknown>;
+  const validSeo = {
+    title: validateLocalizedString(seo.title, "contactPage.seo.title", 120),
+    description: validateLocalizedString(seo.description, "contactPage.seo.description", 300)
+  };
+
+  // Hero
+  assertExactKeys(obj.hero, ["title", "subtitle"], "contactPage.hero");
+  const hero = obj.hero as Record<string, unknown>;
+  const validHero = {
+    title: validateLocalizedString(hero.title, "contactPage.hero.title", 200),
+    subtitle: validateLocalizedString(hero.subtitle, "contactPage.hero.subtitle", 2000)
+  };
+
+  // IntroBanner
+  assertExactKeys(obj.introBanner, ["title", "subtitle", "badges"], "contactPage.introBanner");
+  const intro = obj.introBanner as Record<string, unknown>;
+  if (!Array.isArray(intro.badges) || intro.badges.length !== 3) {
+    throw new ValidationError("contactPage.introBanner.badges must be an array of exactly 3 items");
+  }
+  const validBadges = intro.badges.map((b, i) => {
+    assertExactKeys(b, ["id", "label"], `contactPage.introBanner.badges[${i}]`);
+    const bObj = b as Record<string, unknown>;
+    if (typeof bObj.id !== "string" || !["duration", "commitment", "format"].includes(bObj.id)) {
+      throw new ValidationError(`contactPage.introBanner.badges[${i}].id is invalid`);
+    }
+    return {
+      id: bObj.id,
+      label: validateLocalizedString(bObj.label, `contactPage.introBanner.badges[${i}].label`, 120)
+    };
+  });
+  const badgeIds = new Set(validBadges.map(b => b.id));
+  if (badgeIds.size !== 3 || !badgeIds.has("duration") || !badgeIds.has("commitment") || !badgeIds.has("format")) {
+    throw new ValidationError("contactPage.introBanner.badges must contain exactly 'duration', 'commitment', and 'format'");
+  }
+
+  // BookingIntro
+  assertExactKeys(obj.bookingIntro, ["overtitle", "title", "description", "note"], "contactPage.bookingIntro");
+  const bIntro = obj.bookingIntro as Record<string, unknown>;
+  const validBookingIntro = {
+    overtitle: validateLocalizedString(bIntro.overtitle, "contactPage.bookingIntro.overtitle", 120),
+    title: validateLocalizedString(bIntro.title, "contactPage.bookingIntro.title", 200),
+    description: validateLocalizedString(bIntro.description, "contactPage.bookingIntro.description", 2000),
+    note: validateLocalizedString(bIntro.note, "contactPage.bookingIntro.note", 2000)
+  };
+
+  // VisioBooking
+  assertExactKeys(obj.visioBooking, [
+    "title", "unavailableMsg", "selectDate", "selectTime", "timezone",
+    "formTitle", "labelNames", "labelEmail", "labelPhone", "labelWeddingDate",
+    "labelFormula", "labelMessage", "formulas", "btnSubmit", "btnSubmitting",
+    "successTitle", "successMsg", "btnNewRequest", "errTaken", "errGeneric", "loadingMsg"
+  ], "contactPage.visioBooking");
+  const visio = obj.visioBooking as Record<string, unknown>;
+  
+  assertExactKeys(visio.formulas, ["photo", "film", "duo", "custom", "unknown"], "contactPage.visioBooking.formulas");
+  const visioFormulas = visio.formulas as Record<string, unknown>;
+  
+  const validVisioBooking = {
+    title: validateLocalizedString(visio.title, "contactPage.visioBooking.title", 200),
+    unavailableMsg: validateLocalizedString(visio.unavailableMsg, "contactPage.visioBooking.unavailableMsg", 2000),
+    selectDate: validateLocalizedString(visio.selectDate, "contactPage.visioBooking.selectDate", 120),
+    selectTime: validateLocalizedString(visio.selectTime, "contactPage.visioBooking.selectTime", 120),
+    timezone: validateLocalizedString(visio.timezone, "contactPage.visioBooking.timezone", 120),
+    formTitle: validateLocalizedString(visio.formTitle, "contactPage.visioBooking.formTitle", 200),
+    labelNames: validateLocalizedString(visio.labelNames, "contactPage.visioBooking.labelNames", 120),
+    labelEmail: validateLocalizedString(visio.labelEmail, "contactPage.visioBooking.labelEmail", 120),
+    labelPhone: validateLocalizedString(visio.labelPhone, "contactPage.visioBooking.labelPhone", 120),
+    labelWeddingDate: validateLocalizedString(visio.labelWeddingDate, "contactPage.visioBooking.labelWeddingDate", 120),
+    labelFormula: validateLocalizedString(visio.labelFormula, "contactPage.visioBooking.labelFormula", 120),
+    labelMessage: validateLocalizedString(visio.labelMessage, "contactPage.visioBooking.labelMessage", 120),
+    formulas: {
+      photo: validateLocalizedString(visioFormulas.photo, "contactPage.visioBooking.formulas.photo", 120),
+      film: validateLocalizedString(visioFormulas.film, "contactPage.visioBooking.formulas.film", 120),
+      duo: validateLocalizedString(visioFormulas.duo, "contactPage.visioBooking.formulas.duo", 120),
+      custom: validateLocalizedString(visioFormulas.custom, "contactPage.visioBooking.formulas.custom", 120),
+      unknown: validateLocalizedString(visioFormulas.unknown, "contactPage.visioBooking.formulas.unknown", 120)
+    },
+    btnSubmit: validateLocalizedString(visio.btnSubmit, "contactPage.visioBooking.btnSubmit", 120),
+    btnSubmitting: validateLocalizedString(visio.btnSubmitting, "contactPage.visioBooking.btnSubmitting", 120),
+    successTitle: validateLocalizedString(visio.successTitle, "contactPage.visioBooking.successTitle", 200),
+    successMsg: validateLocalizedString(visio.successMsg, "contactPage.visioBooking.successMsg", 2000),
+    btnNewRequest: validateLocalizedString(visio.btnNewRequest, "contactPage.visioBooking.btnNewRequest", 120),
+    errTaken: validateLocalizedString(visio.errTaken, "contactPage.visioBooking.errTaken", 2000),
+    errGeneric: validateLocalizedString(visio.errGeneric, "contactPage.visioBooking.errGeneric", 2000),
+    loadingMsg: validateLocalizedString(visio.loadingMsg, "contactPage.visioBooking.loadingMsg", 200)
+  };
+
+  // ContactForm
+  assertExactKeys(obj.contactForm, ["formPrompt", "successMsg", "btnSubmitting", "labels", "placeholders", "groupLabels", "options"], "contactPage.contactForm");
+  const cForm = obj.contactForm as Record<string, unknown>;
+
+  assertExactKeys(cForm.labels, ["names", "email", "phone", "date", "location", "formula", "message", "submit"], "contactPage.contactForm.labels");
+  const cLabels = cForm.labels as Record<string, unknown>;
+
+  assertExactKeys(cForm.placeholders, ["names", "email", "phone", "location", "formulaDefault", "formulaSurMesure", "formulaDontKnow", "message"], "contactPage.contactForm.placeholders");
+  const cPlaceholders = cForm.placeholders as Record<string, unknown>;
+
+  assertExactKeys(cForm.groupLabels, ["photo", "film", "duo"], "contactPage.contactForm.groupLabels");
+  const cGroups = cForm.groupLabels as Record<string, unknown>;
+
+  assertExactKeys(cForm.options, ["custom", "unknown"], "contactPage.contactForm.options");
+  const cOptions = cForm.options as Record<string, unknown>;
+
+  const validContactForm = {
+    formPrompt: validateLocalizedString(cForm.formPrompt, "contactPage.contactForm.formPrompt", 2000),
+    successMsg: validateLocalizedString(cForm.successMsg, "contactPage.contactForm.successMsg", 2000),
+    btnSubmitting: validateLocalizedString(cForm.btnSubmitting, "contactPage.contactForm.btnSubmitting", 120),
+    labels: {
+      names: validateLocalizedString(cLabels.names, "contactPage.contactForm.labels.names", 120),
+      email: validateLocalizedString(cLabels.email, "contactPage.contactForm.labels.email", 120),
+      phone: validateLocalizedString(cLabels.phone, "contactPage.contactForm.labels.phone", 120),
+      date: validateLocalizedString(cLabels.date, "contactPage.contactForm.labels.date", 120),
+      location: validateLocalizedString(cLabels.location, "contactPage.contactForm.labels.location", 120),
+      formula: validateLocalizedString(cLabels.formula, "contactPage.contactForm.labels.formula", 120),
+      message: validateLocalizedString(cLabels.message, "contactPage.contactForm.labels.message", 120),
+      submit: validateLocalizedString(cLabels.submit, "contactPage.contactForm.labels.submit", 120)
+    },
+    placeholders: {
+      names: validateLocalizedString(cPlaceholders.names, "contactPage.contactForm.placeholders.names", 250),
+      email: validateLocalizedString(cPlaceholders.email, "contactPage.contactForm.placeholders.email", 250),
+      phone: validateLocalizedString(cPlaceholders.phone, "contactPage.contactForm.placeholders.phone", 250),
+      location: validateLocalizedString(cPlaceholders.location, "contactPage.contactForm.placeholders.location", 250),
+      formulaDefault: validateLocalizedString(cPlaceholders.formulaDefault, "contactPage.contactForm.placeholders.formulaDefault", 250),
+      formulaSurMesure: validateLocalizedString(cPlaceholders.formulaSurMesure, "contactPage.contactForm.placeholders.formulaSurMesure", 250),
+      formulaDontKnow: validateLocalizedString(cPlaceholders.formulaDontKnow, "contactPage.contactForm.placeholders.formulaDontKnow", 250),
+      message: validateLocalizedString(cPlaceholders.message, "contactPage.contactForm.placeholders.message", 250)
+    },
+    groupLabels: {
+      photo: validateLocalizedString(cGroups.photo, "contactPage.contactForm.groupLabels.photo", 120),
+      film: validateLocalizedString(cGroups.film, "contactPage.contactForm.groupLabels.film", 120),
+      duo: validateLocalizedString(cGroups.duo, "contactPage.contactForm.groupLabels.duo", 120)
+    },
+    options: {
+      custom: validateLocalizedString(cOptions.custom, "contactPage.contactForm.options.custom", 120),
+      unknown: validateLocalizedString(cOptions.unknown, "contactPage.contactForm.options.unknown", 120)
+    }
+  };
+
+  // ContactDetails
+  assertExactKeys(obj.contactDetails, ["title", "labelEmail", "labelPhone", "labelArea", "labelSocial", "labelInstagram", "labelLinkedin", "responseTime"], "contactPage.contactDetails");
+  const cDetails = obj.contactDetails as Record<string, unknown>;
+  const validContactDetails = {
+    title: validateLocalizedString(cDetails.title, "contactPage.contactDetails.title", 200),
+    labelEmail: validateLocalizedString(cDetails.labelEmail, "contactPage.contactDetails.labelEmail", 120),
+    labelPhone: validateLocalizedString(cDetails.labelPhone, "contactPage.contactDetails.labelPhone", 120),
+    labelArea: validateLocalizedString(cDetails.labelArea, "contactPage.contactDetails.labelArea", 120),
+    labelSocial: validateLocalizedString(cDetails.labelSocial, "contactPage.contactDetails.labelSocial", 120),
+    labelInstagram: validateLocalizedString(cDetails.labelInstagram, "contactPage.contactDetails.labelInstagram", 120),
+    labelLinkedin: validateLocalizedString(cDetails.labelLinkedin, "contactPage.contactDetails.labelLinkedin", 120),
+    responseTime: validateLocalizedString(cDetails.responseTime, "contactPage.contactDetails.responseTime", 250)
+  };
+
+  // BottomBanner
+  assertExactKeys(obj.bottomBanner, ["text", "linkLabel"], "contactPage.bottomBanner");
+  const bottom = obj.bottomBanner as Record<string, unknown>;
+  const validBottomBanner = {
+    text: validateLocalizedString(bottom.text, "contactPage.bottomBanner.text", 2000),
+    linkLabel: validateLocalizedString(bottom.linkLabel, "contactPage.bottomBanner.linkLabel", 120)
+  };
+
+  return {
+    seo: validSeo,
+    hero: validHero,
+    introBanner: { title: validateLocalizedString(intro.title, "contactPage.introBanner.title", 200), subtitle: validateLocalizedString(intro.subtitle, "contactPage.introBanner.subtitle", 2000), badges: validBadges },
+    bookingIntro: validBookingIntro,
+    visioBooking: validVisioBooking,
+    contactForm: validContactForm,
+    contactDetails: validContactDetails,
+    bottomBanner: validBottomBanner
+  };
+}
+
 export function validateSiteContent(data: unknown): SiteContent {
   if (typeof data !== "object" || data === null) {
     throw new ValidationError("root must be an object");
   }
   const obj = data as Record<string, unknown>;
 
-  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5 && obj.schemaVersion !== 6 && obj.schemaVersion !== 7) {
+  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5 && obj.schemaVersion !== 6 && obj.schemaVersion !== 7 && obj.schemaVersion !== 8) {
     throw new ValidationError("Unsupported schemaVersion");
   }
 
@@ -1008,13 +1292,23 @@ export function validateSiteContent(data: unknown): SiteContent {
     };
   }
 
-  assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage", "aboutPage"], "root");
+
+  if ((obj.schemaVersion as number) < 8) {
+    const defaultContactPage = JSON.parse(JSON.stringify(defaultContent.contactPage));
+    objRef = {
+      ...objRef,
+      contactPage: defaultContactPage
+    };
+  }
+
+  assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage", "aboutPage", "contactPage"], "root");
+
 
   const pricing = validatePricing(rawPricing);
   const home = validateHomeContent(objRef.home);
 
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     revision: obj.revision,
     updatedAt: updatedAtStr,
     business,
@@ -1022,6 +1316,7 @@ export function validateSiteContent(data: unknown): SiteContent {
     home,
     pricingPage: validatePricingPageContent(objRef.pricingPage),
     aboutPage: validateAboutPageContent(objRef.aboutPage),
+    contactPage: validateContactPageContent(objRef.contactPage),
   };
 }
 
@@ -1152,6 +1447,26 @@ export function saveAboutPageSettings(aboutPage: AboutPageContent, previousRevis
     revision: crypto.randomBytes(16).toString("hex"),
     updatedAt: new Date().toISOString(),
     aboutPage: validateAboutPageContent(aboutPage),
+  };
+
+  atomicWriteJson(getFilePath(), newContent);
+  return newContent.revision;
+}
+
+export function saveContactPageSettings(contactPage: ContactPageContent, previousRevision: string) {
+  const current = getRawSiteContent();
+  if (current.isCorrupted) {
+    throw new CorruptedContentError();
+  }
+  if (current.content.revision !== previousRevision) {
+    throw new RevisionConflictError();
+  }
+
+  const newContent: SiteContent = {
+    ...current.content,
+    revision: crypto.randomBytes(16).toString("hex"),
+    updatedAt: new Date().toISOString(),
+    contactPage: validateContactPageContent(contactPage),
   };
 
   atomicWriteJson(getFilePath(), newContent);
