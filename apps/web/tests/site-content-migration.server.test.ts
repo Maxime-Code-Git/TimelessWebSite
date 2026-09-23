@@ -294,7 +294,7 @@ describe("Migration of intermediate V2 content", () => {
 
   describe("Migration to V8 (Contact Admin)", () => {
     const versions = [1, 2, 3, 4, 5, 6, 7];
-    
+
     versions.forEach(version => {
       it(`migrates V${version} to V8 successfully and meets all requirements`, () => {
         let inputData: Record<string, unknown>;
@@ -309,31 +309,31 @@ describe("Migration of intermediate V2 content", () => {
           if (version < 5) delete inputData.aboutPage;
           if (version < 4) delete inputData.pricingPage;
         }
-        
+
         (inputData.business as Record<string, string>).email = `v${version}@test.com`;
-        
+
         const originalJson = JSON.stringify(inputData);
         const migrated = validateSiteContent(inputData);
-        
+
         // résultat en V8
         expect(migrated.schemaVersion).toBe(8);
-        
+
         // présence de contactPage
         expect(migrated.contactPage).toBeDefined();
-        
+
         // préservation d’au moins une valeur existante de business
         expect(migrated.business.email).toBe(`v${version}@test.com`);
-        
+
         // préservation des données applicables des autres sections
         if (migrated.home) expect(migrated.home).toBeDefined();
-        
+
         // objet source non modifié
         expect(JSON.stringify(inputData)).toBe(originalJson);
-        
+
         // aucune référence partagée avec le contenu par défaut
         migrated.contactPage.seo.title.fr = "mutated";
         expect(defaultContent.contactPage.seo.title.fr).not.toBe("mutated");
-        
+
         // résultat idempotent après une seconde validation
         const migratedAgain = validateSiteContent(JSON.parse(JSON.stringify(migrated)));
         expect(migratedAgain).toEqual(migrated);

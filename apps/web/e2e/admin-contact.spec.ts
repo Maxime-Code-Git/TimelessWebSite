@@ -81,7 +81,7 @@ test.describe('Admin Contact End-to-End', () => {
     } finally {
       // Restore Original Values
       await page.goto('/admin/contact');
-      
+
       await page.click('button:has-text("Français")');
       await page.getByLabel('Titre principal').fill(originalTitleFr);
       await page.getByLabel('Titre SEO').fill(originalSeoTitleFr);
