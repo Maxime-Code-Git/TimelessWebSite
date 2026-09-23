@@ -7,9 +7,11 @@ export function meta({ matches }: Route.MetaArgs) {
   const rootData = matches.find((m) => m?.id === "root")?.loaderData as { PUBLIC_SITE_URL?: string; siteContent?: import("~/lib/site-content.server").SiteContent } | undefined;
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
+  const seo = rootData?.siteContent?.contactPage?.seo;
+
   return getSeoMeta({
-    title: "Contact us — Sempra",
-    description: "Write to us about your wedding project. We will take the time to reply within 48h.",
+    title: seo?.title.en || "Contact us — Sempra",
+    description: seo?.description.en || "Write to us about your wedding project. We will take the time to reply within 48h.",
     path: "/en/contact",
     alternatePath: "/fr/contact",
     lang: "en",

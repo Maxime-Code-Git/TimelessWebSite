@@ -26,9 +26,171 @@ async function stopServer(proc: ChildProcess | undefined) {
         clearTimeout(timer);
         resolve();
       }
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
     });
-    proc.kill("SIGTERM");
+
+    expect(postRes.status).toBe(403);
   });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
+    proc.kill("SIGTERM");
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
 }
 
 describe("Admin Contact Route", () => {
@@ -60,7 +222,88 @@ describe("Admin Contact Route", () => {
           SITE_CONTENT_PATH: siteContentPath,
         },
         stdio: ["ignore", "pipe", "pipe"]
-      });
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
 
       const timeout = setTimeout(() => {
         stopServer(serverProcess).finally(() => reject(new Error("Server startup timeout")));
@@ -71,25 +314,592 @@ describe("Admin Contact Route", () => {
           clearTimeout(timeout);
           resolve(undefined);
         }
-      });
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
       serverProcess.stderr?.on("data", (data) => console.error("Server error:", data.toString()));
       serverProcess.on("error", (err) => {
         clearTimeout(timeout);
         stopServer(serverProcess).finally(() => reject(err));
-      });
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
       serverProcess.on("exit", (code) => {
         clearTimeout(timeout);
         if (code !== 0 && code !== null) {
           reject(new Error(`Server exited with code ${code}`));
         }
-      });
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
     });
+
+    expect(postRes.status).toBe(403);
   });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
 
   afterAll(async () => {
     await stopServer(serverProcess);
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.rmSync(tempDir, { recursive: true, force: true
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
   });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
 
   it("should authenticate and get csrf token", async () => {
     // 1. Get initial csrf token from /admin loader
@@ -118,69 +928,16 @@ describe("Admin Contact Route", () => {
       },
       body: formData,
       redirect: "manual"
-    });
 
-    expect(postRes.status).toBe(302);
-    expect(postRes.headers.get("location")).toBe("/admin");
-    const authCookie = postRes.headers.get("set-cookie") || "";
-    expect(authCookie).toContain("__admin_session=");
-    validSessionCookie = authCookie;
-
-    // Get the new CSRF token for the authenticated session
-    const getAdminRes = await fetch(`${BASE_URL}/admin/contact`, {
-      headers: { "Cookie": authCookie },
-      redirect: "manual"
-    });
-    expect(getAdminRes.status).toBe(200);
-    const adminText = await getAdminRes.text();
-    const adminCsrfMatch = adminText.match(/name="csrfToken" value="([^"]+)"/);
-    validCsrfToken = adminCsrfMatch ? adminCsrfMatch[1] : "";
-    expect(validCsrfToken).toBeTruthy();
-
-    const contactPageMatch = adminText.match(/name="contactPage" value="([^"]+)"/);
-    const revisionMatch = adminText.match(/name="revision" value="([^"]+)"/);
-    expect(contactPageMatch).toBeTruthy();
-    expect(revisionMatch).toBeTruthy();
-    
-    // We parse the HTML encoded JSON
-    const contactPageStr = contactPageMatch![1].replace(/&quot;/g, '"');
-    
-    // Save contactPage to use in next test
-    fs.writeFileSync(path.join(tempDir, "currentContactPage.json"), contactPageStr);
-    fs.writeFileSync(path.join(tempDir, "currentRevision.txt"), revisionMatch![1]);
-  });
-
-  it("should reject update if unauthenticated", async () => {
-    const formData = new URLSearchParams();
-    formData.append("csrfToken", validCsrfToken);
-    
-    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
-        "x-forwarded-for": "127.0.0.1"
-      },
-      body: formData,
-      redirect: "manual"
-    });
-    
-    // Redirects to /admin
-    expect(postRes.status).toBe(302);
-  });
-
-  it("should successfully update contactPage with valid data", async () => {
+  it("should reject update with missing CSRF", async () => {
     const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
     const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
-    
-    // Update something
-    currentContactPage.hero.title.fr = "Titre mis à jour !";
-    
+
     const formData = new URLSearchParams();
-    formData.append("csrfToken", validCsrfToken);
+    // Intentionally omit csrfToken
     formData.append("revision", currentRevision);
     formData.append("contactPage", JSON.stringify(currentContactPage));
-    
+
     const postRes = await fetch(`${BASE_URL}/admin/contact`, {
       method: "POST",
       headers: {
@@ -193,11 +950,712 @@ describe("Admin Contact Route", () => {
       body: formData,
       redirect: "manual"
     });
-    
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
+
+    expect(postRes.status).toBe(302);
+    expect(postRes.headers.get("location")).toBe("/admin");
+    const authCookie = postRes.headers.get("set-cookie") || "";
+    expect(authCookie).toContain("__admin_session=");
+    validSessionCookie = authCookie;
+
+    // Get the new CSRF token for the authenticated session
+    const getAdminRes = await fetch(`${BASE_URL}/admin/contact`, {
+      headers: { "Cookie": authCookie },
+      redirect: "manual"
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
+    expect(getAdminRes.status).toBe(200);
+    const adminText = await getAdminRes.text();
+    const adminCsrfMatch = adminText.match(/name="csrfToken" value="([^"]+)"/);
+    validCsrfToken = adminCsrfMatch ? adminCsrfMatch[1] : "";
+    expect(validCsrfToken).toBeTruthy();
+
+    const contactPageMatch = adminText.match(/name="contactPage" value="([^"]+)"/);
+    const revisionMatch = adminText.match(/name="revision" value="([^"]+)"/);
+    expect(contactPageMatch).toBeTruthy();
+    expect(revisionMatch).toBeTruthy();
+
+    // We parse the HTML encoded JSON
+    const contactPageStr = contactPageMatch![1].replace(/&quot;/g, '"');
+
+    // Save contactPage to use in next test
+    fs.writeFileSync(path.join(tempDir, "currentContactPage.json"), contactPageStr);
+    fs.writeFileSync(path.join(tempDir, "currentRevision.txt"), revisionMatch![1]);
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
+
+  it("should reject update if unauthenticated", async () => {
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Origin": BASE_URL,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
+
+    // Redirects to /admin
+    expect(postRes.status).toBe(302);
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
+
+  it("should successfully update contactPage with valid data", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Update something
+    currentContactPage.hero.title.fr = "Titre mis à jour !";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
+
     expect(postRes.status).toBe(200);
-    
+
     // Check if site content actually updated
     const fileContent = JSON.parse(fs.readFileSync(siteContentPath, "utf8"));
     expect(fileContent.contactPage.hero.title.fr).toBe("Titre mis à jour !");
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
+  });
+});
+
+  it("should reject update with missing CSRF", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    // Intentionally omit csrfToken
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(403);
+  });
+
+  it("should reject corrupted JSON formats", async () => {
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", "{ this is not json }");
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toBe("Invalid JSON payload");
+  });
+
+  it("should reject HTML injection in inputs", async () => {
+    const currentContactPage = JSON.parse(fs.readFileSync(path.join(tempDir, "currentContactPage.json"), "utf8"));
+    const currentRevision = fs.readFileSync(path.join(tempDir, "currentRevision.txt"), "utf8");
+
+    // Inject HTML
+    currentContactPage.hero.title.fr = "<script>alert('xss')</script>Titre";
+
+    const formData = new URLSearchParams();
+    formData.append("csrfToken", validCsrfToken);
+    formData.append("revision", currentRevision);
+    formData.append("contactPage", JSON.stringify(currentContactPage));
+
+    const postRes = await fetch(`${BASE_URL}/admin/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": validSessionCookie,
+        "Origin": BASE_URL,
+        "Referer": `${BASE_URL}/admin/contact`,
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: formData,
+      redirect: "manual"
+    });
+
+    expect(postRes.status).toBe(422);
+    const json = await postRes.json();
+    expect(json.error).toMatch(/HTML/i);
   });
 });

@@ -231,8 +231,6 @@ export interface ContactPageContent {
       phone: LocalizedString;
       location: LocalizedString;
       formulaDefault: LocalizedString;
-      formulaSurMesure: LocalizedString;
-      formulaDontKnow: LocalizedString;
       message: LocalizedString;
     };
     groupLabels: {
@@ -243,6 +241,24 @@ export interface ContactPageContent {
     options: {
       custom: LocalizedString;
       unknown: LocalizedString;
+    };
+    errors: {
+      invalidType: LocalizedString;
+      invalidRequest: LocalizedString;
+      payloadTooLarge: LocalizedString;
+      readError: LocalizedString;
+      invalidOrigin: LocalizedString;
+      requiredFields: LocalizedString;
+      maxLength: LocalizedString;
+      invalidEmail: LocalizedString;
+      invalidChars: LocalizedString;
+      invalidFormula: LocalizedString;
+      invalidDateFormat: LocalizedString;
+      invalidDate: LocalizedString;
+      invalidPhone: LocalizedString;
+      invalidNetwork: LocalizedString;
+      rateLimit: LocalizedString;
+      sendError: LocalizedString;
     };
   };
   contactDetails: {
@@ -949,10 +965,10 @@ function validateContactPageContent(data: unknown): ContactPageContent {
     "successTitle", "successMsg", "btnNewRequest", "errTaken", "errGeneric", "loadingMsg"
   ], "contactPage.visioBooking");
   const visio = obj.visioBooking as Record<string, unknown>;
-  
+
   assertExactKeys(visio.formulas, ["photo", "film", "duo", "custom", "unknown"], "contactPage.visioBooking.formulas");
   const visioFormulas = visio.formulas as Record<string, unknown>;
-  
+
   const validVisioBooking = {
     title: validateLocalizedString(visio.title, "contactPage.visioBooking.title", 200),
     unavailableMsg: validateLocalizedString(visio.unavailableMsg, "contactPage.visioBooking.unavailableMsg", 2000),
@@ -984,13 +1000,13 @@ function validateContactPageContent(data: unknown): ContactPageContent {
   };
 
   // ContactForm
-  assertExactKeys(obj.contactForm, ["formPrompt", "successMsg", "btnSubmitting", "labels", "placeholders", "groupLabels", "options"], "contactPage.contactForm");
+  assertExactKeys(obj.contactForm, ["formPrompt", "successMsg", "btnSubmitting", "labels", "placeholders", "groupLabels", "options", "errors"], "contactPage.contactForm");
   const cForm = obj.contactForm as Record<string, unknown>;
 
   assertExactKeys(cForm.labels, ["names", "email", "phone", "date", "location", "formula", "message", "submit"], "contactPage.contactForm.labels");
   const cLabels = cForm.labels as Record<string, unknown>;
 
-  assertExactKeys(cForm.placeholders, ["names", "email", "phone", "location", "formulaDefault", "formulaSurMesure", "formulaDontKnow", "message"], "contactPage.contactForm.placeholders");
+  assertExactKeys(cForm.placeholders, ["names", "email", "phone", "location", "formulaDefault", "message"], "contactPage.contactForm.placeholders");
   const cPlaceholders = cForm.placeholders as Record<string, unknown>;
 
   assertExactKeys(cForm.groupLabels, ["photo", "film", "duo"], "contactPage.contactForm.groupLabels");
@@ -998,6 +1014,13 @@ function validateContactPageContent(data: unknown): ContactPageContent {
 
   assertExactKeys(cForm.options, ["custom", "unknown"], "contactPage.contactForm.options");
   const cOptions = cForm.options as Record<string, unknown>;
+
+  assertExactKeys(cForm.errors, [
+    "invalidType", "invalidRequest", "payloadTooLarge", "readError", "invalidOrigin",
+    "requiredFields", "maxLength", "invalidEmail", "invalidChars", "invalidFormula",
+    "invalidDateFormat", "invalidDate", "invalidPhone", "invalidNetwork", "rateLimit", "sendError"
+  ], "contactPage.contactForm.errors");
+  const cErrors = cForm.errors as Record<string, unknown>;
 
   const validContactForm = {
     formPrompt: validateLocalizedString(cForm.formPrompt, "contactPage.contactForm.formPrompt", 2000),
@@ -1019,8 +1042,6 @@ function validateContactPageContent(data: unknown): ContactPageContent {
       phone: validateLocalizedString(cPlaceholders.phone, "contactPage.contactForm.placeholders.phone", 250),
       location: validateLocalizedString(cPlaceholders.location, "contactPage.contactForm.placeholders.location", 250),
       formulaDefault: validateLocalizedString(cPlaceholders.formulaDefault, "contactPage.contactForm.placeholders.formulaDefault", 250),
-      formulaSurMesure: validateLocalizedString(cPlaceholders.formulaSurMesure, "contactPage.contactForm.placeholders.formulaSurMesure", 250),
-      formulaDontKnow: validateLocalizedString(cPlaceholders.formulaDontKnow, "contactPage.contactForm.placeholders.formulaDontKnow", 250),
       message: validateLocalizedString(cPlaceholders.message, "contactPage.contactForm.placeholders.message", 250)
     },
     groupLabels: {
@@ -1031,6 +1052,24 @@ function validateContactPageContent(data: unknown): ContactPageContent {
     options: {
       custom: validateLocalizedString(cOptions.custom, "contactPage.contactForm.options.custom", 120),
       unknown: validateLocalizedString(cOptions.unknown, "contactPage.contactForm.options.unknown", 120)
+    },
+    errors: {
+      invalidType: validateLocalizedString(cErrors.invalidType, "contactPage.contactForm.errors.invalidType", 500),
+      invalidRequest: validateLocalizedString(cErrors.invalidRequest, "contactPage.contactForm.errors.invalidRequest", 500),
+      payloadTooLarge: validateLocalizedString(cErrors.payloadTooLarge, "contactPage.contactForm.errors.payloadTooLarge", 500),
+      readError: validateLocalizedString(cErrors.readError, "contactPage.contactForm.errors.readError", 500),
+      invalidOrigin: validateLocalizedString(cErrors.invalidOrigin, "contactPage.contactForm.errors.invalidOrigin", 500),
+      requiredFields: validateLocalizedString(cErrors.requiredFields, "contactPage.contactForm.errors.requiredFields", 500),
+      maxLength: validateLocalizedString(cErrors.maxLength, "contactPage.contactForm.errors.maxLength", 500),
+      invalidEmail: validateLocalizedString(cErrors.invalidEmail, "contactPage.contactForm.errors.invalidEmail", 500),
+      invalidChars: validateLocalizedString(cErrors.invalidChars, "contactPage.contactForm.errors.invalidChars", 500),
+      invalidFormula: validateLocalizedString(cErrors.invalidFormula, "contactPage.contactForm.errors.invalidFormula", 500),
+      invalidDateFormat: validateLocalizedString(cErrors.invalidDateFormat, "contactPage.contactForm.errors.invalidDateFormat", 500),
+      invalidDate: validateLocalizedString(cErrors.invalidDate, "contactPage.contactForm.errors.invalidDate", 500),
+      invalidPhone: validateLocalizedString(cErrors.invalidPhone, "contactPage.contactForm.errors.invalidPhone", 500),
+      invalidNetwork: validateLocalizedString(cErrors.invalidNetwork, "contactPage.contactForm.errors.invalidNetwork", 500),
+      rateLimit: validateLocalizedString(cErrors.rateLimit, "contactPage.contactForm.errors.rateLimit", 500),
+      sendError: validateLocalizedString(cErrors.sendError, "contactPage.contactForm.errors.sendError", 500)
     }
   };
 

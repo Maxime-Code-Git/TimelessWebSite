@@ -291,4 +291,78 @@ describe("Migration of intermediate V2 content", () => {
       expect(defaultContent.aboutPage.seo.title.fr).not.toBe("mutated");
     });
   });
+
+  describe("Migration to V8 (Contact Admin)", () => {
+    it("migrates V7 to V8 successfully", () => {
+      const v7Data = JSON.parse(JSON.stringify(defaultContent));
+      v7Data.schemaVersion = 7;
+      delete v7Data.contactPage;
+      v7Data.business.email = "v7@test.com";
+
+      const originalJson = JSON.stringify(v7Data);
+
+      const migrated = validateSiteContent(v7Data);
+      expect(migrated.schemaVersion).toBe(8);
+      expect(migrated.business.email).toBe("v7@test.com");
+      expect(migrated.contactPage).toBeDefined();
+      expect(migrated.contactPage.seo.title.fr).toBe(defaultContent.contactPage.seo.title.fr);
+
+      // No mutation
+      expect(JSON.stringify(v7Data)).toBe(originalJson);
+
+      // No shared references
+      migrated.contactPage.seo.title.fr = "mutated";
+      expect(defaultContent.contactPage.seo.title.fr).not.toBe("mutated");
+    });
+
+    it("migrates V6 to V8 successfully", () => {
+      const v6Data = JSON.parse(JSON.stringify(defaultContent));
+      v6Data.schemaVersion = 6;
+      delete v6Data.contactPage;
+
+      const migrated = validateSiteContent(v6Data);
+      expect(migrated.schemaVersion).toBe(8);
+      expect(migrated.contactPage).toBeDefined();
+      expect(migrated.aboutPage).toBeDefined(); // V6->V7 aboutPage migration happened
+    });
+
+    it("migrates V5 to V8 successfully", () => {
+      const v5Data = JSON.parse(JSON.stringify(defaultContent));
+      v5Data.schemaVersion = 5;
+      delete v5Data.contactPage;
+
+      const migrated = validateSiteContent(v5Data);
+      expect(migrated.schemaVersion).toBe(8);
+      expect(migrated.contactPage).toBeDefined();
+      expect(migrated.pricingPage).toBeDefined();
+    });
+
+    it("rejects incomplete V8 document", () => {
+      const v8Data = JSON.parse(JSON.stringify(defaultContent));
+      delete v8Data.contactPage.seo; // Incomplete
+
+      expect(() => validateSiteContent(v8Data)).toThrow();
+    });
+
+    it("rejects V8 document with unknown root key", () => {
+      const v8Data = JSON.parse(JSON.stringify(defaultContent));
+      v8Data.unknownKey = "test";
+
+      expect(() => validateSiteContent(v8Data)).toThrow();
+    });
+
+    it("rejects V8 document with unknown key in contactPage", () => {
+      const v8Data = JSON.parse(JSON.stringify(defaultContent));
+      (v8Data.contactPage as any).unknownKey = "test";
+
+      expect(() => validateSiteContent(v8Data)).toThrow();
+    });
+
+    it("is idempotent for V8", () => {
+      const v8Data = JSON.parse(JSON.stringify(defaultContent));
+      const migrated1 = validateSiteContent(v8Data);
+      const migrated2 = validateSiteContent(migrated1);
+      expect(migrated1).toEqual(migrated2);
+    });
+  });
 });

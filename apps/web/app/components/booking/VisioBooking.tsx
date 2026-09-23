@@ -3,7 +3,7 @@ import styles from "./VisioBooking.module.css";
 
 import type { ContactPageContent } from "~/lib/site-content.server";
 
-export function VisioBooking({ language, content }: { language: 'fr' | 'en', content?: ContactPageContent['visioBooking'] }) {
+export function VisioBooking({ language, content }: { language: 'fr' | 'en', content: ContactPageContent['visioBooking'] }) {
   const [slots, setSlots] = useState<{ date: string, time: string, slot_key: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>("");
@@ -13,40 +13,34 @@ export function VisioBooking({ language, content }: { language: 'fr' | 'en', con
   const [error, setError] = useState<string | null>(null);
   const successRef = useRef<HTMLDivElement>(null);
 
-  // Fallback labels if content is not loaded
-  const fallback = {
-    fr: "Chargement...",
-    en: "Loading..."
-  };
-
   const t = {
-    title: content?.title[language] || fallback[language],
-    unavailable: content?.unavailableMsg[language] || fallback[language],
-    selectDate: content?.selectDate[language] || fallback[language],
-    selectTime: content?.selectTime[language] || fallback[language],
-    timezone: content?.timezone[language] || fallback[language],
-    formTitle: content?.formTitle[language] || fallback[language],
-    names: content?.labelNames[language] || fallback[language],
-    email: content?.labelEmail[language] || fallback[language],
-    phone: content?.labelPhone[language] || fallback[language],
-    weddingDate: content?.labelWeddingDate[language] || fallback[language],
-    formula: content?.labelFormula[language] || fallback[language],
+    title: content.title[language],
+    unavailable: content.unavailableMsg[language],
+    selectDate: content.selectDate[language],
+    selectTime: content.selectTime[language],
+    timezone: content.timezone[language],
+    formTitle: content.formTitle[language],
+    names: content.labelNames[language],
+    email: content.labelEmail[language],
+    phone: content.labelPhone[language],
+    weddingDate: content.labelWeddingDate[language],
+    formula: content.labelFormula[language],
     formulas: [
-      { value: "photo", label: content?.formulas.photo[language] || fallback[language] },
-      { value: "film", label: content?.formulas.film[language] || fallback[language] },
-      { value: "duo", label: content?.formulas.duo[language] || fallback[language] },
-      { value: "custom", label: content?.formulas.custom[language] || fallback[language] },
-      { value: "unknown", label: content?.formulas.unknown[language] || fallback[language] }
+      { value: "photo", label: content.formulas.photo[language] },
+      { value: "film", label: content.formulas.film[language] },
+      { value: "duo", label: content.formulas.duo[language] },
+      { value: "custom", label: content.formulas.custom[language] },
+      { value: "unknown", label: content.formulas.unknown[language] }
     ],
-    message: content?.labelMessage[language] || fallback[language],
-    submit: content?.btnSubmit[language] || fallback[language],
-    submitting: content?.btnSubmitting[language] || fallback[language],
-    successTitle: content?.successTitle[language] || fallback[language],
-    successMsg: content?.successMsg[language] || fallback[language],
-    newRequest: content?.btnNewRequest[language] || fallback[language],
-    errTaken: content?.errTaken[language] || fallback[language],
-    errGeneric: content?.errGeneric[language] || fallback[language],
-    loading: content?.loadingMsg[language] || fallback[language]
+    message: content.labelMessage[language],
+    submit: content.btnSubmit[language],
+    submitting: content.btnSubmitting[language],
+    successTitle: content.successTitle[language],
+    successMsg: content.successMsg[language],
+    newRequest: content.btnNewRequest[language],
+    errTaken: content.errTaken[language],
+    errGeneric: content.errGeneric[language],
+    loading: content.loadingMsg[language]
   };
 
   useEffect(() => {

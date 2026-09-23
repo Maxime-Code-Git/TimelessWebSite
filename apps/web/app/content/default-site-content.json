@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 8,
   "revision": "00000000000000000000000000000000",
   "updatedAt": "1970-01-01T00:00:00.000Z",
   "business": {
@@ -890,7 +890,7 @@
     },
     "introBanner": {
       "title": {
-        "fr": "Envie de nous parler de vive voix\u00a0?",
+        "fr": "Envie de nous parler de vive voix ?",
         "en": "Want to speak in person?"
       },
       "subtitle": {
@@ -1045,7 +1045,7 @@
     },
     "contactForm": {
       "formPrompt": {
-        "fr": "Vous préférez écrire\u00a0? Remplissez le formulaire ci-dessous.",
+        "fr": "Vous préférez écrire ? Remplissez le formulaire ci-dessous.",
         "en": "Prefer to write? Fill out the form below."
       },
       "successMsg": {
@@ -1111,14 +1111,6 @@
           "fr": "Sélectionner…",
           "en": "Select…"
         },
-        "formulaSurMesure": {
-          "fr": "Sur-mesure",
-          "en": "Bespoke"
-        },
-        "formulaDontKnow": {
-          "fr": "Je ne sais pas encore",
-          "en": "I don't know yet"
-        },
         "message": {
           "fr": "Racontez-nous votre projet, vos envies, votre journée…",
           "en": "Tell us about your project, your wishes, your day…"
@@ -1146,6 +1138,72 @@
         "unknown": {
           "fr": "Je ne sais pas encore",
           "en": "I don't know yet"
+        }
+      },
+      "errors": {
+        "invalidType": {
+          "fr": "Type de requête non supporté.",
+          "en": "Unsupported request type."
+        },
+        "invalidRequest": {
+          "fr": "Requête invalide.",
+          "en": "Invalid request."
+        },
+        "payloadTooLarge": {
+          "fr": "La requête est trop volumineuse.",
+          "en": "Request payload is too large."
+        },
+        "readError": {
+          "fr": "Erreur de lecture de la requête.",
+          "en": "Error reading request."
+        },
+        "invalidOrigin": {
+          "fr": "Origine non autorisée ou absente.",
+          "en": "Unauthorized or missing origin."
+        },
+        "requiredFields": {
+          "fr": "Veuillez remplir tous les champs obligatoires.",
+          "en": "Please fill in all required fields."
+        },
+        "maxLength": {
+          "fr": "Un ou plusieurs champs dépassent la taille maximale autorisée.",
+          "en": "One or more fields exceed the maximum allowed length."
+        },
+        "invalidEmail": {
+          "fr": "Adresse email invalide.",
+          "en": "Invalid email address."
+        },
+        "invalidChars": {
+          "fr": "Caractères non autorisés.",
+          "en": "Unauthorized characters."
+        },
+        "invalidFormula": {
+          "fr": "Formule invalide.",
+          "en": "Invalid formula."
+        },
+        "invalidDateFormat": {
+          "fr": "Format de date invalide.",
+          "en": "Invalid date format."
+        },
+        "invalidDate": {
+          "fr": "Date impossible ou invalide.",
+          "en": "Impossible or invalid date."
+        },
+        "invalidPhone": {
+          "fr": "Format de téléphone invalide.",
+          "en": "Invalid phone format."
+        },
+        "invalidNetwork": {
+          "fr": "Configuration réseau invalide ou IP non autorisée.",
+          "en": "Invalid network configuration or unauthorized IP."
+        },
+        "rateLimit": {
+          "fr": "Trop de tentatives. Veuillez réessayer plus tard.",
+          "en": "Too many attempts. Please try again later."
+        },
+        "sendError": {
+          "fr": "Une erreur est survenue lors de l'envoi du message. Veuillez réessayer plus tard.",
+          "en": "An error occurred while sending the message. Please try again later."
         }
       }
     },
@@ -1185,7 +1243,7 @@
     },
     "bottomBanner": {
       "text": {
-        "fr": "Envie d'en savoir plus sur nos formules\u00a0?",
+        "fr": "Envie d'en savoir plus sur nos formules ?",
         "en": "Want to learn more about our packages?"
       },
       "linkLabel": {
