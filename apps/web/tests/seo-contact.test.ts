@@ -6,9 +6,8 @@ import type { Route as EnRoute } from "../app/routes/+types/en.contact";
 import defaultContent from "../app/content/default-site-content.json";
 
 describe("Contact Page SEO Metadata", () => {
-  const getMockMatches = (content: any) => [
-    { id: "root", pathname: "/", params: {}, data: undefined, handle: undefined },
-    {
+  const getMockMatches = (content: unknown) => [
+        {
       id: "root",
       pathname: "/",
       params: {},
@@ -19,7 +18,7 @@ describe("Contact Page SEO Metadata", () => {
         siteContent: content
       }
     }
-  ] as any; // Type casting as we only need loaderData for this test
+  ] as unknown as FrRoute.MetaArgs["matches"];
 
   it("should use localized SEO for FR", () => {
     const customContent = JSON.parse(JSON.stringify(defaultContent));

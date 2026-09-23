@@ -19,7 +19,6 @@ describe("AdminContactPage Focus Management", () => {
       contactDetails: { title: { fr: "", en: "" }, labelEmail: { fr: "", en: "" }, labelPhone: { fr: "", en: "" }, labelArea: { fr: "", en: "" }, labelSocial: { fr: "", en: "" }, labelInstagram: { fr: "", en: "" }, labelLinkedin: { fr: "", en: "" }, responseTime: { fr: "", en: "" } },
       bottomBanner: { text: { fr: "", en: "" }, linkLabel: { fr: "", en: "" } }
     };
-
     const router = createMemoryRouter([
       {
         path: "/",
@@ -27,27 +26,15 @@ describe("AdminContactPage Focus Management", () => {
         loader: () => ({ contactPage: defaultData, revision: "123", csrfToken: "abc", storageWarning: false })
       }
     ]);
-
     render(<RouterProvider router={router} />);
-
-    // Get the SEO Title input field
     const input = await screen.findByLabelText("Titre SEO");
     expect(input).toBeInTheDocument();
-
-    // Focus the input
     input.focus();
     expect(input).toHaveFocus();
-
-    // Type a character by triggering change event
     fireEvent.change(input, { target: { value: "S" } });
-    
-    // Check if value updated and focus is retained
     expect(input).toHaveValue("S");
     expect(input).toHaveFocus();
-
-    // Type another character
     fireEvent.change(input, { target: { value: "SE" } });
-    
     expect(input).toHaveValue("SE");
     expect(input).toHaveFocus();
   });

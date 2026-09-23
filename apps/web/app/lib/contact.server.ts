@@ -6,7 +6,10 @@ import { getSiteContent } from "./site-content.server";
 
 const MAX_BODY_SIZE = 100 * 1024; // 100 KB
 
-export async function processContactAction(request: Request, lang: "fr" | "en") {
+export async function processContactAction(
+  request: Request,
+  lang: "fr" | "en",
+) {
   const siteContent = getSiteContent();
   // Prevent MOCK_SMTP=true backdoor in production entirely
   if (process.env.NODE_ENV === "production" && process.env.MOCK_SMTP) {
@@ -17,29 +20,42 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
   const rawContentType = request.headers.get("content-type") || "";
   const mimeType = rawContentType.split(";")[0]?.trim().toLowerCase();
 
-  if (mimeType !== "multipart/form-data" && mimeType !== "application/x-www-form-urlencoded") {
-      return { error: siteContent.contactPage.contactForm.errors.invalidType[lang] };
+  if (
+    mimeType !== "multipart/form-data" &&
+    mimeType !== "application/x-www-form-urlencoded"
+  ) {
+    return {
+      error: siteContent.contactPage.contactForm.errors.invalidType[lang],
+    };
   }
 
   const contentLengthStr = request.headers.get("content-length");
   if (contentLengthStr) {
     if (!/^\d+$/.test(contentLengthStr)) {
-          return { error: siteContent.contactPage.contactForm.errors.payloadTooLarge[lang] };
+      return {
+        error: siteContent.contactPage.contactForm.errors.payloadTooLarge[lang],
+      };
     }
     const contentLength = Number(contentLengthStr);
     if (!Number.isSafeInteger(contentLength) || contentLength > MAX_BODY_SIZE) {
-          return { error: siteContent.contactPage.contactForm.errors.payloadTooLarge[lang] };
+      return {
+        error: siteContent.contactPage.contactForm.errors.payloadTooLarge[lang],
+      };
     }
   }
 
   // Strictly check Origin/Same-Origin
   if (!validateOrigin(request)) {
-      return { error: siteContent.contactPage.contactForm.errors.invalidOrigin[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.invalidOrigin[lang],
+    };
   }
 
   // 2. Stream Bounded Reader
   if (!request.body) {
-      return { error: siteContent.contactPage.contactForm.errors.invalidRequest[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.invalidRequest[lang],
+    };
   }
 
   let totalBytes = 0;
@@ -54,13 +70,18 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
         totalBytes += value.byteLength;
         if (totalBytes > MAX_BODY_SIZE) {
           await reader.cancel("Payload too large");
-                  return { error: siteContent.contactPage.contactForm.errors.payloadTooLarge[lang] };
+          return {
+            error:
+              siteContent.contactPage.contactForm.errors.payloadTooLarge[lang],
+          };
         }
         chunks.push(value);
       }
     }
   } catch {
-      return { error: siteContent.contactPage.contactForm.errors.readError[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.readError[lang],
+    };
   }
 
   // Reconstruct body safely
@@ -82,12 +103,16 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
   try {
     formData = await safeRequest.formData();
   } catch {
-      return { error: siteContent.contactPage.contactForm.errors.invalidRequest[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.invalidRequest[lang],
+    };
   }
 
   // 4. Honeypot check
   if (formData.get("website")) {
-      return { error: siteContent.contactPage.contactForm.errors.invalidRequest[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.invalidRequest[lang],
+    };
   }
 
   // 5. Validation and Normalization
@@ -100,22 +125,38 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
   const phone = formData.get("phone")?.toString().trim() || "";
 
   if (!names || !email || !formula || !message || !date || !location) {
-      return { error: siteContent.contactPage.contactForm.errors.requiredFields[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.requiredFields[lang],
+    };
   }
 
   // Strict Max Lengths
-  if (names.length > 100 || email.length > 150 || formula.length > 50 || date.length > 50 || location.length > 100 || message.length > 5000 || phone.length > 50) {
-    return { error: siteContent.contactPage.contactForm.errors.maxLength[lang] };
+  if (
+    names.length > 100 ||
+    email.length > 150 ||
+    formula.length > 50 ||
+    date.length > 50 ||
+    location.length > 100 ||
+    message.length > 5000 ||
+    phone.length > 50
+  ) {
+    return {
+      error: siteContent.contactPage.contactForm.errors.maxLength[lang],
+    };
   }
 
   // Validate Email strictly
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { error: siteContent.contactPage.contactForm.errors.invalidEmail[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.invalidEmail[lang],
+    };
   }
 
   // Anti CRLF injection in email/names (headers)
   if (/[\r\n]/.test(email) || /[\r\n]/.test(names)) {
-    return { error: siteContent.contactPage.contactForm.errors.invalidChars[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.invalidChars[lang],
+    };
   }
 
   // Allowed formulas
@@ -123,48 +164,76 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
   if (formula === "custom") {
     readableFormulaLabel = lang === "fr" ? "Sur-mesure" : "Custom";
   } else if (formula === "unknown") {
-    readableFormulaLabel = lang === "fr" ? "Ne sait pas encore" : "Not sure yet";
+    readableFormulaLabel =
+      lang === "fr" ? "Ne sait pas encore" : "Not sure yet";
   } else {
     const parts = formula.split("-");
     const cat = parts[0];
 
     if (cat !== "photo" && cat !== "film" && cat !== "duo") {
-      return { error: siteContent.contactPage.contactForm.errors.invalidFormula[lang] };
+      return {
+        error: siteContent.contactPage.contactForm.errors.invalidFormula[lang],
+      };
     }
 
-    const formulas = siteContent.pricing[cat as keyof typeof siteContent.pricing] || [];
-    const matched = formulas.find(f => f.enabled && formula === `${cat}-${f.id}`);
+    const formulas =
+      siteContent.pricing[cat as keyof typeof siteContent.pricing] || [];
+    const matched = formulas.find(
+      (f) => f.enabled && formula === `${cat}-${f.id}`,
+    );
     if (!matched) {
-      return { error: siteContent.contactPage.contactForm.errors.invalidFormula[lang] };
+      return {
+        error: siteContent.contactPage.contactForm.errors.invalidFormula[lang],
+      };
     }
-    const catLabel = cat === "photo" ? (lang === "fr" ? "Photographie" : "Photography") : cat === "film" ? "Film" : "Duo";
+    const catLabel =
+      cat === "photo"
+        ? lang === "fr"
+          ? "Photographie"
+          : "Photography"
+        : cat === "film"
+          ? "Film"
+          : "Duo";
     readableFormulaLabel = `[${catLabel}] ${matched.name[lang]} (${formula})`;
   }
 
   // Validate Date
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return { error: siteContent.contactPage.contactForm.errors.invalidDateFormat[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.invalidDateFormat[lang],
+    };
   }
   const parsedDate = new Date(date);
-  if (isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
-    return { error: siteContent.contactPage.contactForm.errors.invalidDate[lang] };
+  if (
+    isNaN(parsedDate.getTime()) ||
+    parsedDate.toISOString().slice(0, 10) !== date
+  ) {
+    return {
+      error: siteContent.contactPage.contactForm.errors.invalidDate[lang],
+    };
   }
 
   // Validate Phone
   if (phone && !/^[\d\s\-+()]{4,30}$/.test(phone)) {
-    return { error: siteContent.contactPage.contactForm.errors.invalidPhone[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.invalidPhone[lang],
+    };
   }
 
   // 6. Rate Limiting and IP Policy
   const clientIp = getClientIp(request);
   if (!clientIp) {
-    return { error: siteContent.contactPage.contactForm.errors.invalidNetwork[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.invalidNetwork[lang],
+    };
   }
 
   try {
     checkRateLimit(clientIp);
   } catch {
-    return { error: siteContent.contactPage.contactForm.errors.rateLimit[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.rateLimit[lang],
+    };
   }
 
   // 7. SMTP Sending
@@ -176,11 +245,13 @@ export async function processContactAction(request: Request, lang: "fr" | "en") 
       location,
       formula: readableFormulaLabel,
       message,
-      phone
+      phone,
     });
     return { success: true };
   } catch {
     // Return localized generic error, hiding exact SMTP failures
-    return { error: siteContent.contactPage.contactForm.errors.sendError[lang] };
+    return {
+      error: siteContent.contactPage.contactForm.errors.sendError[lang],
+    };
   }
 }

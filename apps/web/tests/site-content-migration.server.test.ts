@@ -293,6 +293,50 @@ describe("Migration of intermediate V2 content", () => {
   });
 
   describe("Migration to V8 (Contact Admin)", () => {
+
+    it("migrates V1 to V8 successfully", () => {
+      const v1Data = JSON.parse(JSON.stringify(V1_CONTENT));
+
+      const migrated = validateSiteContent(v1Data);
+      expect(migrated.schemaVersion).toBe(8);
+      expect(migrated.contactPage).toBeDefined();
+      expect(migrated.contactPage.seo.title.fr).toBe(defaultContent.contactPage.seo.title.fr);
+      // No shared references
+      migrated.contactPage.seo.title.fr = "mutated";
+      expect(defaultContent.contactPage.seo.title.fr).not.toBe("mutated");
+    });
+
+    it("migrates V2 to V8 successfully", () => {
+      const v2Data = JSON.parse(JSON.stringify(INTERMEDIATE_V2));
+
+      const migrated = validateSiteContent(v2Data);
+      expect(migrated.schemaVersion).toBe(8);
+      expect(migrated.contactPage).toBeDefined();
+      expect(migrated.contactPage.seo.title.fr).toBe(defaultContent.contactPage.seo.title.fr);
+    });
+
+    it("migrates V3 to V8 successfully", () => {
+      const v3Data = JSON.parse(JSON.stringify(defaultContent));
+      v3Data.schemaVersion = 3;
+      delete v3Data.pricingPage;
+      delete v3Data.aboutPage;
+      delete v3Data.contactPage;
+
+      const migrated = validateSiteContent(v3Data);
+      expect(migrated.schemaVersion).toBe(8);
+      expect(migrated.contactPage).toBeDefined();
+    });
+
+    it("migrates V4 to V8 successfully", () => {
+      const v4Data = JSON.parse(JSON.stringify(defaultContent));
+      v4Data.schemaVersion = 4;
+      delete v4Data.aboutPage;
+      delete v4Data.contactPage;
+
+      const migrated = validateSiteContent(v4Data);
+      expect(migrated.schemaVersion).toBe(8);
+      expect(migrated.contactPage).toBeDefined();
+    });
     it("migrates V7 to V8 successfully", () => {
       const v7Data = JSON.parse(JSON.stringify(defaultContent));
       v7Data.schemaVersion = 7;
@@ -353,7 +397,7 @@ describe("Migration of intermediate V2 content", () => {
 
     it("rejects V8 document with unknown key in contactPage", () => {
       const v8Data = JSON.parse(JSON.stringify(defaultContent));
-      (v8Data.contactPage as any).unknownKey = "test";
+      (v8Data.contactPage as Record<string, unknown>).unknownKey = "test";
 
       expect(() => validateSiteContent(v8Data)).toThrow();
     });

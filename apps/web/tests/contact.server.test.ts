@@ -211,7 +211,7 @@ describe('Contact Server Logic', () => {
   it('should reject oversized body (Content-Length provided)', async () => {
     const req = createRequest(getValidBody(), { "content-length": "9999999" });
     const result = await processContactAction(req, "fr");
-    expect(result.error).toContain("invalide ou trop volumineuse");
+    expect(result.error).toContain("La requête est trop volumineuse.");
   });
 
   it('should reject oversized body (without Content-Length)', async () => {
@@ -253,25 +253,25 @@ describe('Contact Server Logic', () => {
   it('should reject negative Content-Length', async () => {
     const req = createRequest(getValidBody(), { "content-length": "-100" });
     const result = await processContactAction(req, "fr");
-    expect(result.error).toContain("invalide ou trop volumineuse");
+    expect(result.error).toContain("La requête est trop volumineuse.");
   });
 
   it('should reject decimal Content-Length', async () => {
     const req = createRequest(getValidBody(), { "content-length": "100.5" });
     const result = await processContactAction(req, "fr");
-    expect(result.error).toContain("invalide ou trop volumineuse");
+    expect(result.error).toContain("La requête est trop volumineuse.");
   });
 
   it('should reject scientific Content-Length', async () => {
     const req = createRequest(getValidBody(), { "content-length": "1e4" });
     const result = await processContactAction(req, "fr");
-    expect(result.error).toContain("invalide ou trop volumineuse");
+    expect(result.error).toContain("La requête est trop volumineuse.");
   });
 
   it('should reject exact limit crossing Content-Length', async () => {
     const req = createRequest(getValidBody(), { "content-length": "102401" }); // 100 * 1024 + 1
     const result = await processContactAction(req, "fr");
-    expect(result.error).toContain("invalide ou trop volumineuse");
+    expect(result.error).toContain("La requête est trop volumineuse.");
   });
 
   it('should accept a body of exactly 102400 bytes (stream reader allows exactly 100 KB)', async () => {
