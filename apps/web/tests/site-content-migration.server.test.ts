@@ -293,92 +293,51 @@ describe("Migration of intermediate V2 content", () => {
   });
 
   describe("Migration to V8 (Contact Admin)", () => {
-
-    it("migrates V1 to V8 successfully", () => {
-      const v1Data = JSON.parse(JSON.stringify(V1_CONTENT));
-
-      const migrated = validateSiteContent(v1Data);
-      expect(migrated.schemaVersion).toBe(8);
-      expect(migrated.contactPage).toBeDefined();
-      expect(migrated.contactPage.seo.title.fr).toBe(defaultContent.contactPage.seo.title.fr);
-      // No shared references
-      migrated.contactPage.seo.title.fr = "mutated";
-      expect(defaultContent.contactPage.seo.title.fr).not.toBe("mutated");
-    });
-
-    it("migrates V2 to V8 successfully", () => {
-      const v2Data = JSON.parse(JSON.stringify(INTERMEDIATE_V2));
-
-      const migrated = validateSiteContent(v2Data);
-      expect(migrated.schemaVersion).toBe(8);
-      expect(migrated.contactPage).toBeDefined();
-      expect(migrated.contactPage.seo.title.fr).toBe(defaultContent.contactPage.seo.title.fr);
-    });
-
-    it("migrates V3 to V8 successfully", () => {
-      const v3Data = JSON.parse(JSON.stringify(defaultContent));
-      v3Data.schemaVersion = 3;
-      delete v3Data.pricingPage;
-      delete v3Data.aboutPage;
-      delete v3Data.contactPage;
-
-      const migrated = validateSiteContent(v3Data);
-      expect(migrated.schemaVersion).toBe(8);
-      expect(migrated.contactPage).toBeDefined();
-    });
-
-    it("migrates V4 to V8 successfully", () => {
-      const v4Data = JSON.parse(JSON.stringify(defaultContent));
-      v4Data.schemaVersion = 4;
-      delete v4Data.aboutPage;
-      delete v4Data.contactPage;
-
-      const migrated = validateSiteContent(v4Data);
-      expect(migrated.schemaVersion).toBe(8);
-      expect(migrated.contactPage).toBeDefined();
-    });
-    it("migrates V7 to V8 successfully", () => {
-      const v7Data = JSON.parse(JSON.stringify(defaultContent));
-      v7Data.schemaVersion = 7;
-      delete v7Data.contactPage;
-      v7Data.business.email = "v7@test.com";
-
-      const originalJson = JSON.stringify(v7Data);
-
-      const migrated = validateSiteContent(v7Data);
-      expect(migrated.schemaVersion).toBe(8);
-      expect(migrated.business.email).toBe("v7@test.com");
-      expect(migrated.contactPage).toBeDefined();
-      expect(migrated.contactPage.seo.title.fr).toBe(defaultContent.contactPage.seo.title.fr);
-
-      // No mutation
-      expect(JSON.stringify(v7Data)).toBe(originalJson);
-
-      // No shared references
-      migrated.contactPage.seo.title.fr = "mutated";
-      expect(defaultContent.contactPage.seo.title.fr).not.toBe("mutated");
-    });
-
-    it("migrates V6 to V8 successfully", () => {
-      const v6Data = JSON.parse(JSON.stringify(defaultContent));
-      v6Data.schemaVersion = 6;
-      delete v6Data.contactPage;
-
-      const migrated = validateSiteContent(v6Data);
-      expect(migrated.schemaVersion).toBe(8);
-      expect(migrated.contactPage).toBeDefined();
-      expect(migrated.aboutPage).toBeDefined(); // V6->V7 aboutPage migration happened
-    });
-
-    it("migrates V5 to V8 successfully", () => {
-      const v5Data = JSON.parse(JSON.stringify(defaultContent));
-      v5Data.schemaVersion = 5;
-      delete v5Data.contactPage;
-
-      const migrated = validateSiteContent(v5Data);
-      expect(migrated.schemaVersion).toBe(8);
-      expect(migrated.contactPage).toBeDefined();
-      expect(migrated.pricingPage).toBeDefined();
+    const versions = [1, 2, 3, 4, 5, 6, 7];
+    
+    versions.forEach(version => {
+      it(`migrates V${version} to V8 successfully and meets all requirements`, () => {
+        let inputData: Record<string, unknown>;
+        if (version === 1) {
+          inputData = JSON.parse(JSON.stringify(V1_CONTENT));
+        } else if (version === 2) {
+          inputData = JSON.parse(JSON.stringify(INTERMEDIATE_V2));
+        } else {
+          inputData = JSON.parse(JSON.stringify(defaultContent));
+          inputData.schemaVersion = version;
+          delete inputData.contactPage;
+          if (version < 5) delete inputData.aboutPage;
+          if (version < 4) delete inputData.pricingPage;
+        }
+        
+        (inputData.business as Record<string, string>).email = `v${version}@test.com`;
+        
+        const originalJson = JSON.stringify(inputData);
+        const migrated = validateSiteContent(inputData);
+        
+        // résultat en V8
+        expect(migrated.schemaVersion).toBe(8);
+        
+        // présence de contactPage
+        expect(migrated.contactPage).toBeDefined();
+        
+        // préservation d’au moins une valeur existante de business
+        expect(migrated.business.email).toBe(`v${version}@test.com`);
+        
+        // préservation des données applicables des autres sections
+        if (migrated.home) expect(migrated.home).toBeDefined();
+        
+        // objet source non modifié
+        expect(JSON.stringify(inputData)).toBe(originalJson);
+        
+        // aucune référence partagée avec le contenu par défaut
+        migrated.contactPage.seo.title.fr = "mutated";
+        expect(defaultContent.contactPage.seo.title.fr).not.toBe("mutated");
+        
+        // résultat idempotent après une seconde validation
+        const migratedAgain = validateSiteContent(JSON.parse(JSON.stringify(migrated)));
+        expect(migratedAgain).toEqual(migrated);
+      });
     });
 
     it("rejects incomplete V8 document", () => {

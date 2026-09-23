@@ -253,6 +253,8 @@ describe("Admin Contact Route", () => {
     const res = await makePostRequest(formData);
     expect(res.status).toBe(422);
     const json = await res.text();
+    expect(json).toContain("contactPage.hero.title.fr is too long");
+    expect(json).not.toContain("stack");
   });
 
   it("should reject unknown key", async () => {
@@ -280,12 +282,15 @@ describe("Admin Contact Route", () => {
     const formData = createValidFormData();
     // Simulate corruption by making site-content.json invalid
     const backup = fs.readFileSync(siteContentPath, "utf8");
-    fs.writeFileSync(siteContentPath, "{ corrupted }", "utf8");
-    const res = await makePostRequest(formData);
-    expect(res.status).toBe(409);
-    const json = await res.text();
-    expect(json).toContain("stockage du contenu doit être vérifié");
-    fs.writeFileSync(siteContentPath, backup, "utf8");
+    try {
+      fs.writeFileSync(siteContentPath, "{ corrupted }", "utf8");
+      const res = await makePostRequest(formData);
+      expect(res.status).toBe(409);
+      const json = await res.text();
+      expect(json).toContain("stockage du contenu doit être vérifié");
+    } finally {
+      fs.writeFileSync(siteContentPath, backup, "utf8");
+    }
   });
 
   it("should successfully update and persist FR/EN with no error leak", async () => {

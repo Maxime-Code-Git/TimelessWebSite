@@ -8,7 +8,7 @@ import {
   useRouteError,
 } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { getRawSiteContent, saveContactPageSettings } from "../lib/site-content.server";
+import { getRawSiteContent, saveContactPageSettings, CorruptedContentError, RevisionConflictError, ValidationError } from "../lib/site-content.server";
 import { requireValidAdminSession, validateAdminFormData, createAdminHeaders, ActionSecurityError } from "../lib/admin-auth.server";
 import { commitSession } from "../lib/session.server";
 import * as crypto from "node:crypto";
@@ -52,20 +52,19 @@ export async function action({ request }: ActionFunctionArgs) {
       const newRev = saveContactPageSettings(parsedContactPage, revision);
       return Response.json({ success: true, revision: newRev });
     } catch (e: unknown) {
-      console.error("DEBUG ERROR INNER:", e);
-      if (e && typeof e === 'object' && 'name' in e && e.name === "CorruptedContentError") {
+      if (e instanceof CorruptedContentError) {
         return Response.json(
           { error: "Le stockage du contenu doit être vérifié avant toute modification." },
           { status: 409 }
         );
       }
-      if (e && typeof e === 'object' && 'name' in e && e.name === "RevisionConflictError") {
+      if (e instanceof RevisionConflictError) {
         return Response.json(
           { error: "Conflit de révision : quelqu'un a modifié les données entre-temps. Veuillez rafraîchir." },
           { status: 409 }
         );
       }
-      if (e && typeof e === 'object' && 'name' in e && e.name === "ValidationError") {
+      if (e instanceof ValidationError) {
         return Response.json(
           { error: e.message },
           { status: 422 }
@@ -74,7 +73,6 @@ export async function action({ request }: ActionFunctionArgs) {
       throw e;
     }
   } catch (e: unknown) {
-    console.error("DEBUG ERROR OUTER:", e);
     if (e instanceof ActionSecurityError) {
       return Response.json({ error: e.message }, { status: e.status });
     }
