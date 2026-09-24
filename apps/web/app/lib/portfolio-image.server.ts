@@ -83,7 +83,7 @@ function getFontPath(): string {
   return cachedFontPath;
 }
 
-/** Reset cached font path — for testing only */
+/** Reset cached font path - for testing only */
 export function _resetFontCache(): void {
   cachedFontPath = null;
 }

@@ -657,7 +657,7 @@ export default function AdminGalleryEdit() {
                     <summary>Fichiers refusés ({(previewData.rejected as { file: string; reason: string }[]).length})</summary>
                     <ul>
                       {(previewData.rejected as { file: string; reason: string }[]).map((r, i) => (
-                        <li key={i}>{r.file} — {r.reason}</li>
+                        <li key={i}>{r.file} - {r.reason}</li>
                       ))}
                     </ul>
                   </details>
@@ -734,8 +734,8 @@ export default function AdminGalleryEdit() {
 
               return (
                 <li key={i.id}>
-                  <strong>{new Date(i.created_at).toLocaleString()}</strong> — {statusLabel}
-                  {resultSummary && <span> — {resultSummary}</span>}
+                  <strong>{new Date(i.created_at).toLocaleString()}</strong> - {statusLabel}
+                  {resultSummary && <span> - {resultSummary}</span>}
                 </li>
               );
             })}

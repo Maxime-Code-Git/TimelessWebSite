@@ -584,8 +584,12 @@ function validateBusiness(data: unknown): BusinessContent {
 function validateLocalizedString(data: unknown, context: string, maxLength = 2000): LocalizedString {
   assertExactKeys(data, ["fr", "en"], context);
   const obj = data as Record<string, unknown>;
-  const fr = validateStringOrNull(obj.fr, `${context}.fr`, maxLength);
-  const en = validateStringOrNull(obj.en, `${context}.en`, maxLength);
+  let fr = validateStringOrNull(obj.fr, `${context}.fr`, maxLength);
+  let en = validateStringOrNull(obj.en, `${context}.en`, maxLength);
+  
+  if (fr) fr = fr.replace(/[\u2013\u2014]/g, "-");
+  if (en) en = en.replace(/[\u2013\u2014]/g, "-");
+
   if (!fr || !en) {
     throw new ValidationError(`fr and en are required in ${context}`);
   }

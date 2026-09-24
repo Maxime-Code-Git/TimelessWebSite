@@ -525,7 +525,7 @@ describe("site-content.server.ts", () => {
         throw new Error("Fake rotation readdirSync error");
       });
 
-      // This should NOT throw — rotation is best-effort
+      // This should NOT throw - rotation is best-effort
       const newRev = savePricing(newPricing, defaultContent.revision);
       expect(newRev).not.toBe(defaultContent.revision);
 

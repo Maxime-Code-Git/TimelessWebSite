@@ -67,6 +67,6 @@ describe("Contact Page SEO Metadata", () => {
     } as unknown as EnRoute.MetaArgs);
 
     const titleMeta = result.find(m => "title" in m);
-    expect(titleMeta).toEqual({ title: "Contact us — Sempra" });
+    expect(titleMeta).toEqual({ title: "Contact us | Sempra" });
   });
 });

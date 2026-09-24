@@ -24,7 +24,7 @@ export function meta({ data, matches }: { data?: LoaderData; matches: Record<str
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: data?.gallery ? `Galerie de ${data.gallery.bride_names} — Sempra` : "Galerie — Sempra",
+    title: data?.gallery ? `Galerie de ${data.gallery.bride_names} | Sempra` : "Galerie | Sempra",
     description: "Votre galerie privée.",
     path: `/fr/galerie/${data?.gallery?.public_id || ""}`,
     lang: "fr",

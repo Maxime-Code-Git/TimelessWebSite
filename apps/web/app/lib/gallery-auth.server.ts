@@ -20,12 +20,12 @@ function normalizeCode(code: string): string {
   return code.toUpperCase().replace(/[\s-]/g, "");
 }
 
-// HMAC for deterministic search — normalizes (strips dashes, uppercases)
+// HMAC for deterministic search - normalizes (strips dashes, uppercases)
 export function hashGalleryCode(code: string): string {
   return crypto.createHmac("sha256", HMAC_KEY).update(normalizeCode(code)).digest("hex");
 }
 
-// AES-256-GCM for encryption — preserves original formatting with dashes
+// AES-256-GCM for encryption - preserves original formatting with dashes
 export function encryptGalleryCode(code: string): string {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", AES_KEY, iv);

@@ -253,7 +253,7 @@ describe("gallery-db migrations", () => {
       CREATE TABLE gallery_imports (id TEXT PRIMARY KEY, gallery_id TEXT NOT NULL, status TEXT NOT NULL, progress INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL DEFAULT 0, result_json TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, FOREIGN KEY(gallery_id) REFERENCES galleries(id) ON DELETE CASCADE);
     `);
 
-    // Two galleries sharing a hash — collision!
+    // Two galleries sharing a hash - collision!
     db.prepare(`INSERT INTO galleries (id, public_id, bride_names, wedding_date, created_at, expires_at, status, guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted) VALUES ('g1', 'pub1', 'A & B', '2026-06-15', 1000, 9999999999999, 'draft', 'SHARED_HASH', 'h_c1', 'e1', 'e2')`).run();
     db.prepare(`INSERT INTO galleries (id, public_id, bride_names, wedding_date, created_at, expires_at, status, guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted) VALUES ('g2', 'pub2', 'C & D', '2026-07-15', 1000, 9999999999999, 'draft', 'SHARED_HASH', 'h_c2', 'e3', 'e4')`).run();
 

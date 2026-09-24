@@ -12,7 +12,7 @@ const fixtureDirectory = fileURLToPath(new URL(".", import.meta.url));
 
 const IMPORT_FOLDER = "e2e-playwright-import";
 
-test.describe("Client Gallery E2E — Full Cycle", () => {
+test.describe("Client Gallery E2E - Full Cycle", () => {
   let targetDir: string;
   let galleryDbPath: string;
 

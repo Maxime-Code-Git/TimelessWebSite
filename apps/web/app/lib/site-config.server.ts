@@ -1,9 +1,9 @@
 /**
- * Server-only module — do NOT import from client components.
+ * Server-only module - do NOT import from client components.
  * Filename ends in .server.ts to enforce server-only usage with React Router.
  *
  * Reads PUBLIC_SITE_URL from environment variables.
- * In production, this MUST be set — canonical, hreflang, OG and sitemap depend on it.
+ * In production, this MUST be set - canonical, hreflang, OG and sitemap depend on it.
  * Example: PUBLIC_SITE_URL=https://sempra.be
  */
 

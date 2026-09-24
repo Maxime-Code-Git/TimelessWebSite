@@ -226,7 +226,7 @@ export function ContactPage({ lang }: ContactPageProps) {
                   {BUSINESS.instagramUrl && (
                     <a href={BUSINESS.instagramUrl} className={styles.infoLink} target="_blank" rel="noopener noreferrer">{contactContent.contactDetails.labelInstagram[lang]}</a>
                   )}
-                  {BUSINESS.instagramUrl && BUSINESS.linkedinUrl && " — "}
+                  {BUSINESS.instagramUrl && BUSINESS.linkedinUrl && " | "}
                   {BUSINESS.linkedinUrl && (
                     <a href={BUSINESS.linkedinUrl} className={styles.infoLink} target="_blank" rel="noopener noreferrer">{contactContent.contactDetails.labelLinkedin[lang]}</a>
                   )}

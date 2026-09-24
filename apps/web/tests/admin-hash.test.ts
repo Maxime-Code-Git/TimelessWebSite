@@ -51,7 +51,7 @@ describe("admin:hash script", () => {
         stdio: ["pipe", "pipe", "pipe"],
       });
 
-      // Global safety timeout — 10 seconds
+      // Global safety timeout - 10 seconds
       const timer = setTimeout(() => {
         if (!settled) {
           settled = true;
@@ -75,14 +75,14 @@ describe("admin:hash script", () => {
         // Count new `*` markers indicating a readline prompt is active
         const starCount = (text.match(/\*/g) || []).length;
         if (starCount > 0 && inputIndex < inputs.length) {
-          // A new prompt has appeared — detect transition
+          // A new prompt has appeared - detect transition
           const newPromptCount = promptCount + starCount;
           // Send one input per prompt transition (prompt 1 = first password, prompt 2 = confirmation)
           if (newPromptCount > promptCount && inputIndex < inputs.length) {
             child.stdin?.write(inputs[inputIndex] + "\n");
             inputIndex++;
             if (inputIndex >= inputs.length) {
-              // All inputs sent — close stdin orderly
+              // All inputs sent - close stdin orderly
               child.stdin?.end();
             }
           }

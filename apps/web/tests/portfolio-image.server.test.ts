@@ -984,7 +984,7 @@ describe("Image Processing Engine (Phase 3C.2A)", () => {
 
       const snapshotBefore = fs.readdirSync(mediaDir);
 
-      // Return 0 for all writeSync calls — atomicWriteFile should throw
+      // Return 0 for all writeSync calls - atomicWriteFile should throw
       (vi.spyOn(fs, "writeSync") as ReturnType<typeof vi.fn>).mockReturnValue(0);
 
       await expect(processImage(filePath, tempDir, PROJECT_ID, mediaDir, "T", "R"))

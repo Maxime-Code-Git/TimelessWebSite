@@ -1,5 +1,5 @@
 /**
- * Resource route — /robots.txt
+ * Resource route - /robots.txt
  *
  * Dynamic route required because PUBLIC_SITE_URL is a server-side environment
  * variable and cannot be embedded into a static file.
@@ -12,7 +12,7 @@ export async function loader() {
     "User-agent: *",
     "Allow: /",
     "",
-    // Private areas — crawlers must not index
+    // Private areas - crawlers must not index
     "Disallow: /fr/espace-clients",
     "Disallow: /en/client-area",
     "Disallow: /fr/galerie/",

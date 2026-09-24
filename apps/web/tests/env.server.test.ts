@@ -15,7 +15,7 @@ vi.mock("../../../scripts/env-loader.js", () => ({}));
  * (which contains ENV with real secrets) into the test output.
  * Instead we use a safe helper that captures only the Error object.
  */
-describe("Environment Validation — fail-fast on import", () => {
+describe("Environment Validation - fail-fast on import", () => {
   const originalEnv = process.env;
 
   function validEnv(): Record<string, string> {
@@ -512,7 +512,7 @@ describe("Environment Validation — fail-fast on import", () => {
       // If it fails unexpectedly, fail the test explicitly with a generic message
       throw new Error(`Expected env.server import to succeed: ${err.message}`);
     }
-    // Either way, the sentinel must not appear — captureImportError
+    // Either way, the sentinel must not appear - captureImportError
     // never retains the resolved module, so no serialization leak.
   });
 });

@@ -10,7 +10,7 @@ export function meta({ matches }: Route.MetaArgs) {
   const seo = rootData?.siteContent?.contactPage?.seo;
 
   return getSeoMeta({
-    title: seo?.title.en || "Contact us — Sempra",
+    title: seo?.title.en || "Contact us | Sempra",
     description: seo?.description.en || "Write to us about your wedding project. We will take the time to reply within 48h.",
     path: "/en/contact",
     alternatePath: "/fr/contact",

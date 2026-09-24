@@ -150,7 +150,7 @@ const FR: I18nStrings = {
     formulesPromo:
       "Photo et film réunis sous un même studio\u00a0: ",
     formulesPromoBold:
-      "une cohérence — et un tarif — impossibles à obtenir avec deux prestataires séparés.",
+      "une cohérence (et un tarif) impossibles à obtenir avec deux prestataires séparés.",
     formulesCaveat:
       "* Photos et vidéos conservées et disponibles pendant 24 mois",
     formulesContact: "Nous contacter",
@@ -163,7 +163,7 @@ const FR: I18nStrings = {
     },
     studioTitle: "Deux regards, un seul studio.",
     studioText:
-      "L'un filme, l'autre photographie — mais nous travaillons comme une seule main, présents ensemble le jour J pour ne rien manquer de votre histoire.",
+      "L'un filme, l'autre photographie, mais nous travaillons comme une seule main, présents ensemble le jour J pour ne rien manquer de votre histoire.",
     featuredBadge: "Le plus choisi",
   },
   portfolio: {
@@ -259,7 +259,7 @@ const EN: I18nStrings = {
     formulesPromo:
       "Photo and film united under one studio: ",
     formulesPromoBold:
-      "a consistency — and a price — impossible to achieve with two separate providers.",
+      "a consistency (and a price) impossible to achieve with two separate providers.",
     formulesCaveat:
       "* Photos and videos stored and available for 24 months",
     formulesContact: "Contact us",
@@ -272,7 +272,7 @@ const EN: I18nStrings = {
     },
     studioTitle: "Two perspectives, one studio.",
     studioText:
-      "One films, the other photographs — but we work as one, present together on the day to capture every moment of your story.",
+      "One films, the other photographs, but we work as one, present together on the day to capture every moment of your story.",
     featuredBadge: "Most popular",
   },
   portfolio: {

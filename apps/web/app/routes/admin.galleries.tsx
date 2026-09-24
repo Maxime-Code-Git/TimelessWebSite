@@ -6,7 +6,7 @@ import styles from "./admin.module.css";
 import { formatEuropeanDate } from "~/lib/date";
 
 export function meta() {
-  return [{ title: "Sempra Admin — Galeries" }];
+  return [{ title: "Sempra Admin | Galeries" }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {

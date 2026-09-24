@@ -18,7 +18,7 @@ export function Footer({ lang }: FooterProps) {
   return (
     <footer className={styles.footer}>
       {/* Logo */}
-      <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Sempra — Accueil">
+      <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Sempra | Accueil">
         <img
           src="/brand/sempra_horizontal_ivory.svg"
           alt="Sempra"
@@ -27,7 +27,7 @@ export function Footer({ lang }: FooterProps) {
         />
       </Link>
 
-      {/* Social links — only render if URLs are configured */}
+      {/* Social links - only render if URLs are configured */}
       <div className={styles.socialRow}>
         {business?.instagramUrl && (
           <a

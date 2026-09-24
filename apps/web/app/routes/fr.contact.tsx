@@ -10,7 +10,7 @@ export function meta({ matches }: Route.MetaArgs) {
   const seo = rootData?.siteContent?.contactPage?.seo;
 
   return getSeoMeta({
-    title: seo?.title.fr || "Contact — Sempra",
+    title: seo?.title.fr || "Contact | Sempra",
     description: seo?.description.fr || "Contact Sempra Studio.",
     path: "/fr/contact",
     alternatePath: "/en/contact",

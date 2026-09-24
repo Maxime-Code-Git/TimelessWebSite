@@ -8,7 +8,7 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: rootData?.siteContent?.aboutPage.seo.title.fr || "À propos — Sempra",
+    title: rootData?.siteContent?.aboutPage.seo.title.fr || "À propos | Sempra",
     description: rootData?.siteContent?.aboutPage.seo.description.fr || "Deux regards, une même exigence : capter votre journée avec justesse, pour qu'elle vous revienne intacte dans trente ans.",
     path: "/fr/a-propos",
     alternatePath: "/en/about",

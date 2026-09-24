@@ -130,7 +130,7 @@ describe("readStrictFormUrlEncoded", () => {
       body: "csrf=not-hex-at-all"
     });
     const params = await readStrictFormUrlEncoded(req);
-    // It reads fine — CSRF validation is separate
+    // It reads fine - CSRF validation is separate
     expect(params.get("csrf")).toBe("not-hex-at-all");
   });
 });

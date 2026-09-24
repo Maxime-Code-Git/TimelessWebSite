@@ -8,8 +8,8 @@ export function meta({ matches }: Route.MetaArgs) {
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
 
   return getSeoMeta({
-    title: "Sempra — Wedding Photo & Video in Belgium",
-    description: "High-end wedding photography and videography studio in Belgium. Two perspectives, one studio — making your day eternal.",
+    title: "Sempra | Wedding Photo & Video in Belgium",
+    description: "High-end wedding photography and videography studio in Belgium. Two perspectives, one studio: making your day eternal.",
     path: "/en/",
     alternatePath: "/fr/",
     lang: "en",

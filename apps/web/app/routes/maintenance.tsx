@@ -1,13 +1,13 @@
 /**
- * Maintenance page — /maintenance
+ * Maintenance page - /maintenance
  * Shown when the site is temporarily unavailable.
- * Explicitly registered in routes.ts — not auto-discovered.
+ * Explicitly registered in routes.ts - not auto-discovered.
  */
 import styles from "./maintenance.module.css";
 
 export function meta() {
   return [
-    { title: "Maintenance — Sempra" },
+    { title: "Maintenance | Sempra" },
     { name: "description", content: "Le site est temporairement indisponible." },
     { name: "robots", content: "noindex, nofollow" },
   ];

@@ -48,11 +48,11 @@ export const links: Route.LinksFunction = () => [
 
 export function meta(_args: Route.MetaArgs) {
   return [
-    { title: "Sempra — Photo & Video de mariage en Belgique" },
+    { title: "Sempra | Photo & Video de mariage en Belgique" },
     {
       name: "description",
       content:
-        "Studio de photographie et vidéo de mariage haut de gamme en Belgique. Deux regards, un seul studio — pour que votre journée reste éternelle.",
+        "Studio de photographie et vidéo de mariage haut de gamme en Belgique. Deux regards, un seul studio : pour que votre journée reste éternelle.",
     },
   ];
 }

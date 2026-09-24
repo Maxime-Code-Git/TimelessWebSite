@@ -689,8 +689,8 @@
       "en": "Photo and film united under one studio: "
     },
     "promoTextBold": {
-      "fr": "une cohérence — et un tarif — impossibles à obtenir avec deux prestataires séparés.",
-      "en": "a consistency — and a price — impossible to achieve with two separate providers."
+      "fr": "une cohérence (et un tarif) impossibles à obtenir avec deux prestataires séparés.",
+      "en": "a consistency (and a price) impossible to achieve with two separate providers."
     },
     "caveat": {
       "fr": "* Photos et vidéos conservées et disponibles pendant 24 mois",
@@ -741,8 +741,8 @@
           "en": "Can a package be customised?"
         },
         "answer": {
-          "fr": "Oui, chaque formule peut être ajustée — heures supplémentaires, second photographe, album additionnel — sur simple demande.",
-          "en": "Yes, each package can be adjusted — extra hours, second photographer, additional album — on request."
+          "fr": "Oui, chaque formule peut être ajustée (heures supplémentaires, second photographe, album additionnel) sur simple demande.",
+          "en": "Yes, each package can be adjusted (extra hours, second photographer, additional album) on request."
         }
       }
     ]
@@ -750,8 +750,8 @@
   "aboutPage": {
     "seo": {
       "title": {
-        "fr": "À propos — Sempra",
-        "en": "About us — Sempra"
+        "fr": "À propos | Sempra",
+        "en": "About us | Sempra"
       },
       "description": {
         "fr": "Deux regards, une même exigence : capter votre journée avec justesse, pour qu'elle vous revienne intacte dans trente ans.",
@@ -853,8 +853,8 @@
             "en": "A timeless result"
           },
           "text": {
-            "fr": "Des choix sobres et durables, qui vieillissent bien — loin des effets de mode.",
-            "en": "Sober and lasting choices that age well — far from passing trends."
+            "fr": "Des choix sobres et durables, qui vieillissent bien, loin des effets de mode.",
+            "en": "Sober and lasting choices that age well, far from passing trends."
           }
         }
       ]
@@ -865,20 +865,20 @@
         "en": "Our difference"
       },
       "text": {
-        "fr": "Réunir la photo et le film sous un même studio, c'est une cohérence de regard du premier au dernier plan — et une présence commune le jour J, pour ne rien manquer de votre histoire.",
-        "en": "Uniting photo and film under one studio means a coherent vision from the first to the last frame — and a shared presence on the day, to miss nothing of your story."
+        "fr": "Réunir la photo et le film sous un même studio, c'est une cohérence de regard du premier au dernier plan, et une présence commune le jour J, pour ne rien manquer de votre histoire.",
+        "en": "Uniting photo and film under one studio means a coherent vision from the first to the last frame, and a shared presence on the day, to miss nothing of your story."
       }
     }
   },
   "contactPage": {
     "seo": {
       "title": {
-        "fr": "Contact — Sempra Studio",
-        "en": "Contact — Sempra Studio"
+        "fr": "Contact | Sempra Studio",
+        "en": "Contact | Sempra Studio"
       },
       "description": {
-        "fr": "Écrivez-nous, sans engagement — nous prendrons le temps de vous répondre.",
-        "en": "Write to us, no commitment — we'll take the time to reply."
+        "fr": "Écrivez-nous, sans engagement : nous prendrons le temps de vous répondre.",
+        "en": "Write to us, no commitment, we'll take the time to reply."
       }
     },
     "hero": {
@@ -887,8 +887,8 @@
         "en": "Let's tell your day."
       },
       "subtitle": {
-        "fr": "Écrivez-nous, sans engagement — nous prendrons le temps de vous répondre.",
-        "en": "Write to us, no commitment — we'll take the time to reply."
+        "fr": "Écrivez-nous, sans engagement : nous prendrons le temps de vous répondre.",
+        "en": "Write to us, no commitment, we'll take the time to reply."
       }
     },
     "introBanner": {

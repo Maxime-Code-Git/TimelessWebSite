@@ -5,7 +5,7 @@ export default [
   index("routes/root-redirect.tsx"),
 
   // ── System resource routes ────────────────────────────────
-  // These MUST be declared here — files in routes/ are NOT auto-discovered
+  // These MUST be declared here - files in routes/ are NOT auto-discovered
   route("robots.txt", "routes/robots[.txt].tsx"),
   route("sitemap.xml", "routes/sitemap[.xml].tsx"),
   route("maintenance", "routes/maintenance.tsx"),

@@ -90,7 +90,7 @@ export function FormulesPage({ lang }: FormulesPageProps) {
                   <ul className={styles.featuresList}>
                     {tier.includedItems.map((item: FormulaIncludedItem) => (
                       <li key={item.id} className={styles.featureItem}>
-                        <span className={styles.featureDash}>—</span>
+                        <span className={styles.featureDash}>-</span>
                         <span>{item.text[lang]}</span>
                       </li>
                     ))}

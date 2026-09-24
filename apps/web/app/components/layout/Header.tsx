@@ -58,7 +58,7 @@ export function Header({
 
   return (
     <header className={styles.header}>
-      <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Sempra — Accueil">
+      <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Sempra | Accueil">
         <img
           src="/brand/SempraFullBlue.png"
           alt="Sempra"

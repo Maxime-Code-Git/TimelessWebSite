@@ -105,7 +105,7 @@ test.describe('Visio Booking Flow', () => {
       }
       expect(availableTimeValues).not.toContain(selectedTime);
     }
-    // If date is gone entirely, the slot is also gone — that's fine.
+    // If date is gone entirely, the slot is also gone - that\'s fine.
 
     // 5. Apparition dans l'administration
     const contextAdmin = await browser.newContext();

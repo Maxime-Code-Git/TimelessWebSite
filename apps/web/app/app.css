@@ -1,12 +1,12 @@
 /* ============================================================
-   SEMPRA PHOTO & VIDEO — Global CSS
+   SEMPRA PHOTO & VIDEO - Global CSS
    Design system: tokens, reset, typography, utilities
    NO Tailwind. Pure CSS with Custom Properties.
    ============================================================ */
 
 /* ── 1. Design Tokens ─────────────────────────────────────── */
 :root {
-  /* Brand colors — exact palette from maquettes */
+  /* Brand colors - exact palette from maquettes */
   --ivory:        #FBF6F0;
   --forest-deep:  #072421;
   --forest:       #0D3A35;
@@ -18,7 +18,7 @@
   --footer-bg:    #04211D;
   --footer-link:  #5F8177;
 
-  /* Typography — loaded from local WOFF2, no Google Fonts */
+  /* Typography - loaded from local WOFF2, no Google Fonts */
   --font-serif:   'Cormorant Garamond', Georgia, 'Times New Roman', serif;
   --font-sans:    'Hanken Grotesk', system-ui, -apple-system, sans-serif;
 
@@ -60,7 +60,7 @@
   --border-gold-thin: 0.5px solid var(--gold-light);
 }
 
-/* ── 2. Font-face declarations — self-hosted WOFF2 only ───── */
+/* ── 2. Font-face declarations - self-hosted WOFF2 only ───── */
 /* Cormorant Garamond */
 @font-face {
   font-family: 'Cormorant Garamond';
@@ -374,7 +374,7 @@ button:focus-visible {
 }
 
 /* ── 15. Responsive breakpoints ───────────────────────────── */
-/* Mobile first — breakpoints mirror the maquettes */
+/* Mobile first - breakpoints mirror the maquettes */
 /* sm: 390px (mobile), md: 768px (tablet), lg: 1024px, xl: 1440px */
 
 @media (max-width: 720px) {

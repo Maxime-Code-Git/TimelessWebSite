@@ -189,7 +189,7 @@ test.describe('Admin Portfolio V2', () => {
   test('should completely manage categories and respect constraints', async ({ page }) => {
     await page.goto('/admin/portfolio');
 
-    // 1. Create first category — the creation form uses input[name="nameFr"] etc.
+    // 1. Create first category - the creation form uses input[name="nameFr"] etc.
     await page.fill('input[placeholder="Nom FR"]', 'Catégorie 1 FR');
     await page.fill('input[placeholder="Nom EN"]', 'Category 1 EN');
     await page.fill('input[placeholder="Slug"]', 'cat-1');
@@ -253,7 +253,7 @@ test.describe('Admin Portfolio V2', () => {
     await page.locator('button:has-text("Oui, supprimer")').first().click();
     await expect(page.locator('button:has-text("Oui, supprimer")')).not.toBeVisible();
 
-    // Verification that categories are deleted — heading shows (0)
+    // Verification that categories are deleted - heading shows (0)
     await expect(page.locator('h2:has-text("Catégories (0)")')).toBeVisible();
   });
 

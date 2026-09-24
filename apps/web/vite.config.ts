@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// No Tailwind — using CSS Modules + CSS custom properties (design tokens)
+// No Tailwind - using CSS Modules + CSS custom properties (design tokens)
 export default defineConfig({
   plugins: [reactRouter()],
   resolve: {

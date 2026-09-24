@@ -1,8 +1,8 @@
 /**
- * Resource route — /sitemap.xml
+ * Resource route - /sitemap.xml
  *
  * Returns 503 when PUBLIC_SITE_URL is not configured (production misconfiguration).
- * Only public pages are included — private areas (gallery, client-area) are excluded.
+ * Only public pages are included - private areas (gallery, client-area) are excluded.
  */
 
 

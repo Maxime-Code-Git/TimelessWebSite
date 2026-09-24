@@ -1,5 +1,5 @@
 /**
- * Custom entry.server.tsx — required for:
+ * Custom entry.server.tsx - required for:
  * 1. Nonce-based Content-Security-Policy (one nonce per response)
  * 2. Security headers (X-Content-Type-Options, X-Frame-Options, etc.)
  *
@@ -56,7 +56,7 @@ function buildCsp(nonce: string): string {
     "default-src 'self'",
     // React Router hydration scripts require nonce
     `script-src 'self' 'nonce-${nonce}'`,
-    // CSS Modules compile to separate .css files — no inline styles needed in production
+    // CSS Modules compile to separate .css files - no inline styles needed in production
     `style-src ${styleSrc}`,
     // Local fonts only (woff2 served from /public/fonts/)
     "font-src 'self'",
@@ -79,7 +79,7 @@ function buildCsp(nonce: string): string {
 }
 
 function addSecurityHeaders(headers: Headers, nonce: string): void {
-  // CSP with nonce — regenerated per response (no replay attacks)
+  // CSP with nonce - regenerated per response (no replay attacks)
   headers.set("Content-Security-Policy", buildCsp(nonce));
 
   // Prevent MIME sniffing
