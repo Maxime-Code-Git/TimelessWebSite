@@ -322,7 +322,26 @@ export interface LegalPagesContent {
   cookies: LegalPageState;
 }
 
+
+export interface LegalUI {
+  draftWarning: LocalizedString;
+  hostedBy: LocalizedString;
+  toBeDefined: LocalizedString;
+  enterpriseNumber: LocalizedString;
+  vatNumber: LocalizedString;
+  effectiveDate: LocalizedString;
+  unpublishedDraft: LocalizedString;
+  cookiesInventoryTitle: LocalizedString;
+  cookiesInventoryEmpty: LocalizedString;
+  cookieColName: LocalizedString;
+  cookieColProvider: LocalizedString;
+  cookieColCategory: LocalizedString;
+  cookieColPurpose: LocalizedString;
+  cookieColDuration: LocalizedString;
+}
+
 export interface SiteContent {
+  legalUI: LegalUI;
   schemaVersion: 9;
   revision: string;
   updatedAt: string;
@@ -1273,7 +1292,33 @@ export function validateLegalPageState(data: unknown, context: string): LegalPag
   return { draft, published, history };
 }
 
-export function validateLegalPagesContent(data: unknown): LegalPagesContent {
+export 
+function validateLegalUI(obj: unknown): LegalUI {
+  assertExactKeys(obj, [
+    "draftWarning", "hostedBy", "toBeDefined", "enterpriseNumber", "vatNumber",
+    "effectiveDate", "unpublishedDraft", "cookiesInventoryTitle", "cookiesInventoryEmpty",
+    "cookieColName", "cookieColProvider", "cookieColCategory", "cookieColPurpose", "cookieColDuration"
+  ], "legalUI");
+  const o = obj as Record<string, unknown>;
+  return {
+    draftWarning: validateLocalizedString(o.draftWarning, "legalUI.draftWarning"),
+    hostedBy: validateLocalizedString(o.hostedBy, "legalUI.hostedBy"),
+    toBeDefined: validateLocalizedString(o.toBeDefined, "legalUI.toBeDefined"),
+    enterpriseNumber: validateLocalizedString(o.enterpriseNumber, "legalUI.enterpriseNumber"),
+    vatNumber: validateLocalizedString(o.vatNumber, "legalUI.vatNumber"),
+    effectiveDate: validateLocalizedString(o.effectiveDate, "legalUI.effectiveDate"),
+    unpublishedDraft: validateLocalizedString(o.unpublishedDraft, "legalUI.unpublishedDraft"),
+    cookiesInventoryTitle: validateLocalizedString(o.cookiesInventoryTitle, "legalUI.cookiesInventoryTitle"),
+    cookiesInventoryEmpty: validateLocalizedString(o.cookiesInventoryEmpty, "legalUI.cookiesInventoryEmpty"),
+    cookieColName: validateLocalizedString(o.cookieColName, "legalUI.cookieColName"),
+    cookieColProvider: validateLocalizedString(o.cookieColProvider, "legalUI.cookieColProvider"),
+    cookieColCategory: validateLocalizedString(o.cookieColCategory, "legalUI.cookieColCategory"),
+    cookieColPurpose: validateLocalizedString(o.cookieColPurpose, "legalUI.cookieColPurpose"),
+    cookieColDuration: validateLocalizedString(o.cookieColDuration, "legalUI.cookieColDuration"),
+  };
+}
+
+function validateLegalPagesContent(data: unknown): LegalPagesContent {
   assertExactKeys(data, ["mentions", "privacy", "cgv", "cookies"], "legalPages");
   const obj = data as Record<string, unknown>;
   return {
@@ -1518,12 +1563,15 @@ export function validateSiteContent(data: unknown): SiteContent {
   }
 
 
-  if ((obj.schemaVersion as number) < 9) {
+
+  if ((obj.schemaVersion as number) < 9 || (obj.schemaVersion as number) === 9 && !('legalUI' in objRef)) {
     const defaultLegalPages = JSON.parse(JSON.stringify(defaultContent.legalPages));
     objRef = {
       ...objRef,
-      legalPages: defaultLegalPages
+      legalPages: 'legalPages' in objRef ? objRef.legalPages : defaultLegalPages,
+      legalUI: 'legalUI' in objRef ? objRef.legalUI : JSON.parse(JSON.stringify(defaultContent.legalUI)),
     };
+
     
     // Default business variables were added in V9
     const currentBusiness = objRef.business as Record<string, unknown>;
@@ -1535,7 +1583,7 @@ export function validateSiteContent(data: unknown): SiteContent {
     };
   }
 
-  assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage", "aboutPage", "contactPage", "legalPages"], "root");
+  assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage", "aboutPage", "contactPage", "legalPages", "legalUI"], "root");
 
 
 
@@ -1553,6 +1601,7 @@ export function validateSiteContent(data: unknown): SiteContent {
     aboutPage: validateAboutPageContent(objRef.aboutPage),
     contactPage: validateContactPageContent(objRef.contactPage),
     legalPages: validateLegalPagesContent(objRef.legalPages),
+    legalUI: validateLegalUI(objRef.legalUI),
   };
 }
 

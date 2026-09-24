@@ -1,7 +1,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { action } from "../app/routes/admin.legal";
-import { getSiteContent } from "../app/lib/site-content.server";
+import { getSiteContent, saveSettings } from "../app/lib/site-content.server";
 import { commitSession, getSession } from "../app/lib/session.server";
 import { resetRateLimit } from "../app/lib/rate-limit.server";
 import { computeCredentialVersion } from "../app/lib/auth.server";
@@ -41,6 +41,12 @@ describe("Admin Legal Route HTTP API", () => {
     const reqHeaders = new Headers(headers);
     if (!reqHeaders.has("Origin")) reqHeaders.set("Origin", "http://localhost:5173");
     if (!reqHeaders.has("X-Forwarded-For")) reqHeaders.set("X-Forwarded-For", "127.0.0.1");
+    if (!reqHeaders.has("Content-Type") && typeof body === "string") {
+      reqHeaders.set("Content-Type", "application/x-www-form-urlencoded");
+    }
+    if (!reqHeaders.has("Content-Length")) {
+      reqHeaders.set("Content-Length", "1000");
+    }
 
     return new Request("http://localhost:5173/admin/legal", {
       method,
@@ -117,7 +123,7 @@ describe("Admin Legal Route HTTP API", () => {
 
     const req = createRequest("POST", formData, { Cookie: cookie });
     const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
   it("publishes successfully and archives old version", async () => {
@@ -125,7 +131,22 @@ describe("Admin Legal Route HTTP API", () => {
     let content = getSiteContent();
     
     // First publish
+    
+    content.business.address = "123 Street";
+    content.business.enterpriseNumber = "123";
+    content.business.hostingProvider = "Host";
+    saveSettings(content.business, content.revision);
+    
+    content = getSiteContent();
     let draft = content.legalPages.mentions.draft;
+    // Fill required fields
+    draft.seoTitle = { fr: "T", en: "T" };
+    draft.seoDescription = { fr: "T", en: "T" };
+    draft.publicTitle = { fr: "T", en: "T" };
+    draft.intro = { fr: "T", en: "T" };
+    if (!draft.sections.length) draft.sections.push({ id: "s1", title: {fr: "t", en: "t"}, paragraphs: [], listItems: [] });
+    else draft.sections[0].title = { fr: "T", en: "T" };
+
     draft.effectiveDate = "2026-01-01";
     draft.version = 1;
     
@@ -196,7 +217,7 @@ describe("Admin Legal Route HTTP API", () => {
 
     const req = createRequest("POST", formData, { Cookie: cookie });
     const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
-    expect(res.status).toBe(400); // validation error catches < and >
+    expect(res.status).toBe(422); // validation error catches < and >
   });
   
   it("rejects payload too large", async () => {
@@ -209,6 +230,9 @@ describe("Admin Legal Route HTTP API", () => {
   it("maintains historical versions and draft independence after two publications", async () => {
     const cookie = await createValidSession("csrf-1");
     let contentObj = getSiteContent();
+    contentObj.business.address = '123';
+    contentObj.business.enterpriseNumber = '123';
+    contentObj.business.hostingProvider = 'Host';
     let draft = contentObj.legalPages.privacy.draft;
     draft.effectiveDate = "2026-10-01";
     draft.publicTitle.fr = "V1";
@@ -287,5 +311,104 @@ describe("Admin Legal Route HTTP API", () => {
     
     const updated = getSiteContent();
     expect(updated.legalPages.mentions.draft.publicTitle.fr).toBe("Mentions 🚀 こんにちは");
+  });
+
+  it("rejects invalid Content-Type", async () => {
+    const cookie = await createValidSession("csrf-1");
+    const req = createRequest("POST", "{}" as unknown as FormData, { Cookie: cookie, "Content-Type": "text/plain", "Content-Length": "2" });
+    const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
+    expect(res.status).toBe(415);
+  });
+
+  it("rejects invalid Content-Length", async () => {
+    const cookie = await createValidSession("csrf-1");
+    const lengths = ["", "-10", "10.5", "abc", "9007199254740992", "1000000"];
+    for (const len of lengths) {
+       resetRateLimit("127.0.0.1", "admin_action");
+       const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded", Cookie: cookie };
+       if (len) headers["Content-Length"] = len;
+       
+       const req = createRequest("POST", "csrfToken=csrf-1&intent=save_draft&pageKey=mentions", headers);
+       
+       // Override headers get to bypass undici sanitization
+       const oldGet = req.headers.get.bind(req.headers);
+       req.headers.get = (key: string) => {
+          if (key.toLowerCase() === "content-length") return len || null;
+          return oldGet(key);
+       };
+
+       const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
+       if (!len || !/^\d+$/.test(len)) {
+          expect(res.status).toBe(411);
+       } else {
+          expect(res.status).toBe(413);
+       }
+    }
+  });
+
+  it("rejects malformed JSON", async () => {
+    const cookie = await createValidSession("csrf-1");
+    const formData = new FormData();
+    formData.append("csrfToken", "csrf-1");
+    formData.append("intent", "save_draft");
+    formData.append("pageKey", "mentions");
+    formData.append("data", "{ bad json");
+    
+    const req = createRequest("POST", formData, { Cookie: cookie, "Content-Length": "100" });
+    const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("JSON malformé");
+  });
+
+  it("rejects invalid pageKey and intent", async () => {
+    const cookie = await createValidSession("csrf-1");
+    const formData = new FormData();
+    formData.append("csrfToken", "csrf-1");
+    formData.append("intent", "save_draft");
+    formData.append("pageKey", "unknown");
+    formData.append("data", "{}");
+    
+    const req = createRequest("POST", formData, { Cookie: cookie, "Content-Length": "100" });
+    let res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
+    expect(res.status).toBe(400);
+    
+    formData.set("pageKey", "mentions");
+    formData.set("intent", "delete_all");
+    const req2 = createRequest("POST", formData, { Cookie: cookie, "Content-Length": "100" });
+    res = await action({ request: req2, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects publication with missing fields and duplicate IDs", async () => {
+    const cookie = await createValidSession("csrf-1");
+    const contentObj = getSiteContent();
+    contentObj.business.address = "123 Street";
+    contentObj.business.enterpriseNumber = "123";
+    contentObj.business.hostingProvider = "Host";
+    saveSettings(contentObj.business, contentObj.revision);
+    const draft = contentObj.legalPages.mentions.draft;
+
+    draft.effectiveDate = "2026-01-01";
+    draft.seoTitle = { fr: "Titre", en: "Title" };
+    draft.seoDescription = { fr: "Desc", en: "Desc" };
+    draft.publicTitle = { fr: "Pub", en: "Pub" };
+    draft.intro = { fr: "Intro", en: "Intro" };
+    if (!draft.sections.length) draft.sections.push({ id: "s1", title: {fr: "t", en: "t"}, paragraphs: [], listItems: [] });
+    // Duplicate ID
+    draft.sections.push(draft.sections[0]); 
+    
+    const formData = new FormData();
+    formData.append("csrfToken", "csrf-1");
+    formData.append("intent", "publish");
+    formData.append("pageKey", "mentions");
+    formData.append("revision", contentObj.revision);
+    formData.append("data", JSON.stringify(draft));
+    
+    const req = createRequest("POST", formData, { Cookie: cookie, "Content-Length": "1000" });
+    const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
+    expect(res.status).toBe(422); 
+    const json = await res.json();
+    expect(json.error).toContain("dupliqué");
   });
 });

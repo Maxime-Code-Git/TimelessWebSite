@@ -16,6 +16,7 @@ interface Props {
 export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Props) {
   const rootData = useRouteLoaderData<typeof rootLoader>("root");
   const business = rootData?.siteContent?.business;
+  const legalUI = rootData?.siteContent?.legalUI;
 
   const isComplete = Boolean(
     business?.address && business?.enterpriseNumber && business?.hostingProvider
@@ -36,8 +37,8 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
         {business.email && <><a href={`mailto:${business.email}`}>{business.email}</a><br /></>}
         {business.phoneDisplay && <a href={`tel:${business.phoneE164}`}>{business.phoneDisplay}</a>}
         <br />
-        {business.enterpriseNumber && <>{lang === "fr" ? "Numéro d'entreprise" : "Enterprise Number"} : {business.enterpriseNumber}<br /></>}
-        {business.vatNumber && <>{lang === "fr" ? "TVA" : "VAT"} : {business.vatNumber}<br /></>}
+        {business.enterpriseNumber && <>{legalUI?.enterpriseNumber[lang]} : {business.enterpriseNumber}<br /></>}
+        {business.vatNumber && <>{legalUI?.vatNumber[lang]} : {business.vatNumber}<br /></>}
       </address>
     );
   };
@@ -46,7 +47,7 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
     if (!business) return null;
     return (
       <p>
-        {lang === "fr" ? "Le site est hébergé par" : "The site is hosted by"} {business.hostingProvider || (lang === "fr" ? "[À définir]" : "[To be defined]")}.
+        {legalUI?.hostedBy[lang]} {business.hostingProvider || (lang === "fr" ? "[À définir]" : "[To be defined]")}.
         {business.hostingAddress && <><br /><span className={styles.preLine}>{business.hostingAddress}</span></>}
       </p>
     );
@@ -61,18 +62,18 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
     }
     if (section.id === "cookies-inventory") {
       if (!document.inventory || document.inventory.length === 0) {
-        return <p>{lang === "fr" ? "Aucun cookie spécifique répertorié." : "No specific cookies listed."}</p>;
+        return <p>{legalUI?.cookiesInventoryEmpty[lang]}</p>;
       }
       return (
         <div className={styles.tableWrapper}>
           <table>
             <thead>
               <tr>
-                <th>{lang === "fr" ? "Nom" : "Name"}</th>
-                <th>{lang === "fr" ? "Fournisseur" : "Provider"}</th>
-                <th>{lang === "fr" ? "Catégorie" : "Category"}</th>
-                <th>{lang === "fr" ? "Finalité" : "Purpose"}</th>
-                <th>{lang === "fr" ? "Durée" : "Duration"}</th>
+                <th>{legalUI?.cookieColName[lang]}</th>
+                <th>{legalUI?.cookieColProvider[lang]}</th>
+                <th>{legalUI?.cookieColCategory[lang]}</th>
+                <th>{legalUI?.cookieColPurpose[lang]}</th>
+                <th>{legalUI?.cookieColDuration[lang]}</th>
               </tr>
             </thead>
             <tbody>
@@ -116,17 +117,15 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
 
           {showWarning && (
             <div className={styles.draftNotice}>
-              {lang === "fr"
-                ? "Ce document est en cours de finalisation et ne constitue pas un document juridique opposable."
-                : "This document is being finalized and does not constitute a legally binding document."}
+              {legalUI?.draftWarning[lang]}
             </div>
           )}
           
           <div className={styles.metaInfo}>
             {document.effectiveDate ? (
-              <p><em>{lang === "fr" ? "Date d'entrée en vigueur :" : "Effective date:"} {document.effectiveDate} (Version {document.version})</em></p>
+              <p><em>{legalUI?.effectiveDate[lang]} {document.effectiveDate} (Version {document.version})</em></p>
             ) : (
-              <p><em>{lang === "fr" ? "Brouillon non publié" : "Unpublished draft"}</em></p>
+              <p><em>{legalUI?.unpublishedDraft[lang]}</em></p>
             )}
           </div>
 
@@ -142,7 +141,7 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
             
             {document.inventory && !document.sections.some(s => s.id === "cookies-inventory") && (
               <div key="cookies-inventory">
-                <h2>{lang === "fr" ? "Inventaire des cookies" : "Cookies inventory"}</h2>
+                <h2>{legalUI?.cookiesInventoryTitle[lang]}</h2>
                 {renderSectionContent({ id: "cookies-inventory", title: {fr: "", en: ""}, paragraphs: [] })}
               </div>
             )}
