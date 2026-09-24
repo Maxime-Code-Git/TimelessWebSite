@@ -397,7 +397,7 @@ describe("Migration of intermediate V2 content", () => {
       expect(migrated.schemaVersion).toBe(9);
       expect(migrated.legalUI.draftWarning.fr).toBe("Modifié"); // Conservé
       expect(migrated.legalUI.versionLabel.fr).toBe("Version"); // Injecté depuis le défaut
-      
+
       // Ensure no shared reference
       expect(migrated.legalUI.versionLabel).not.toBe(defaultContent.legalUI.versionLabel);
     });

@@ -1569,7 +1569,7 @@ export function validateSiteContent(data: unknown): SiteContent {
   if ((obj.schemaVersion as number) < 9 || (obj.schemaVersion as number) === 9) {
     const defaultLegalPages = JSON.parse(JSON.stringify(defaultContent.legalPages));
     const migratedLegalUI = 'legalUI' in objRef ? { ...(objRef.legalUI as Record<string, unknown>) } : JSON.parse(JSON.stringify(defaultContent.legalUI));
-    
+
     // Inject versionLabel if missing in existing V9 legalUI
     if (!('versionLabel' in migratedLegalUI)) {
       migratedLegalUI.versionLabel = JSON.parse(JSON.stringify(defaultContent.legalUI.versionLabel));

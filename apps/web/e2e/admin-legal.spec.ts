@@ -95,11 +95,11 @@ test.describe('Admin Legal Pages', () => {
     // 11. Verify history in admin
     await page.goto('/admin/legal');
     await page.click('button:has-text("Mentions Légales")');
-    
+
     // Check current version
     await expect(page.locator('text="(Courante)"')).toBeVisible();
     await expect(page.locator('text="2026-10-01"').first()).toBeVisible();
-    
+
     // Check archived version
     await expect(page.locator('text="(Archivée)"')).toBeVisible();
     await expect(page.locator('text="2026-01-01"').first()).toBeVisible();

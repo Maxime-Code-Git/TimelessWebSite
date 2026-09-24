@@ -88,7 +88,7 @@ const mockUseLoaderData = vi.fn(() => ({
   business: mockContent.business
 }));
 
- 
+
 vi.mock("react-router", async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const actual: any = await importOriginal();
@@ -118,7 +118,7 @@ describe("AdminLegal React Component", () => {
     ]);
 
     render(<RouterProvider router={router} />);
-    
+
     // Check if the current published cookie is rendered in detail
     expect(screen.getAllByText(/CookieTestFR/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/FournisseurTest/).length).toBeGreaterThan(0);
