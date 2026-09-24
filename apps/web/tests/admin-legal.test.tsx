@@ -105,6 +105,21 @@ vi.mock("react-router", async (importOriginal) => {
     Form: ({ children }: { children: ReactNode }) => <form>{children}</form>,
     useSubmit: () => vi.fn(),
   };
+  it("renders data-testid on current and archived history entries", () => {
+    currentActionData = null;
+    const router = createMemoryRouter([{ path: "/", element: <AdminLegal /> }]);
+    const { container } = render(<RouterProvider router={router} />);
+
+    const currentEntry = container.querySelector('[data-testid="legal-history-current"]');
+    expect(currentEntry).not.toBeNull();
+    expect(currentEntry?.textContent).toContain("(Courante)");
+    expect(currentEntry?.textContent).toContain("2026-01-01");
+
+    const archivedEntries = container.querySelectorAll('[data-testid="legal-history-archived"]');
+    expect(archivedEntries.length).toBe(1);
+    expect(archivedEntries[0].textContent).toContain("(Archiv\u00e9e)");
+    expect(archivedEntries[0].textContent).toContain("2025-01-01");
+  });
 });
 
 describe("AdminLegal React Component", () => {
@@ -141,7 +156,7 @@ describe("AdminLegal React Component", () => {
     currentActionData = { success: true };
     const router = createMemoryRouter([{ path: "/", element: <AdminLegal /> }]);
     render(<RouterProvider router={router} />);
-    
+
     const statusEl = screen.getByRole("status");
     expect(statusEl.textContent).toBe("Modifications enregistrées.");
   });
@@ -150,10 +165,26 @@ describe("AdminLegal React Component", () => {
     currentActionData = { error: "Something went wrong" };
     const router = createMemoryRouter([{ path: "/", element: <AdminLegal /> }]);
     render(<RouterProvider router={router} />);
-    
+
     // the uncompleted profile warning might also have role="alert" if isComplete were false,
     // but we mocked isComplete: true.
     const alertEl = screen.getByRole("alert");
     expect(alertEl.textContent).toBe("Something went wrong");
+  });
+
+  it("renders data-testid on current and archived history entries", () => {
+    currentActionData = null;
+    const router = createMemoryRouter([{ path: "/", element: <AdminLegal /> }]);
+    const { container } = render(<RouterProvider router={router} />);
+
+    const currentEntry = container.querySelector('[data-testid="legal-history-current"]');
+    expect(currentEntry).not.toBeNull();
+    expect(currentEntry?.textContent).toContain("(Courante)");
+    expect(currentEntry?.textContent).toContain("2026-01-01");
+
+    const archivedEntries = container.querySelectorAll('[data-testid="legal-history-archived"]');
+    expect(archivedEntries.length).toBe(1);
+    expect(archivedEntries[0].textContent).toContain("(Archivée)");
+    expect(archivedEntries[0].textContent).toContain("2025-01-01");
   });
 });

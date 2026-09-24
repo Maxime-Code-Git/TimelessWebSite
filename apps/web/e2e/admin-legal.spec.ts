@@ -104,11 +104,15 @@ test.describe('Admin Legal Pages', () => {
     await expect(page.getByRole('button', { name: 'Mentions Légales', exact: true })).toBeVisible();
 
     // Check current version
-    await expect(page.locator('text="(Courante)"')).toBeVisible();
-    await expect(page.locator('text="2026-10-01"').first()).toBeVisible();
+    const currentVersion = page.getByTestId('legal-history-current');
+    await expect(currentVersion).toContainText('(Courante)');
+    await expect(currentVersion).toContainText('2026-10-01');
 
     // Check archived version
-    await expect(page.locator('text="(Archivée)"')).toBeVisible();
-    await expect(page.locator('text="2026-01-01"').first()).toBeVisible();
+    const archivedVersions = page.getByTestId('legal-history-archived');
+    await expect(archivedVersions).toHaveCount(1);
+    const archivedVersion = archivedVersions.first();
+    await expect(archivedVersion).toContainText('(Archivée)');
+    await expect(archivedVersion).toContainText('2026-01-01');
   });
 });

@@ -582,7 +582,7 @@ export default function AdminLegal() {
                    <h3 className={styles.sectionTitle}>Historique</h3>
                    <ul>
                      {content.legalPages[activeTab].published ? (
-                       <li>
+                       <li data-testid="legal-history-current">
                          <strong>Version {content.legalPages[activeTab].published.version} (Courante)</strong> - {content.legalPages[activeTab].published.effectiveDate}
                          <details>
                            <summary>Voir le contenu</summary>
@@ -623,7 +623,7 @@ export default function AdminLegal() {
                      )}
 
                      {content.legalPages[activeTab].history.map((h: LegalDocument, i: number) => (
-                        <li key={i}>
+                        <li key={i} data-testid="legal-history-archived">
                            <strong>Version {h.version} (Archivée)</strong> - {h.effectiveDate}
                            <details>
                              <summary>Voir le contenu</summary>
