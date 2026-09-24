@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
+import type { ReactNode } from "react";
 import AdminLegal from "../app/routes/admin.legal";
 import { createMemoryRouter, RouterProvider } from "react-router";
 
@@ -47,7 +48,7 @@ const mockContent = {
             id: "cookie-1",
             name: { fr: "CookieTestFR", en: "CookieTestEN" },
             provider: { fr: "FournisseurTest", en: "ProviderTest" },
-            category: "Analytics",
+            category: "analytics",
             purpose: { fr: "FinalitéTest", en: "PurposeTest" },
             duration: { fr: "1 an", en: "1 year" },
           },
@@ -66,7 +67,7 @@ const mockContent = {
               id: "cookie-old",
               name: { fr: "OldCookieFR", en: "OldCookieEN" },
               provider: { fr: "OldProvider", en: "OldProvider" },
-              category: "Marketing",
+              category: "ads",
               purpose: { fr: "OldPurpose", en: "OldPurpose" },
               duration: { fr: "6 mois", en: "6 months" },
             },
@@ -85,21 +86,21 @@ const mockUseLoaderData = vi.fn(() => ({
   csrfToken: "mock-token",
   flashError: null,
   flashSuccess: null,
-  business: mockContent.business
+  business: mockContent.business,
+  revision: "mock-rev",
+  isComplete: true
 }));
 
 
 vi.mock("react-router", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const actual: any = await importOriginal();
+  const actual = await importOriginal<typeof import("react-router")>();
   return {
     ...actual,
     useLoaderData: () => mockUseLoaderData(),
     useRouteLoaderData: () => mockUseLoaderData(),
     useActionData: () => null,
     useNavigation: () => ({ state: "idle" }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Form: ({ children }: any) => <form>{children}</form>,
+    Form: ({ children }: { children: ReactNode }) => <form>{children}</form>,
     useSubmit: () => vi.fn(),
   };
 });
@@ -122,14 +123,14 @@ describe("AdminLegal React Component", () => {
     // Check if the current published cookie is rendered in detail
     expect(screen.getAllByText(/CookieTestFR/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/FournisseurTest/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Analytics/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/analytics/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/FinalitéTest/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1 an/).length).toBeGreaterThan(0);
 
     // Check if the archived cookie is rendered in detail
     expect(screen.getAllByText(/OldCookieFR/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/OldProvider/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Marketing/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/ads/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/OldPurpose/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/6 mois/).length).toBeGreaterThan(0);
   });

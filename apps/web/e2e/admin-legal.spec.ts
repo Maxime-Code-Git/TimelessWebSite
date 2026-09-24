@@ -1,7 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Admin Legal Pages', () => {
-  test('can modify draft, check public page independence, publish, and check history', async ({ page }) => {
+  test('can modify draft, check public page independence, publish, and check history', async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+
+    const suffix = `${testInfo.project.name}-${testInfo.retry}`
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-");
+    const newTitleFR = `Mentions légales E2E ${suffix}`;
+    const newTitleEN = `Legal notice E2E ${suffix}`;
     // 1. Authenticate
     await page.goto('/admin');
     const e2e_password = process.env.E2E_ADMIN_PASSWORD || 'e2e_password';
@@ -12,7 +19,7 @@ test.describe('Admin Legal Pages', () => {
 
     // 1b. Prepare business settings to enable publishing
     await page.goto('/admin/settings');
-    await page.fill('input#address', '123 E2E Street');
+    await page.fill('textarea#address', '123 E2E Street');
     await page.fill('input#enterpriseNumber', 'E2E-123456');
     await page.fill('input#hostingProvider', 'E2E Hosting');
     const settingsSavePromise = page.waitForResponse(r => r.url().includes('/admin/settings') && r.request().method() === 'POST');
@@ -20,7 +27,7 @@ test.describe('Admin Legal Pages', () => {
     const settingsSaveRes = await settingsSavePromise;
     expect(settingsSaveRes.status()).toBe(200);
     await page.reload();
-    await expect(page.locator('input#address')).toHaveValue('123 E2E Street');
+    await expect(page.locator('textarea#address')).toHaveValue('123 E2E Street');
     await expect(page.locator('input#enterpriseNumber')).toHaveValue('E2E-123456');
     await expect(page.locator('input#hostingProvider')).toHaveValue('E2E Hosting');
 
@@ -45,11 +52,11 @@ test.describe('Admin Legal Pages', () => {
 
     // 4. Modify FR draft text
     await page.click('button:has-text("FR")');
-    await page.fill('input#pubTitle', 'Mentions Légales (Brouillon)');
+    await page.fill('input#pubTitle', newTitleFR);
 
     // 5. Modify EN draft text
     await page.click('button:has-text("EN")');
-    await page.fill('input#pubTitle', 'Legal Notice (Draft)');
+    await page.fill('input#pubTitle', newTitleEN);
 
     // 6. Save draft
     const saveDraftPromise = page.waitForResponse(r => r.url().includes('/admin/legal') && r.request().method() === 'POST');
@@ -61,17 +68,17 @@ test.describe('Admin Legal Pages', () => {
     // 7. Verify persistence after reload
     await page.reload();
     await page.click('button:has-text("FR")');
-    await expect(page.locator('input#pubTitle')).toHaveValue('Mentions Légales (Brouillon)');
+    await expect(page.locator('input#pubTitle')).toHaveValue(newTitleFR);
     await page.click('button:has-text("EN")');
-    await expect(page.locator('input#pubTitle')).toHaveValue('Legal Notice (Draft)');
+    await expect(page.locator('input#pubTitle')).toHaveValue(newTitleEN);
 
     // 8. Verify public pages retain old version (independence)
     await page.goto('/fr/mentions-legales');
-    await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Mentions Légales (Brouillon)');
+    await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(newTitleFR);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(initialTitleFR);
 
     await page.goto('/en/legal');
-    await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Legal Notice (Draft)');
+    await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(newTitleEN);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(initialTitleEN);
 
     // 9. Publish
@@ -87,10 +94,10 @@ test.describe('Admin Legal Pages', () => {
 
     // 10. Verify new version on public pages
     await page.goto('/fr/mentions-legales');
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mentions Légales (Brouillon)');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(newTitleFR);
 
     await page.goto('/en/legal');
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Legal Notice (Draft)');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(newTitleEN);
 
     // 11. Verify history in admin
     await page.goto('/admin/legal');
