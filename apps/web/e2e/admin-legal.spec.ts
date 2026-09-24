@@ -4,11 +4,25 @@ test.describe('Admin Legal Pages', () => {
   test('can modify draft, check public page independence, publish, and check history', async ({ page }) => {
     // 1. Authenticate
     await page.goto('/admin');
-    const e2e_password = process.env.E2E_ADMIN_PASSWORD || 'test-password';
+    const e2e_password = process.env.E2E_ADMIN_PASSWORD || 'e2e_password';
     await page.fill('input[name="password"]', e2e_password);
     await page.click('button[type="submit"]');
     // Wait for an authenticated dashboard element instead of just URL
     await expect(page.getByRole('heading', { name: 'Administration Sempra' })).toBeVisible();
+
+    // 1b. Prepare business settings to enable publishing
+    await page.goto('/admin/settings');
+    await page.fill('input#address', '123 E2E Street');
+    await page.fill('input#enterpriseNumber', 'E2E-123456');
+    await page.fill('input#hostingProvider', 'E2E Hosting');
+    const settingsSavePromise = page.waitForResponse(r => r.url().includes('/admin/settings') && r.request().method() === 'POST');
+    await page.click('button:has-text("Enregistrer")');
+    const settingsSaveRes = await settingsSavePromise;
+    expect(settingsSaveRes.status()).toBe(200);
+    await page.reload();
+    await expect(page.locator('input#address')).toHaveValue('123 E2E Street');
+    await expect(page.locator('input#enterpriseNumber')).toHaveValue('E2E-123456');
+    await expect(page.locator('input#hostingProvider')).toHaveValue('E2E Hosting');
 
     // 2. Navigate to legal pages administration
     await page.goto('/admin/legal');

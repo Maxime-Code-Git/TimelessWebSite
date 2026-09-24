@@ -601,7 +601,18 @@ export default function AdminLegal() {
                              ))}
                              {content.legalPages[activeTab].published.inventory && content.legalPages[activeTab].published.inventory.length > 0 && (
                                <div className={styles.historySection}>
-                                 <p><strong>Inventaire des cookies:</strong> {content.legalPages[activeTab].published.inventory.length} cookies</p>
+                                 <p><strong>Inventaire des cookies:</strong></p>
+                                 <ul className={styles.cookieList}>
+                                   {content.legalPages[activeTab].published.inventory.map(cookie => (
+                                     <li key={cookie.id} className={styles.cookieItem}>
+                                       <p><strong>Nom :</strong> {cookie.name[activeLang]}</p>
+                                       <p><strong>Fournisseur :</strong> {cookie.provider[activeLang]}</p>
+                                       <p><strong>Catégorie :</strong> {cookie.category}</p>
+                                       <p><strong>Finalité :</strong> {cookie.purpose[activeLang]}</p>
+                                       <p><strong>Durée :</strong> {cookie.duration[activeLang]}</p>
+                                     </li>
+                                   ))}
+                                 </ul>
                                </div>
                              )}
                            </div>
@@ -631,7 +642,18 @@ export default function AdminLegal() {
                              ))}
                              {h.inventory && h.inventory.length > 0 && (
                                <div className={styles.historySection}>
-                                 <p><strong>Inventaire des cookies:</strong> {h.inventory.length} cookies</p>
+                                 <p><strong>Inventaire des cookies:</strong></p>
+                                 <ul className={styles.cookieList}>
+                                   {h.inventory.map(cookie => (
+                                     <li key={cookie.id} className={styles.cookieItem}>
+                                       <p><strong>Nom :</strong> {cookie.name[activeLang]}</p>
+                                       <p><strong>Fournisseur :</strong> {cookie.provider[activeLang]}</p>
+                                       <p><strong>Catégorie :</strong> {cookie.category}</p>
+                                       <p><strong>Finalité :</strong> {cookie.purpose[activeLang]}</p>
+                                       <p><strong>Durée :</strong> {cookie.duration[activeLang]}</p>
+                                     </li>
+                                   ))}
+                                 </ul>
                                </div>
                              )}
                            </div>
