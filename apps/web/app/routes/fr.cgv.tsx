@@ -25,9 +25,9 @@ export function meta({ matches }: Route.MetaArgs) {
 export default function LegalRoute() {
   const rootData = useRouteLoaderData<typeof rootLoader>("root");
   const content = rootData?.siteContent?.legalPages?.cgv;
-  
+
   if (!content) return null;
-  
+
   const isDraft = !content.published;
   const doc = content.published || content.draft;
 

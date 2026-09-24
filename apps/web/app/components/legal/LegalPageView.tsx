@@ -47,7 +47,7 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
     if (!business) return null;
     return (
       <p>
-        {legalUI?.hostedBy[lang]} {business.hostingProvider || (lang === "fr" ? "[À définir]" : "[To be defined]")}.
+        {legalUI?.hostedBy[lang]} {business.hostingProvider || legalUI?.toBeDefined?.[lang] || "[À définir]"}.
         {business.hostingAddress && <><br /><span className={styles.preLine}>{business.hostingAddress}</span></>}
       </p>
     );
@@ -91,7 +91,7 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
         </div>
       );
     }
-    
+
     return (
       <>
         {section.paragraphs.map((p, i) => (
@@ -120,10 +120,10 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
               {legalUI?.draftWarning[lang]}
             </div>
           )}
-          
+
           <div className={styles.metaInfo}>
             {document.effectiveDate ? (
-              <p><em>{legalUI?.effectiveDate[lang]} {document.effectiveDate} (Version {document.version})</em></p>
+              <p><em>{legalUI?.effectiveDate[lang]} {document.effectiveDate} ({legalUI?.versionLabel?.[lang]} {document.version})</em></p>
             ) : (
               <p><em>{legalUI?.unpublishedDraft[lang]}</em></p>
             )}
@@ -138,7 +138,7 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
                 {renderSectionContent(section)}
               </div>
             ))}
-            
+
             {document.inventory && !document.sections.some(s => s.id === "cookies-inventory") && (
               <div key="cookies-inventory">
                 <h2>{legalUI?.cookiesInventoryTitle[lang]}</h2>

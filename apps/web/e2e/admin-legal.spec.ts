@@ -50,13 +50,13 @@ test.describe('Admin Legal Pages', () => {
       // 7. Verify public pages retain old version (independence)
       await page.goto('/fr/legal');
       await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Mentions Légales (Brouillon)');
-      
+
       await page.goto('/en/legal');
       await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Legal Notice (Draft)');
 
       // 8. Publish
       await page.goto('/admin/legal');
-      
+
       // Set required fields for publishing
       await page.click('button:has-text("FR")');
       await page.fill('input#effectiveDate', '2026-10-01');
@@ -72,21 +72,21 @@ test.describe('Admin Legal Pages', () => {
 
       // 10. Verify history in admin
       await page.goto('/admin/legal');
-      await expect(page.locator('text="Version courante publiée : "')).toBeVisible();
+      await expect(page.locator('text="(Courante)"')).toBeVisible();
 
     } finally {
       // 11. Restore initial state
       await page.goto('/admin/legal');
-      
+
       // Reset FR
       await page.click('button:has-text("FR")');
       await page.fill('input#pubTitle', initialContentFR);
       await page.fill('input#effectiveDate', '2020-01-01');
-      
+
       // Reset EN
       await page.click('button:has-text("EN")');
       await page.fill('input#pubTitle', initialContentEN);
-      
+
       await page.click('button:has-text("Publier")');
       await expect(page.locator('.successAlert, [class*="successAlert"]')).toBeVisible();
     }

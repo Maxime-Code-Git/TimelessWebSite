@@ -338,6 +338,7 @@ export interface LegalUI {
   cookieColCategory: LocalizedString;
   cookieColPurpose: LocalizedString;
   cookieColDuration: LocalizedString;
+  versionLabel: LocalizedString;
 }
 
 export interface SiteContent {
@@ -1180,18 +1181,18 @@ function validateContactPageContent(data: unknown): ContactPageContent {
 export function validateLegalSection(data: unknown, context: string): LegalSection {
   assertExactKeys(data, ["id", "title", "paragraphs", "listItems"], context);
   const obj = data as Record<string, unknown>;
-  
+
   if (typeof obj.id !== "string" || obj.id.trim() === "") {
     throw new ValidationError(`Invalid id in ${context}`);
   }
 
   const title = validateLocalizedString(obj.title, `${context}.title`, 255);
-  
+
   if (!Array.isArray(obj.paragraphs)) {
     throw new ValidationError(`${context}.paragraphs must be an array`);
   }
   const paragraphs = obj.paragraphs.map((p, i) => validateLocalizedString(p, `${context}.paragraphs[${i}]`, 5000));
-  
+
   let listItems: LocalizedString[] | undefined;
   if (obj.listItems !== undefined) {
     if (!Array.isArray(obj.listItems)) {
@@ -1199,23 +1200,23 @@ export function validateLegalSection(data: unknown, context: string): LegalSecti
     }
     listItems = obj.listItems.map((li, i) => validateLocalizedString(li, `${context}.listItems[${i}]`, 5000));
   }
-  
+
   return { id: obj.id, title, paragraphs, listItems };
 }
 
 export function validateCookieInventoryItem(data: unknown, context: string): CookieInventoryItem {
   assertExactKeys(data, ["id", "category", "name", "provider", "purpose", "duration"], context);
   const obj = data as Record<string, unknown>;
-  
+
   if (typeof obj.id !== "string" || obj.id.trim() === "") {
     throw new ValidationError(`Invalid id in ${context}`);
   }
-  
+
   const validCategories = ["necessary", "admin", "gallery", "security", "video", "analytics", "ads"];
   if (typeof obj.category !== "string" || !validCategories.includes(obj.category)) {
     throw new ValidationError(`Invalid category in ${context}`);
   }
-  
+
   return {
     id: obj.id,
     category: obj.category as CookieInventoryItem["category"],
@@ -1229,11 +1230,11 @@ export function validateCookieInventoryItem(data: unknown, context: string): Coo
 export function validateLegalDocument(data: unknown, context: string): LegalDocument {
   assertExactKeys(data, ["seoTitle", "seoDescription", "publicTitle", "intro", "sections", "version", "effectiveDate", "lastModified", "inventory"], context);
   const obj = data as Record<string, unknown>;
-  
+
   if (typeof obj.version !== "number" || !Number.isInteger(obj.version) || obj.version < 1) {
     throw new ValidationError(`${context}.version must be a positive integer`);
   }
-  
+
   let effectiveDate: string | null = null;
   if (obj.effectiveDate !== null) {
     if (typeof obj.effectiveDate !== "string" || !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z)?$/.test(obj.effectiveDate)) {
@@ -1241,17 +1242,17 @@ export function validateLegalDocument(data: unknown, context: string): LegalDocu
     }
     effectiveDate = obj.effectiveDate;
   }
-  
+
   if (typeof obj.lastModified !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(obj.lastModified)) {
     throw new ValidationError(`${context}.lastModified must be a valid ISO datetime string`);
   }
-  
+
   if (!Array.isArray(obj.sections)) {
     throw new ValidationError(`${context}.sections must be an array`);
   }
-  
+
   const sections = obj.sections.map((s, i) => validateLegalSection(s, `${context}.sections[${i}]`));
-  
+
   let inventory: CookieInventoryItem[] | undefined;
   if (obj.inventory !== undefined) {
     if (!Array.isArray(obj.inventory)) {
@@ -1259,7 +1260,7 @@ export function validateLegalDocument(data: unknown, context: string): LegalDocu
     }
     inventory = obj.inventory.map((item, i) => validateCookieInventoryItem(item, `${context}.inventory[${i}]`));
   }
-  
+
   return {
     seoTitle: validateLocalizedString(obj.seoTitle, `${context}.seoTitle`, 255),
     seoDescription: validateLocalizedString(obj.seoDescription, `${context}.seoDescription`, 1000),
@@ -1276,28 +1277,28 @@ export function validateLegalDocument(data: unknown, context: string): LegalDocu
 export function validateLegalPageState(data: unknown, context: string): LegalPageState {
   assertExactKeys(data, ["draft", "published", "history"], context);
   const obj = data as Record<string, unknown>;
-  
+
   const draft = validateLegalDocument(obj.draft, `${context}.draft`);
-  
+
   let published: LegalDocument | null = null;
   if (obj.published !== null) {
     published = validateLegalDocument(obj.published, `${context}.published`);
   }
-  
+
   if (!Array.isArray(obj.history)) {
     throw new ValidationError(`${context}.history must be an array`);
   }
   const history = obj.history.map((h, i) => validateLegalDocument(h, `${context}.history[${i}]`));
-  
+
   return { draft, published, history };
 }
 
-export 
+export
 function validateLegalUI(obj: unknown): LegalUI {
   assertExactKeys(obj, [
     "draftWarning", "hostedBy", "toBeDefined", "enterpriseNumber", "vatNumber",
     "effectiveDate", "unpublishedDraft", "cookiesInventoryTitle", "cookiesInventoryEmpty",
-    "cookieColName", "cookieColProvider", "cookieColCategory", "cookieColPurpose", "cookieColDuration"
+    "cookieColName", "cookieColProvider", "cookieColCategory", "cookieColPurpose", "cookieColDuration", "versionLabel"
   ], "legalUI");
   const o = obj as Record<string, unknown>;
   return {
@@ -1315,6 +1316,7 @@ function validateLegalUI(obj: unknown): LegalUI {
     cookieColCategory: validateLocalizedString(o.cookieColCategory, "legalUI.cookieColCategory"),
     cookieColPurpose: validateLocalizedString(o.cookieColPurpose, "legalUI.cookieColPurpose"),
     cookieColDuration: validateLocalizedString(o.cookieColDuration, "legalUI.cookieColDuration"),
+    versionLabel: validateLocalizedString(o.versionLabel, "legalUI.versionLabel"),
   };
 }
 
@@ -1572,7 +1574,7 @@ export function validateSiteContent(data: unknown): SiteContent {
       legalUI: 'legalUI' in objRef ? objRef.legalUI : JSON.parse(JSON.stringify(defaultContent.legalUI)),
     };
 
-    
+
     // Default business variables were added in V9
     const currentBusiness = objRef.business as Record<string, unknown>;
     objRef.business = {
@@ -1627,7 +1629,8 @@ export function getRawSiteContent(): { content: SiteContent, isCorrupted: boolea
       const parsed = JSON.parse(content);
       return { content: validateSiteContent(parsed), isCorrupted: false };
     }
-  } catch {
+  } catch (e) {
+    console.error("VALIDATION ERROR IN GETRAWSITECONTENT:", e);
     return { content: validateSiteContent(defaultContent), isCorrupted: true };
   }
   return { content: validateSiteContent(defaultContent), isCorrupted: false };
@@ -1759,11 +1762,30 @@ export function saveContactPageSettings(contactPage: ContactPageContent, previou
 }
 
 
+export function saveLegalUI(legalUI: LegalUI, previousRevision: string) {
+  const current = getRawSiteContent();
+  if (current.isCorrupted) throw new CorruptedContentError();
+  if (current.content.revision !== previousRevision) throw new RevisionConflictError();
+
+  const validated = validateLegalUI(legalUI);
+  const nextRevision = crypto.randomBytes(16).toString("hex");
+
+  const newContent: SiteContent = {
+    ...current.content,
+    revision: nextRevision,
+    updatedAt: new Date().toISOString(),
+    legalUI: validated
+  };
+  atomicWriteJson(getFilePath(), newContent);
+  return newContent.revision;
+}
+
 export function saveLegalPageDraft(key: keyof LegalPagesContent, draft: LegalDocument, previousRevision: string) {
   const current = getRawSiteContent();
   if (current.isCorrupted) throw new CorruptedContentError();
   if (current.content.revision !== previousRevision) throw new RevisionConflictError();
 
+  draft.lastModified = new Date().toISOString();
   const validatedDraft = validateLegalDocument(draft, `legalPages.${key}.draft`);
 
   const newContent: SiteContent = {
@@ -1788,15 +1810,16 @@ export function publishLegalPage(key: keyof LegalPagesContent, draftToPublish: L
   if (current.isCorrupted) throw new CorruptedContentError();
   if (current.content.revision !== previousRevision) throw new RevisionConflictError();
 
+  draftToPublish.lastModified = new Date().toISOString();
   const validatedDraft = validateLegalDocument(draftToPublish, `legalPages.${key}.draft`);
-  
+
   if (!validatedDraft.effectiveDate) {
     throw new ValidationError("effectiveDate is required to publish");
   }
 
   const oldPublished = current.content.legalPages[key].published;
   const newHistory = [...current.content.legalPages[key].history];
-  
+
   if (oldPublished) {
     newHistory.push(oldPublished);
   }

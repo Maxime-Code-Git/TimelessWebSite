@@ -1678,6 +1678,10 @@
     "cookieColDuration": {
       "fr": "Durée",
       "en": "Duration"
+    },
+    "versionLabel": {
+      "fr": "Version",
+      "en": "Version"
     }
   }
 }

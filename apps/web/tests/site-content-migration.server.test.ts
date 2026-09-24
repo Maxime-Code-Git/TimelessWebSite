@@ -378,7 +378,7 @@ describe("Migration of intermediate V2 content", () => {
       delete v8.business.legalName;
       delete v8.business.tradeName;
       delete v8.business.vatNumber;
-      
+
       const migrated = validateSiteContent(v8);
       expect(migrated.schemaVersion).toBe(9);
       expect(migrated.legalPages).toBeDefined();
@@ -386,20 +386,20 @@ describe("Migration of intermediate V2 content", () => {
       expect(migrated.business.tradeName).toBeNull();
       expect(migrated.business.legalName).toBeNull();
     });
-    
+
     it("rejects incomplete V9 if required fields are missing", () => {
       const v9 = JSON.parse(JSON.stringify(defaultContent));
       v9.schemaVersion = 9;
       delete v9.legalPages.mentions.draft.seoTitle;
-      
+
       expect(() => validateSiteContent(v9)).toThrow();
     });
-    
+
     it("rejects unknown keys in V9", () => {
       const v9 = JSON.parse(JSON.stringify(defaultContent));
       v9.schemaVersion = 9;
       v9.legalPages.mentions.draft.unknownKey = "hack";
-      
+
       expect(() => validateSiteContent(v9)).toThrow();
     });
   });
