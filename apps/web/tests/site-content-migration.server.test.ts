@@ -167,7 +167,7 @@ describe("Migration of intermediate V2 content", () => {
     const { content } = getRawSiteContent();
 
     // Check that it's migrated to V3
-    expect(content.schemaVersion).toBe(8);
+    expect(content.schemaVersion).toBe(9);
 
     // Check real fallbacks instead of generic "Description"
     const photoEssential = content.pricing.photo.find(f => f.id === "essential");
@@ -247,7 +247,7 @@ describe("Migration of intermediate V2 content", () => {
       const originalJson = JSON.stringify(v3Data);
 
       const migrated = validateSiteContent(v3Data);
-      expect(migrated.schemaVersion).toBe(8);
+      expect(migrated.schemaVersion).toBe(9);
       expect(migrated.business.email).toBe("v3@test.com");
       expect(migrated.pricingPage).toBeDefined();
       expect(migrated.pricingPage.faqs).toHaveLength(defaultContent.pricingPage.faqs.length);
@@ -278,7 +278,7 @@ describe("Migration of intermediate V2 content", () => {
       const originalJson = JSON.stringify(v4Data);
 
       const migrated = validateSiteContent(v4Data);
-      expect(migrated.schemaVersion).toBe(8);
+      expect(migrated.schemaVersion).toBe(9);
       expect(migrated.business.email).toBe("v4@test.com");
       expect(migrated.aboutPage).toBeDefined();
       expect(migrated.aboutPage.seo.title.fr).toBe(defaultContent.aboutPage.seo.title.fr);
@@ -316,7 +316,7 @@ describe("Migration of intermediate V2 content", () => {
         const migrated = validateSiteContent(inputData);
 
         // résultat en V8
-        expect(migrated.schemaVersion).toBe(8);
+        expect(migrated.schemaVersion).toBe(9);
 
         // présence de contactPage
         expect(migrated.contactPage).toBeDefined();
@@ -366,6 +366,41 @@ describe("Migration of intermediate V2 content", () => {
       const migrated1 = validateSiteContent(v8Data);
       const migrated2 = validateSiteContent(migrated1);
       expect(migrated1).toEqual(migrated2);
+    });
+  });
+
+  describe("Migration to V9 (Legal Admin)", () => {
+    it("migrates from V8 to V9 safely (legalPages)", () => {
+      const v8 = JSON.parse(JSON.stringify(defaultContent));
+      v8.schemaVersion = 8;
+      delete v8.legalPages;
+      // ensure business doesn't have V9 fields
+      delete v8.business.legalName;
+      delete v8.business.tradeName;
+      delete v8.business.vatNumber;
+      
+      const migrated = validateSiteContent(v8);
+      expect(migrated.schemaVersion).toBe(9);
+      expect(migrated.legalPages).toBeDefined();
+      expect(migrated.legalPages.mentions.draft.publicTitle.fr).toBe("Mentions légales");
+      expect(migrated.business.tradeName).toBeNull();
+      expect(migrated.business.legalName).toBeNull();
+    });
+    
+    it("rejects incomplete V9 if required fields are missing", () => {
+      const v9 = JSON.parse(JSON.stringify(defaultContent));
+      v9.schemaVersion = 9;
+      delete v9.legalPages.mentions.draft.seoTitle;
+      
+      expect(() => validateSiteContent(v9)).toThrow();
+    });
+    
+    it("rejects unknown keys in V9", () => {
+      const v9 = JSON.parse(JSON.stringify(defaultContent));
+      v9.schemaVersion = 9;
+      v9.legalPages.mentions.draft.unknownKey = "hack";
+      
+      expect(() => validateSiteContent(v9)).toThrow();
     });
   });
 });

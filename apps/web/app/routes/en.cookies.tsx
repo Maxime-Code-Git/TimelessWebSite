@@ -1,4 +1,4 @@
-import type { Route } from "./+types/fr.cgv";
+import type { Route } from "./+types/en.cookies";
 import { LegalPageView } from "~/components/legal/LegalPageView";
 import { useRouteLoaderData } from "react-router";
 import type { loader as rootLoader } from "../root";
@@ -7,15 +7,15 @@ import { getSeoMeta } from "~/lib/seo";
 export function meta({ matches }: Route.MetaArgs) {
   const rootData = matches.find((m) => m?.id === "root")?.loaderData as { PUBLIC_SITE_URL?: string, siteContent?: any } | undefined;
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
-  const content = rootData?.siteContent?.legalPages?.cgv;
+  const content = rootData?.siteContent?.legalPages?.cookies;
   const doc = content?.published || content?.draft;
 
   return getSeoMeta({
-    title: doc?.seoTitle?.fr || "",
-    description: doc?.seoDescription?.fr || "",
-    path: "/fr/cgv",
-    alternatePath: "/en/cgv",
-    lang: "fr",
+    title: doc?.seoTitle?.en || "",
+    description: doc?.seoDescription?.en || "",
+    path: "/en/cookies",
+    alternatePath: "/fr/cookies",
+    lang: "en",
     noindex: true,
     siteUrl,
   });
@@ -23,7 +23,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function LegalRoute() {
   const rootData = useRouteLoaderData<typeof rootLoader>("root");
-  const content = rootData?.siteContent?.legalPages?.cgv;
+  const content = rootData?.siteContent?.legalPages?.cookies;
   
   if (!content) return null;
   
@@ -32,8 +32,8 @@ export default function LegalRoute() {
 
   return (
     <LegalPageView
-      lang="fr"
-      alternateLangHref="/en/cgv"
+      lang="en"
+      alternateLangHref="/fr/cookies"
       document={doc}
       isDraft={isDraft}
     />

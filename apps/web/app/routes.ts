@@ -36,6 +36,7 @@ export default [
     route("mentions-legales", "routes/fr.legal.tsx"),
     route("confidentialite", "routes/fr.privacy.tsx"),
     route("cgv", "routes/fr.cgv.tsx"),
+    route("cookies", "routes/fr.cookies.tsx"),
   ]),
 
   // ── English routes ────────────────────────────────────────
@@ -51,6 +52,7 @@ export default [
     route("legal", "routes/en.legal.tsx"),
     route("privacy", "routes/en.privacy.tsx"),
     route("terms", "routes/en.cgv.tsx"),
+    route("cookies", "routes/en.cookies.tsx"),
   ]),
 
   // ── Test routes (not in production) ───────────────────────
@@ -70,6 +72,7 @@ export default [
   route("admin/home", "routes/admin.home.tsx"),
   route("admin/about", "routes/admin.about.tsx"),
   route("admin/contact", "routes/admin.contact.tsx"),
+  route("admin/legal", "routes/admin.legal.tsx"),
   route("admin/galleries", "routes/admin.galleries.tsx"),
   route("admin/galleries/new", "routes/admin.galleries.new.tsx"),
   route("admin/galleries/:id", "routes/admin.galleries.$id.tsx"),

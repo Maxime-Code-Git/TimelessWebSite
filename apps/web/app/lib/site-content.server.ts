@@ -27,6 +27,9 @@ export interface PricingCategory {
 }
 
 export interface BusinessContent {
+  legalName: string | null;
+  tradeName: string | null;
+  vatNumber: string | null;
   email: string | null;
   phoneDisplay: string | null;
   phoneE164: string | null;
@@ -277,8 +280,50 @@ export interface ContactPageContent {
   };
 }
 
+
+export interface LegalSection {
+  id: string;
+  title: LocalizedString;
+  paragraphs: LocalizedString[];
+  listItems?: LocalizedString[];
+}
+
+export interface CookieInventoryItem {
+  id: string;
+  category: "necessary" | "admin" | "gallery" | "security" | "video" | "analytics" | "ads";
+  name: LocalizedString;
+  provider: LocalizedString;
+  purpose: LocalizedString;
+  duration: LocalizedString;
+}
+
+export interface LegalDocument {
+  seoTitle: LocalizedString;
+  seoDescription: LocalizedString;
+  publicTitle: LocalizedString;
+  intro: LocalizedString;
+  sections: LegalSection[];
+  version: number;
+  effectiveDate: string | null;
+  lastModified: string;
+  inventory?: CookieInventoryItem[];
+}
+
+export interface LegalPageState {
+  draft: LegalDocument;
+  published: LegalDocument | null;
+  history: LegalDocument[];
+}
+
+export interface LegalPagesContent {
+  mentions: LegalPageState;
+  privacy: LegalPageState;
+  cgv: LegalPageState;
+  cookies: LegalPageState;
+}
+
 export interface SiteContent {
-  schemaVersion: 8;
+  schemaVersion: 9;
   revision: string;
   updatedAt: string;
   business: BusinessContent;
@@ -287,6 +332,7 @@ export interface SiteContent {
   pricingPage: PricingPageContent;
   aboutPage: AboutPageContent;
   contactPage: ContactPageContent;
+  legalPages: LegalPagesContent;
 }
 
 export class RevisionConflictError extends Error {
@@ -475,6 +521,7 @@ function validateDepositPercent(value: unknown): number | null {
 
 function validateBusiness(data: unknown): BusinessContent {
   assertExactKeys(data, [
+    "legalName", "tradeName", "vatNumber",
     "email", "phoneDisplay", "phoneE164", "address", "enterpriseNumber",
     "legalForm", "legalRepresentative", "hostingProvider", "hostingAddress",
     "depositPercent", "instagramUrl", "linkedinUrl", "serviceArea"
@@ -492,6 +539,9 @@ function validateBusiness(data: unknown): BusinessContent {
   }
 
   return {
+    legalName: validateStringOrNull(obj.legalName, "legalName", 100),
+    tradeName: validateStringOrNull(obj.tradeName, "tradeName", 100),
+    vatNumber: validateStringOrNull(obj.vatNumber, "vatNumber", 50),
     email: validateEmail(obj.email),
     phoneDisplay: validateStringOrNull(obj.phoneDisplay, "phoneDisplay", 50),
     phoneE164: validatePhoneE164(obj.phoneE164),
@@ -1107,13 +1157,140 @@ function validateContactPageContent(data: unknown): ContactPageContent {
   };
 }
 
+
+export function validateLegalSection(data: unknown, context: string): LegalSection {
+  assertExactKeys(data, ["id", "title", "paragraphs", "listItems"], context);
+  const obj = data as Record<string, unknown>;
+  
+  if (typeof obj.id !== "string" || obj.id.trim() === "") {
+    throw new ValidationError(`Invalid id in ${context}`);
+  }
+
+  const title = validateLocalizedString(obj.title, `${context}.title`, 255);
+  
+  if (!Array.isArray(obj.paragraphs)) {
+    throw new ValidationError(`${context}.paragraphs must be an array`);
+  }
+  const paragraphs = obj.paragraphs.map((p, i) => validateLocalizedString(p, `${context}.paragraphs[${i}]`, 5000));
+  
+  let listItems: LocalizedString[] | undefined;
+  if (obj.listItems !== undefined) {
+    if (!Array.isArray(obj.listItems)) {
+      throw new ValidationError(`${context}.listItems must be an array`);
+    }
+    listItems = obj.listItems.map((li, i) => validateLocalizedString(li, `${context}.listItems[${i}]`, 5000));
+  }
+  
+  return { id: obj.id, title, paragraphs, listItems };
+}
+
+export function validateCookieInventoryItem(data: unknown, context: string): CookieInventoryItem {
+  assertExactKeys(data, ["id", "category", "name", "provider", "purpose", "duration"], context);
+  const obj = data as Record<string, unknown>;
+  
+  if (typeof obj.id !== "string" || obj.id.trim() === "") {
+    throw new ValidationError(`Invalid id in ${context}`);
+  }
+  
+  const validCategories = ["necessary", "admin", "gallery", "security", "video", "analytics", "ads"];
+  if (typeof obj.category !== "string" || !validCategories.includes(obj.category)) {
+    throw new ValidationError(`Invalid category in ${context}`);
+  }
+  
+  return {
+    id: obj.id,
+    category: obj.category as CookieInventoryItem["category"],
+    name: validateLocalizedString(obj.name, `${context}.name`, 255),
+    provider: validateLocalizedString(obj.provider, `${context}.provider`, 255),
+    purpose: validateLocalizedString(obj.purpose, `${context}.purpose`, 1000),
+    duration: validateLocalizedString(obj.duration, `${context}.duration`, 255)
+  };
+}
+
+export function validateLegalDocument(data: unknown, context: string): LegalDocument {
+  assertExactKeys(data, ["seoTitle", "seoDescription", "publicTitle", "intro", "sections", "version", "effectiveDate", "lastModified", "inventory"], context);
+  const obj = data as Record<string, unknown>;
+  
+  if (typeof obj.version !== "number" || !Number.isInteger(obj.version) || obj.version < 1) {
+    throw new ValidationError(`${context}.version must be a positive integer`);
+  }
+  
+  let effectiveDate: string | null = null;
+  if (obj.effectiveDate !== null) {
+    if (typeof obj.effectiveDate !== "string" || !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z)?$/.test(obj.effectiveDate)) {
+      throw new ValidationError(`${context}.effectiveDate must be a valid ISO string or YYYY-MM-DD`);
+    }
+    effectiveDate = obj.effectiveDate;
+  }
+  
+  if (typeof obj.lastModified !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(obj.lastModified)) {
+    throw new ValidationError(`${context}.lastModified must be a valid ISO datetime string`);
+  }
+  
+  if (!Array.isArray(obj.sections)) {
+    throw new ValidationError(`${context}.sections must be an array`);
+  }
+  
+  const sections = obj.sections.map((s, i) => validateLegalSection(s, `${context}.sections[${i}]`));
+  
+  let inventory: CookieInventoryItem[] | undefined;
+  if (obj.inventory !== undefined) {
+    if (!Array.isArray(obj.inventory)) {
+      throw new ValidationError(`${context}.inventory must be an array`);
+    }
+    inventory = obj.inventory.map((item, i) => validateCookieInventoryItem(item, `${context}.inventory[${i}]`));
+  }
+  
+  return {
+    seoTitle: validateLocalizedString(obj.seoTitle, `${context}.seoTitle`, 255),
+    seoDescription: validateLocalizedString(obj.seoDescription, `${context}.seoDescription`, 1000),
+    publicTitle: validateLocalizedString(obj.publicTitle, `${context}.publicTitle`, 255),
+    intro: validateLocalizedString(obj.intro, `${context}.intro`, 5000),
+    sections,
+    version: obj.version,
+    effectiveDate,
+    lastModified: obj.lastModified,
+    inventory
+  };
+}
+
+export function validateLegalPageState(data: unknown, context: string): LegalPageState {
+  assertExactKeys(data, ["draft", "published", "history"], context);
+  const obj = data as Record<string, unknown>;
+  
+  const draft = validateLegalDocument(obj.draft, `${context}.draft`);
+  
+  let published: LegalDocument | null = null;
+  if (obj.published !== null) {
+    published = validateLegalDocument(obj.published, `${context}.published`);
+  }
+  
+  if (!Array.isArray(obj.history)) {
+    throw new ValidationError(`${context}.history must be an array`);
+  }
+  const history = obj.history.map((h, i) => validateLegalDocument(h, `${context}.history[${i}]`));
+  
+  return { draft, published, history };
+}
+
+export function validateLegalPagesContent(data: unknown): LegalPagesContent {
+  assertExactKeys(data, ["mentions", "privacy", "cgv", "cookies"], "legalPages");
+  const obj = data as Record<string, unknown>;
+  return {
+    mentions: validateLegalPageState(obj.mentions, "legalPages.mentions"),
+    privacy: validateLegalPageState(obj.privacy, "legalPages.privacy"),
+    cgv: validateLegalPageState(obj.cgv, "legalPages.cgv"),
+    cookies: validateLegalPageState(obj.cookies, "legalPages.cookies")
+  };
+}
+
 export function validateSiteContent(data: unknown): SiteContent {
   if (typeof data !== "object" || data === null) {
     throw new ValidationError("root must be an object");
   }
   const obj = data as Record<string, unknown>;
 
-  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5 && obj.schemaVersion !== 6 && obj.schemaVersion !== 7 && obj.schemaVersion !== 8) {
+  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5 && obj.schemaVersion !== 6 && obj.schemaVersion !== 7 && obj.schemaVersion !== 8 && obj.schemaVersion !== 9) {
     throw new ValidationError("Unsupported schemaVersion");
   }
 
@@ -1340,14 +1517,33 @@ export function validateSiteContent(data: unknown): SiteContent {
     };
   }
 
-  assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage", "aboutPage", "contactPage"], "root");
+
+  if ((obj.schemaVersion as number) < 9) {
+    const defaultLegalPages = JSON.parse(JSON.stringify(defaultContent.legalPages));
+    objRef = {
+      ...objRef,
+      legalPages: defaultLegalPages
+    };
+    
+    // Default business variables were added in V9
+    const currentBusiness = objRef.business as Record<string, unknown>;
+    objRef.business = {
+      ...currentBusiness,
+      legalName: currentBusiness.legalName ?? null,
+      tradeName: currentBusiness.tradeName ?? "Sempra",
+      vatNumber: currentBusiness.vatNumber ?? null
+    };
+  }
+
+  assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage", "aboutPage", "contactPage", "legalPages"], "root");
+
 
 
   const pricing = validatePricing(rawPricing);
   const home = validateHomeContent(objRef.home);
 
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     revision: obj.revision,
     updatedAt: updatedAtStr,
     business,
@@ -1356,6 +1552,7 @@ export function validateSiteContent(data: unknown): SiteContent {
     pricingPage: validatePricingPageContent(objRef.pricingPage),
     aboutPage: validateAboutPageContent(objRef.aboutPage),
     contactPage: validateContactPageContent(objRef.contactPage),
+    legalPages: validateLegalPagesContent(objRef.legalPages),
   };
 }
 
@@ -1506,6 +1703,72 @@ export function saveContactPageSettings(contactPage: ContactPageContent, previou
     revision: crypto.randomBytes(16).toString("hex"),
     updatedAt: new Date().toISOString(),
     contactPage: validateContactPageContent(contactPage),
+  };
+
+  atomicWriteJson(getFilePath(), newContent);
+  return newContent.revision;
+}
+
+
+export function saveLegalPageDraft(key: keyof LegalPagesContent, draft: LegalDocument, previousRevision: string) {
+  const current = getRawSiteContent();
+  if (current.isCorrupted) throw new CorruptedContentError();
+  if (current.content.revision !== previousRevision) throw new RevisionConflictError();
+
+  const validatedDraft = validateLegalDocument(draft, `legalPages.${key}.draft`);
+
+  const newContent: SiteContent = {
+    ...current.content,
+    revision: crypto.randomBytes(16).toString("hex"),
+    updatedAt: new Date().toISOString(),
+    legalPages: {
+      ...current.content.legalPages,
+      [key]: {
+        ...current.content.legalPages[key],
+        draft: validatedDraft
+      }
+    }
+  };
+
+  atomicWriteJson(getFilePath(), newContent);
+  return newContent.revision;
+}
+
+export function publishLegalPage(key: keyof LegalPagesContent, draftToPublish: LegalDocument, previousRevision: string) {
+  const current = getRawSiteContent();
+  if (current.isCorrupted) throw new CorruptedContentError();
+  if (current.content.revision !== previousRevision) throw new RevisionConflictError();
+
+  const validatedDraft = validateLegalDocument(draftToPublish, `legalPages.${key}.draft`);
+  
+  if (!validatedDraft.effectiveDate) {
+    throw new ValidationError("effectiveDate is required to publish");
+  }
+
+  const oldPublished = current.content.legalPages[key].published;
+  const newHistory = [...current.content.legalPages[key].history];
+  
+  if (oldPublished) {
+    newHistory.push(oldPublished);
+  }
+
+  const newPublished: LegalDocument = {
+    ...validatedDraft,
+    version: (oldPublished ? oldPublished.version + 1 : 1)
+  };
+
+  const newContent: SiteContent = {
+    ...current.content,
+    revision: crypto.randomBytes(16).toString("hex"),
+    updatedAt: new Date().toISOString(),
+    legalPages: {
+      ...current.content.legalPages,
+      [key]: {
+        draft: newPublished, // Current draft becomes identical to published
+        published: newPublished,
+        history: newHistory
+      }
+    }
   };
 
   atomicWriteJson(getFilePath(), newContent);

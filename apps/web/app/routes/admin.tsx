@@ -286,6 +286,10 @@ export default function AdminPage() {
                 <h3>Page Contact</h3>
                 <p>Gérer les textes de la page de contact</p>
               </Link>
+              <Link to="/admin/legal" className={styles.card}>
+                <h3>Pages légales</h3>
+                <p>Mentions légales, CGV, confidentialité et cookies</p>
+              </Link>
             </div>
           </div>
         </main>

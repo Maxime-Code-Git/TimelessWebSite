@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "revision": "00000000000000000000000000000000",
   "updatedAt": "1970-01-01T00:00:00.000Z",
   "business": {
@@ -18,7 +18,10 @@
     "serviceArea": {
       "fr": "Belgique & mariages à l'étranger",
       "en": "Belgium & destination weddings"
-    }
+    },
+    "legalName": null,
+    "tradeName": "Sempra",
+    "vatNumber": null
   },
   "pricing": {
     "photo": [
@@ -1250,6 +1253,294 @@
         "fr": "Voir nos formules",
         "en": "View our packages"
       }
+    }
+  },
+  "legalPages": {
+    "mentions": {
+      "draft": {
+        "seoTitle": {
+          "fr": "Mentions légales",
+          "en": "Legal Notice"
+        },
+        "seoDescription": {
+          "fr": "Description en cours de rédaction",
+          "en": "Draft description"
+        },
+        "publicTitle": {
+          "fr": "Mentions légales",
+          "en": "Legal Notice"
+        },
+        "intro": {
+          "fr": "Ce document est un brouillon.",
+          "en": "This document is a draft."
+        },
+        "sections": [
+          {
+            "id": "editor",
+            "title": {
+              "fr": "Éditeur du site",
+              "en": "Site Editor"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          },
+          {
+            "id": "hosting",
+            "title": {
+              "fr": "Hébergement",
+              "en": "Hosting"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          },
+          {
+            "id": "property",
+            "title": {
+              "fr": "Propriété intellectuelle",
+              "en": "Intellectual Property"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          }
+        ],
+        "version": 1,
+        "effectiveDate": null,
+        "lastModified": "2026-09-24T00:00:00.000Z"
+      },
+      "published": null,
+      "history": []
+    },
+    "privacy": {
+      "draft": {
+        "seoTitle": {
+          "fr": "Politique de confidentialité",
+          "en": "Privacy Policy"
+        },
+        "seoDescription": {
+          "fr": "Description en cours de rédaction",
+          "en": "Draft description"
+        },
+        "publicTitle": {
+          "fr": "Politique de confidentialité",
+          "en": "Privacy Policy"
+        },
+        "intro": {
+          "fr": "Ce document est un brouillon.",
+          "en": "This document is a draft."
+        },
+        "sections": [
+          {
+            "id": "controller",
+            "title": {
+              "fr": "Responsable du traitement",
+              "en": "Data Controller"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          },
+          {
+            "id": "categories",
+            "title": {
+              "fr": "Catégories de données",
+              "en": "Data Categories"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          },
+          {
+            "id": "rights",
+            "title": {
+              "fr": "Droits RGPD",
+              "en": "GDPR Rights"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          }
+        ],
+        "version": 1,
+        "effectiveDate": null,
+        "lastModified": "2026-09-24T00:00:00.000Z"
+      },
+      "published": null,
+      "history": []
+    },
+    "cgv": {
+      "draft": {
+        "seoTitle": {
+          "fr": "Conditions générales de vente",
+          "en": "Terms of Sale"
+        },
+        "seoDescription": {
+          "fr": "Description en cours de rédaction",
+          "en": "Draft description"
+        },
+        "publicTitle": {
+          "fr": "Conditions générales de vente",
+          "en": "Terms of Sale"
+        },
+        "intro": {
+          "fr": "Ce document est un brouillon.",
+          "en": "This document is a draft."
+        },
+        "sections": [
+          {
+            "id": "scope",
+            "title": {
+              "fr": "Objet et champ d'application",
+              "en": "Scope"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          },
+          {
+            "id": "booking",
+            "title": {
+              "fr": "Réservation et acompte",
+              "en": "Booking and Deposit"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          },
+          {
+            "id": "payment",
+            "title": {
+              "fr": "Paiement du solde",
+              "en": "Balance Payment"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          }
+        ],
+        "version": 1,
+        "effectiveDate": null,
+        "lastModified": "2026-09-24T00:00:00.000Z"
+      },
+      "published": null,
+      "history": []
+    },
+    "cookies": {
+      "draft": {
+        "seoTitle": {
+          "fr": "Politique relative aux cookies",
+          "en": "Cookie Policy"
+        },
+        "seoDescription": {
+          "fr": "Description en cours de rédaction",
+          "en": "Draft description"
+        },
+        "publicTitle": {
+          "fr": "Politique relative aux cookies",
+          "en": "Cookie Policy"
+        },
+        "intro": {
+          "fr": "Ce document est un brouillon.",
+          "en": "This document is a draft."
+        },
+        "sections": [
+          {
+            "id": "definition",
+            "title": {
+              "fr": "Définition",
+              "en": "Definition"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          },
+          {
+            "id": "strictly_necessary",
+            "title": {
+              "fr": "Cookies strictement nécessaires",
+              "en": "Strictly necessary cookies"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          },
+          {
+            "id": "management",
+            "title": {
+              "fr": "Gestion et suppression",
+              "en": "Management and deletion"
+            },
+            "paragraphs": [
+              {
+                "fr": "Brouillon",
+                "en": "Draft"
+              }
+            ]
+          }
+        ],
+        "version": 1,
+        "effectiveDate": null,
+        "lastModified": "2026-09-24T00:00:00.000Z",
+        "inventory": [
+          {
+            "id": "admin-session",
+            "category": "admin",
+            "name": {
+              "fr": "Session d'administration",
+              "en": "Admin session"
+            },
+            "provider": {
+              "fr": "Sempra",
+              "en": "Sempra"
+            },
+            "purpose": {
+              "fr": "Maintenir la connexion sécurisée à l'administration.",
+              "en": "Keep the admin session secure."
+            },
+            "duration": {
+              "fr": "1 heure",
+              "en": "1 hour"
+            }
+          }
+        ]
+      },
+      "published": null,
+      "history": []
     }
   }
 }
