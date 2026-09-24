@@ -34,42 +34,42 @@ test.describe('Admin Legal Pages', () => {
     // 2. Navigate to legal pages administration
     await page.goto('/admin/legal');
     await expect(page.getByRole('heading', { name: 'Pages Légales' })).toBeVisible();
-    await page.click('button:has-text("Mentions Légales")');
+    await expect(page.getByRole('button', { name: 'Mentions Légales', exact: true })).toBeVisible();
 
     // 3. Prepare a published version of reference
-    await page.click('button:has-text("FR")');
+    await page.getByRole('button', { name: 'FR', exact: true }).click();
     await page.fill('input#effectiveDate', '2026-01-01');
     const publishRefPromise = page.waitForResponse(r => r.url().includes('/admin/legal') && r.request().method() === 'POST');
-    await page.click('button:has-text("Publier")');
+    await page.getByRole('button', { name: 'Publier', exact: true }).click();
     const publishRefRes = await publishRefPromise;
     expect(publishRefRes.status()).toBe(200);
-    await expect(page.locator('.successAlert, [class*="successAlert"]')).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('Modifications enregistrées.');
 
     // Store the published title for comparison
     const initialTitleFR = await page.locator('input#pubTitle').inputValue();
-    await page.click('button:has-text("EN")');
+    await page.getByRole('button', { name: 'EN', exact: true }).click();
     const initialTitleEN = await page.locator('input#pubTitle').inputValue();
 
     // 4. Modify FR draft text
-    await page.click('button:has-text("FR")');
+    await page.getByRole('button', { name: 'FR', exact: true }).click();
     await page.fill('input#pubTitle', newTitleFR);
 
     // 5. Modify EN draft text
-    await page.click('button:has-text("EN")');
+    await page.getByRole('button', { name: 'EN', exact: true }).click();
     await page.fill('input#pubTitle', newTitleEN);
 
     // 6. Save draft
     const saveDraftPromise = page.waitForResponse(r => r.url().includes('/admin/legal') && r.request().method() === 'POST');
-    await page.click('button:has-text("Enregistrer le brouillon")');
+    await page.getByRole('button', { name: 'Enregistrer le brouillon', exact: true }).click();
     const saveDraftRes = await saveDraftPromise;
     expect(saveDraftRes.status()).toBe(200);
-    await expect(page.locator('.successAlert, [class*="successAlert"]')).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('Modifications enregistrées.');
 
     // 7. Verify persistence after reload
     await page.reload();
-    await page.click('button:has-text("FR")');
+    await page.getByRole('button', { name: 'FR', exact: true }).click();
     await expect(page.locator('input#pubTitle')).toHaveValue(newTitleFR);
-    await page.click('button:has-text("EN")');
+    await page.getByRole('button', { name: 'EN', exact: true }).click();
     await expect(page.locator('input#pubTitle')).toHaveValue(newTitleEN);
 
     // 8. Verify public pages retain old version (independence)
@@ -83,14 +83,14 @@ test.describe('Admin Legal Pages', () => {
 
     // 9. Publish
     await page.goto('/admin/legal');
-    await page.click('button:has-text("Mentions Légales")');
-    await page.click('button:has-text("FR")');
+    await expect(page.getByRole('button', { name: 'Mentions Légales', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'FR', exact: true }).click();
     await page.fill('input#effectiveDate', '2026-10-01');
     const publishPromise = page.waitForResponse(r => r.url().includes('/admin/legal') && r.request().method() === 'POST');
-    await page.click('button:has-text("Publier")');
+    await page.getByRole('button', { name: 'Publier', exact: true }).click();
     const publishRes = await publishPromise;
     expect(publishRes.status()).toBe(200);
-    await expect(page.locator('.successAlert, [class*="successAlert"]')).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('Modifications enregistrées.');
 
     // 10. Verify new version on public pages
     await page.goto('/fr/mentions-legales');
@@ -101,7 +101,7 @@ test.describe('Admin Legal Pages', () => {
 
     // 11. Verify history in admin
     await page.goto('/admin/legal');
-    await page.click('button:has-text("Mentions Légales")');
+    await expect(page.getByRole('button', { name: 'Mentions Légales', exact: true })).toBeVisible();
 
     // Check current version
     await expect(page.locator('text="(Courante)"')).toBeVisible();

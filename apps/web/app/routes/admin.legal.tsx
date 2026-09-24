@@ -240,7 +240,7 @@ export default function AdminLegal() {
         </div>
       </header>
 
-      <main className={styles.mainContent}>
+      <main className={styles.legalMainContent}>
         <div className={styles.tabs}>
           <button type="button" className={activeTab === "mentions" ? styles.tabActive : styles.tab} onClick={() => handleTabSwitch("mentions")}>Mentions Légales</button>
           <button type="button" className={activeTab === "privacy" ? styles.tabActive : styles.tab} onClick={() => handleTabSwitch("privacy")}>Confidentialité</button>
@@ -249,9 +249,9 @@ export default function AdminLegal() {
           <button type="button" className={activeTab === "legalUI" ? styles.tabActive : styles.tab} onClick={() => handleTabSwitch("legalUI")}>Libellés UI</button>
         </div>
 
-        {actionData?.error && <div className={styles.errorAlert}>{actionData.error}</div>}
-        {actionData?.success && <div className={styles.successAlert}>Modifications enregistrées.</div>}
-        {!isComplete && activeTab !== "legalUI" && <div className={styles.errorAlert}>Attention : Les informations d'entreprise sont incomplètes. La publication est bloquée.</div>}
+        {actionData?.error && <div className={styles.errorAlert} role="alert">{actionData.error}</div>}
+        {actionData?.success && <div className={styles.successAlert} role="status" aria-live="polite">Modifications enregistrées.</div>}
+        {!isComplete && activeTab !== "legalUI" && <div className={styles.errorAlert} role="alert">Attention : Les informations d'entreprise sont incomplètes. La publication est bloquée.</div>}
 
         <div className={styles.formCard}>
           <div className={styles.langTabs}>

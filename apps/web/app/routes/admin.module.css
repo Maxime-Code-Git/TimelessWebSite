@@ -696,6 +696,8 @@
 /* Editor additions */
 .tabs {
   display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: 1rem;
   margin-bottom: 1rem;
   border-bottom: 1px solid var(--color-border);
@@ -1314,4 +1316,100 @@
 
 .cookieItem p {
   margin: 0 0 0.25rem 0;
+}
+
+.legalMainContent {
+  width: 100%;
+  min-width: 0;
+  padding: 1rem;
+}
+
+.backButton {
+  text-decoration: none;
+  color: #3b82f6;
+  font-weight: 500;
+  margin-right: 1rem;
+}
+.backButton:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.errorAlert {
+  background-color: #fef2f2;
+  border-left: 4px solid #ef4444;
+  color: #991b1b;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.successAlert {
+  background-color: #f0fdf4;
+  border-left: 4px solid #22c55e;
+  color: #166534;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.fieldGroup {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.formCard {
+  width: 100%;
+  max-width: 64rem;
+  min-width: 0;
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.headerTitleGroup {
+  display: flex;
+  align-items: center;
+}
+
+.langTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-width: 100%;
+  margin-bottom: 1rem;
+}
+
+.preLine {
+  white-space: pre-wrap;
+}
+
+.submitGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  background-color: #f9fafb;
+  color: #374151;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+.tab:hover {
+  background-color: #e5e7eb;
+}
+
+.tabActive {
+  padding: 0.5rem 1rem;
+  border: 1px solid #3b82f6;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-weight: 600;
 }

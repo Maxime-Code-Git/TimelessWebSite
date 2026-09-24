@@ -91,6 +91,8 @@ const mockUseLoaderData = vi.fn(() => ({
   isComplete: true
 }));
 
+let currentActionData: { error?: string; success?: boolean } | null = null;
+const mockUseActionData = vi.fn(() => currentActionData);
 
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
@@ -98,7 +100,7 @@ vi.mock("react-router", async (importOriginal) => {
     ...actual,
     useLoaderData: () => mockUseLoaderData(),
     useRouteLoaderData: () => mockUseLoaderData(),
-    useActionData: () => null,
+    useActionData: () => mockUseActionData(),
     useNavigation: () => ({ state: "idle" }),
     Form: ({ children }: { children: ReactNode }) => <form>{children}</form>,
     useSubmit: () => vi.fn(),
@@ -133,5 +135,25 @@ describe("AdminLegal React Component", () => {
     expect(screen.getAllByText(/ads/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/OldPurpose/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/6 mois/).length).toBeGreaterThan(0);
+  });
+
+  it("renders success status when actionData has success", () => {
+    currentActionData = { success: true };
+    const router = createMemoryRouter([{ path: "/", element: <AdminLegal /> }]);
+    render(<RouterProvider router={router} />);
+    
+    const statusEl = screen.getByRole("status");
+    expect(statusEl.textContent).toBe("Modifications enregistrées.");
+  });
+
+  it("renders error alert when actionData has error", () => {
+    currentActionData = { error: "Something went wrong" };
+    const router = createMemoryRouter([{ path: "/", element: <AdminLegal /> }]);
+    render(<RouterProvider router={router} />);
+    
+    // the uncompleted profile warning might also have role="alert" if isComplete were false,
+    // but we mocked isComplete: true.
+    const alertEl = screen.getByRole("alert");
+    expect(alertEl.textContent).toBe("Something went wrong");
   });
 });
