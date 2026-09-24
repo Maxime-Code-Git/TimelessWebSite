@@ -572,9 +572,9 @@ export default function AdminLegal() {
                 {publishError && <p className={styles.errorAlert}>{publishError}</p>}
 
                 <div className={styles.sectionCard}>
-                   <h3 className={styles.sectionTitle}>Aperçu du brouillon (FR)</h3>
-                   <div style={{ border: '1px solid #ccc', padding: '1rem', borderRadius: '4px', backgroundColor: 'var(--color-bg)' }}>
-                     <LegalPageView lang={activeLang} alternateLangHref="#" document={draft} isDraft={true} />
+                   <h3 className={styles.sectionTitle}>Aperçu du brouillon ({activeLang.toUpperCase()})</h3>
+                   <div className={styles.previewContainer}>
+                     <LegalPageView mode="embedded" lang={activeLang} alternateLangHref="#" document={draft} isDraft={true} />
                    </div>
                 </div>
 
@@ -586,15 +586,24 @@ export default function AdminLegal() {
                          <strong>Version {content.legalPages[activeTab].published.version} (Courante)</strong> - {content.legalPages[activeTab].published.effectiveDate}
                          <details>
                            <summary>Voir le contenu</summary>
-                           <div style={{ paddingLeft: '1rem', borderLeft: '2px solid #ccc', marginTop: '0.5rem' }}>
+                           <div className={styles.historyContainer}>
+                             <p><strong>Version:</strong> {content.legalPages[activeTab].published.version}</p>
+                             <p><strong>Date d'entrée en vigueur:</strong> {content.legalPages[activeTab].published.effectiveDate || "N/A"}</p>
+                             <p><strong>Dernière modification:</strong> {content.legalPages[activeTab].published.lastModified || "N/A"}</p>
                              <p><strong>Titre:</strong> {content.legalPages[activeTab].published.publicTitle[activeLang]}</p>
-                             <p><strong>Intro:</strong> {content.legalPages[activeTab].published.intro[activeLang]}</p>
+                             <p className={styles.preLine}><strong>Intro:</strong> {content.legalPages[activeTab].published.intro[activeLang]}</p>
                              {content.legalPages[activeTab].published.sections.map((s: LegalSection) => (
-                               <div key={s.id}>
+                               <div key={s.id} className={styles.historySection}>
                                  <p><strong>{s.title[activeLang]}</strong></p>
-                                 <p>{s.paragraphs[0]?.[activeLang]}...</p>
+                                 {s.paragraphs.map((p, pIdx) => <p key={pIdx} className={styles.preLine}>{p[activeLang]}</p>)}
+                                 {s.listItems && s.listItems.length > 0 && <ul>{s.listItems.map((li, liIdx) => <li key={liIdx}>{li[activeLang]}</li>)}</ul>}
                                </div>
                              ))}
+                             {content.legalPages[activeTab].published.inventory && content.legalPages[activeTab].published.inventory.length > 0 && (
+                               <div className={styles.historySection}>
+                                 <p><strong>Inventaire des cookies:</strong> {content.legalPages[activeTab].published.inventory.length} cookies</p>
+                               </div>
+                             )}
                            </div>
                          </details>
                        </li>
@@ -607,16 +616,25 @@ export default function AdminLegal() {
                            <strong>Version {h.version} (Archivée)</strong> - {h.effectiveDate}
                            <details>
                              <summary>Voir le contenu</summary>
-                             <div style={{ paddingLeft: '1rem', borderLeft: '2px solid #ccc', marginTop: '0.5rem' }}>
-                               <p><strong>Titre:</strong> {h.publicTitle[activeLang]}</p>
-                               <p><strong>Intro:</strong> {h.intro[activeLang]}</p>
-                               {h.sections.map((s: LegalSection) => (
-                                 <div key={s.id}>
-                                   <p><strong>{s.title[activeLang]}</strong></p>
-                                   <p>{s.paragraphs[0]?.[activeLang]}...</p>
-                                 </div>
-                               ))}
-                             </div>
+                             <div className={styles.historyContainer}>
+                             <p><strong>Version:</strong> {h.version}</p>
+                             <p><strong>Date d'entrée en vigueur:</strong> {h.effectiveDate || "N/A"}</p>
+                             <p><strong>Dernière modification:</strong> {h.lastModified || "N/A"}</p>
+                             <p><strong>Titre:</strong> {h.publicTitle[activeLang]}</p>
+                             <p className={styles.preLine}><strong>Intro:</strong> {h.intro[activeLang]}</p>
+                             {h.sections.map((s: LegalSection) => (
+                               <div key={s.id} className={styles.historySection}>
+                                 <p><strong>{s.title[activeLang]}</strong></p>
+                                 {s.paragraphs.map((p, pIdx) => <p key={pIdx} className={styles.preLine}>{p[activeLang]}</p>)}
+                                 {s.listItems && s.listItems.length > 0 && <ul>{s.listItems.map((li, liIdx) => <li key={liIdx}>{li[activeLang]}</li>)}</ul>}
+                               </div>
+                             ))}
+                             {h.inventory && h.inventory.length > 0 && (
+                               <div className={styles.historySection}>
+                                 <p><strong>Inventaire des cookies:</strong> {h.inventory.length} cookies</p>
+                               </div>
+                             )}
+                           </div>
                            </details>
                         </li>
                      ))}

@@ -387,6 +387,21 @@ describe("Migration of intermediate V2 content", () => {
       expect(migrated.business.legalName).toBeNull();
     });
 
+    it("migrates V9 with incomplete legalUI (missing versionLabel)", () => {
+      const v9 = JSON.parse(JSON.stringify(defaultContent));
+      v9.schemaVersion = 9;
+      v9.legalUI.draftWarning = { fr: "Modifié", en: "Modified" };
+      delete v9.legalUI.versionLabel;
+
+      const migrated = validateSiteContent(v9);
+      expect(migrated.schemaVersion).toBe(9);
+      expect(migrated.legalUI.draftWarning.fr).toBe("Modifié"); // Conservé
+      expect(migrated.legalUI.versionLabel.fr).toBe("Version"); // Injecté depuis le défaut
+      
+      // Ensure no shared reference
+      expect(migrated.legalUI.versionLabel).not.toBe(defaultContent.legalUI.versionLabel);
+    });
+
     it("rejects incomplete V9 if required fields are missing", () => {
       const v9 = JSON.parse(JSON.stringify(defaultContent));
       v9.schemaVersion = 9;

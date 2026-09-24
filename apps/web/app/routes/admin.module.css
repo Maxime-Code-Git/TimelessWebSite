@@ -1280,3 +1280,20 @@
   height: auto;
   border-radius: 4px;
 }
+
+.previewContainer {
+  border: 1px solid #ccc;
+  padding: 1rem;
+  border-radius: 4px;
+  background-color: var(--color-bg);
+}
+
+.historyContainer {
+  padding-left: 1rem;
+  border-left: 2px solid #ccc;
+  margin-top: 0.5rem;
+}
+
+.historySection {
+  margin-top: 1rem;
+}

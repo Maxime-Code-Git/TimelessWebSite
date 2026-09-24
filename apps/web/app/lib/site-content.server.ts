@@ -1566,12 +1566,19 @@ export function validateSiteContent(data: unknown): SiteContent {
 
 
 
-  if ((obj.schemaVersion as number) < 9 || (obj.schemaVersion as number) === 9 && !('legalUI' in objRef)) {
+  if ((obj.schemaVersion as number) < 9 || (obj.schemaVersion as number) === 9) {
     const defaultLegalPages = JSON.parse(JSON.stringify(defaultContent.legalPages));
+    const migratedLegalUI = 'legalUI' in objRef ? { ...(objRef.legalUI as Record<string, unknown>) } : JSON.parse(JSON.stringify(defaultContent.legalUI));
+    
+    // Inject versionLabel if missing in existing V9 legalUI
+    if (!('versionLabel' in migratedLegalUI)) {
+      migratedLegalUI.versionLabel = JSON.parse(JSON.stringify(defaultContent.legalUI.versionLabel));
+    }
+
     objRef = {
       ...objRef,
       legalPages: 'legalPages' in objRef ? objRef.legalPages : defaultLegalPages,
-      legalUI: 'legalUI' in objRef ? objRef.legalUI : JSON.parse(JSON.stringify(defaultContent.legalUI)),
+      legalUI: migratedLegalUI,
     };
 
 
@@ -1785,8 +1792,11 @@ export function saveLegalPageDraft(key: keyof LegalPagesContent, draft: LegalDoc
   if (current.isCorrupted) throw new CorruptedContentError();
   if (current.content.revision !== previousRevision) throw new RevisionConflictError();
 
-  draft.lastModified = new Date().toISOString();
-  const validatedDraft = validateLegalDocument(draft, `legalPages.${key}.draft`);
+  const draftWithServerDate = {
+    ...draft,
+    lastModified: new Date().toISOString()
+  };
+  const validatedDraft = validateLegalDocument(draftWithServerDate, `legalPages.${key}.draft`);
 
   const newContent: SiteContent = {
     ...current.content,
@@ -1810,8 +1820,11 @@ export function publishLegalPage(key: keyof LegalPagesContent, draftToPublish: L
   if (current.isCorrupted) throw new CorruptedContentError();
   if (current.content.revision !== previousRevision) throw new RevisionConflictError();
 
-  draftToPublish.lastModified = new Date().toISOString();
-  const validatedDraft = validateLegalDocument(draftToPublish, `legalPages.${key}.draft`);
+  const draftWithServerDate = {
+    ...draftToPublish,
+    lastModified: new Date().toISOString()
+  };
+  const validatedDraft = validateLegalDocument(draftWithServerDate, `legalPages.${key}.draft`);
 
   if (!validatedDraft.effectiveDate) {
     throw new ValidationError("effectiveDate is required to publish");

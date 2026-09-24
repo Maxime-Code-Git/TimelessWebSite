@@ -7,13 +7,14 @@ import styles from "~/routes/legal.module.css";
 import type { LegalDocument, LegalSection } from "~/lib/site-content.server";
 
 interface Props {
+  mode?: "public" | "embedded";
   lang: "fr" | "en";
   alternateLangHref: string;
   document: LegalDocument;
   isDraft: boolean;
 }
 
-export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Props) {
+export function LegalPageView({ mode = "public", lang, alternateLangHref, document, isDraft }: Props) {
   const rootData = useRouteLoaderData<typeof rootLoader>("root");
   const business = rootData?.siteContent?.business;
   const legalUI = rootData?.siteContent?.legalUI;
@@ -44,10 +45,10 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
   };
 
   const formatHosting = () => {
-    if (!business) return null;
+    if (!business || !legalUI) return null;
     return (
       <p>
-        {legalUI?.hostedBy[lang]} {business.hostingProvider || legalUI?.toBeDefined?.[lang] || "[À définir]"}.
+        {legalUI?.hostedBy[lang]} {business.hostingProvider || legalUI.toBeDefined[lang]}.
         {business.hostingAddress && <><br /><span className={styles.preLine}>{business.hostingAddress}</span></>}
       </p>
     );
@@ -110,7 +111,7 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
 
   return (
     <div className={styles.container}>
-      <Header lang={lang} alternateLangHref={alternateLangHref} />
+      {mode !== "embedded" && <Header lang={lang} alternateLangHref={alternateLangHref} />}
       <main className={styles.mainSection}>
         <div className={styles.wrapper}>
           <h1 className={styles.title}>{document.publicTitle[lang]}</h1>
@@ -148,7 +149,7 @@ export function LegalPageView({ lang, alternateLangHref, document, isDraft }: Pr
           </div>
         </div>
       </main>
-      <Footer lang={lang} />
+      {mode !== "embedded" && <Footer lang={lang} />}
     </div>
   );
 }

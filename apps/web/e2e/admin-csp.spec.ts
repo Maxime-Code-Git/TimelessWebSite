@@ -74,5 +74,6 @@ test.describe('Admin CSP and Styles', () => {
     await checkRoute('/admin/portfolio/watermark');
     await checkRoute('/admin/bookings');
     await checkRoute('/admin/contact');
+    await checkRoute('/admin/legal');
   });
 });
