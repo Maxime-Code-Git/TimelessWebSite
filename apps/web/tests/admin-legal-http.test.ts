@@ -1,11 +1,11 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { action } from "../app/routes/admin.legal";
-import { getSiteContent, getRawSiteContent } from "../app/lib/site-content.server";
+import { getSiteContent } from "../app/lib/site-content.server";
 import { commitSession, getSession } from "../app/lib/session.server";
 import { resetRateLimit } from "../app/lib/rate-limit.server";
 import { computeCredentialVersion } from "../app/lib/auth.server";
-import * as crypto from "node:crypto";
+
 import fs from "node:fs";
 
 const TEST_DB = "./data/test-site-content-legal.json";
@@ -52,7 +52,7 @@ describe("Admin Legal Route HTTP API", () => {
   it("rejects missing session", async () => {
     const formData = new FormData();
     const req = createRequest("POST", formData);
-    await expect(action({ request: req, params: {}, context: {} })).rejects.toThrow();
+    await expect(action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0])).rejects.toThrow();
   });
 
   it("rejects invalid CSRF", async () => {
@@ -61,7 +61,7 @@ describe("Admin Legal Route HTTP API", () => {
     formData.append("csrfToken", "fake-csrf");
     
     const req = createRequest("POST", formData, { Cookie: cookie });
-    const res = await action({ request: req, params: {}, context: {} }) as Response;
+    const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
     expect(res.status).toBe(403);
   });
   
@@ -76,7 +76,7 @@ describe("Admin Legal Route HTTP API", () => {
       headers: reqHeaders,
       body: formData
     });
-    const res = await action({ request: req, params: {}, context: {} }) as Response;
+    const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
     expect(res.status).toBe(403);
   });
 
@@ -94,7 +94,7 @@ describe("Admin Legal Route HTTP API", () => {
     formData.append("data", JSON.stringify(draft));
 
     const req = createRequest("POST", formData, { Cookie: cookie });
-    const res = await action({ request: req, params: {}, context: {} }) as Response;
+    const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
     expect(res.status).toBe(200);
     
     const newContent = getSiteContent();
@@ -116,7 +116,7 @@ describe("Admin Legal Route HTTP API", () => {
     formData.append("data", JSON.stringify(draft));
 
     const req = createRequest("POST", formData, { Cookie: cookie });
-    const res = await action({ request: req, params: {}, context: {} }) as Response;
+    const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
     expect(res.status).toBe(400);
   });
 
@@ -137,7 +137,7 @@ describe("Admin Legal Route HTTP API", () => {
     formData.append("data", JSON.stringify(draft));
 
     let req = createRequest("POST", formData, { Cookie: cookie });
-    let res = await action({ request: req, params: {}, context: {} }) as Response;
+    let res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
     expect(res.status).toBe(200);
     
     content = getSiteContent();
@@ -155,7 +155,7 @@ describe("Admin Legal Route HTTP API", () => {
     formData.append("data", JSON.stringify(draft));
     
     req = createRequest("POST", formData, { Cookie: cookie });
-    res = await action({ request: req, params: {}, context: {} }) as Response;
+    res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
     expect(res.status).toBe(200);
     
     content = getSiteContent();
@@ -177,7 +177,7 @@ describe("Admin Legal Route HTTP API", () => {
     formData.append("data", JSON.stringify(draft));
 
     const req = createRequest("POST", formData, { Cookie: cookie });
-    const res = await action({ request: req, params: {}, context: {} }) as Response;
+    const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
     expect(res.status).toBe(409);
   });
   
@@ -195,14 +195,97 @@ describe("Admin Legal Route HTTP API", () => {
     formData.append("data", JSON.stringify(draft));
 
     const req = createRequest("POST", formData, { Cookie: cookie });
-    const res = await action({ request: req, params: {}, context: {} }) as Response;
+    const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
     expect(res.status).toBe(400); // validation error catches < and >
   });
   
   it("rejects payload too large", async () => {
     const cookie = await createValidSession("csrf-1");
-    const req = createRequest("POST", "a".repeat(100) as any, { Cookie: cookie, "Content-Length": "10000000" });
-    const res = await action({ request: req, params: {}, context: {} }) as Response;
+    const req = createRequest("POST", "a".repeat(100) as unknown as FormData, { Cookie: cookie, "Content-Length": "10000000" });
+    const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
     expect(res.status).toBe(413);
+  });
+
+  it("maintains historical versions and draft independence after two publications", async () => {
+    const cookie = await createValidSession("csrf-1");
+    let contentObj = getSiteContent();
+    let draft = contentObj.legalPages.privacy.draft;
+    draft.effectiveDate = "2026-10-01";
+    draft.publicTitle.fr = "V1";
+    
+    // Publish V1
+    let formData = new FormData();
+    formData.append("csrfToken", "csrf-1");
+    formData.append("intent", "publish");
+    formData.append("pageKey", "privacy");
+    formData.append("revision", contentObj.revision);
+    formData.append("data", JSON.stringify(draft));
+    
+    let req = createRequest("POST", formData, { Cookie: cookie });
+    let res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
+    expect(res.status).toBe(200);
+    
+    // Create Draft V2
+    contentObj = getSiteContent();
+    draft = contentObj.legalPages.privacy.draft;
+    draft.publicTitle.fr = "Draft V2";
+    
+    formData = new FormData();
+    formData.append("csrfToken", "csrf-1");
+    formData.append("intent", "save_draft");
+    formData.append("pageKey", "privacy");
+    formData.append("revision", contentObj.revision);
+    formData.append("data", JSON.stringify(draft));
+    
+    req = createRequest("POST", formData, { Cookie: cookie });
+    res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
+    expect(res.status).toBe(200);
+    
+    // Check independence
+    contentObj = getSiteContent();
+    expect(contentObj.legalPages.privacy.draft.publicTitle.fr).toBe("Draft V2");
+    expect(contentObj.legalPages.privacy.published?.publicTitle.fr).toBe("V1");
+    
+    // Publish V2
+    draft = contentObj.legalPages.privacy.draft;
+    draft.effectiveDate = "2026-11-01";
+    
+    formData = new FormData();
+    formData.append("csrfToken", "csrf-1");
+    formData.append("intent", "publish");
+    formData.append("pageKey", "privacy");
+    formData.append("revision", contentObj.revision);
+    formData.append("data", JSON.stringify(draft));
+    
+    req = createRequest("POST", formData, { Cookie: cookie });
+    res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
+    expect(res.status).toBe(200);
+    
+    contentObj = getSiteContent();
+    expect(contentObj.legalPages.privacy.published?.version).toBe(2);
+    expect(contentObj.legalPages.privacy.published?.publicTitle.fr).toBe("Draft V2");
+    expect(contentObj.legalPages.privacy.history.length).toBe(1);
+    expect(contentObj.legalPages.privacy.history[0].publicTitle.fr).toBe("V1");
+  });
+
+  it("handles Unicode characters correctly", async () => {
+    const cookie = await createValidSession("csrf-1");
+    const contentObj = getSiteContent();
+    const draft = contentObj.legalPages.mentions.draft;
+    draft.publicTitle.fr = "Mentions 🚀 こんにちは";
+    
+    const formData = new FormData();
+    formData.append("csrfToken", "csrf-1");
+    formData.append("intent", "save_draft");
+    formData.append("pageKey", "mentions");
+    formData.append("revision", contentObj.revision);
+    formData.append("data", JSON.stringify(draft));
+    
+    const req = createRequest("POST", formData, { Cookie: cookie });
+    const res = await action({ request: req, params: {}, context: {} } as unknown as Parameters<typeof action>[0]) as Response;
+    expect(res.status).toBe(200);
+    
+    const updated = getSiteContent();
+    expect(updated.legalPages.mentions.draft.publicTitle.fr).toBe("Mentions 🚀 こんにちは");
   });
 });

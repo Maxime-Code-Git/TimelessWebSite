@@ -1,7 +1,7 @@
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
-  redirect,
+  
 } from "react-router";
 import {
   Form,
@@ -19,7 +19,6 @@ import {
   publishLegalPage,
   type LegalPagesContent,
   type LegalDocument,
-  type LegalSection,
   CorruptedContentError,
   RevisionConflictError,
   ValidationError,

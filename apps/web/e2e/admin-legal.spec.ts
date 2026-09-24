@@ -21,7 +21,6 @@ test.describe('Admin Legal Pages', () => {
     await page.click('button:has-text("EN")');
     
     // Fill SEO title for EN
-    const seoInput = page.locator('input').filter({ hasText: 'Titre SEO' }).first(); // just as an example since it's a prototype
     
     // Verify draft save button exists
     await expect(page.getByRole('button', { name: 'Enregistrer le brouillon' })).toBeVisible();

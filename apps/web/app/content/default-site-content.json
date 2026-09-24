@@ -16,7 +16,7 @@
     "instagramUrl": null,
     "linkedinUrl": null,
     "serviceArea": {
-      "fr": "Belgique & mariages à l'étranger",
+      "fr": "Belgique & mariages \u00e0 l'\u00e9tranger",
       "en": "Belgium & destination weddings"
     },
     "legalName": null,
@@ -35,11 +35,11 @@
           "en": "Essential"
         },
         "summary": {
-          "fr": "Les moments clés, en images.",
+          "fr": "Les moments cl\u00e9s, en images.",
           "en": "Key moments, in images."
         },
         "description": {
-          "fr": "Une présence discrète pour capturer l'essentiel de votre mariage. Idéal pour les mariages intimes.",
+          "fr": "Une pr\u00e9sence discr\u00e8te pour capturer l'essentiel de votre mariage. Id\u00e9al pour les mariages intimes.",
           "en": "Discreet presence to capture the essence of your wedding. Ideal for intimate weddings."
         },
         "includedItems": [
@@ -53,14 +53,14 @@
           {
             "id": "6164d174-7e00-4139-b980-c8325e0042b4",
             "text": {
-              "fr": "200 photos livrées",
+              "fr": "200 photos livr\u00e9es",
               "en": "200 photos delivered"
             }
           },
           {
             "id": "e9d76f6f-f9e0-4b71-8ae6-076131195e94",
             "text": {
-              "fr": "Galerie en ligne privée",
+              "fr": "Galerie en ligne priv\u00e9e",
               "en": "Private online gallery"
             }
           },
@@ -87,11 +87,11 @@
           "en": "Signature"
         },
         "summary": {
-          "fr": "L'histoire complète de votre journée.",
+          "fr": "L'histoire compl\u00e8te de votre journ\u00e9e.",
           "en": "The full story of your day."
         },
         "description": {
-          "fr": "Une couverture étendue pour ne rien manquer, des préparatifs jusqu'à la première danse.",
+          "fr": "Une couverture \u00e9tendue pour ne rien manquer, des pr\u00e9paratifs jusqu'\u00e0 la premi\u00e8re danse.",
           "en": "Extended coverage to miss nothing, from preparations to the first dance."
         },
         "includedItems": [
@@ -105,14 +105,14 @@
           {
             "id": "7390b093-2170-443b-9f6d-58ccb6fe7c29",
             "text": {
-              "fr": "400 photos livrées",
+              "fr": "400 photos livr\u00e9es",
               "en": "400 photos delivered"
             }
           },
           {
             "id": "b325f996-a29a-4488-97aa-931ed1158c1c",
             "text": {
-              "fr": "Galerie en ligne privée",
+              "fr": "Galerie en ligne priv\u00e9e",
               "en": "Private online gallery"
             }
           },
@@ -146,7 +146,7 @@
           "en": "Prestige"
         },
         "summary": {
-          "fr": "L'expérience absolue.",
+          "fr": "L'exp\u00e9rience absolue.",
           "en": "The ultimate experience."
         },
         "description": {
@@ -157,21 +157,21 @@
           {
             "id": "201f63f9-4aeb-4726-8710-d22d9672e4c4",
             "text": {
-              "fr": "Journée complète (12h)",
+              "fr": "Journ\u00e9e compl\u00e8te (12h)",
               "en": "Full day (12h)"
             }
           },
           {
             "id": "410830fa-ab32-485b-837e-cbff77bbe199",
             "text": {
-              "fr": "600+ photos livrées",
+              "fr": "600+ photos livr\u00e9es",
               "en": "600+ photos delivered"
             }
           },
           {
             "id": "6d6701ff-7382-48c0-861c-1415ed7b7211",
             "text": {
-              "fr": "Galerie en ligne privée",
+              "fr": "Galerie en ligne priv\u00e9e",
               "en": "Private online gallery"
             }
           },
@@ -185,14 +185,14 @@
           {
             "id": "6bf854d0-9a9b-4dfc-802c-01ce7b3379b3",
             "text": {
-              "fr": "Album photo relié inclus",
+              "fr": "Album photo reli\u00e9 inclus",
               "en": "Bound photo album included"
             }
           },
           {
             "id": "42e1ea5e-a874-4ec2-b549-5c0a365fe814",
             "text": {
-              "fr": "Séance couple offerte",
+              "fr": "S\u00e9ance couple offerte",
               "en": "Complimentary couple session"
             }
           }
@@ -218,7 +218,7 @@
           "en": "The essence of your union."
         },
         "description": {
-          "fr": "Un souvenir rythmé et intense des moments forts de votre journée.",
+          "fr": "Un souvenir rythm\u00e9 et intense des moments forts de votre journ\u00e9e.",
           "en": "A rhythmic and intense memory of the highlights of your day."
         },
         "includedItems": [
@@ -232,7 +232,7 @@
           {
             "id": "b44fc1ed-9d76-44da-864d-482110119773",
             "text": {
-              "fr": "Captation cérémonie",
+              "fr": "Captation c\u00e9r\u00e9monie",
               "en": "Ceremony capture"
             }
           },
@@ -266,11 +266,11 @@
           "en": "Signature"
         },
         "summary": {
-          "fr": "Le récit cinématographique.",
+          "fr": "Le r\u00e9cit cin\u00e9matographique.",
           "en": "The cinematic narrative."
         },
         "description": {
-          "fr": "Un documentaire élégant de votre mariage, capturant chaque émotion en mouvement.",
+          "fr": "Un documentaire \u00e9l\u00e9gant de votre mariage, capturant chaque \u00e9motion en mouvement.",
           "en": "An elegant documentary of your wedding, capturing every emotion in motion."
         },
         "includedItems": [
@@ -284,14 +284,14 @@
           {
             "id": "c06d5cb1-5fd8-4319-b1d6-c7af042d04d7",
             "text": {
-              "fr": "Captation cérémonie + réception",
+              "fr": "Captation c\u00e9r\u00e9monie + r\u00e9ception",
               "en": "Ceremony + reception capture"
             }
           },
           {
             "id": "1d354171-cc32-45da-b4d8-c33771feaaf7",
             "text": {
-              "fr": "Teaser réseaux sociaux inclus",
+              "fr": "Teaser r\u00e9seaux sociaux inclus",
               "en": "Social media teaser included"
             }
           },
@@ -322,21 +322,21 @@
           "en": "Your story, writ large."
         },
         "description": {
-          "fr": "Une œuvre cinématographique complète, incluant un teaser pour partager l'émotion.",
+          "fr": "Une \u0153uvre cin\u00e9matographique compl\u00e8te, incluant un teaser pour partager l'\u00e9motion.",
           "en": "A complete cinematic work, including a teaser to share the emotion."
         },
         "includedItems": [
           {
             "id": "24d2203b-967d-4317-a96c-57656215c4e2",
             "text": {
-              "fr": "Long métrage (15-20 min)",
+              "fr": "Long m\u00e9trage (15-20 min)",
               "en": "Feature film (15-20 min)"
             }
           },
           {
             "id": "051078ab-ad32-458e-859c-48caa63bea41",
             "text": {
-              "fr": "Captation intégrale de la journée",
+              "fr": "Captation int\u00e9grale de la journ\u00e9e",
               "en": "Full day capture"
             }
           },
@@ -383,7 +383,7 @@
           "en": "The best of both worlds."
         },
         "description": {
-          "fr": "La combinaison parfaite de la photo et de la vidéo pour les moments clés.",
+          "fr": "La combinaison parfaite de la photo et de la vid\u00e9o pour les moments cl\u00e9s.",
           "en": "The perfect combination of photo and video for key moments."
         },
         "includedItems": [
@@ -404,7 +404,7 @@
           {
             "id": "aa9243d7-7118-4858-8ffb-c125d4ee1c36",
             "text": {
-              "fr": "Galerie en ligne privée",
+              "fr": "Galerie en ligne priv\u00e9e",
               "en": "Private online gallery"
             }
           },
@@ -435,7 +435,7 @@
           "en": "Complete coverage."
         },
         "description": {
-          "fr": "L'équipe complète à vos côtés pour raconter votre histoire sous toutes ses formes.",
+          "fr": "L'\u00e9quipe compl\u00e8te \u00e0 vos c\u00f4t\u00e9s pour raconter votre histoire sous toutes ses formes.",
           "en": "The complete team by your side to tell your story in all its forms."
         },
         "includedItems": [
@@ -456,14 +456,14 @@
           {
             "id": "fb034496-60fa-4ecf-b08d-1d7b62e17268",
             "text": {
-              "fr": "Galerie en ligne privée",
+              "fr": "Galerie en ligne priv\u00e9e",
               "en": "Private online gallery"
             }
           },
           {
             "id": "4260b20e-f396-4254-ab54-051b9b674ea4",
             "text": {
-              "fr": "Teaser réseaux sociaux inclus",
+              "fr": "Teaser r\u00e9seaux sociaux inclus",
               "en": "Social media teaser included"
             }
           },
@@ -490,32 +490,32 @@
           "en": "Prestige"
         },
         "summary": {
-          "fr": "L'héritage visuel parfait.",
+          "fr": "L'h\u00e9ritage visuel parfait.",
           "en": "The perfect visual legacy."
         },
         "description": {
-          "fr": "Une prestation sans compromis. L'excellence de notre studio dédiée à votre mariage.",
+          "fr": "Une prestation sans compromis. L'excellence de notre studio d\u00e9di\u00e9e \u00e0 votre mariage.",
           "en": "A compromise-free service. The excellence of our studio dedicated to your wedding."
         },
         "includedItems": [
           {
             "id": "2c14026b-9a1e-4bec-8395-e6c151cdad36",
             "text": {
-              "fr": "Journée complète",
+              "fr": "Journ\u00e9e compl\u00e8te",
               "en": "Full day"
             }
           },
           {
             "id": "6d7b7991-c90a-473c-a674-8f3dbb634f54",
             "text": {
-              "fr": "600+ photos + long métrage",
+              "fr": "600+ photos + long m\u00e9trage",
               "en": "600+ photos + feature film"
             }
           },
           {
             "id": "8c7b32fd-2cab-43b5-a297-37f73fc4ac56",
             "text": {
-              "fr": "Album photo relié inclus",
+              "fr": "Album photo reli\u00e9 inclus",
               "en": "Bound photo album included"
             }
           },
@@ -548,7 +548,7 @@
         "en": "Sempra Studio"
       },
       "largeTitle": {
-        "fr": "Arrêter le temps",
+        "fr": "Arr\u00eater le temps",
         "en": "Stop time"
       },
       "subtitle": {
@@ -590,11 +590,11 @@
     },
     "editorial": {
       "paragraph": {
-        "fr": "Au-delà des tendances, nous capturons l'essence de vos instants précieux. Notre approche allie discrétion, élégance et authenticité pour créer",
+        "fr": "Au-del\u00e0 des tendances, nous capturons l'essence de vos instants pr\u00e9cieux. Notre approche allie discr\u00e9tion, \u00e9l\u00e9gance et authenticit\u00e9 pour cr\u00e9er",
         "en": "Beyond trends, we capture the essence of your precious moments. Our approach combines discretion, elegance, and authenticity to create"
       },
       "highlight": {
-        "fr": "un héritage visuel intemporel",
+        "fr": "un h\u00e9ritage visuel intemporel",
         "en": "a timeless visual legacy"
       }
     },
@@ -611,7 +611,7 @@
           "en": "Photography"
         },
         "subtitle": {
-          "fr": "Lumière naturelle & moments volés",
+          "fr": "Lumi\u00e8re naturelle & moments vol\u00e9s",
           "en": "Natural light & candid moments"
         }
       },
@@ -627,26 +627,26 @@
           "en": "Wedding Film"
         },
         "subtitle": {
-          "fr": "Émotions en mouvement",
+          "fr": "\u00c9motions en mouvement",
           "en": "Emotions in motion"
         }
       }
     },
     "pricingPreview": {
       "sectionTitle": {
-        "fr": "Des formules adaptées à vos envies",
+        "fr": "Des formules adapt\u00e9es \u00e0 vos envies",
         "en": "Packages tailored to your desires"
       },
       "promoText": {
-        "fr": "Bénéficiez de ",
+        "fr": "B\u00e9n\u00e9ficiez de ",
         "en": "Enjoy a "
       },
       "promoTextBold": {
-        "fr": "10% de réduction",
+        "fr": "10% de r\u00e9duction",
         "en": "10% discount"
       },
       "caveat": {
-        "fr": "pour toute réservation Duo (Photo + Film).",
+        "fr": "pour toute r\u00e9servation Duo (Photo + Film).",
         "en": "for any Duo booking (Photo + Film)."
       },
       "buttonText": {
@@ -658,7 +658,7 @@
         "en": "Do you have a unique project?"
       },
       "customFormulaTextEm": {
-        "fr": "Créons une formule sur-mesure.",
+        "fr": "Cr\u00e9ons une formule sur-mesure.",
         "en": "Let's create a custom package."
       }
     },
@@ -681,19 +681,19 @@
   },
   "pricingPage": {
     "faqTitle": {
-      "fr": "Questions fréquentes",
+      "fr": "Questions fr\u00e9quentes",
       "en": "Frequently asked questions"
     },
     "promoText": {
-      "fr": "Photo et film réunis sous un même studio : ",
+      "fr": "Photo et film r\u00e9unis sous un m\u00eame studio : ",
       "en": "Photo and film united under one studio: "
     },
     "promoTextBold": {
-      "fr": "une cohérence — et un tarif — impossibles à obtenir avec deux prestataires séparés.",
-      "en": "a consistency — and a price — impossible to achieve with two separate providers."
+      "fr": "une coh\u00e9rence \u2014 et un tarif \u2014 impossibles \u00e0 obtenir avec deux prestataires s\u00e9par\u00e9s.",
+      "en": "a consistency \u2014 and a price \u2014 impossible to achieve with two separate providers."
     },
     "caveat": {
-      "fr": "* Photos et vidéos conservées et disponibles pendant 24 mois",
+      "fr": "* Photos et vid\u00e9os conserv\u00e9es et disponibles pendant 24 mois",
       "en": "* Photos and videos stored and available for 24 months"
     },
     "faqs": [
@@ -701,11 +701,11 @@
         "id": "travel",
         "enabled": true,
         "question": {
-          "fr": "Les déplacements sont-ils inclus ?",
+          "fr": "Les d\u00e9placements sont-ils inclus\u00a0?",
           "en": "Is travel included?"
         },
         "answer": {
-          "fr": "Les déplacements sont inclus dans un rayon de référence autour de notre studio ; au-delà, un forfait déplacement est ajouté au devis.",
+          "fr": "Les d\u00e9placements sont inclus dans un rayon de r\u00e9f\u00e9rence autour de notre studio\u00a0; au-del\u00e0, un forfait d\u00e9placement est ajout\u00e9 au devis.",
           "en": "Travel is included within a reference radius from our studio; beyond that, a travel fee is added to the quote."
         }
       },
@@ -713,11 +713,11 @@
         "id": "deposit",
         "enabled": true,
         "question": {
-          "fr": "Quel acompte pour réserver la date ?",
+          "fr": "Quel acompte pour r\u00e9server la date\u00a0?",
           "en": "What deposit is required to book the date?"
         },
         "answer": {
-          "fr": "Un acompte de réservation est demandé à la signature, le solde étant réglé avant l'événement selon un échéancier convenu ensemble.",
+          "fr": "Un acompte de r\u00e9servation est demand\u00e9 \u00e0 la signature, le solde \u00e9tant r\u00e9gl\u00e9 avant l'\u00e9v\u00e9nement selon un \u00e9ch\u00e9ancier convenu ensemble.",
           "en": "A booking deposit is required at signing, with the balance settled before the event according to an agreed schedule."
         }
       },
@@ -725,11 +725,11 @@
         "id": "delivery",
         "enabled": true,
         "question": {
-          "fr": "Quels sont les délais de livraison ?",
+          "fr": "Quels sont les d\u00e9lais de livraison\u00a0?",
           "en": "What are the delivery times?"
         },
         "answer": {
-          "fr": "Les délais varient selon la formule choisie, indiqués dans chaque carte ci-dessus ; une première sélection d'images est partagée bien avant la livraison finale.",
+          "fr": "Les d\u00e9lais varient selon la formule choisie, indiqu\u00e9s dans chaque carte ci-dessus\u00a0; une premi\u00e8re s\u00e9lection d'images est partag\u00e9e bien avant la livraison finale.",
           "en": "Delivery times vary by package, as indicated in each card above; an initial selection of images is shared well before the final delivery."
         }
       },
@@ -737,12 +737,12 @@
         "id": "custom-package",
         "enabled": true,
         "question": {
-          "fr": "Peut-on personnaliser une formule ?",
+          "fr": "Peut-on personnaliser une formule\u00a0?",
           "en": "Can a package be customised?"
         },
         "answer": {
-          "fr": "Oui, chaque formule peut être ajustée — heures supplémentaires, second photographe, album additionnel — sur simple demande.",
-          "en": "Yes, each package can be adjusted — extra hours, second photographer, additional album — on request."
+          "fr": "Oui, chaque formule peut \u00eatre ajust\u00e9e \u2014 heures suppl\u00e9mentaires, second photographe, album additionnel \u2014 sur simple demande.",
+          "en": "Yes, each package can be adjusted \u2014 extra hours, second photographer, additional album \u2014 on request."
         }
       }
     ]
@@ -750,21 +750,21 @@
   "aboutPage": {
     "seo": {
       "title": {
-        "fr": "À propos — Sempra",
-        "en": "About us — Sempra"
+        "fr": "\u00c0 propos \u2014 Sempra",
+        "en": "About us \u2014 Sempra"
       },
       "description": {
-        "fr": "Deux regards, une même exigence : capter votre journée avec justesse, pour qu'elle vous revienne intacte dans trente ans.",
+        "fr": "Deux regards, une m\u00eame exigence : capter votre journ\u00e9e avec justesse, pour qu'elle vous revienne intacte dans trente ans.",
         "en": "Two perspectives, one standard: capturing your day with precision, so it comes back to you intact in thirty years."
       }
     },
     "hero": {
       "title": {
-        "fr": "Arrêter le temps, rendre le jour éternel.",
+        "fr": "Arr\u00eater le temps, rendre le jour \u00e9ternel.",
         "en": "Stop time, make the day eternal."
       },
       "subtitle": {
-        "fr": "Deux regards, une même exigence : capter votre journée avec justesse, pour qu'elle vous revienne intacte dans trente ans.",
+        "fr": "Deux regards, une m\u00eame exigence : capter votre journ\u00e9e avec justesse, pour qu'elle vous revienne intacte dans trente ans.",
         "en": "Two perspectives, one standard: capturing your day with precision, so it comes back to you intact in thirty years."
       }
     },
@@ -781,7 +781,7 @@
             "en": "Photographer"
           },
           "bio": {
-            "fr": "Passionné par l'image depuis toujours...",
+            "fr": "Passionn\u00e9 par l'image depuis toujours...",
             "en": "Always passionate about the image..."
           },
           "image": {
@@ -800,18 +800,18 @@
             "en": "Partner"
           },
           "role": {
-            "fr": "Vidéaste",
+            "fr": "Vid\u00e9aste",
             "en": "Videographer"
           },
           "bio": {
-            "fr": "L'œil cinématographique de notre duo...",
+            "fr": "L'\u0153il cin\u00e9matographique de notre duo...",
             "en": "The cinematic eye of our duo..."
           },
           "image": {
             "imageId": null,
             "variants": [],
             "alt": {
-              "fr": "Partenaire, vidéaste",
+              "fr": "Partenaire, vid\u00e9aste",
               "en": "Partner, videographer"
             }
           }
@@ -827,11 +827,11 @@
         {
           "id": "discretion",
           "title": {
-            "fr": "Discrétion le jour J",
+            "fr": "Discr\u00e9tion le jour J",
             "en": "Discretion on the day"
           },
           "text": {
-            "fr": "Présents sans jamais s'imposer, pour que vous viviez votre journée pleinement.",
+            "fr": "Pr\u00e9sents sans jamais s'imposer, pour que vous viviez votre journ\u00e9e pleinement.",
             "en": "Present without ever imposing, so you can live your day fully."
           }
         },
@@ -842,7 +842,7 @@
             "en": "One studio"
           },
           "text": {
-            "fr": "Photo et film pensés ensemble, pour une même sensibilité du début à la fin.",
+            "fr": "Photo et film pens\u00e9s ensemble, pour une m\u00eame sensibilit\u00e9 du d\u00e9but \u00e0 la fin.",
             "en": "Photo and film conceived together, for the same sensitivity from start to finish."
           }
         },
@@ -853,32 +853,32 @@
             "en": "A timeless result"
           },
           "text": {
-            "fr": "Des choix sobres et durables, qui vieillissent bien — loin des effets de mode.",
-            "en": "Sober and lasting choices that age well — far from passing trends."
+            "fr": "Des choix sobres et durables, qui vieillissent bien \u2014 loin des effets de mode.",
+            "en": "Sober and lasting choices that age well \u2014 far from passing trends."
           }
         }
       ]
     },
     "difference": {
       "title": {
-        "fr": "Notre différence",
+        "fr": "Notre diff\u00e9rence",
         "en": "Our difference"
       },
       "text": {
-        "fr": "Réunir la photo et le film sous un même studio, c'est une cohérence de regard du premier au dernier plan — et une présence commune le jour J, pour ne rien manquer de votre histoire.",
-        "en": "Uniting photo and film under one studio means a coherent vision from the first to the last frame — and a shared presence on the day, to miss nothing of your story."
+        "fr": "R\u00e9unir la photo et le film sous un m\u00eame studio, c'est une coh\u00e9rence de regard du premier au dernier plan \u2014 et une pr\u00e9sence commune le jour J, pour ne rien manquer de votre histoire.",
+        "en": "Uniting photo and film under one studio means a coherent vision from the first to the last frame \u2014 and a shared presence on the day, to miss nothing of your story."
       }
     }
   },
   "contactPage": {
     "seo": {
       "title": {
-        "fr": "Contact — Sempra Studio",
-        "en": "Contact — Sempra Studio"
+        "fr": "Contact \u2014 Sempra Studio",
+        "en": "Contact \u2014 Sempra Studio"
       },
       "description": {
-        "fr": "Écrivez-nous, sans engagement — nous prendrons le temps de vous répondre.",
-        "en": "Write to us, no commitment — we'll take the time to reply."
+        "fr": "\u00c9crivez-nous, sans engagement \u2014 nous prendrons le temps de vous r\u00e9pondre.",
+        "en": "Write to us, no commitment \u2014 we'll take the time to reply."
       }
     },
     "hero": {
@@ -887,17 +887,17 @@
         "en": "Let's tell your day."
       },
       "subtitle": {
-        "fr": "Écrivez-nous, sans engagement — nous prendrons le temps de vous répondre.",
-        "en": "Write to us, no commitment — we'll take the time to reply."
+        "fr": "\u00c9crivez-nous, sans engagement \u2014 nous prendrons le temps de vous r\u00e9pondre.",
+        "en": "Write to us, no commitment \u2014 we'll take the time to reply."
       }
     },
     "introBanner": {
       "title": {
-        "fr": "Envie de nous parler de vive voix ?",
+        "fr": "Envie de nous parler de vive voix\u00a0?",
         "en": "Want to speak in person?"
       },
       "subtitle": {
-        "fr": "Un appel découverte gratuit, sans engagement, pour faire connaissance et parler de votre mariage.",
+        "fr": "Un appel d\u00e9couverte gratuit, sans engagement, pour faire connaissance et parler de votre mariage.",
         "en": "A free discovery call, no commitment, to get to know each other and discuss your wedding."
       },
       "badges": [
@@ -918,7 +918,7 @@
         {
           "id": "format",
           "label": {
-            "fr": "En visio ou par téléphone",
+            "fr": "En visio ou par t\u00e9l\u00e9phone",
             "en": "Video call or phone"
           }
         }
@@ -930,11 +930,11 @@
         "en": "Appointment"
       },
       "title": {
-        "fr": "Choisissez votre créneau",
+        "fr": "Choisissez votre cr\u00e9neau",
         "en": "Choose your slot"
       },
       "description": {
-        "fr": "Sélectionnez le jour et l'heure qui vous conviennent pour un appel de 30 minutes.",
+        "fr": "S\u00e9lectionnez le jour et l'heure qui vous conviennent pour un appel de 30 minutes.",
         "en": "Select the day and time that suit you for a 30-minute call."
       },
       "note": {
@@ -944,11 +944,11 @@
     },
     "visioBooking": {
       "title": {
-        "fr": "Réserver un rendez-vous visio",
+        "fr": "R\u00e9server un rendez-vous visio",
         "en": "Book a video meeting"
       },
       "unavailableMsg": {
-        "fr": "Aucun créneau visio n'est disponible actuellement. N'hésitez pas à utiliser le formulaire de contact classique.",
+        "fr": "Aucun cr\u00e9neau visio n'est disponible actuellement. N'h\u00e9sitez pas \u00e0 utiliser le formulaire de contact classique.",
         "en": "No video meeting slots are available right now. Please use the contact form."
       },
       "selectDate": {
@@ -964,7 +964,7 @@
         "en": "All times are in Brussels Time"
       },
       "formTitle": {
-        "fr": "Vos coordonnées",
+        "fr": "Vos coordonn\u00e9es",
         "en": "Your details"
       },
       "labelNames": {
@@ -976,7 +976,7 @@
         "en": "Email address *"
       },
       "labelPhone": {
-        "fr": "Numéro de téléphone",
+        "fr": "Num\u00e9ro de t\u00e9l\u00e9phone",
         "en": "Phone number"
       },
       "labelWeddingDate": {
@@ -984,7 +984,7 @@
         "en": "Wedding date (if applicable)"
       },
       "labelFormula": {
-        "fr": "Formule souhaitée",
+        "fr": "Formule souhait\u00e9e",
         "en": "Interested in"
       },
       "labelMessage": {
@@ -1022,11 +1022,11 @@
         "en": "Sending..."
       },
       "successTitle": {
-        "fr": "Demande enregistrée !",
+        "fr": "Demande enregistr\u00e9e !",
         "en": "Request recorded!"
       },
       "successMsg": {
-        "fr": "Votre demande a bien été enregistrée et est en attente de notre validation. Nous vous enverrons très vite un email de confirmation contenant le lien visio.",
+        "fr": "Votre demande a bien \u00e9t\u00e9 enregistr\u00e9e et est en attente de notre validation. Nous vous enverrons tr\u00e8s vite un email de confirmation contenant le lien visio.",
         "en": "Your request has been saved and is pending our validation. We will send you a confirmation email with the video link shortly."
       },
       "btnNewRequest": {
@@ -1034,25 +1034,25 @@
         "en": "Make another request"
       },
       "errTaken": {
-        "fr": "Ce créneau vient juste d'être réservé par quelqu'un d'autre. Veuillez en choisir un autre.",
+        "fr": "Ce cr\u00e9neau vient juste d'\u00eatre r\u00e9serv\u00e9 par quelqu'un d'autre. Veuillez en choisir un autre.",
         "en": "This slot was just booked by someone else. Please choose another one."
       },
       "errGeneric": {
-        "fr": "Une erreur est survenue. Veuillez réessayer plus tard.",
+        "fr": "Une erreur est survenue. Veuillez r\u00e9essayer plus tard.",
         "en": "An error occurred. Please try again later."
       },
       "loadingMsg": {
-        "fr": "Chargement des créneaux disponibles...",
+        "fr": "Chargement des cr\u00e9neaux disponibles...",
         "en": "Loading available slots..."
       }
     },
     "contactForm": {
       "formPrompt": {
-        "fr": "Vous préférez écrire ? Remplissez le formulaire ci-dessous.",
+        "fr": "Vous pr\u00e9f\u00e9rez \u00e9crire\u00a0? Remplissez le formulaire ci-dessous.",
         "en": "Prefer to write? Fill out the form below."
       },
       "successMsg": {
-        "fr": "Votre message a bien été envoyé. Nous vous répondrons très vite.",
+        "fr": "Votre message a bien \u00e9t\u00e9 envoy\u00e9. Nous vous r\u00e9pondrons tr\u00e8s vite.",
         "en": "Your message has been sent successfully. We will reply very soon."
       },
       "btnSubmitting": {
@@ -1061,7 +1061,7 @@
       },
       "labels": {
         "names": {
-          "fr": "Prénom(s) des futurs mariés",
+          "fr": "Pr\u00e9nom(s) des futurs mari\u00e9s",
           "en": "Names of the couple"
         },
         "email": {
@@ -1069,7 +1069,7 @@
           "en": "Email address"
         },
         "phone": {
-          "fr": "Téléphone (optionnel)",
+          "fr": "T\u00e9l\u00e9phone (optionnel)",
           "en": "Phone (optional)"
         },
         "date": {
@@ -1077,11 +1077,11 @@
           "en": "Wedding date"
         },
         "location": {
-          "fr": "Lieu / région du mariage",
+          "fr": "Lieu / r\u00e9gion du mariage",
           "en": "Wedding venue / region"
         },
         "formula": {
-          "fr": "Formule qui vous intéresse",
+          "fr": "Formule qui vous int\u00e9resse",
           "en": "Package of interest"
         },
         "message": {
@@ -1107,16 +1107,16 @@
           "en": "+32 4XX XX XX XX"
         },
         "location": {
-          "fr": "Bruxelles, Namur…",
-          "en": "Brussels, Namur…"
+          "fr": "Bruxelles, Namur\u2026",
+          "en": "Brussels, Namur\u2026"
         },
         "formulaDefault": {
-          "fr": "Sélectionner…",
-          "en": "Select…"
+          "fr": "S\u00e9lectionner\u2026",
+          "en": "Select\u2026"
         },
         "message": {
-          "fr": "Racontez-nous votre projet, vos envies, votre journée…",
-          "en": "Tell us about your project, your wishes, your day…"
+          "fr": "Racontez-nous votre projet, vos envies, votre journ\u00e9e\u2026",
+          "en": "Tell us about your project, your wishes, your day\u2026"
         }
       },
       "groupLabels": {
@@ -1145,23 +1145,23 @@
       },
       "errors": {
         "invalidType": {
-          "fr": "Type de requête non supporté.",
+          "fr": "Type de requ\u00eate non support\u00e9.",
           "en": "Unsupported request type."
         },
         "invalidRequest": {
-          "fr": "Requête invalide.",
+          "fr": "Requ\u00eate invalide.",
           "en": "Invalid request."
         },
         "payloadTooLarge": {
-          "fr": "La requête est trop volumineuse.",
+          "fr": "La requ\u00eate est trop volumineuse.",
           "en": "Request payload is too large."
         },
         "readError": {
-          "fr": "Erreur de lecture de la requête.",
+          "fr": "Erreur de lecture de la requ\u00eate.",
           "en": "Error reading request."
         },
         "invalidOrigin": {
-          "fr": "Origine non autorisée ou absente.",
+          "fr": "Origine non autoris\u00e9e ou absente.",
           "en": "Unauthorized or missing origin."
         },
         "requiredFields": {
@@ -1169,7 +1169,7 @@
           "en": "Please fill in all required fields."
         },
         "maxLength": {
-          "fr": "Un ou plusieurs champs dépassent la taille maximale autorisée.",
+          "fr": "Un ou plusieurs champs d\u00e9passent la taille maximale autoris\u00e9e.",
           "en": "One or more fields exceed the maximum allowed length."
         },
         "invalidEmail": {
@@ -1177,7 +1177,7 @@
           "en": "Invalid email address."
         },
         "invalidChars": {
-          "fr": "Caractères non autorisés.",
+          "fr": "Caract\u00e8res non autoris\u00e9s.",
           "en": "Unauthorized characters."
         },
         "invalidFormula": {
@@ -1193,26 +1193,26 @@
           "en": "Impossible or invalid date."
         },
         "invalidPhone": {
-          "fr": "Format de téléphone invalide.",
+          "fr": "Format de t\u00e9l\u00e9phone invalide.",
           "en": "Invalid phone format."
         },
         "invalidNetwork": {
-          "fr": "Configuration réseau invalide ou IP non autorisée.",
+          "fr": "Configuration r\u00e9seau invalide ou IP non autoris\u00e9e.",
           "en": "Invalid network configuration or unauthorized IP."
         },
         "rateLimit": {
-          "fr": "Trop de tentatives. Veuillez réessayer plus tard.",
+          "fr": "Trop de tentatives. Veuillez r\u00e9essayer plus tard.",
           "en": "Too many attempts. Please try again later."
         },
         "sendError": {
-          "fr": "Une erreur est survenue lors de l'envoi du message. Veuillez réessayer plus tard.",
+          "fr": "Une erreur est survenue lors de l'envoi du message. Veuillez r\u00e9essayer plus tard.",
           "en": "An error occurred while sending the message. Please try again later."
         }
       }
     },
     "contactDetails": {
       "title": {
-        "fr": "Coordonnées",
+        "fr": "Coordonn\u00e9es",
         "en": "Contact details"
       },
       "labelEmail": {
@@ -1220,7 +1220,7 @@
         "en": "Email"
       },
       "labelPhone": {
-        "fr": "Téléphone",
+        "fr": "T\u00e9l\u00e9phone",
         "en": "Phone"
       },
       "labelArea": {
@@ -1228,7 +1228,7 @@
         "en": "Service area"
       },
       "labelSocial": {
-        "fr": "Réseaux",
+        "fr": "R\u00e9seaux",
         "en": "Social"
       },
       "labelInstagram": {
@@ -1240,13 +1240,13 @@
         "en": "LinkedIn"
       },
       "responseTime": {
-        "fr": "Nous répondons sous 48h.",
+        "fr": "Nous r\u00e9pondons sous 48h.",
         "en": "We reply within 48h."
       }
     },
     "bottomBanner": {
       "text": {
-        "fr": "Envie d'en savoir plus sur nos formules ?",
+        "fr": "Envie d'en savoir plus sur nos formules\u00a0?",
         "en": "Want to learn more about our packages?"
       },
       "linkLabel": {
@@ -1259,15 +1259,15 @@
     "mentions": {
       "draft": {
         "seoTitle": {
-          "fr": "Mentions légales",
+          "fr": "Mentions l\u00e9gales",
           "en": "Legal Notice"
         },
         "seoDescription": {
-          "fr": "Description en cours de rédaction",
+          "fr": "Description en cours de r\u00e9daction",
           "en": "Draft description"
         },
         "publicTitle": {
-          "fr": "Mentions légales",
+          "fr": "Mentions l\u00e9gales",
           "en": "Legal Notice"
         },
         "intro": {
@@ -1278,39 +1278,39 @@
           {
             "id": "editor",
             "title": {
-              "fr": "Éditeur du site",
+              "fr": "\u00c9diteur du site",
               "en": "Site Editor"
             },
             "paragraphs": [
               {
-                "fr": "Brouillon",
-                "en": "Draft"
+                "fr": "Identit\u00e9 \u00e0 pr\u00e9ciser",
+                "en": "Identity to be defined"
               }
             ]
           },
           {
             "id": "hosting",
             "title": {
-              "fr": "Hébergement",
+              "fr": "H\u00e9bergement",
               "en": "Hosting"
             },
             "paragraphs": [
               {
-                "fr": "Brouillon",
-                "en": "Draft"
+                "fr": "H\u00e9bergeur \u00e0 pr\u00e9ciser",
+                "en": "Hosting provider to be defined"
               }
             ]
           },
           {
             "id": "property",
             "title": {
-              "fr": "Propriété intellectuelle",
+              "fr": "Propri\u00e9t\u00e9 intellectuelle",
               "en": "Intellectual Property"
             },
             "paragraphs": [
               {
-                "fr": "Brouillon",
-                "en": "Draft"
+                "fr": "L'ensemble des contenus (textes, images, vid\u00e9os) pr\u00e9sents sur ce site sont la propri\u00e9t\u00e9 exclusive de Sempra, sauf mention contraire. Toute reproduction est interdite sans autorisation pr\u00e9alable.",
+                "en": "All contents (texts, images, videos) on this site are the exclusive property of Sempra, unless otherwise stated. Any reproduction is prohibited without prior authorization."
               }
             ]
           }
@@ -1325,15 +1325,15 @@
     "privacy": {
       "draft": {
         "seoTitle": {
-          "fr": "Politique de confidentialité",
+          "fr": "Politique de confidentialit\u00e9",
           "en": "Privacy Policy"
         },
         "seoDescription": {
-          "fr": "Description en cours de rédaction",
+          "fr": "Description en cours de r\u00e9daction",
           "en": "Draft description"
         },
         "publicTitle": {
-          "fr": "Politique de confidentialité",
+          "fr": "Politique de confidentialit\u00e9",
           "en": "Privacy Policy"
         },
         "intro": {
@@ -1349,34 +1349,93 @@
             },
             "paragraphs": [
               {
-                "fr": "Brouillon",
-                "en": "Draft"
+                "fr": "Identit\u00e9 \u00e0 pr\u00e9ciser",
+                "en": "Identity to be defined"
               }
             ]
           },
           {
-            "id": "categories",
+            "id": "data_collection",
             "title": {
-              "fr": "Catégories de données",
-              "en": "Data Categories"
+              "fr": "Donn\u00e9es collect\u00e9es et finalit\u00e9s",
+              "en": "Data Collection and Purposes"
             },
             "paragraphs": [
               {
-                "fr": "Brouillon",
-                "en": "Draft"
+                "fr": "Nous collectons des donn\u00e9es \u00e0 caract\u00e8re personnel dans les cas suivants :",
+                "en": "We collect personal data in the following cases:"
+              }
+            ],
+            "listItems": [
+              {
+                "fr": "Formulaire de contact : nom, pr\u00e9nom, adresse e-mail, t\u00e9l\u00e9phone, et date du mariage. Ces donn\u00e9es sont envoy\u00e9es par e-mail via notre prestataire Brevo (SMTP) afin de r\u00e9pondre \u00e0 votre demande. Elles ne sont pas stock\u00e9es dans la base de donn\u00e9es du site web.",
+                "en": "Contact form: name, email address, phone number, and wedding date. This data is sent by email via our provider Brevo (SMTP) to respond to your request. It is not stored in the website's database."
+              },
+              {
+                "fr": "R\u00e9servation de visioconf\u00e9rence : nom, adresse e-mail, date et heure du rendez-vous. Ces donn\u00e9es sont stock\u00e9es dans la base de donn\u00e9es locale du site (SQLite) pour organiser le rendez-vous.",
+                "en": "Video conference booking: name, email address, appointment date and time. This data is stored in the site's local database (SQLite) to organize the appointment."
+              },
+              {
+                "fr": "Acc\u00e8s aux galeries priv\u00e9es : les codes d'acc\u00e8s et mots de passe utilis\u00e9s pour acc\u00e9der aux galeries clients sont trait\u00e9s et v\u00e9rifi\u00e9s pour s\u00e9curiser l'acc\u00e8s aux photos.",
+                "en": "Access to private galleries: access codes and passwords used to access client galleries are processed and verified to secure access to photos."
+              },
+              {
+                "fr": "S\u00e9curit\u00e9 et limitation de d\u00e9bit : votre adresse IP est hach\u00e9e et conserv\u00e9e temporairement (maximum 1 heure) dans notre base de donn\u00e9es locale afin de pr\u00e9venir les abus (rate limiting). L'adresse IP en clair n'est pas conserv\u00e9e.",
+                "en": "Security and rate limiting: your IP address is hashed and temporarily stored (maximum 1 hour) in our local database to prevent abuse (rate limiting). The clear text IP address is not stored."
               }
             ]
           },
           {
-            "id": "rights",
+            "id": "retention",
             "title": {
-              "fr": "Droits RGPD",
-              "en": "GDPR Rights"
+              "fr": "Dur\u00e9es de conservation",
+              "en": "Retention Periods"
             },
             "paragraphs": [
               {
-                "fr": "Brouillon",
-                "en": "Draft"
+                "fr": "\u00c0 D\u00c9FINIR PAR L'UTILISATEUR :",
+                "en": "TO BE DEFINED BY THE USER:"
+              }
+            ],
+            "listItems": [
+              {
+                "fr": "Dur\u00e9e de conservation des e-mails de contact.",
+                "en": "Retention period for contact emails."
+              },
+              {
+                "fr": "Dur\u00e9e de conservation des rendez-vous en base de donn\u00e9es.",
+                "en": "Retention period for appointments in the database."
+              },
+              {
+                "fr": "Dur\u00e9e de conservation des galeries photos.",
+                "en": "Retention period for photo galleries."
+              }
+            ]
+          },
+          {
+            "id": "third_parties",
+            "title": {
+              "fr": "Partage de donn\u00e9es avec des tiers",
+              "en": "Data Sharing with Third Parties"
+            },
+            "paragraphs": [
+              {
+                "fr": "Certaines donn\u00e9es peuvent transiter par ou \u00eatre h\u00e9berg\u00e9es chez nos sous-traitants strictement pour des n\u00e9cessit\u00e9s techniques :",
+                "en": "Some data may transit through or be hosted by our subcontractors strictly for technical necessity:"
+              }
+            ],
+            "listItems": [
+              {
+                "fr": "Brevo : acheminement des e-mails du formulaire de contact.",
+                "en": "Brevo: routing of contact form emails."
+              },
+              {
+                "fr": "Cloudflare : gestion DNS et pare-feu d'application web (WAF) prot\u00e9geant le site.",
+                "en": "Cloudflare: DNS management and web application firewall (WAF) protecting the site."
+              },
+              {
+                "fr": "YouTube / Vimeo : h\u00e9bergement et lecture des vid\u00e9os du portfolio (charg\u00e9es uniquement sur consentement de l'utilisateur).",
+                "en": "YouTube / Vimeo: hosting and playback of portfolio videos (loaded only upon user consent)."
               }
             ]
           }
@@ -1391,15 +1450,15 @@
     "cgv": {
       "draft": {
         "seoTitle": {
-          "fr": "Conditions générales de vente",
+          "fr": "Conditions g\u00e9n\u00e9rales de vente",
           "en": "Terms of Sale"
         },
         "seoDescription": {
-          "fr": "Description en cours de rédaction",
+          "fr": "Description en cours de r\u00e9daction",
           "en": "Draft description"
         },
         "publicTitle": {
-          "fr": "Conditions générales de vente",
+          "fr": "Conditions g\u00e9n\u00e9rales de vente",
           "en": "Terms of Sale"
         },
         "intro": {
@@ -1408,41 +1467,46 @@
         },
         "sections": [
           {
-            "id": "scope",
+            "id": "rights",
             "title": {
-              "fr": "Objet et champ d'application",
-              "en": "Scope"
+              "fr": "Droit \u00e0 l'image et publication",
+              "en": "Image Rights and Publication"
             },
             "paragraphs": [
               {
-                "fr": "Brouillon",
-                "en": "Draft"
+                "fr": "La r\u00e9alisation des photographies/vid\u00e9os dans le cadre du contrat et leur livraison priv\u00e9e aux clients est distincte de la publication publique dans notre portfolio.",
+                "en": "The production of photographs/videos under the contract and their private delivery to clients is separate from public publication in our portfolio."
+              },
+              {
+                "fr": "La publication publique de photographies ou vid\u00e9os sur le site web Sempra ou sur ses r\u00e9seaux sociaux repose sur une autorisation distincte, sp\u00e9cifique et r\u00e9vocable de la part des personnes photographi\u00e9es.",
+                "en": "The public publication of photographs or videos on the Sempra website or its social networks is based on a distinct, specific, and revocable authorization from the photographed persons."
               }
             ]
           },
           {
-            "id": "booking",
+            "id": "tbd",
             "title": {
-              "fr": "Réservation et acompte",
-              "en": "Booking and Deposit"
+              "fr": "Mentions \u00e0 compl\u00e9ter",
+              "en": "Sections to complete"
             },
             "paragraphs": [
               {
-                "fr": "Brouillon",
-                "en": "Draft"
+                "fr": "\u00c0 D\u00c9FINIR PAR L'UTILISATEUR OU JURISTE :",
+                "en": "TO BE DEFINED BY THE USER OR LEGAL COUNSEL:"
               }
-            ]
-          },
-          {
-            "id": "payment",
-            "title": {
-              "fr": "Paiement du solde",
-              "en": "Balance Payment"
-            },
-            "paragraphs": [
+            ],
+            "listItems": [
               {
-                "fr": "Brouillon",
-                "en": "Draft"
+                "fr": "Conditions exactes de r\u00e9tractation et acompte.",
+                "en": "Exact conditions for withdrawal and deposit."
+              },
+              {
+                "fr": "M\u00e9thode de r\u00e9solution des litiges et m\u00e9diation belge.",
+                "en": "Dispute resolution method and Belgian mediation."
+              },
+              {
+                "fr": "Pr\u00e9cision sur le prix total.",
+                "en": "Details on the total price."
               }
             ]
           }
@@ -1461,7 +1525,7 @@
           "en": "Cookie Policy"
         },
         "seoDescription": {
-          "fr": "Description en cours de rédaction",
+          "fr": "Description en cours de r\u00e9daction",
           "en": "Draft description"
         },
         "publicTitle": {
@@ -1474,43 +1538,38 @@
         },
         "sections": [
           {
-            "id": "definition",
-            "title": {
-              "fr": "Définition",
-              "en": "Definition"
-            },
-            "paragraphs": [
-              {
-                "fr": "Brouillon",
-                "en": "Draft"
-              }
-            ]
-          },
-          {
             "id": "strictly_necessary",
             "title": {
-              "fr": "Cookies strictement nécessaires",
-              "en": "Strictly necessary cookies"
+              "fr": "Cookies strictement n\u00e9cessaires",
+              "en": "Strictly Necessary Cookies"
             },
             "paragraphs": [
               {
-                "fr": "Brouillon",
-                "en": "Draft"
+                "fr": "Ce site n'utilise par d\u00e9faut que des cookies strictement n\u00e9cessaires \u00e0 son fonctionnement technique et \u00e0 sa s\u00e9curit\u00e9. Par cons\u00e9quent, aucun bandeau de consentement pr\u00e9alable n'est affich\u00e9 lors de votre arriv\u00e9e sur le site, conform\u00e9ment \u00e0 la r\u00e9glementation.",
+                "en": "By default, this site only uses cookies strictly necessary for its technical operation and security. Therefore, no prior consent banner is displayed upon your arrival on the site, in accordance with regulations."
               }
             ]
           },
           {
-            "id": "management",
+            "id": "third_party",
             "title": {
-              "fr": "Gestion et suppression",
-              "en": "Management and deletion"
+              "fr": "Contenus tiers (Vid\u00e9os)",
+              "en": "Third-Party Content (Videos)"
             },
             "paragraphs": [
               {
-                "fr": "Brouillon",
-                "en": "Draft"
+                "fr": "Le portfolio peut contenir des vid\u00e9os h\u00e9berg\u00e9es sur YouTube ou Vimeo. Ces vid\u00e9os ne sont pas charg\u00e9es automatiquement. Elles n\u00e9cessitent un clic explicite de votre part pour \u00eatre lanc\u00e9es. En cliquant sur le bouton de lecture, vous consentez au chargement de ces lecteurs et au d\u00e9p\u00f4t potentiel de cookies tiers par YouTube ou Vimeo.",
+                "en": "The portfolio may contain videos hosted on YouTube or Vimeo. These videos are not loaded automatically. They require an explicit click from you to be launched. By clicking the play button, you consent to the loading of these players and the potential placement of third-party cookies by YouTube or Vimeo."
               }
             ]
+          },
+          {
+            "id": "cookies-inventory",
+            "title": {
+              "fr": "Inventaire des cookies",
+              "en": "Cookies Inventory"
+            },
+            "paragraphs": []
           }
         ],
         "version": 1,
@@ -1521,20 +1580,40 @@
             "id": "admin-session",
             "category": "admin",
             "name": {
-              "fr": "Session d'administration",
-              "en": "Admin session"
+              "fr": "__admin_session",
+              "en": "__admin_session"
             },
             "provider": {
               "fr": "Sempra",
               "en": "Sempra"
             },
             "purpose": {
-              "fr": "Maintenir la connexion sécurisée à l'administration.",
-              "en": "Keep the admin session secure."
+              "fr": "Maintien de la session s\u00e9curis\u00e9e pour les administrateurs.",
+              "en": "Maintenance of secure session for administrators."
             },
             "duration": {
-              "fr": "1 heure",
-              "en": "1 hour"
+              "fr": "8 heures",
+              "en": "8 hours"
+            }
+          },
+          {
+            "id": "gallery-session",
+            "category": "security",
+            "name": {
+              "fr": "sempra_gallery_session",
+              "en": "sempra_gallery_session"
+            },
+            "provider": {
+              "fr": "Sempra",
+              "en": "Sempra"
+            },
+            "purpose": {
+              "fr": "Authentification et acc\u00e8s s\u00e9curis\u00e9 aux galeries clients priv\u00e9es.",
+              "en": "Authentication and secure access to private client galleries."
+            },
+            "duration": {
+              "fr": "Session de navigation",
+              "en": "Browser session"
             }
           }
         ]

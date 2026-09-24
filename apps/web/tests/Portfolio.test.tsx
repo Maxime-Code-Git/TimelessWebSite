@@ -89,7 +89,7 @@ describe("Portfolio Video Component", () => {
     const videoSection = container.querySelector('#galerie-video');
     expect(videoSection).toBeInTheDocument();
 
-    const playButton = screen.getByRole("button", { name: "Lire la vidéo" });
+    const playButton = screen.getByRole("button", { name: "Charger la vidéo depuis Vimeo" });
     expect(playButton).toBeInTheDocument();
 
     // Simulate user click to load the iframe
@@ -112,7 +112,7 @@ describe("Portfolio Video Component", () => {
       </MemoryRouter>
     );
 
-    const playButton = screen.getByRole("button", { name: "Play video" });
+    const playButton = screen.getByRole("button", { name: "Load video from YouTube" });
     expect(playButton).toBeInTheDocument();
     fireEvent.click(playButton);
 
