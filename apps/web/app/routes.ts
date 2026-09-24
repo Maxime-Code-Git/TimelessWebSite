@@ -51,7 +51,7 @@ export default [
     route("gallery/:id", "routes/en.gallery.tsx"),
     route("legal", "routes/en.legal.tsx"),
     route("privacy", "routes/en.privacy.tsx"),
-    route("terms", "routes/en.cgv.tsx"),
+    route("terms", "routes/en.terms.tsx"),
     route("cookies", "routes/en.cookies.tsx"),
   ]),
 

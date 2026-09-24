@@ -725,6 +725,38 @@
   flex-direction: column;
   gap: 2rem;
 }
+
+.formContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.settingsGrid > * {
+  min-width: 0;
+}
+
+.settingsSection {
+  background-color: white;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.settingsSection h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
 .formulaEditorCard {
   border: 1px solid var(--color-border);
   border-radius: 8px;

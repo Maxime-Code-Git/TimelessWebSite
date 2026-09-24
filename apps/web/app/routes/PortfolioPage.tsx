@@ -161,27 +161,38 @@ export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
                         />
                       </picture>
                     ) : (
-                      <div className={styles.videoCoverFallback} />
+                      <div className={styles.videoPoster}>
+                        <button
+                          type="button"
+                          className={styles.videoPlayBtn}
+                          onClick={() => setVideoPlaying(true)}
+                          aria-label={lang === "fr" ? "Lire la vidéo" : "Play video"}
+                        >
+                          {lang === "fr" ? "Lire la vidéo" : "Play video"}
+                        </button>
+                      </div>
                     )}
-                    <div className={styles.videoConsentOverlay}>
-                      <p>
-                        {lang === "fr"
-                          ? `En cliquant sur "Charger la vidéo", vous acceptez le chargement d'un lecteur ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"} et l'utilisation potentielle de cookies tiers associés.`
-                          : `By clicking "Load video", you consent to loading a ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"} player and the potential use of associated third-party cookies.`}
-                        <br />
-                        <a href={lang === "fr" ? "/fr/cookies" : "/en/cookies"} target="_blank" rel="noopener noreferrer">
-                          {lang === "fr" ? "En savoir plus dans notre politique relative aux cookies." : "Learn more in our Cookie Policy."}
-                        </a>
-                      </p>
-                      <button
-                        type="button"
-                        className={styles.videoPlayBtn}
-                        onClick={() => setVideoPlaying(true)}
-                        aria-label={lang === "fr" ? `Charger la vidéo depuis ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}` : `Load video from ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}`}
-                      >
-                        {lang === "fr" ? `Charger la vidéo depuis ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}` : `Load video from ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}`}
-                      </button>
-                    </div>
+                    {portfolio.video.cover && (
+                      <div className={styles.videoConsentOverlay}>
+                        <p>
+                          {lang === "fr"
+                            ? `En cliquant sur "Charger la vidéo", vous acceptez le chargement d'un lecteur ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"} et l'utilisation potentielle de cookies tiers associés.`
+                            : `By clicking "Load video", you consent to loading a ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"} player and the potential use of associated third-party cookies.`}
+                          <br />
+                          <a href={lang === "fr" ? "/fr/cookies" : "/en/cookies"} target="_blank" rel="noopener noreferrer">
+                            {lang === "fr" ? "En savoir plus dans notre politique relative aux cookies." : "Learn more in our Cookie Policy."}
+                          </a>
+                        </p>
+                        <button
+                          type="button"
+                          className={styles.videoPlayBtn}
+                          onClick={() => setVideoPlaying(true)}
+                          aria-label={lang === "fr" ? `Charger la vidéo depuis ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}` : `Load video from ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}`}
+                        >
+                          {lang === "fr" ? `Charger la vidéo depuis ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}` : `Load video from ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}`}
+                        </button>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <iframe

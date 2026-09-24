@@ -168,6 +168,7 @@ test.describe('Admin Portfolio V2', () => {
 
       await page.reload();
       await expect(page.locator('button:has-text("Ajouter une cover")')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('input[name="videoUrl"]')).toHaveValue('https://vimeo.com/76979871');
 
       const deletedRes = await request.get(secondSrc!);
       expect(deletedRes.status()).toBe(404);

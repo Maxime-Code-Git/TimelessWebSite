@@ -1,5 +1,5 @@
 import type { SiteContent } from "~/lib/site-content.server";
-import type { Route } from "./+types/en.cgv";
+import type { Route } from "./+types/en.terms";
 import { LegalPageView } from "~/components/legal/LegalPageView";
 import { useRouteLoaderData } from "react-router";
 import type { loader as rootLoader } from "../root";
@@ -14,7 +14,7 @@ export function meta({ matches }: Route.MetaArgs) {
   return getSeoMeta({
     title: doc?.seoTitle?.en || "",
     description: doc?.seoDescription?.en || "",
-    path: "/en/cgv",
+    path: "/en/terms",
     alternatePath: "/fr/cgv",
     lang: "en",
     noindex: true,

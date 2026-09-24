@@ -15,7 +15,7 @@ export function meta({ matches }: Route.MetaArgs) {
     title: doc?.seoTitle?.fr || "",
     description: doc?.seoDescription?.fr || "",
     path: "/fr/cgv",
-    alternatePath: "/en/cgv",
+    alternatePath: "/en/terms",
     lang: "fr",
     noindex: true,
     siteUrl,
@@ -34,7 +34,7 @@ export default function LegalRoute() {
   return (
     <LegalPageView
       lang="fr"
-      alternateLangHref="/en/cgv"
+      alternateLangHref="/en/terms"
       document={doc}
       isDraft={isDraft}
     />

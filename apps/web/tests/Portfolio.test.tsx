@@ -76,7 +76,11 @@ describe("Portfolio Video Component", () => {
   it("avec vidéo (Vimeo) : iframe s'affiche", () => {
     const portfolioWithVimeo: PublicPortfolio = {
       ...portfolio,
-      video: { provider: "vimeo", videoId: "123456789" },
+      video: { 
+        provider: "vimeo", 
+        videoId: "123456789",
+        cover: { imageId: "cover1", width: 1920, height: 1080, variants: [] }
+      },
     };
 
     const { container } = render(
@@ -103,7 +107,11 @@ describe("Portfolio Video Component", () => {
   it("URL YouTube générée avec youtube-nocookie.com", () => {
     const portfolioWithYoutube: PublicPortfolio = {
       ...portfolio,
-      video: { provider: "youtube", videoId: "dQw4w9WgXcQ" },
+      video: { 
+        provider: "youtube", 
+        videoId: "dQw4w9WgXcQ",
+        cover: { imageId: "cover2", width: 1920, height: 1080, variants: [] }
+      },
     };
 
     const { container } = render(

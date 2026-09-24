@@ -145,8 +145,8 @@ export default function AdminContactPage() {
           </p>
 
           <div className={styles.tabs}>
-            <button className={`${styles.tabBtn} ${lang === 'fr' ? styles.activeTab : ''}`} onClick={() => setLang('fr')}>Français</button>
-            <button className={`${styles.tabBtn} ${lang === 'en' ? styles.activeTab : ''}`} onClick={() => setLang('en')}>English</button>
+            <button className={`${styles.tabBtn} ${lang === 'fr' ? styles.activeTabBtn : ''}`} onClick={() => setLang('fr')}>Français</button>
+            <button className={`${styles.tabBtn} ${lang === 'en' ? styles.activeTabBtn : ''}`} onClick={() => setLang('en')}>English</button>
           </div>
 
           <Form method="post" className={styles.formContainer}>
@@ -158,7 +158,7 @@ export default function AdminContactPage() {
               <div className={styles.error} role="alert">Le stockage du contenu doit être vérifié avant toute modification.</div>
             )}
             {actionData?.error && <div className={styles.error} role="alert">{actionData.error}</div>}
-            {actionData?.success && !actionData?.error && <div className={styles.success} role="status">Informations mises à jour avec succès.</div>}
+            {actionData?.success && !actionData?.error && <div className={styles.successMessage} role="status">Informations mises à jour avec succès.</div>}
 
             <div className={styles.settingsGrid}>
               <div className={styles.settingsSection}>
