@@ -63,6 +63,12 @@ describe("Admin Data Retention Booking API", () => {
 
     // Past confirmed (for bulk tests)
     insertBooking.run("book-3", "2024-03-01", "09:00", "slot-3", "2024-03-01T08:00:00Z", "2024-03-01T08:30:00Z", "Europe/Paris", "confirmed", "Bob Test", "bob@test.com", "fr", now, now);
+
+    // Future pending
+    const futurePendingDate = new Date();
+    futurePendingDate.setFullYear(futurePendingDate.getFullYear() + 1);
+    futurePendingDate.setMonth(futurePendingDate.getMonth() + 1);
+    insertBooking.run("book-4", futurePendingDate.toISOString().split("T")[0], "11:00", "slot-4", futurePendingDate.toISOString(), futurePendingDate.toISOString(), "Europe/Paris", "pending", "Pending User", "pending@test.com", "fr", now, now);
   });
 
   afterEach(() => {
@@ -244,6 +250,15 @@ describe("Admin Data Retention Booking API", () => {
     expect(db.prepare("SELECT * FROM bookings WHERE id = ?").get("book-2")).toBeDefined();
   });
 
+  it("suppression d'un rendez-vous futur pending → 200", async () => {
+    const req = createRequest("delete_booking_single", { id: "book-4", confirm: "SUPPRIMER" });
+    const res = await callAction(req);
+    expect(res.status).toBe(200);
+    expect(db.prepare("SELECT * FROM bookings WHERE id = ?").get("book-4")).toBeUndefined();
+    // book-2 (future confirmed) must remain protected
+    expect(db.prepare("SELECT * FROM bookings WHERE id = ?").get("book-2")).toBeDefined();
+  });
+
   it("confirmation incorrecte → 400", async () => {
     const req = createRequest("delete_booking_single", { id: "book-1", confirm: "WRONG" });
     const res = await callAction(req);
@@ -267,12 +282,26 @@ describe("Admin Data Retention Booking API", () => {
     expect(db.prepare("SELECT * FROM bookings WHERE id = ?").get("book-2")).toBeDefined();
   });
 
-  it("rendez-vous futur protégé dans le lot → 400", async () => {
+  it("rendez-vous futur confirmé protégé dans le lot → 400", async () => {
     const req = createRequest("delete_booking_bulk", { ids: JSON.stringify(["book-2"]), confirm: "SUPPRIMER" });
     const res = await callAction(req);
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain("Impossible de supprimer le rendez-vous futur");
+    expect(json.error).toContain("Impossible de supprimer le rendez-vous futur confirmé");
+    expect(db.prepare("SELECT * FROM bookings WHERE id = ?").get("book-2")).toBeDefined();
+  });
+
+  it("rendez-vous futur pending supprimable dans le lot → 200", async () => {
+    const req = createRequest("delete_booking_bulk", {
+      ids: JSON.stringify(["book-4"]),
+      confirm: "SUPPRIMER"
+    });
+    const res = await callAction(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.deletedCount).toBe(1);
+    expect(db.prepare("SELECT * FROM bookings WHERE id = ?").get("book-4")).toBeUndefined();
+    // book-2 (future confirmed) must remain
     expect(db.prepare("SELECT * FROM bookings WHERE id = ?").get("book-2")).toBeDefined();
   });
 

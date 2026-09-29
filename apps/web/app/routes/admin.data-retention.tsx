@@ -217,7 +217,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     if (
-      (booking.status === "confirmed" || booking.status === "pending") &&
+      booking.status === "confirmed" &&
       new Date(booking.starts_at_utc) > new Date()
     ) {
       return errorResponse("Impossible de supprimer un rendez-vous futur confirmé", 400);
@@ -273,10 +273,10 @@ export async function action({ request }: ActionFunctionArgs) {
         return errorResponse(`Rendez-vous introuvable : ${id}`, 404);
       }
       if (
-        (booking.status === "confirmed" || booking.status === "pending") &&
+        booking.status === "confirmed" &&
         new Date(booking.starts_at_utc) > now
       ) {
-        return errorResponse(`Impossible de supprimer le rendez-vous futur ${id}`, 400);
+        return errorResponse(`Impossible de supprimer le rendez-vous futur confirmé ${id}`, 400);
       }
     }
 
