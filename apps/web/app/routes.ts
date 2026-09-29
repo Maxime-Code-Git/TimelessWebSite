@@ -73,6 +73,7 @@ export default [
   route("admin/about", "routes/admin.about.tsx"),
   route("admin/contact", "routes/admin.contact.tsx"),
   route("admin/legal", "routes/admin.legal.tsx"),
+  route("admin/data-retention", "routes/admin.data-retention.tsx"),
   route("admin/galleries", "routes/admin.galleries.tsx"),
   route("admin/galleries/new", "routes/admin.galleries.new.tsx"),
   route("admin/galleries/:id", "routes/admin.galleries.$id.tsx"),

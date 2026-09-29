@@ -57,7 +57,16 @@ test.describe('Admin CSP and Styles', () => {
     expect(cspErrors).toHaveLength(0);
     expect(pageErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
 
-    // 6. Verify Portfolio Pages
+    // 6. Verify Data Retention Page
+    const retentionRes = await page.goto('/admin/data-retention');
+    expect(retentionRes?.status()).toBe(200);
+    const cspHeaderRetention = retentionRes?.headers()['content-security-policy'];
+    expect(cspHeaderRetention).toBeDefined();
+    expect(cspHeaderRetention).not.toContain("'unsafe-inline'");
+    expect(await page.locator('[style]').count()).toBe(0);
+    expect(await page.locator('[class*="undefined"]').count()).toBe(0);
+
+    // 7. Verify Portfolio Pages
     const checkRoute = async (route: string) => {
       const res = await page.goto(route);
       expect(res?.status()).toBe(200);

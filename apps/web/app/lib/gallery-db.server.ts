@@ -318,21 +318,30 @@ export function closeGalleryDb(): void {
 
 export function deleteGalleryAndQuarantine(galleryId: string): void {
   const db = getGalleryDb();
-  
+
   if (!galleryId || typeof galleryId !== "string" || !/^[0-9a-zA-Z_-]+$/.test(galleryId)) {
     throw new Error("Invalid gallery ID");
   }
 
-  const gallery = db.prepare("SELECT * FROM galleries WHERE id = ?").get(galleryId) as Record<string, unknown> | undefined;
+  const gallery = db.prepare(
+    "SELECT id, import_path FROM galleries WHERE id = ?"
+  ).get(galleryId) as { id: string; import_path: string | null } | undefined;
   if (!gallery) {
     throw new Error("Gallery not found");
   }
 
   const baseMedia = path.resolve(ENV.GALLERY_MEDIA_PATH);
   const mediaDir = path.resolve(baseMedia, galleryId);
+
+  // Strict confinement: relative path must be non-empty, non-absolute,
+  // and must not start with ".." followed by the path separator.
   const relativeToMedia = path.relative(baseMedia, mediaDir);
-  
-  if (relativeToMedia.includes("..") || relativeToMedia === "" || !mediaDir.startsWith(baseMedia)) {
+  if (
+    !relativeToMedia ||
+    path.isAbsolute(relativeToMedia) ||
+    relativeToMedia.startsWith(".." + path.sep) ||
+    relativeToMedia === ".."
+  ) {
     throw new Error("Invalid media directory path");
   }
 
@@ -342,55 +351,87 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
     if (stat.isSymbolicLink()) {
       throw new Error("Media directory cannot be a symbolic link");
     }
-    if (stat.isDirectory()) {
-      hasMediaDir = true;
+    if (!stat.isDirectory()) {
+      throw new Error("Media path is not a directory");
+    }
+    hasMediaDir = true;
+  }
+
+  // Quarantine lives under GALLERY_MEDIA_PATH/.trash to guarantee same filesystem
+  const trashBase = path.join(baseMedia, ".trash", "gallery-deletions");
+  if (fs.existsSync(trashBase)) {
+    const trashStat = fs.lstatSync(trashBase);
+    if (trashStat.isSymbolicLink() || !trashStat.isDirectory()) {
+      throw new Error("Quarantine base is not a valid directory");
+    }
+  } else {
+    fs.mkdirSync(trashBase, { recursive: true, mode: 0o700 });
+  }
+
+  const jobId = crypto.randomUUID();
+  const quarantineDir = path.join(trashBase, jobId);
+  // Store path relative to GALLERY_MEDIA_PATH, never relative to cwd
+  const relativeQuarantinePath = path.relative(baseMedia, quarantineDir);
+
+  if (hasMediaDir) {
+    try {
+      fs.renameSync(mediaDir, quarantineDir);
+    } catch (moveErr: unknown) {
+      // EXDEV or any move failure: gallery stays intact
+      const code = moveErr instanceof Error && moveErr.message.includes("EXDEV")
+        ? "CROSS_DEVICE_MOVE"
+        : "QUARANTINE_MOVE_FAILED";
+      throw new Error(code, { cause: moveErr });
     }
   }
 
-  const baseTrash = path.resolve(process.cwd(), "data", ".trash", "gallery-deletions");
-  fs.mkdirSync(baseTrash, { recursive: true });
-  const jobId = crypto.randomUUID();
-  const quarantineDir = path.join(baseTrash, jobId);
-  const relativeQuarantinePath = path.relative(process.cwd(), quarantineDir);
-
-  if (hasMediaDir) {
-    fs.renameSync(mediaDir, quarantineDir);
-  }
-
   db.exec("BEGIN EXCLUSIVE TRANSACTION;");
-    try {
+  try {
     const now = Date.now();
-    db.prepare(`
-      INSERT INTO gallery_deletion_jobs (id, gallery_id, relative_quarantine_path, status, created_at, updated_at)
-      VALUES (?, ?, ?, 'pending', ?, ?)
-    `).run(jobId, galleryId, relativeQuarantinePath, now, now);
+    db.prepare(
+      `INSERT INTO gallery_deletion_jobs
+       (id, gallery_id, relative_quarantine_path, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'pending', ?, ?)`
+    ).run(jobId, galleryId, relativeQuarantinePath, now, now);
 
     db.prepare("DELETE FROM galleries WHERE id = ?").run(galleryId);
 
     db.exec("COMMIT;");
-  } catch (err) {
+  } catch (sqlErr: unknown) {
     db.exec("ROLLBACK;");
     if (hasMediaDir) {
       try {
         fs.renameSync(quarantineDir, mediaDir);
-      } catch (e) {
-        console.error("Critical error: failed to restore quarantine on SQL error", e);
+      } catch (restoreErr: unknown) {
+        // Restore failed — critical but we can't expose raw fs errors
+        throw new Error("RESTORE_FAILED", { cause: restoreErr });
       }
     }
-    throw err;
+    throw sqlErr;
   }
 
+  // After successful commit, attempt immediate cleanup
   if (hasMediaDir) {
     try {
       fs.rmSync(quarantineDir, { recursive: true, force: true });
-      db.prepare("UPDATE gallery_deletion_jobs SET status = 'completed', updated_at = ? WHERE id = ?").run(Date.now(), jobId);
-    } catch (err: unknown) {
-      db.prepare("UPDATE gallery_deletion_jobs SET status = 'pending', error_message = ?, attempt_count = attempt_count + 1, updated_at = ? WHERE id = ?")
-        .run("Failed to delete quarantine", Date.now(), jobId);
-      // We throw to indicate partial success / cleanup needed
-      throw new Error("Gallery deleted but final cleanup failed. Cleanup will be retried.", { cause: err });
+      db.prepare(
+        `UPDATE gallery_deletion_jobs
+         SET status = 'completed', updated_at = ?, worker_id = NULL, lease_expires_at = NULL
+         WHERE id = ?`
+      ).run(Date.now(), jobId);
+    } catch {
+      // Cleanup failed — job stays pending for worker retry
+      db.prepare(
+        `UPDATE gallery_deletion_jobs
+         SET error_message = 'CLEANUP_FAILED', attempt_count = attempt_count + 1, updated_at = ?
+         WHERE id = ?`
+      ).run(Date.now(), jobId);
     }
-  } else if (!hasMediaDir) {
-    db.prepare("UPDATE gallery_deletion_jobs SET status = 'completed', updated_at = ? WHERE id = ?").run(Date.now(), jobId);
+  } else {
+    db.prepare(
+      `UPDATE gallery_deletion_jobs
+       SET status = 'completed', updated_at = ?, worker_id = NULL, lease_expires_at = NULL
+       WHERE id = ?`
+    ).run(Date.now(), jobId);
   }
 }
