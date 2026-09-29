@@ -158,7 +158,7 @@ describe("Gallery Deletion & Data Retention", () => {
     fs.mkdirSync(fakeDir);
     fs.symlinkSync(fakeDir, path.join(tmpDir, "media", "gal-1"), "dir");
 
-    expect(() => deleteGalleryAndQuarantine("gal-1")).toThrow("Media directory cannot be a symbolic link");
+    expect(() => deleteGalleryAndQuarantine("gal-1")).toThrow("INVALID_MEDIA_PATH");
     expect(db.prepare("SELECT * FROM galleries WHERE id = ?").get("gal-1")).toBeDefined();
   });
 
@@ -166,7 +166,7 @@ describe("Gallery Deletion & Data Retention", () => {
     fs.rmSync(path.join(tmpDir, "media", "gal-1"), { recursive: true });
     fs.writeFileSync(path.join(tmpDir, "media", "gal-1"), "not a directory");
 
-    expect(() => deleteGalleryAndQuarantine("gal-1")).toThrow("Media path is not a directory");
+    expect(() => deleteGalleryAndQuarantine("gal-1")).toThrow("INVALID_MEDIA_PATH");
     expect(db.prepare("SELECT * FROM galleries WHERE id = ?").get("gal-1")).toBeDefined();
   });
 
@@ -392,7 +392,7 @@ describe("Gallery Compensations & Bulk", () => {
 
     expect(() => {
       deleteGalleryAndQuarantine("gal-1");
-    }).toThrow(/Quarantine base is not a valid directory/);
+    }).toThrow(/INVALID_QUARANTINE_PATH/);
 
     fs.rmSync(trashBase, { force: true });
   });
@@ -405,7 +405,7 @@ describe("Gallery Compensations & Bulk", () => {
 
     expect(() => {
       deleteGalleryAndQuarantine("gal-1");
-    }).toThrow(/Media path is not a directory/);
+    }).toThrow(/INVALID_MEDIA_PATH/);
   });
 
   it("dossier source d'import toujours intact", () => {
@@ -441,6 +441,49 @@ describe("Gallery Compensations & Bulk", () => {
     // DB rollback verify
     const gal1 = db.prepare("SELECT * FROM galleries WHERE id = 'gal-1'").get();
     expect(gal1).toBeDefined();
+
+    vi.restoreAllMocks();
+  });
+
+  it("suppression groupée avec échec de deuxième galerie ET échec de restauration lance RESTORE_FAILED", () => {
+    const originalPrepare = DatabaseSync.prototype.prepare;
+    vi.spyOn(DatabaseSync.prototype, "prepare").mockImplementation(function (this: DatabaseSync, sql: string) {
+      if (sql.includes("DELETE FROM galleries")) {
+        return {
+          run: (id: string) => {
+            if (id === "gal-2") throw new Error("Mock SQL error gal-2");
+            originalPrepare.call(this, sql).run(id);
+          }
+        } as unknown as ReturnType<typeof DatabaseSync.prototype.prepare>;
+      }
+      return originalPrepare.call(this, sql);
+    });
+
+    const originalRename = fs.renameSync;
+    vi.spyOn(fs, "renameSync").mockImplementation((oldPath: fs.PathLike, newPath: fs.PathLike) => {
+      // Allow the initial move to quarantine
+      if (oldPath.toString().includes("gal-1") && newPath.toString().includes(".trash")) {
+        return originalRename(oldPath, newPath);
+      }
+      // Simulate failure during RESTORE (moving back from quarantine to media dir)
+      if (oldPath.toString().includes(".trash") && newPath.toString().includes("gal-1")) {
+        throw new Error("Mock rename error during restore");
+      }
+      return originalRename(oldPath, newPath);
+    });
+
+    try {
+      deleteGalleriesAndQuarantineBulk(["gal-1", "gal-2"]);
+      expect.unreachable("Should have thrown");
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toBe("RESTORE_FAILED");
+    }
+
+    // Verify import folder remains intact
+    const importDir = path.join(path.dirname(ENV.GALLERY_MEDIA_PATH), "imports", "import-folder-1");
+    expect(fs.existsSync(importDir)).toBe(true);
+    expect(fs.existsSync(path.join(importDir, "original.jpg"))).toBe(true);
 
     vi.restoreAllMocks();
   });

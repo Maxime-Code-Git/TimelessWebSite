@@ -349,10 +349,10 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
   if (fs.existsSync(mediaDir)) {
     const stat = fs.lstatSync(mediaDir);
     if (stat.isSymbolicLink()) {
-      throw new Error("Media directory cannot be a symbolic link");
+      throw new Error("INVALID_MEDIA_PATH");
     }
     if (!stat.isDirectory()) {
-      throw new Error("Media path is not a directory");
+      throw new Error("INVALID_MEDIA_PATH");
     }
     hasMediaDir = true;
   }
@@ -365,14 +365,14 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
   if (fs.existsSync(trashRoot)) {
     const rootStat = fs.lstatSync(trashRoot);
     if (rootStat.isSymbolicLink()) {
-      throw new Error("Quarantine base is not a valid directory");
+      throw new Error("INVALID_QUARANTINE_PATH");
     }
   }
 
   if (fs.existsSync(trashBase)) {
     const trashStat = fs.lstatSync(trashBase);
     if (trashStat.isSymbolicLink() || !trashStat.isDirectory()) {
-      throw new Error("Quarantine base is not a valid directory");
+      throw new Error("INVALID_QUARANTINE_PATH");
     }
   } else {
     fs.mkdirSync(trashBase, { recursive: true, mode: 0o700 });
@@ -391,7 +391,8 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
       const code = moveErr instanceof Error && moveErr.message.includes("EXDEV")
         ? "CROSS_DEVICE_MOVE"
         : "QUARANTINE_MOVE_FAILED";
-      throw new Error(code, { cause: moveErr });
+      // eslint-disable-next-line preserve-caught-error
+      throw new Error(code);
     }
   }
 
@@ -407,22 +408,24 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
     db.prepare("DELETE FROM galleries WHERE id = ?").run(galleryId);
 
     db.exec("COMMIT;");
-  } catch (sqlErr: unknown) {
+  } catch {
     try {
       db.exec("ROLLBACK;");
     } catch {
-      // Ignore rollback error, prioritize file restoration
+      console.error("ROLLBACK_FAILED");
     }
 
     if (hasMediaDir) {
       try {
         fs.renameSync(quarantineDir, mediaDir);
-      } catch (restoreErr: unknown) {
-        // Restore failed - critical but we can't expose raw fs errors
-        throw new Error("RESTORE_FAILED", { cause: restoreErr });
+      } catch {
+        console.error("RESTORE_FAILED");
+        // eslint-disable-next-line preserve-caught-error
+        throw new Error("RESTORE_FAILED");
       }
     }
-    throw new Error("SQL_TRANSACTION_FAILED", { cause: sqlErr }); // Hide raw SQL error
+    // eslint-disable-next-line preserve-caught-error
+    throw new Error("SQL_TRANSACTION_FAILED");
   }
 
   // After successful commit, attempt immediate cleanup
@@ -457,11 +460,15 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
   const baseMedia = path.resolve(ENV.GALLERY_MEDIA_PATH);
 
   // Verify .trash base
-  const trashBase = path.join(baseMedia, ".trash", "gallery-deletions");
+  const trashLevel1 = path.join(baseMedia, ".trash");
+  if (fs.existsSync(trashLevel1)) {
+    if (fs.lstatSync(trashLevel1).isSymbolicLink()) throw new Error("INVALID_QUARANTINE_PATH");
+  }
+  const trashBase = path.join(trashLevel1, "gallery-deletions");
   if (fs.existsSync(trashBase)) {
     const trashStat = fs.lstatSync(trashBase);
     if (trashStat.isSymbolicLink() || !trashStat.isDirectory()) {
-      throw new Error("Quarantine base is not a valid directory");
+      throw new Error("INVALID_QUARANTINE_PATH");
     }
   } else {
     fs.mkdirSync(trashBase, { recursive: true, mode: 0o700 });
@@ -472,13 +479,13 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
 
   for (const galleryId of galleryIds) {
     if (!galleryId || typeof galleryId !== "string" || !/^[0-9a-zA-Z_-]+$/.test(galleryId)) {
-      throw new Error(`Invalid gallery ID: ${galleryId}`);
+      throw new Error("INVALID_GALLERY_ID");
     }
     const gallery = db.prepare(
       "SELECT id FROM galleries WHERE id = ?"
     ).get(galleryId);
     if (!gallery) {
-      throw new Error(`Gallery not found: ${galleryId}`);
+      throw new Error("GALLERY_NOT_FOUND");
     }
 
     const mediaDir = path.resolve(baseMedia, galleryId);
@@ -489,14 +496,14 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
       relativeToMedia.startsWith(".." + path.sep) ||
       relativeToMedia === ".."
     ) {
-      throw new Error(`Invalid media directory path for ${galleryId}`);
+      throw new Error("INVALID_MEDIA_PATH");
     }
 
     let hasMediaDir = false;
     if (fs.existsSync(mediaDir)) {
       const stat = fs.lstatSync(mediaDir);
-      if (stat.isSymbolicLink()) throw new Error(`Media directory cannot be a symbolic link: ${galleryId}`);
-      if (!stat.isDirectory()) throw new Error(`Media path is not a directory: ${galleryId}`);
+      if (stat.isSymbolicLink()) throw new Error("INVALID_MEDIA_PATH");
+      if (!stat.isDirectory()) throw new Error("INVALID_MEDIA_PATH");
       hasMediaDir = true;
     }
 
@@ -518,13 +525,24 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
     }
   } catch (moveErr: unknown) {
     // Restore those already moved
+    let restoreFailed = false;
     for (const op of moved) {
-      try { fs.renameSync(op.quarantineDir, op.mediaDir); } catch (rollbackErr) { console.error(`Failed to rollback rename for ${op.id}:`, rollbackErr); }
+      try { 
+        fs.renameSync(op.quarantineDir, op.mediaDir); 
+      } catch { 
+        restoreFailed = true;
+        console.error("RESTORE_FAILED"); 
+      }
+    }
+    if (restoreFailed) {
+      // eslint-disable-next-line preserve-caught-error
+      throw new Error("RESTORE_FAILED");
     }
     const code = moveErr instanceof Error && moveErr.message.includes("EXDEV")
       ? "CROSS_DEVICE_MOVE"
       : "QUARANTINE_MOVE_FAILED";
-    throw new Error(code, { cause: moveErr });
+    // eslint-disable-next-line preserve-caught-error
+    throw new Error(code);
   }
 
   // Phase 3: SQL Transaction
@@ -543,13 +561,24 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
       deleteGal.run(op.id);
     }
     db.exec("COMMIT;");
-  } catch (sqlErr: unknown) {
-    try { db.exec("ROLLBACK;"); } catch (rollbackErr) { console.error("Failed to rollback transaction:", rollbackErr); }
+  } catch {
+    try { db.exec("ROLLBACK;"); } catch { console.error("ROLLBACK_FAILED"); }
     // Restore all moved
+    let restoreFailed = false;
     for (const op of moved) {
-      try { fs.renameSync(op.quarantineDir, op.mediaDir); } catch (rollbackErr) { console.error(`Failed to rollback rename for ${op.id}:`, rollbackErr); }
+      try { 
+        fs.renameSync(op.quarantineDir, op.mediaDir); 
+      } catch { 
+        restoreFailed = true;
+        console.error("RESTORE_FAILED"); 
+      }
     }
-    throw new Error("SQL_TRANSACTION_FAILED", { cause: sqlErr });
+    if (restoreFailed) {
+      // eslint-disable-next-line preserve-caught-error
+      throw new Error("RESTORE_FAILED");
+    }
+    // eslint-disable-next-line preserve-caught-error
+    throw new Error("SQL_TRANSACTION_FAILED");
   }
 
   // Phase 4: Cleanup

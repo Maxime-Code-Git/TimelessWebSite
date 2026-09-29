@@ -11,6 +11,8 @@ const { currentFetcher, useMockFetcher, setMockFetcher } = vi.hoisted(() => {
   const current = {
     data: {} as Record<string, unknown>,
     state: "idle" as "idle" | "loading" | "submitting",
+    submit: (() => {}) as ReturnType<typeof vi.fn>,
+    Form: (({ children, ...props }: any) => <form {...props}>{children}</form>) as any,
   };
 
   const setMockFetcher = (updates: Partial<typeof current>) => {
@@ -36,8 +38,7 @@ const { currentFetcher, useMockFetcher, setMockFetcher } = vi.hoisted(() => {
 });
 
 currentFetcher.submit = vi.fn();
-const MockForm = ({ children, ...props }: React.FormHTMLAttributes<HTMLFormElement>) => <form {...props}>{children}</form>;
-currentFetcher.Form = MockForm;
+currentFetcher.Form = ({ children, ...props }: React.FormHTMLAttributes<HTMLFormElement>) => <form {...props}>{children}</form>;
 
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
