@@ -40,12 +40,14 @@ describe("AdminContactPage Focus Management", () => {
 
     // Check RGPD field focus
     const rgpdInput = screen.getAllByRole("textbox").find(el => el.getAttribute("name") === "contactForm.rgpdNotice.text.fr");
-    if (rgpdInput) {
-      rgpdInput.focus();
-      expect(rgpdInput).toHaveFocus();
-      fireEvent.change(rgpdInput, { target: { value: "R" } });
-      expect(rgpdInput).toHaveValue("R");
-      expect(rgpdInput).toHaveFocus();
+    expect(rgpdInput).not.toBeUndefined();
+    if (!rgpdInput) {
+      throw new Error("RGPD input field was not rendered");
     }
+    rgpdInput.focus();
+    expect(rgpdInput).toHaveFocus();
+    fireEvent.change(rgpdInput, { target: { value: "R" } });
+    expect(rgpdInput).toHaveValue("R");
+    expect(rgpdInput).toHaveFocus();
   });
 });

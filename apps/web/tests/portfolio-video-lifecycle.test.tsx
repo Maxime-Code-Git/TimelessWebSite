@@ -54,10 +54,12 @@ describe("PortfolioPage Video Lifecycle", () => {
 
     // Check clicking background doesn't create iframe
     const poster = container.querySelector('div[class*="videoPoster"]');
-    if (poster) {
-      fireEvent.click(poster);
-      expect(container.querySelector("iframe")).toBeNull();
+    expect(poster).not.toBeNull();
+    if (!poster) {
+      throw new Error("Video poster was not rendered");
     }
+    fireEvent.click(poster);
+    expect(container.querySelector("iframe")).toBeNull();
 
     const loadBtn = screen.getByRole("button", { name: "Charger la vidéo depuis YouTube" });
 
@@ -107,10 +109,12 @@ describe("PortfolioPage Video Lifecycle", () => {
 
     // Check clicking cover doesn't create iframe
     const coverImage = container.querySelector('img[class*="videoCoverImage"]');
-    if (coverImage) {
-      fireEvent.click(coverImage);
-      expect(container.querySelector("iframe")).toBeNull();
+    expect(coverImage).not.toBeNull();
+    if (!coverImage) {
+      throw new Error("Video cover image was not rendered");
     }
+    fireEvent.click(coverImage);
+    expect(container.querySelector("iframe")).toBeNull();
 
     const loadBtn = screen.getByRole("button", { name: "Load video from Vimeo" });
 
