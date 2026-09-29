@@ -77,6 +77,7 @@ describe("Admin Data Retention React UI", () => {
           galleries: mockGalleries,
           csrfToken: "mock-csrf",
           q: "",
+          gq: "",
           deletionJobs: mockDeletionJobs
         })
       }
@@ -154,6 +155,7 @@ describe("Admin Data Retention React UI", () => {
           galleries: [],
           csrfToken: "mock-csrf",
           q: "",
+          gq: "",
           deletionJobs: { pending: 0, processing: 0, failed: 0, failedJobs: [] }
         })
       }
@@ -204,6 +206,7 @@ describe("Admin Data Retention React UI", () => {
           galleries: [],
           csrfToken: "mock-csrf",
           q: "",
+          gq: "",
           deletionJobs: { pending: 0, processing: 0, failed: 0, failedJobs: [] }
         })
       }
@@ -252,5 +255,50 @@ describe("Admin Data Retention React UI", () => {
     await screen.findByRole("heading", { name: "Conservation et suppression des données" });
     const undefinedClasses = document.querySelectorAll('[class*="undefined"]');
     expect(undefinedClasses.length).toBe(0);
+});
+
+  it("vérifie les formulaires de recherche de galeries et de rendez-vous", async () => {
+    const router = createMemoryRouter([
+      {
+        path: "/",
+        element: <DataRetentionPage />,
+        loader: () => ({
+          bookings: mockBookings,
+          galleries: mockGalleries,
+          csrfToken: "mock-csrf",
+          q: "search-book",
+          gq: "search-gal",
+          deletionJobs: mockDeletionJobs
+        })
+      }
+    ], { initialEntries: ["/"] });
+
+    cleanup();
+    render(<RouterProvider router={router} />);
+
+    // Verify both forms exist with their respective names
+    const bookingForm = await screen.findByRole("form", { name: "Recherche de rendez-vous" });
+    const galleryForm = await screen.findByRole("form", { name: "Recherche de galeries" });
+    expect(bookingForm).toBeDefined();
+    expect(galleryForm).toBeDefined();
+
+    // Verify the gallery search input
+    const galleryInput = await screen.findByLabelText("Rechercher des galeries");
+    expect(galleryInput).toBeDefined();
+
+    // Verify value retention for gallery search
+    expect((galleryInput as HTMLInputElement).value).toBe("search-gal");
+    
+    // Verify value retention for booking search
+    const bookingInput = await screen.findByLabelText("Email, Nom, ID, Statut ou Date");
+    expect((bookingInput as HTMLInputElement).value).toBe("search-book");
+
+    // Verify that hidden inputs are correctly populated
+    const hiddenGqInBooking = bookingForm.querySelector('input[name="gq"]');
+    expect((hiddenGqInBooking as HTMLInputElement).value).toBe("search-gal");
+
+    const hiddenQInGallery = galleryForm.querySelector('input[name="q"]');
+    expect((hiddenQInGallery as HTMLInputElement).value).toBe("search-book");
   });
 });
+

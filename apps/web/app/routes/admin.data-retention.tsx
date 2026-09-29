@@ -625,7 +625,7 @@ export default function DataRetentionPage() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Recherche de rendez-vous</h2>
 
-        <Form method="get" className={styles.searchForm}>
+        <Form method="get" className={styles.searchForm} aria-label="Recherche de rendez-vous">
           {/* Preserve the gallery search if present */}
           <input type="hidden" name="gq" value={gq} />
           <div className={styles.formGroup}>
@@ -736,7 +736,7 @@ export default function DataRetentionPage() {
       <section className={styles.galleriesSection}>
         <h2 className={styles.sectionTitle}>Recherche de galeries</h2>
 
-        <Form method="get" className={styles.searchForm}>
+        <Form method="get" className={styles.searchForm} aria-label="Recherche de galeries">
           {/* Preserve the booking search if present */}
           <input type="hidden" name="q" value={q} />
 

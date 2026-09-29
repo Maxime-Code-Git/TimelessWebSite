@@ -63,8 +63,9 @@ test.describe("Data Retention & GDPR Administration", () => {
       await expect(page.getByRole("heading", { name: "Conservation et suppression des données" })).toBeVisible();
 
       // 5. Search
-      await page.getByLabel("Email, Nom, ID, Statut ou Date").fill(testBookingName);
-      await page.getByRole("button", { name: "Rechercher" }).click();
+      const bookingSearchForm = page.getByRole("form", { name: "Recherche de rendez-vous" });
+      await bookingSearchForm.getByLabel("Email, Nom, ID, Statut ou Date").fill(testBookingName);
+      await bookingSearchForm.getByRole("button", { name: "Rechercher", exact: true }).click();
       await expect(page.getByText(testBookingName)).toBeVisible();
 
       const row = page.getByRole("row").filter({ hasText: testBookingName });
@@ -101,8 +102,9 @@ test.describe("Data Retention & GDPR Administration", () => {
       await expect(page.getByRole("dialog")).not.toBeVisible();
 
       // 9. Verify it's gone
-      await page.getByLabel("Email, Nom, ID, Statut ou Date").fill(testBookingName);
-      await page.getByRole("button", { name: "Rechercher" }).click();
+      const bookingSearchForm2 = page.getByRole("form", { name: "Recherche de rendez-vous" });
+      await bookingSearchForm2.getByLabel("Email, Nom, ID, Statut ou Date").fill(testBookingName);
+      await bookingSearchForm2.getByRole("button", { name: "Rechercher", exact: true }).click();
       await expect(page.getByText(testBookingName)).not.toBeVisible();
 
     } finally {
@@ -138,9 +140,9 @@ test.describe("Data Retention & GDPR Administration", () => {
       db = new DatabaseSync(dbPath);
       db.prepare(
         `INSERT INTO galleries
-         (id, public_id, bride_names, wedding_date, import_path, guest_code_hash, couple_code_hash, created_at, expires_at, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published')`
-      ).run(galId, galId, galName, "2026-01-01", importSourceDir, "hash1", "hash2", Date.now(), Date.now() + 100000);
+         (id, public_id, bride_names, wedding_date, import_path, guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted, guest_code_version, couple_code_version, created_at, expires_at, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published')`
+      ).run(galId, galId, galName, "2026-01-01", importSourceDir, "hash1", "hash2", "enc1", "enc2", 1, 1, Date.now(), Date.now() + 100000);
 
       // 2. Create managed media dir
       const mediaDir = path.join(mediaRoot, galId);
@@ -161,8 +163,9 @@ test.describe("Data Retention & GDPR Administration", () => {
       await page.goto("/admin/data-retention");
       await expect(page.getByRole("heading", { name: "Conservation et suppression des données" })).toBeVisible();
 
-      await page.getByLabel("Rechercher des galeries").fill(galName);
-      await page.getByRole("button", { name: "Rechercher", exact: true }).click();
+      const gallerySearchForm = page.getByRole("form", { name: "Recherche de galeries" });
+      await gallerySearchForm.getByLabel("Rechercher des galeries").fill(galName);
+      await gallerySearchForm.getByRole("button", { name: "Rechercher", exact: true }).click();
 
       const row = page.getByRole("row").filter({ hasText: galName });
       await expect(row).toBeVisible();
@@ -188,8 +191,9 @@ test.describe("Data Retention & GDPR Administration", () => {
       await expect(page.getByRole("dialog")).not.toBeVisible();
 
       // Check in UI
-      await page.getByLabel("Rechercher des galeries").fill(galName);
-      await page.getByRole("button", { name: "Rechercher", exact: true }).click();
+      const gallerySearchForm2 = page.getByRole("form", { name: "Recherche de galeries" });
+      await gallerySearchForm2.getByLabel("Rechercher des galeries").fill(galName);
+      await gallerySearchForm2.getByRole("button", { name: "Rechercher", exact: true }).click();
       await expect(page.getByText(galName)).not.toBeVisible();
 
       // 8. Verify media dir deleted or quarantined
