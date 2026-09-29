@@ -178,7 +178,7 @@ test.describe('Admin Portfolio V2', () => {
       await page.goto('/fr/portfolio');
       await expect(page.locator("#galerie-video picture img")).toHaveCount(0);
 
-      const playButton = page.getByRole("button", { name: "Lire la vidéo" });
+      const playButton = page.getByRole("button", { name: "Charger la vidéo depuis Vimeo", exact: true });
       await expect(playButton).toBeVisible();
       await playButton.click();
 

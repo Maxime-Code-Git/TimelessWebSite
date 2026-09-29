@@ -67,10 +67,8 @@ test.describe('Portfolio Video Player', () => {
     const videoSection = page.locator('#galerie-video');
     await expect(videoSection).toBeVisible();
 
-    const playBtn = videoSection.locator('button').first();
-    const btnClass = await playBtn.getAttribute('class');
-    expect(btnClass).not.toContain('undefined');
-    expect(btnClass).toContain('videoPlayBtn');
+    const playBtn = videoSection.getByRole("button", { name: "Charger la vidéo depuis YouTube", exact: true });
+    await expect(playBtn).toBeVisible();
 
     const playerWrap = videoSection.locator('[class*="videoPlayerWrap"]');
     const wrapBox = await playerWrap.boundingBox();
@@ -97,6 +95,9 @@ test.describe('Portfolio Video Player', () => {
     await playBtn.scrollIntoViewIfNeeded();
     await playBtn.click();
     await expect(playBtn).toHaveCount(0);
+
+    const closeBtn = videoSection.getByRole("button", { name: "Fermer et décharger la vidéo", exact: true });
+    await expect(closeBtn).toBeVisible();
 
     iframe = videoSection.locator('iframe');
     await expect(iframe).toHaveCount(1);
@@ -130,7 +131,9 @@ test.describe('Portfolio Video Player', () => {
     const videoSection = page.locator('#galerie-video');
     await expect(videoSection).toBeVisible();
 
-    const playBtn = videoSection.locator('button').first();
+    const playBtn = videoSection.getByRole("button", { name: "Charger la vidéo depuis Vimeo", exact: true });
+    await expect(playBtn).toBeVisible();
+
     let iframe = videoSection.locator('iframe');
     await expect(iframe).toHaveCount(0);
 
@@ -139,13 +142,17 @@ test.describe('Portfolio Video Player', () => {
 
     await playBtn.scrollIntoViewIfNeeded();
     await playBtn.click();
+    await expect(playBtn).toHaveCount(0);
+
+    const closeBtn = videoSection.getByRole("button", { name: "Fermer et décharger la vidéo", exact: true });
+    await expect(closeBtn).toBeVisible();
 
     iframe = videoSection.locator('iframe');
     await expect(iframe).toHaveCount(1);
     await expect(iframe).toBeVisible();
 
     const src = await iframe.getAttribute('src');
-    expect(src).toBe('https://player.vimeo.com/video/76979871?autoplay=1');
+    expect(src).toBe('https://player.vimeo.com/video/76979871?autoplay=1&dnt=1');
 
     const box = await iframe.boundingBox();
     expect(box).not.toBeNull();
