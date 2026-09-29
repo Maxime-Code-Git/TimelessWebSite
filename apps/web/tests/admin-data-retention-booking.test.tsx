@@ -6,13 +6,15 @@ afterEach(() => {
   cleanup();
 });
 
-const { currentFetcher, useMockFetcher, setMockFetcher } = vi.hoisted(() => {
+import type * as ReactTypes from "react";
+
+const { currentFetcher, listeners, setMockFetcher } = vi.hoisted(() => {
   const listeners = new Set<() => void>();
   const current = {
     data: {} as Record<string, unknown>,
     state: "idle" as "idle" | "loading" | "submitting",
-    submit: (() => {}) as ReturnType<typeof vi.fn>,
-    Form: (({ children, ...props }: any) => <form {...props}>{children}</form>) as any,
+    submit: (() => {}) as unknown as ReturnType<typeof vi.fn>,
+    Form: (() => null) as unknown as ReactTypes.FC<ReactTypes.FormHTMLAttributes<HTMLFormElement>>,
   };
 
   const setMockFetcher = (updates: Partial<typeof current>) => {
@@ -20,28 +22,26 @@ const { currentFetcher, useMockFetcher, setMockFetcher } = vi.hoisted(() => {
     listeners.forEach(l => l());
   };
 
-  // We can't use React hooks inside vi.hoisted directly if React isn't loaded,
-  // but we can return a function that will be called later!
+  return { currentFetcher: current, listeners, setMockFetcher };
+});
+
+currentFetcher.submit = vi.fn();
+currentFetcher.Form = ({ children, ...props }: ReactTypes.FormHTMLAttributes<HTMLFormElement>) => <form {...props}>{children}</form>;
+
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  const React = await import("react");
+
   const useMockFetcher = () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const React = require("react");
     const [, setTick] = React.useState(0);
     React.useEffect(() => {
       const l = () => setTick((t: number) => t + 1);
       listeners.add(l);
-      return () => listeners.delete(l);
+      return () => { listeners.delete(l); };
     }, []);
-    return current;
+    return currentFetcher;
   };
 
-  return { currentFetcher: current, useMockFetcher, setMockFetcher };
-});
-
-currentFetcher.submit = vi.fn();
-currentFetcher.Form = ({ children, ...props }: React.FormHTMLAttributes<HTMLFormElement>) => <form {...props}>{children}</form>;
-
-vi.mock("react-router", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react-router")>();
   return {
     ...actual,
     useFetcher: useMockFetcher
@@ -184,7 +184,7 @@ describe("Admin Data Retention React UI", () => {
 
     // Focus should be returned to the input field
     const input = screen.getByLabelText(/Veuillez taper SUPPRIMER/i);
-    expect(input).toBeDefined();
+    await waitFor(() => expect(input).toHaveFocus());
 
     // Close modal
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
@@ -239,7 +239,7 @@ describe("Admin Data Retention React UI", () => {
     expect(statusMsg).toBeDefined();
 
     // Focus returned to trigger
-    expect(trigger).toBeDefined();
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   it("absence de styles inline dans toute la page", async () => {

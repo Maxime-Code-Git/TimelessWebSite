@@ -64,6 +64,7 @@ interface LoaderData {
   galleries: Gallery[];
   csrfToken: string;
   q: string;
+  gq: string;
   deletionJobs: DeletionJobSummary;
 }
 
@@ -123,6 +124,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const url = new URL(request.url);
   const q = url.searchParams.get("q") || "";
+  const gq = url.searchParams.get("gq") || "";
 
   const db = getBookingDb();
   let query = "SELECT id, names, email, local_date, local_time, status, starts_at_utc FROM bookings";
@@ -145,9 +147,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     LEFT JOIN gallery_media m ON m.gallery_id = g.id`;
   const gParams: string[] = [];
 
-  if (q) {
+  if (gq) {
     gQuery += " WHERE g.public_id LIKE ? OR g.bride_names LIKE ? OR g.id = ? OR g.status = ?";
-    gParams.push(`%${q}%`, `%${q}%`, q, q);
+    gParams.push(`%${gq}%`, `%${gq}%`, gq, gq);
   }
   gQuery += " GROUP BY g.id ORDER BY g.created_at DESC LIMIT 100";
 
@@ -174,7 +176,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const csrfToken = session.get("csrfToken") ?? "";
 
   return Response.json(
-    { bookings, galleries, csrfToken, q, deletionJobs: jobSummary },
+    { bookings, galleries, csrfToken, q, gq, deletionJobs: jobSummary },
     { headers: secureHeaders() }
   );
 }
@@ -408,7 +410,7 @@ function formatSize(bytes: number): string {
 }
 
 export default function DataRetentionPage() {
-  const { bookings, galleries, csrfToken, q, deletionJobs } = useLoaderData<LoaderData>();
+  const { bookings, galleries, csrfToken, q, gq, deletionJobs } = useLoaderData<LoaderData>();
   const actionData = useActionData<{ error?: string; success?: boolean; message?: string }>();
   const navigation = useNavigation();
   const fetcher = useFetcher<{ error?: string; success?: boolean; message?: string }>();
@@ -416,6 +418,7 @@ export default function DataRetentionPage() {
   const isDeleting = fetcher.state !== "idle";
 
   const [search, setSearch] = useState(q);
+  const [gallerySearch, setGallerySearch] = useState(gq);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedGalleryIds, setSelectedGalleryIds] = useState<Set<string>>(new Set());
 
@@ -623,6 +626,8 @@ export default function DataRetentionPage() {
         <h2 className={styles.sectionTitle}>Recherche de rendez-vous</h2>
 
         <Form method="get" className={styles.searchForm}>
+          {/* Preserve the gallery search if present */}
+          <input type="hidden" name="gq" value={gq} />
           <div className={styles.formGroup}>
             <label htmlFor="q" className={styles.label}>Email, Nom, ID, Statut ou Date</label>
             <input
@@ -730,6 +735,27 @@ export default function DataRetentionPage() {
       {/* Galleries */}
       <section className={styles.galleriesSection}>
         <h2 className={styles.sectionTitle}>Recherche de galeries</h2>
+
+        <Form method="get" className={styles.searchForm}>
+          {/* Preserve the booking search if present */}
+          <input type="hidden" name="q" value={q} />
+          
+          <div className={styles.formGroup}>
+            <label htmlFor="gq" className={styles.label}>Rechercher des galeries</label>
+            <input
+              id="gq"
+              name="gq"
+              type="text"
+              className={styles.input}
+              value={gallerySearch}
+              onChange={(e) => setGallerySearch(e.target.value)}
+              placeholder="ID interne, public ID, mariés..."
+            />
+          </div>
+          <button type="submit" className={styles.button} disabled={isSubmitting}>
+            Rechercher
+          </button>
+        </Form>
 
         <div className={styles.tableContainer}>
           <table className={styles.table}>

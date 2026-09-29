@@ -6,6 +6,10 @@ import { ENV } from "./env.server";
 
 let singletonDb: DatabaseSync | undefined;
 
+function throwErrorCode(code: string): never {
+  throw new Error(code);
+}
+
 export function openGalleryDb(dbPath: string): DatabaseSync {
   const dir = path.dirname(dbPath);
 
@@ -391,8 +395,7 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
       const code = moveErr instanceof Error && moveErr.message.includes("EXDEV")
         ? "CROSS_DEVICE_MOVE"
         : "QUARANTINE_MOVE_FAILED";
-      // eslint-disable-next-line preserve-caught-error
-      throw new Error(code);
+      throwErrorCode(code);
     }
   }
 
@@ -420,12 +423,10 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
         fs.renameSync(quarantineDir, mediaDir);
       } catch {
         console.error("RESTORE_FAILED");
-        // eslint-disable-next-line preserve-caught-error
-        throw new Error("RESTORE_FAILED");
+        throwErrorCode("RESTORE_FAILED");
       }
     }
-    // eslint-disable-next-line preserve-caught-error
-    throw new Error("SQL_TRANSACTION_FAILED");
+    throwErrorCode("SQL_TRANSACTION_FAILED");
   }
 
   // After successful commit, attempt immediate cleanup
@@ -527,22 +528,20 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
     // Restore those already moved
     let restoreFailed = false;
     for (const op of moved) {
-      try { 
-        fs.renameSync(op.quarantineDir, op.mediaDir); 
-      } catch { 
+      try {
+        fs.renameSync(op.quarantineDir, op.mediaDir);
+      } catch {
         restoreFailed = true;
-        console.error("RESTORE_FAILED"); 
+        console.error("RESTORE_FAILED");
       }
     }
     if (restoreFailed) {
-      // eslint-disable-next-line preserve-caught-error
-      throw new Error("RESTORE_FAILED");
+      throwErrorCode("RESTORE_FAILED");
     }
     const code = moveErr instanceof Error && moveErr.message.includes("EXDEV")
       ? "CROSS_DEVICE_MOVE"
       : "QUARANTINE_MOVE_FAILED";
-    // eslint-disable-next-line preserve-caught-error
-    throw new Error(code);
+    throwErrorCode(code);
   }
 
   // Phase 3: SQL Transaction
@@ -566,19 +565,17 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
     // Restore all moved
     let restoreFailed = false;
     for (const op of moved) {
-      try { 
-        fs.renameSync(op.quarantineDir, op.mediaDir); 
-      } catch { 
+      try {
+        fs.renameSync(op.quarantineDir, op.mediaDir);
+      } catch {
         restoreFailed = true;
-        console.error("RESTORE_FAILED"); 
+        console.error("RESTORE_FAILED");
       }
     }
     if (restoreFailed) {
-      // eslint-disable-next-line preserve-caught-error
-      throw new Error("RESTORE_FAILED");
+      throwErrorCode("RESTORE_FAILED");
     }
-    // eslint-disable-next-line preserve-caught-error
-    throw new Error("SQL_TRANSACTION_FAILED");
+    throwErrorCode("SQL_TRANSACTION_FAILED");
   }
 
   // Phase 4: Cleanup

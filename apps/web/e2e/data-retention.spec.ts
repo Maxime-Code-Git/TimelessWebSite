@@ -8,6 +8,8 @@ test.describe("Data Retention & GDPR Administration", () => {
   test("full lifecycle: create data, export, delete, verify", async ({ page, request }, testInfo) => {
     const password = process.env.E2E_ADMIN_PASSWORD;
     if (!password) throw new Error("E2E_ADMIN_PASSWORD is required");
+    const dbPath = process.env.BOOKING_DB_PATH;
+    if (!dbPath) throw new Error("BOOKING_DB_PATH is required");
 
     const projectName = testInfo.project.name.replace(/[^a-z0-9]/gi, "-").toLowerCase();
     const uniqueId = crypto.randomUUID().split("-")[0];
@@ -35,11 +37,14 @@ test.describe("Data Retention & GDPR Administration", () => {
         language: "fr"
       };
 
+      const originUrl = testInfo.project.use.baseURL;
+      if (!originUrl) throw new Error("baseURL is required");
+
       const createRes = await request.post("/api/booking", {
         data: bookingPayload,
         headers: {
           "Content-Type": "application/json",
-          "Origin": "http://127.0.0.1:3000"
+          "Origin": originUrl
         }
       });
 
@@ -102,7 +107,6 @@ test.describe("Data Retention & GDPR Administration", () => {
 
     } finally {
       // Unconditional cleanup via DB
-      const dbPath = process.env.DB_BOOKING_PATH || path.join(process.cwd(), "data", "booking.db");
       if (fs.existsSync(dbPath)) {
         const db = new DatabaseSync(dbPath);
         db.prepare("DELETE FROM bookings WHERE email = ?").run(testBookingEmail);
@@ -119,29 +123,24 @@ test.describe("Data Retention & GDPR Administration", () => {
     const galId = `e2e-gal-${uniqueId}`;
     const galName = `E2E Gallery ${uniqueId}`;
 
-    const dbPath = process.env.DB_GALLERY_PATH || path.join(process.cwd(), "data", "gallery.db");
-    const mediaRoot = process.env.GALLERIES_DIR || path.join(process.cwd(), "public", "galleries");
-    const quarantineRoot = process.env.GALLERIES_TRASH_DIR || path.join(process.cwd(), ".trash", "galleries");
-    const importSourceDir = path.join(process.cwd(), "tmp", `e2e-source-${uniqueId}`);
+    const dbPath = process.env.GALLERY_DB_PATH;
+    if (!dbPath) throw new Error("GALLERY_DB_PATH is required");
+    const mediaRoot = process.env.GALLERY_MEDIA_PATH;
+    if (!mediaRoot) throw new Error("GALLERY_MEDIA_PATH is required");
+    const importBase = process.env.GALLERY_IMPORT_PATH;
+    if (!importBase) throw new Error("GALLERY_IMPORT_PATH is required");
+    const importSourceDir = path.join(importBase, `e2e-source-${uniqueId}`);
 
     let db: DatabaseSync | null = null;
 
     try {
       // 1. Create isolated gallery in DB
-      if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath), { recursive: true });
       db = new DatabaseSync(dbPath);
-      // Make sure table exists
-      db.exec(`CREATE TABLE IF NOT EXISTS galleries (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        slug TEXT UNIQUE,
-        description TEXT,
-        status TEXT NOT NULL,
-        created_at_utc TEXT NOT NULL
-      )`);
       db.prepare(
-        "INSERT INTO galleries (id, name, slug, status, created_at_utc) VALUES (?, ?, ?, 'published', datetime('now'))"
-      ).run(galId, galName, galId);
+        `INSERT INTO galleries 
+         (id, public_id, bride_names, wedding_date, import_path, guest_code_hash, couple_code_hash, created_at, expires_at, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published')`
+      ).run(galId, galId, galName, "2026-01-01", importSourceDir, "hash1", "hash2", Date.now(), Date.now() + 100000);
 
       // 2. Create managed media dir
       const mediaDir = path.join(mediaRoot, galId);
@@ -162,14 +161,14 @@ test.describe("Data Retention & GDPR Administration", () => {
       await page.goto("/admin/data-retention");
       await expect(page.getByRole("heading", { name: "Conservation et suppression des données" })).toBeVisible();
 
-      await page.getByLabel("Rechercher dans les galeries (ID ou Nom)").fill(galName);
+      await page.getByLabel("Rechercher des galeries").fill(galName);
       await page.getByRole("button", { name: "Rechercher", exact: true }).click();
 
       const row = page.getByRole("row").filter({ hasText: galName });
       await expect(row).toBeVisible();
 
       // 5. Confirm deletion
-      await row.getByRole("button", { name: "Supprimer" }).click();
+      await row.getByRole("button", { name: "Supprimer (Quarantaine)" }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
 
       const confirmInput = page.getByLabel("Veuillez taper SUPPRIMER pour confirmer :");
@@ -189,7 +188,7 @@ test.describe("Data Retention & GDPR Administration", () => {
       await expect(page.getByRole("dialog")).not.toBeVisible();
 
       // Check in UI
-      await page.getByLabel("Rechercher dans les galeries (ID ou Nom)").fill(galName);
+      await page.getByLabel("Rechercher des galeries").fill(galName);
       await page.getByRole("button", { name: "Rechercher", exact: true }).click();
       await expect(page.getByText(galName)).not.toBeVisible();
 
@@ -202,16 +201,19 @@ test.describe("Data Retention & GDPR Administration", () => {
     } finally {
       // 10. Cleanup exclusively own fixtures
       if (db) {
-        try {
-          db.prepare("DELETE FROM galleries WHERE id = ?").run(galId);
-        } catch { /* ignore */ }
+        // Fetch quarantine path before deletion
+        const row = db.prepare("SELECT relative_quarantine_path FROM gallery_deletion_jobs WHERE gallery_id = ?").get(galId) as { relative_quarantine_path?: string } | undefined;
+        if (row?.relative_quarantine_path) {
+          const qDir = path.join(mediaRoot, row.relative_quarantine_path);
+          if (fs.existsSync(qDir)) fs.rmSync(qDir, { recursive: true });
+        }
+        db.prepare("DELETE FROM gallery_deletion_jobs WHERE gallery_id = ?").run(galId);
+        db.prepare("DELETE FROM galleries WHERE id = ?").run(galId);
         db.close();
       }
       const mediaDir = path.join(mediaRoot, galId);
-      const quarantineDir = path.join(quarantineRoot, galId);
-      fs.rmSync(mediaDir, { recursive: true, force: true });
-      fs.rmSync(quarantineDir, { recursive: true, force: true });
-      fs.rmSync(importSourceDir, { recursive: true, force: true });
+      if (fs.existsSync(mediaDir)) fs.rmSync(mediaDir, { recursive: true });
+      if (fs.existsSync(importSourceDir)) fs.rmSync(importSourceDir, { recursive: true });
     }
   });
 });
