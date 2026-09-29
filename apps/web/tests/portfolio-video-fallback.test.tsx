@@ -3,11 +3,17 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { PortfolioPage } from "../app/routes/PortfolioPage";
 
+import defaultContent from "../app/content/default-site-content.json";
+
 vi.mock("react-router", async () => {
   const actual = await vi.importActual("react-router");
   return {
     ...actual as Record<string, unknown>,
-    useLocation: () => ({ search: "" })
+    useLocation: () => ({ search: "" }),
+    useRouteLoaderData: (routeId: string) => {
+      if (routeId === "root") return { siteContent: defaultContent };
+      return undefined;
+    }
   };
 });
 
@@ -37,7 +43,7 @@ describe("PortfolioPage Video Fallback", () => {
     expect(document.querySelector("picture")).not.toBeInTheDocument();
 
     // The fallback play button
-    const playBtn = screen.getByRole("button", { name: "Lire la vidéo" });
+    const playBtn = screen.getByRole("button", { name: "Charger la vidéo depuis YouTube" });
     expect(playBtn).toBeInTheDocument();
     
     // Click play
@@ -68,7 +74,7 @@ describe("PortfolioPage Video Fallback", () => {
     ]);
     render(<RouterProvider router={router} />);
     
-    const playBtn = screen.getByRole("button", { name: "Play video" });
+    const playBtn = screen.getByRole("button", { name: "Load video from YouTube" });
     expect(playBtn).toBeInTheDocument();
   });
 });

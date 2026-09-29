@@ -40,7 +40,8 @@ export function VisioBooking({ language, content }: { language: 'fr' | 'en', con
     newRequest: content.btnNewRequest[language],
     errTaken: content.errTaken[language],
     errGeneric: content.errGeneric[language],
-    loading: content.loadingMsg[language]
+    loading: content.loadingMsg[language],
+    rgpdNotice: content.rgpdNotice
   };
 
   useEffect(() => {
@@ -209,6 +210,14 @@ export function VisioBooking({ language, content }: { language: 'fr' | 'en', con
             <button className={styles.submitBtn} type="submit" disabled={submitting}>
               {submitting ? t.submitting : t.submit}
             </button>
+            {t.rgpdNotice && (
+              <p className={styles.rgpdNotice}>
+                {t.rgpdNotice.text[language]} <br/>
+                <a href={language === "fr" ? "/fr/privacy" : "/en/privacy"} target="_blank" rel="noopener noreferrer" className={styles.rgpdLink}>
+                  {t.rgpdNotice.linkLabel[language]}
+                </a>
+              </p>
+            )}
           </div>
         </form>
       )}

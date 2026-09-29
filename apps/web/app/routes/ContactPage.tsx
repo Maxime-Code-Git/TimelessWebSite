@@ -188,6 +188,14 @@ export function ContactPage({ lang }: ContactPageProps) {
             <button type="submit" className={`btn btn--primary ${styles.submitBtn}`} disabled={isSubmitting}>
               {isSubmitting ? contactContent.contactForm.btnSubmitting[lang] : contactContent.contactForm.labels.submit[lang]}
             </button>
+            {contactContent.contactForm.rgpdNotice && (
+              <p className={styles.rgpdNotice}>
+                {contactContent.contactForm.rgpdNotice.text[lang]} <br/>
+                <a href={lang === "fr" ? "/fr/privacy" : "/en/privacy"} target="_blank" rel="noopener noreferrer" className={styles.rgpdLink}>
+                  {contactContent.contactForm.rgpdNotice.linkLabel[lang]}
+                </a>
+              </p>
+            )}
           </fetcher.Form>
 
           {/* Info Card with Real Config */}

@@ -167,7 +167,7 @@ describe("Migration of intermediate V2 content", () => {
     const { content } = getRawSiteContent();
 
     // Check that it's migrated to V3
-    expect(content.schemaVersion).toBe(9);
+    expect(content.schemaVersion).toBe(10);
 
     // Check real fallbacks instead of generic "Description"
     const photoEssential = content.pricing.photo.find(f => f.id === "essential");
@@ -247,7 +247,7 @@ describe("Migration of intermediate V2 content", () => {
       const originalJson = JSON.stringify(v3Data);
 
       const migrated = validateSiteContent(v3Data);
-      expect(migrated.schemaVersion).toBe(9);
+      expect(migrated.schemaVersion).toBe(10);
       expect(migrated.business.email).toBe("v3@test.com");
       expect(migrated.pricingPage).toBeDefined();
       expect(migrated.pricingPage.faqs).toHaveLength(defaultContent.pricingPage.faqs.length);
@@ -278,7 +278,7 @@ describe("Migration of intermediate V2 content", () => {
       const originalJson = JSON.stringify(v4Data);
 
       const migrated = validateSiteContent(v4Data);
-      expect(migrated.schemaVersion).toBe(9);
+      expect(migrated.schemaVersion).toBe(10);
       expect(migrated.business.email).toBe("v4@test.com");
       expect(migrated.aboutPage).toBeDefined();
       expect(migrated.aboutPage.seo.title.fr).toBe(defaultContent.aboutPage.seo.title.fr);
@@ -316,7 +316,7 @@ describe("Migration of intermediate V2 content", () => {
         const migrated = validateSiteContent(inputData);
 
         // résultat en V8
-        expect(migrated.schemaVersion).toBe(9);
+        expect(migrated.schemaVersion).toBe(10);
 
         // présence de contactPage
         expect(migrated.contactPage).toBeDefined();
@@ -380,7 +380,7 @@ describe("Migration of intermediate V2 content", () => {
       delete v8.business.vatNumber;
 
       const migrated = validateSiteContent(v8);
-      expect(migrated.schemaVersion).toBe(9);
+      expect(migrated.schemaVersion).toBe(10);
       expect(migrated.legalPages).toBeDefined();
       expect(migrated.legalPages.mentions.draft.publicTitle.fr).toBe("Mentions légales");
       expect(migrated.business.tradeName).toBeNull();
@@ -394,7 +394,7 @@ describe("Migration of intermediate V2 content", () => {
       delete v9.legalUI.versionLabel;
 
       const migrated = validateSiteContent(v9);
-      expect(migrated.schemaVersion).toBe(9);
+      expect(migrated.schemaVersion).toBe(10);
       expect(migrated.legalUI.draftWarning.fr).toBe("Modifié"); // Conservé
       expect(migrated.legalUI.versionLabel.fr).toBe("Version"); // Injecté depuis le défaut
 

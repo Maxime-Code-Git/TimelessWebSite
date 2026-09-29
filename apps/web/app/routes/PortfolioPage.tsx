@@ -1,4 +1,6 @@
 import { useState, useMemo } from "react";
+import { useRouteLoaderData } from "react-router";
+import type { SiteContent } from "~/lib/site-content.server";
 import { Header } from "~/components/layout/Header";
 import { Footer } from "~/components/layout/Footer";
 import type { Lang } from "~/lib/i18n";
@@ -15,7 +17,7 @@ interface PortfolioPageProps {
 export function getVideoEmbedUrl(video: { provider: "youtube" | "vimeo", videoId: string } | null): string | null {
   if (!video) return null;
   if (video.provider === "youtube") return `https://www.youtube-nocookie.com/embed/${video.videoId}?autoplay=1`;
-  if (video.provider === "vimeo") return `https://player.vimeo.com/video/${video.videoId}?autoplay=1`;
+  if (video.provider === "vimeo") return `https://player.vimeo.com/video/${video.videoId}?autoplay=1&dnt=1`;
   return null;
 }
 
@@ -36,6 +38,8 @@ export function getPublicPhotoSrcSet(photo: PublicPortfolioPhoto): string {
 }
 
 export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
+  const rootData = useRouteLoaderData("root") as { siteContent: SiteContent };
+  const legalUI = rootData.siteContent.legalUI;
   const t = getStrings(lang).portfolio;
   const [activeFilter, setActiveFilter] = useState("all");
   const alternateLangHref = lang === "fr" ? "/en/portfolio" : "/fr/portfolio";
@@ -158,41 +162,30 @@ export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
                           alt=""
                           className={styles.videoCoverImage}
                           loading="lazy"
+                          onClick={() => setVideoPlaying(true)}
                         />
                       </picture>
                     ) : (
-                      <div className={styles.videoPoster}>
-                        <button
-                          type="button"
-                          className={styles.videoPlayBtn}
-                          onClick={() => setVideoPlaying(true)}
-                          aria-label={lang === "fr" ? "Lire la vidéo" : "Play video"}
-                        >
-                          {lang === "fr" ? "Lire la vidéo" : "Play video"}
-                        </button>
+                      <div className={styles.videoPoster} onClick={() => setVideoPlaying(true)}>
                       </div>
                     )}
-                    {portfolio.video.cover && (
-                      <div className={styles.videoConsentOverlay}>
-                        <p>
-                          {lang === "fr"
-                            ? `En cliquant sur "Charger la vidéo", vous acceptez le chargement d'un lecteur ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"} et l'utilisation potentielle de cookies tiers associés.`
-                            : `By clicking "Load video", you consent to loading a ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"} player and the potential use of associated third-party cookies.`}
-                          <br />
-                          <a href={lang === "fr" ? "/fr/cookies" : "/en/cookies"} target="_blank" rel="noopener noreferrer">
-                            {lang === "fr" ? "En savoir plus dans notre politique relative aux cookies." : "Learn more in our Cookie Policy."}
-                          </a>
-                        </p>
-                        <button
-                          type="button"
-                          className={styles.videoPlayBtn}
-                          onClick={() => setVideoPlaying(true)}
-                          aria-label={lang === "fr" ? `Charger la vidéo depuis ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}` : `Load video from ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}`}
-                        >
-                          {lang === "fr" ? `Charger la vidéo depuis ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}` : `Load video from ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}`}
-                        </button>
-                      </div>
-                    )}
+                    <div className={styles.videoConsentOverlay}>
+                      <p>
+                        {legalUI.videoConsentMessage[lang].replace("{provider}", portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo")}
+                        <br />
+                        <a href={lang === "fr" ? "/fr/cookies" : "/en/cookies"} target="_blank" rel="noopener noreferrer">
+                          {legalUI.videoConsentCookieLink[lang]}
+                        </a>
+                      </p>
+                      <button
+                        type="button"
+                        className={styles.videoPlayBtn}
+                        onClick={() => setVideoPlaying(true)}
+                        aria-label={legalUI.videoConsentLoadButton[lang].replace("{provider}", portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo")}
+                      >
+                        {legalUI.videoConsentLoadButton[lang].replace("{provider}", portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo")}
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <iframe
@@ -209,6 +202,9 @@ export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
               </div>
               {videoPlaying && (
                 <div className={styles.videoFallback}>
+                  <button type="button" className={`${styles.videoPlayBtn} ${styles.videoCloseBtn}`} onClick={() => setVideoPlaying(false)}>
+                    {legalUI.videoConsentUnloadButton[lang]}
+                  </button>
                   <a href={getCanonicalVideoUrl(portfolio.video)} target="_blank" rel="noopener noreferrer" className={styles.videoFallbackLink}>
                     {lang === "fr" ? `Ouvrir la vidéo sur ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}` : `Open video on ${portfolio.video.provider === "youtube" ? "YouTube" : "Vimeo"}`}
                   </a>

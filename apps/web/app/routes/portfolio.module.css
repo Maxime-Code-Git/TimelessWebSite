@@ -284,6 +284,11 @@
   text-align: center;
 }
 
+.videoCloseBtn {
+  display: block;
+  margin: 0 auto 12px auto;
+}
+
 .videoFallbackLink {
   color: var(--gold-light);
   font-size: 14px;
@@ -338,6 +343,7 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-sans);
+  cursor: pointer;
   font-size: 14px;
   color: var(--ivory);
 }
@@ -380,6 +386,7 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  cursor: pointer;
 }
 
 .videoSeeAll {

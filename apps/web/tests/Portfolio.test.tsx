@@ -4,9 +4,14 @@ import { MemoryRouter } from "react-router";
 import { PortfolioPage } from "../app/routes/PortfolioPage";
 import type { PublicPortfolio, PublicCategory, PublicPortfolioPhoto } from "../app/lib/portfolio-content.server";
 
+import defaultContent from "../app/content/default-site-content.json";
+
 vi.mock("react-router", async importOriginal => {
   const module = await importOriginal<typeof import("react-router")>();
-  return { ...module, useRouteLoaderData: () => undefined };
+  return { ...module, useRouteLoaderData: (routeId: string) => {
+    if (routeId === "root") return { siteContent: defaultContent };
+    return undefined;
+  }};
 });
 
 const makeCategory = (id: string, nameFr: string, nameEn: string): PublicCategory => ({

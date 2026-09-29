@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 9,
+  "schemaVersion": 10,
   "revision": "00000000000000000000000000000000",
   "updatedAt": "1970-01-01T00:00:00.000Z",
   "business": {
@@ -1044,6 +1044,16 @@
       "loadingMsg": {
         "fr": "Chargement des créneaux disponibles...",
         "en": "Loading available slots..."
+      },
+      "rgpdNotice": {
+        "text": {
+          "fr": "Les informations transmises sont utilisées pour traiter et organiser votre demande de rendez-vous.",
+          "en": "The submitted information is used to process and organize your appointment request."
+        },
+        "linkLabel": {
+          "fr": "Politique de confidentialité",
+          "en": "Privacy Policy"
+        }
       }
     },
     "contactForm": {
@@ -1207,6 +1217,16 @@
         "sendError": {
           "fr": "Une erreur est survenue lors de l'envoi du message. Veuillez réessayer plus tard.",
           "en": "An error occurred while sending the message. Please try again later."
+        }
+      },
+      "rgpdNotice": {
+        "text": {
+          "fr": "Les informations transmises sont utilisées pour répondre à votre demande et préparer une éventuelle prestation.",
+          "en": "The submitted information is used to answer your request and prepare a potential service."
+        },
+        "linkLabel": {
+          "fr": "Politique de confidentialité",
+          "en": "Privacy Policy"
         }
       }
     },
@@ -1615,6 +1635,46 @@
               "fr": "Session de navigation",
               "en": "Browser session"
             }
+          },
+          {
+            "id": "youtube",
+            "category": "video",
+            "name": {
+              "fr": "Lecteur vidéo YouTube",
+              "en": "YouTube Video Player"
+            },
+            "provider": {
+              "fr": "Google LLC / YouTube",
+              "en": "Google LLC / YouTube"
+            },
+            "purpose": {
+              "fr": "Affichage de contenus vidéo tiers. Uniquement après clic explicite.",
+              "en": "Display third-party video content. Only after explicit click."
+            },
+            "duration": {
+              "fr": "À vérifier lors de l'évaluation préproduction",
+              "en": "To be verified during pre-production evaluation"
+            }
+          },
+          {
+            "id": "vimeo",
+            "category": "video",
+            "name": {
+              "fr": "Lecteur vidéo Vimeo",
+              "en": "Vimeo Video Player"
+            },
+            "provider": {
+              "fr": "Vimeo.com, Inc.",
+              "en": "Vimeo.com, Inc."
+            },
+            "purpose": {
+              "fr": "Affichage de contenus vidéo tiers. Uniquement après clic explicite.",
+              "en": "Display third-party video content. Only after explicit click."
+            },
+            "duration": {
+              "fr": "À vérifier lors de l'évaluation préproduction",
+              "en": "To be verified during pre-production evaluation"
+            }
           }
         ]
       },
@@ -1682,6 +1742,22 @@
     "versionLabel": {
       "fr": "Version",
       "en": "Version"
+    },
+    "videoConsentMessage": {
+      "fr": "En lisant cette vidéo, vous acceptez que {provider} dépose des cookies et autres traceurs conformément à leur politique.",
+      "en": "By playing this video, you accept that {provider} sets cookies and other trackers in accordance with their policy."
+    },
+    "videoConsentCookieLink": {
+      "fr": "En savoir plus sur les cookies",
+      "en": "Learn more about cookies"
+    },
+    "videoConsentLoadButton": {
+      "fr": "Charger la vidéo depuis {provider}",
+      "en": "Load video from {provider}"
+    },
+    "videoConsentUnloadButton": {
+      "fr": "Fermer et décharger la vidéo",
+      "en": "Close and unload the video"
     }
   }
 }

@@ -451,3 +451,20 @@
   margin-bottom: 1.5rem;
   border-radius: 4px;
 }
+
+.rgpdNotice {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #6b7280);
+  margin-top: 1rem;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.rgpdLink {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.rgpdLink:hover {
+  color: var(--color-text);
+}

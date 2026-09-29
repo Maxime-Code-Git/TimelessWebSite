@@ -277,7 +277,11 @@ export default function AdminLegal() {
                  { key: "cookieColCategory", label: "Colonne Catégorie" },
                  { key: "cookieColPurpose", label: "Colonne Finalité" },
                  { key: "cookieColDuration", label: "Colonne Durée" },
-                 { key: "versionLabel", label: "Label Version" }
+                 { key: "versionLabel", label: "Label Version" },
+                 { key: "videoConsentMessage", label: "Message consentement vidéo (utiliser {provider})" },
+                 { key: "videoConsentCookieLink", label: "Lien cookies vidéo" },
+                 { key: "videoConsentLoadButton", label: "Bouton charger vidéo" },
+                 { key: "videoConsentUnloadButton", label: "Bouton fermer/décharger vidéo" }
                ].map((field) => (
                   <div className={styles.fieldGroup} key={field.key}>
                     <label htmlFor={field.key}>{field.label}</label>

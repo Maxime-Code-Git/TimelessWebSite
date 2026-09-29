@@ -33,7 +33,7 @@ describe("home-content.server.test.ts", () => {
       pricing: defaultContent.pricing
     };
     const migrated = validateSiteContent(v1Data);
-    expect(migrated.schemaVersion).toBe(9);
+    expect(migrated.schemaVersion).toBe(10);
     expect(migrated.revision).toBe(v1Data.revision);
     expect(migrated.home).toBeDefined();
     expect(migrated.updatedAt).toBe(v1Data.updatedAt);

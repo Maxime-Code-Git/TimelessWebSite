@@ -213,6 +213,10 @@ export interface ContactPageContent {
     errTaken: LocalizedString;
     errGeneric: LocalizedString;
     loadingMsg: LocalizedString;
+    rgpdNotice: {
+      text: LocalizedString;
+      linkLabel: LocalizedString;
+    };
   };
   contactForm: {
     formPrompt: LocalizedString;
@@ -262,6 +266,10 @@ export interface ContactPageContent {
       invalidNetwork: LocalizedString;
       rateLimit: LocalizedString;
       sendError: LocalizedString;
+    };
+    rgpdNotice: {
+      text: LocalizedString;
+      linkLabel: LocalizedString;
     };
   };
   contactDetails: {
@@ -339,11 +347,15 @@ export interface LegalUI {
   cookieColPurpose: LocalizedString;
   cookieColDuration: LocalizedString;
   versionLabel: LocalizedString;
+  videoConsentMessage: LocalizedString;
+  videoConsentCookieLink: LocalizedString;
+  videoConsentLoadButton: LocalizedString;
+  videoConsentUnloadButton: LocalizedString;
 }
 
 export interface SiteContent {
   legalUI: LegalUI;
-  schemaVersion: 9;
+  schemaVersion: 10;
   revision: string;
   updatedAt: string;
   business: BusinessContent;
@@ -1036,7 +1048,7 @@ function validateContactPageContent(data: unknown): ContactPageContent {
     "title", "unavailableMsg", "selectDate", "selectTime", "timezone",
     "formTitle", "labelNames", "labelEmail", "labelPhone", "labelWeddingDate",
     "labelFormula", "labelMessage", "formulas", "btnSubmit", "btnSubmitting",
-    "successTitle", "successMsg", "btnNewRequest", "errTaken", "errGeneric", "loadingMsg"
+    "successTitle", "successMsg", "btnNewRequest", "errTaken", "errGeneric", "loadingMsg", "rgpdNotice"
   ], "contactPage.visioBooking");
   const visio = obj.visioBooking as Record<string, unknown>;
 
@@ -1070,11 +1082,19 @@ function validateContactPageContent(data: unknown): ContactPageContent {
     btnNewRequest: validateLocalizedString(visio.btnNewRequest, "contactPage.visioBooking.btnNewRequest", 120),
     errTaken: validateLocalizedString(visio.errTaken, "contactPage.visioBooking.errTaken", 2000),
     errGeneric: validateLocalizedString(visio.errGeneric, "contactPage.visioBooking.errGeneric", 2000),
-    loadingMsg: validateLocalizedString(visio.loadingMsg, "contactPage.visioBooking.loadingMsg", 200)
+    loadingMsg: validateLocalizedString(visio.loadingMsg, "contactPage.visioBooking.loadingMsg", 200),
+    rgpdNotice: (function() {
+      assertExactKeys(visio.rgpdNotice, ["text", "linkLabel"], "contactPage.visioBooking.rgpdNotice");
+      const r = visio.rgpdNotice as Record<string, unknown>;
+      return {
+        text: validateLocalizedString(r.text, "contactPage.visioBooking.rgpdNotice.text", 2000),
+        linkLabel: validateLocalizedString(r.linkLabel, "contactPage.visioBooking.rgpdNotice.linkLabel", 255)
+      };
+    })()
   };
 
   // ContactForm
-  assertExactKeys(obj.contactForm, ["formPrompt", "successMsg", "btnSubmitting", "labels", "placeholders", "groupLabels", "options", "errors"], "contactPage.contactForm");
+  assertExactKeys(obj.contactForm, ["formPrompt", "successMsg", "btnSubmitting", "labels", "placeholders", "groupLabels", "options", "errors", "rgpdNotice"], "contactPage.contactForm");
   const cForm = obj.contactForm as Record<string, unknown>;
 
   assertExactKeys(cForm.labels, ["names", "email", "phone", "date", "location", "formula", "message", "submit"], "contactPage.contactForm.labels");
@@ -1144,7 +1164,15 @@ function validateContactPageContent(data: unknown): ContactPageContent {
       invalidNetwork: validateLocalizedString(cErrors.invalidNetwork, "contactPage.contactForm.errors.invalidNetwork", 500),
       rateLimit: validateLocalizedString(cErrors.rateLimit, "contactPage.contactForm.errors.rateLimit", 500),
       sendError: validateLocalizedString(cErrors.sendError, "contactPage.contactForm.errors.sendError", 500)
-    }
+    },
+    rgpdNotice: (function() {
+      assertExactKeys(cForm.rgpdNotice, ["text", "linkLabel"], "contactPage.contactForm.rgpdNotice");
+      const r = cForm.rgpdNotice as Record<string, unknown>;
+      return {
+        text: validateLocalizedString(r.text, "contactPage.contactForm.rgpdNotice.text", 2000),
+        linkLabel: validateLocalizedString(r.linkLabel, "contactPage.contactForm.rgpdNotice.linkLabel", 255)
+      };
+    })()
   };
 
   // ContactDetails
@@ -1302,7 +1330,8 @@ function validateLegalUI(obj: unknown): LegalUI {
   assertExactKeys(obj, [
     "draftWarning", "hostedBy", "toBeDefined", "enterpriseNumber", "vatNumber",
     "effectiveDate", "unpublishedDraft", "cookiesInventoryTitle", "cookiesInventoryEmpty",
-    "cookieColName", "cookieColProvider", "cookieColCategory", "cookieColPurpose", "cookieColDuration", "versionLabel"
+    "cookieColName", "cookieColProvider", "cookieColCategory", "cookieColPurpose", "cookieColDuration", "versionLabel",
+    "videoConsentMessage", "videoConsentCookieLink", "videoConsentLoadButton", "videoConsentUnloadButton"
   ], "legalUI");
   const o = obj as Record<string, unknown>;
   return {
@@ -1321,6 +1350,10 @@ function validateLegalUI(obj: unknown): LegalUI {
     cookieColPurpose: validateLocalizedString(o.cookieColPurpose, "legalUI.cookieColPurpose"),
     cookieColDuration: validateLocalizedString(o.cookieColDuration, "legalUI.cookieColDuration"),
     versionLabel: validateLocalizedString(o.versionLabel, "legalUI.versionLabel"),
+    videoConsentMessage: validateLocalizedString(o.videoConsentMessage, "legalUI.videoConsentMessage", 2000),
+    videoConsentCookieLink: validateLocalizedString(o.videoConsentCookieLink, "legalUI.videoConsentCookieLink", 255),
+    videoConsentLoadButton: validateLocalizedString(o.videoConsentLoadButton, "legalUI.videoConsentLoadButton", 255),
+    videoConsentUnloadButton: validateLocalizedString(o.videoConsentUnloadButton, "legalUI.videoConsentUnloadButton", 255),
   };
 }
 
@@ -1341,7 +1374,7 @@ export function validateSiteContent(data: unknown): SiteContent {
   }
   const obj = data as Record<string, unknown>;
 
-  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5 && obj.schemaVersion !== 6 && obj.schemaVersion !== 7 && obj.schemaVersion !== 8 && obj.schemaVersion !== 9) {
+  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5 && obj.schemaVersion !== 6 && obj.schemaVersion !== 7 && obj.schemaVersion !== 8 && obj.schemaVersion !== 9 && obj.schemaVersion !== 10) {
     throw new ValidationError("Unsupported schemaVersion");
   }
 
@@ -1596,6 +1629,38 @@ export function validateSiteContent(data: unknown): SiteContent {
     };
   }
 
+  if ((obj.schemaVersion as number) < 10) {
+    const migratedLegalUI = 'legalUI' in objRef ? { ...(objRef.legalUI as Record<string, unknown>) } : JSON.parse(JSON.stringify(defaultContent.legalUI));
+    if (!('videoConsentMessage' in migratedLegalUI)) {
+      migratedLegalUI.videoConsentMessage = JSON.parse(JSON.stringify(defaultContent.legalUI.videoConsentMessage));
+      migratedLegalUI.videoConsentCookieLink = JSON.parse(JSON.stringify(defaultContent.legalUI.videoConsentCookieLink));
+      migratedLegalUI.videoConsentLoadButton = JSON.parse(JSON.stringify(defaultContent.legalUI.videoConsentLoadButton));
+      migratedLegalUI.videoConsentUnloadButton = JSON.parse(JSON.stringify(defaultContent.legalUI.videoConsentUnloadButton));
+    }
+
+    const currentContactPage = objRef.contactPage as Record<string, unknown>;
+    const migratedContactPage = { ...currentContactPage };
+
+    if (!('rgpdNotice' in (migratedContactPage.visioBooking as Record<string, unknown>))) {
+      migratedContactPage.visioBooking = {
+        ...(migratedContactPage.visioBooking as Record<string, unknown>),
+        rgpdNotice: JSON.parse(JSON.stringify(defaultContent.contactPage.visioBooking.rgpdNotice))
+      };
+    }
+    if (!('rgpdNotice' in (migratedContactPage.contactForm as Record<string, unknown>))) {
+      migratedContactPage.contactForm = {
+        ...(migratedContactPage.contactForm as Record<string, unknown>),
+        rgpdNotice: JSON.parse(JSON.stringify(defaultContent.contactPage.contactForm.rgpdNotice))
+      };
+    }
+
+    objRef = {
+      ...objRef,
+      legalUI: migratedLegalUI,
+      contactPage: migratedContactPage
+    };
+  }
+
   assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage", "aboutPage", "contactPage", "legalPages", "legalUI"], "root");
 
 
@@ -1604,7 +1669,7 @@ export function validateSiteContent(data: unknown): SiteContent {
   const home = validateHomeContent(objRef.home);
 
   return {
-    schemaVersion: 9,
+    schemaVersion: 10,
     revision: obj.revision,
     updatedAt: updatedAtStr,
     business,

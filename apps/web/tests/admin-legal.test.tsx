@@ -26,6 +26,10 @@ const mockContent = {
     cookieColCategory: { fr: "Catégorie", en: "Category" },
     cookieColPurpose: { fr: "Finalité", en: "Purpose" },
     cookieColDuration: { fr: "Durée", en: "Duration" },
+    videoConsentMessage: { fr: "Message", en: "Message" },
+    videoConsentCookieLink: { fr: "Lien", en: "Link" },
+    videoConsentLoadButton: { fr: "Charger", en: "Load" },
+    videoConsentUnloadButton: { fr: "Fermer", en: "Close" },
   },
   legalPages: {
     mentions: {
