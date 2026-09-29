@@ -519,7 +519,7 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
   } catch (moveErr: unknown) {
     // Restore those already moved
     for (const op of moved) {
-      try { fs.renameSync(op.quarantineDir, op.mediaDir); } catch { /* ignore secondary errors */ }
+      try { fs.renameSync(op.quarantineDir, op.mediaDir); } catch (rollbackErr) { console.error(`Failed to rollback rename for ${op.id}:`, rollbackErr); }
     }
     const code = moveErr instanceof Error && moveErr.message.includes("EXDEV")
       ? "CROSS_DEVICE_MOVE"
@@ -544,10 +544,10 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
     }
     db.exec("COMMIT;");
   } catch (sqlErr: unknown) {
-    try { db.exec("ROLLBACK;"); } catch { /* ignore */ }
+    try { db.exec("ROLLBACK;"); } catch (rollbackErr) { console.error("Failed to rollback transaction:", rollbackErr); }
     // Restore all moved
     for (const op of moved) {
-      try { fs.renameSync(op.quarantineDir, op.mediaDir); } catch { /* ignore */ }
+      try { fs.renameSync(op.quarantineDir, op.mediaDir); } catch (rollbackErr) { console.error(`Failed to rollback rename for ${op.id}:`, rollbackErr); }
     }
     throw new Error("SQL_TRANSACTION_FAILED", { cause: sqlErr });
   }

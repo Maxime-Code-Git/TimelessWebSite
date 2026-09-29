@@ -2,20 +2,18 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act, cleanup } from "@testing-library/react";
 import { vi } from "vitest";
 
-import { useState, useEffect } from "react";
-
 afterEach(() => {
   cleanup();
 });
 
 const { currentFetcher, useMockFetcher, setMockFetcher } = vi.hoisted(() => {
   const listeners = new Set<() => void>();
-  let current: any = {
-    data: {},
-    state: "idle",
+  const current = {
+    data: {} as Record<string, unknown>,
+    state: "idle" as "idle" | "loading" | "submitting",
   };
 
-  const setMockFetcher = (updates: any) => {
+  const setMockFetcher = (updates: Partial<typeof current>) => {
     Object.assign(current, updates);
     listeners.forEach(l => l());
   };
