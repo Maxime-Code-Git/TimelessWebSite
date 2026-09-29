@@ -4,6 +4,12 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import * as crypto from "node:crypto";
 
+interface BookingSlot {
+  date: string;
+  time: string;
+  slot_key: string;
+}
+
 test.describe("Data Retention & GDPR Administration", () => {
   test("full lifecycle: create data, export, delete, verify", async ({ page, request }, testInfo) => {
     const password = process.env.E2E_ADMIN_PASSWORD;
@@ -21,17 +27,22 @@ test.describe("Data Retention & GDPR Administration", () => {
       // 1. Fetch available slots
       const slotsRes = await request.get("/api/booking");
       expect(slotsRes.status()).toBe(200);
-      const slotsData = await slotsRes.json();
+      const slotsData = await slotsRes.json() as { slots: BookingSlot[] };
       const slots = slotsData.slots;
       expect(slots).toBeDefined();
       expect(slots.length).toBeGreaterThan(0);
 
       const targetSlot = slots[0];
+      
+      expect(typeof targetSlot.date).toBe("string");
+      expect(targetSlot.date.length).toBeGreaterThan(0);
+      expect(typeof targetSlot.time).toBe("string");
+      expect(targetSlot.time.length).toBeGreaterThan(0);
 
       // 2. Create an isolated test booking via the booking API
       const bookingPayload = {
-        date: targetSlot.local_date,
-        time: targetSlot.local_time,
+        date: targetSlot.date,
+        time: targetSlot.time,
         names: testBookingName,
         email: testBookingEmail,
         language: "fr"
