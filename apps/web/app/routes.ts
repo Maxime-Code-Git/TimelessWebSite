@@ -12,6 +12,7 @@ export default [
   route("api/booking", "routes/api.booking.ts"),
   route("api/admin/home-image", "routes/api.admin.home-image.ts"),
   route("api/admin/portfolio-video-cover", "routes/api.admin.portfolio-video-cover.ts"),
+  route("api/admin/data-retention/booking-export", "routes/api.admin.data-retention.booking-export.ts"),
   route("portfolio/media/:photoId/:variant", "routes/portfolio.media.$photoId.$variant.tsx"),
   route("portfolio/video-cover/:photoId/:variant/:ext", "routes/portfolio.video-cover.$photoId.$variant.$ext.ts"),
   route("media/home/:section/:imageId/:variant/:ext", "routes/media.home.$section.$imageId.$variant.$ext.tsx"),

@@ -110,7 +110,7 @@ describe("Admin Data Retention Booking API", () => {
         "Content-Type": "application/x-www-form-urlencoded",
         "Content-Length": "21"
       },
-      body: "intent=export_booking"
+      body: "intent=delete_booking_single&id=book-1&confirm=SUPPRIMER"
     });
     const res = await callAction(req);
     expect(res.status).toBe(302); // Redirects to /admin
@@ -188,7 +188,7 @@ describe("Admin Data Retention Booking API", () => {
         "Content-Type": "application/x-www-form-urlencoded",
         "Content-Length": "abc"
       },
-      body: "intent=export_booking"
+      body: "intent=delete_booking_single"
     });
     const res = await callAction(req);
     expect(res.status).toBe(400);
@@ -206,7 +206,7 @@ describe("Admin Data Retention Booking API", () => {
         "Content-Type": "application/x-www-form-urlencoded",
         "Content-Length": "999999"
       },
-      body: "intent=export_booking"
+      body: "intent=delete_booking_single"
     });
     const res = await callAction(req);
     expect(res.status).toBe(413);
@@ -218,29 +218,6 @@ describe("Admin Data Retention Booking API", () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error).toContain("Unknown intent");
-  });
-
-  // ── Export booking ───────────────────────────────────────
-
-  it("export d'un rendez-vous avec liste blanche de colonnes", async () => {
-    const req = createRequest("export_booking", { id: "book-1" });
-    const res = await callAction(req);
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Cache-Control")).toBe("no-store");
-    expect(res.headers.get("Content-Disposition")).toContain("attachment");
-    // Filename must be neutral (no name, no email, no personal ID)
-    expect(res.headers.get("Content-Disposition")).toBe('attachment; filename="booking_export.json"');
-    const json = await res.json();
-    expect(json.id).toBe("book-1");
-    expect(json.email).toBe("john@test.com");
-    // Must NOT include technical fields like slot_key
-    expect(json.slot_key).toBeUndefined();
-  });
-
-  it("export rendez-vous inexistant → 404", async () => {
-    const req = createRequest("export_booking", { id: "unknown" });
-    const res = await callAction(req);
-    expect(res.status).toBe(404);
   });
 
   // ── Delete booking single ──────────────────────────────
@@ -363,9 +340,9 @@ describe("Admin Data Retention Booking API", () => {
   });
 
   it("Cache-Control: no-store est présent sur toutes les réponses", async () => {
-    const req = createRequest("export_booking", { id: "book-1" });
+    const req = createRequest("delete_booking_single", { id: "book-1", confirm: "SUPPRIMER" });
     const res = await callAction(req);
-    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    expect(res.headers.get("Cache-Control")).toContain("no-store");
 
     const req2 = createRequest("delete_booking_single", { id: "unknown", confirm: "SUPPRIMER" });
     const res2 = await callAction(req2);
@@ -380,7 +357,7 @@ describe("Admin Data Retention Booking API", () => {
 
   describe("Payload Limits & Security", () => {
     it("corps sans Content-Length inférieur à la limite", async () => {
-      const req = createRequest("export_booking", { id: "book-1" });
+      const req = createRequest("delete_booking_single", { id: "book-1", confirm: "SUPPRIMER" });
       req.headers.delete("content-length");
       const resp = await callAction(req);
       expect(resp.status).toBe(200);
@@ -388,7 +365,7 @@ describe("Admin Data Retention Booking API", () => {
 
     it("corps sans Content-Length supérieur à la limite", async () => {
       const largeData = "x".repeat(131073);
-      const req = createRequest("export_booking", { id: "book-1", padding: largeData });
+      const req = createRequest("delete_booking_single", { id: "book-1", confirm: "SUPPRIMER", padding: largeData });
       req.headers.delete("content-length");
       const resp = await callAction(req);
       expect(resp.status).toBe(413);
@@ -397,7 +374,7 @@ describe("Admin Data Retention Booking API", () => {
     it("longueur décimale, négative, non numérique ou non sûre", async () => {
       const cases = ["12.5", "-1", "abc", "9007199254740992"];
       for (const cl of cases) {
-        const req = createRequest("export_booking", { id: "book-1" });
+        const req = createRequest("delete_booking_single", { id: "book-1", confirm: "SUPPRIMER" });
         req.headers.set("content-length", cl);
         const resp = await callAction(req);
         expect(resp.status).toBe(400);
@@ -423,7 +400,7 @@ describe("Admin Data Retention Booking API", () => {
       const req = new Request("http://localhost/admin/data-retention", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intent: "export_booking", id: "book-1" })
+        body: JSON.stringify({ intent: "delete_booking_single", id: "book-1" })
       });
       vi.mocked(authServer.requireAdminSession).mockResolvedValue({
         isValid: true,

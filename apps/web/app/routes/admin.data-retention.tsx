@@ -73,7 +73,6 @@ interface LoaderData {
 
 const MAX_BULK_IDS = 50;
 const VALID_INTENTS = [
-  "export_booking",
   "delete_booking_single",
   "delete_booking_bulk",
   "delete_gallery_single",
@@ -81,12 +80,6 @@ const VALID_INTENTS = [
   "retry_failed_job"
 ] as const;
 type Intent = typeof VALID_INTENTS[number];
-
-const BOOKING_EXPORT_COLUMNS = [
-  "id", "local_date", "local_time", "starts_at_utc", "ends_at_utc",
-  "timezone", "status", "names", "email", "phone", "wedding_date",
-  "formula", "message", "language", "created_at", "updated_at"
-] as const;
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -204,22 +197,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const db = getBookingDb();
 
-  // ── Export booking ──────────────────────────────────────
-  if (intent === "export_booking") {
-    const id = String(formData.get("id") ?? "");
-    if (!isValidId(id)) return errorResponse("Invalid booking ID", 400);
 
-    const columnList = BOOKING_EXPORT_COLUMNS.join(", ");
-    const booking = db.prepare(`SELECT ${columnList} FROM bookings WHERE id = ?`).get(id);
-    if (!booking) {
-      return new Response("Not found", { status: 404, headers: secureHeaders() });
-    }
-    const json = JSON.stringify(booking, null, 2);
-    const h = secureHeaders();
-    h.set("Content-Type", "application/json");
-    h.set("Content-Disposition", `attachment; filename="booking_export.json"`);
-    return new Response(json, { headers: h });
-  }
 
   // ── Delete booking single ──────────────────────────────
   if (intent === "delete_booking_single") {
@@ -685,8 +663,7 @@ export default function DataRetentionPage() {
                   <td>{booking.email}</td>
                   <td>
                     <div className={styles.actions}>
-                      <Form method="post" reloadDocument>
-                        <input type="hidden" name="intent" value="export_booking" />
+                      <Form method="post" action="/api/admin/data-retention/booking-export" reloadDocument>
                         <input type="hidden" name="id" value={booking.id} />
                         <input type="hidden" name="csrfToken" value={csrfToken} />
                         <button type="submit" className={styles.exportButton}>

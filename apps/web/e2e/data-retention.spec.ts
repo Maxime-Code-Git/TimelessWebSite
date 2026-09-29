@@ -33,7 +33,7 @@ test.describe("Data Retention & GDPR Administration", () => {
       expect(slots.length).toBeGreaterThan(0);
 
       const targetSlot = slots[0];
-      
+
       expect(typeof targetSlot.date).toBe("string");
       expect(targetSlot.date.length).toBeGreaterThan(0);
       expect(typeof targetSlot.time).toBe("string");
@@ -82,11 +82,17 @@ test.describe("Data Retention & GDPR Administration", () => {
       const row = page.getByRole("row").filter({ hasText: testBookingName });
 
       // 6. Export JSON
-      const downloadPromise = page.waitForEvent("download");
-      await row.getByRole("button", { name: "Exporter (JSON)" }).click();
-      const download = await downloadPromise;
+      const [download] = await Promise.all([
+        page.waitForEvent("download"),
+        row.getByRole("button", { name: "Exporter (JSON)" }).click()
+      ]);
       expect(download.suggestedFilename()).toBe("booking_export.json");
-      expect(await download.path()).toBeTruthy();
+      const downloadPath = await download.path();
+      expect(downloadPath).toBeTruthy();
+      const downloadContent = JSON.parse(fs.readFileSync(downloadPath!, "utf-8"));
+      expect(downloadContent.id).toBeDefined();
+      expect(downloadContent.email).toBe(testBookingEmail);
+      expect(downloadContent.slot_key).toBeUndefined();
 
       // 7. Delete (incorrect)
       await row.getByRole("button", { name: "Supprimer" }).click();
