@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as crypto from "node:crypto";
 import { ENV } from "./env.server";
 
 let singletonDb: DatabaseSync | undefined;
@@ -275,6 +276,25 @@ export function openGalleryDb(dbPath: string): DatabaseSync {
       currentVersion = 7;
     }
 
+    if (currentVersion < 8) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS gallery_deletion_jobs (
+          id TEXT PRIMARY KEY,
+          gallery_id TEXT NOT NULL,
+          relative_quarantine_path TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+          worker_id TEXT,
+          attempt_count INTEGER NOT NULL DEFAULT 0,
+          lease_expires_at INTEGER,
+          error_message TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+      `);
+      db.prepare("INSERT INTO gallery_migrations (version, applied_at) VALUES (8, ?)").run(Date.now());
+      currentVersion = 8;
+    }
+
     db.exec("COMMIT;");
   } catch (err) {
     db.exec("ROLLBACK;");
@@ -294,4 +314,83 @@ export function closeGalleryDb(): void {
   if (!singletonDb) return;
   singletonDb.close();
   singletonDb = undefined;
+}
+
+export function deleteGalleryAndQuarantine(galleryId: string): void {
+  const db = getGalleryDb();
+  
+  if (!galleryId || typeof galleryId !== "string" || !/^[0-9a-zA-Z_-]+$/.test(galleryId)) {
+    throw new Error("Invalid gallery ID");
+  }
+
+  const gallery = db.prepare("SELECT * FROM galleries WHERE id = ?").get(galleryId) as Record<string, unknown> | undefined;
+  if (!gallery) {
+    throw new Error("Gallery not found");
+  }
+
+  const baseMedia = path.resolve(ENV.GALLERY_MEDIA_PATH);
+  const mediaDir = path.resolve(baseMedia, galleryId);
+  const relativeToMedia = path.relative(baseMedia, mediaDir);
+  
+  if (relativeToMedia.includes("..") || relativeToMedia === "" || !mediaDir.startsWith(baseMedia)) {
+    throw new Error("Invalid media directory path");
+  }
+
+  let hasMediaDir = false;
+  if (fs.existsSync(mediaDir)) {
+    const stat = fs.lstatSync(mediaDir);
+    if (stat.isSymbolicLink()) {
+      throw new Error("Media directory cannot be a symbolic link");
+    }
+    if (stat.isDirectory()) {
+      hasMediaDir = true;
+    }
+  }
+
+  const baseTrash = path.resolve(process.cwd(), "data", ".trash", "gallery-deletions");
+  fs.mkdirSync(baseTrash, { recursive: true });
+  const jobId = crypto.randomUUID();
+  const quarantineDir = path.join(baseTrash, jobId);
+  const relativeQuarantinePath = path.relative(process.cwd(), quarantineDir);
+
+  if (hasMediaDir) {
+    fs.renameSync(mediaDir, quarantineDir);
+  }
+
+  db.exec("BEGIN EXCLUSIVE TRANSACTION;");
+    try {
+    const now = Date.now();
+    db.prepare(`
+      INSERT INTO gallery_deletion_jobs (id, gallery_id, relative_quarantine_path, status, created_at, updated_at)
+      VALUES (?, ?, ?, 'pending', ?, ?)
+    `).run(jobId, galleryId, relativeQuarantinePath, now, now);
+
+    db.prepare("DELETE FROM galleries WHERE id = ?").run(galleryId);
+
+    db.exec("COMMIT;");
+  } catch (err) {
+    db.exec("ROLLBACK;");
+    if (hasMediaDir) {
+      try {
+        fs.renameSync(quarantineDir, mediaDir);
+      } catch (e) {
+        console.error("Critical error: failed to restore quarantine on SQL error", e);
+      }
+    }
+    throw err;
+  }
+
+  if (hasMediaDir) {
+    try {
+      fs.rmSync(quarantineDir, { recursive: true, force: true });
+      db.prepare("UPDATE gallery_deletion_jobs SET status = 'completed', updated_at = ? WHERE id = ?").run(Date.now(), jobId);
+    } catch (err: unknown) {
+      db.prepare("UPDATE gallery_deletion_jobs SET status = 'pending', error_message = ?, attempt_count = attempt_count + 1, updated_at = ? WHERE id = ?")
+        .run("Failed to delete quarantine", Date.now(), jobId);
+      // We throw to indicate partial success / cleanup needed
+      throw new Error("Gallery deleted but final cleanup failed. Cleanup will be retried.", { cause: err });
+    }
+  } else if (!hasMediaDir) {
+    db.prepare("UPDATE gallery_deletion_jobs SET status = 'completed', updated_at = ? WHERE id = ?").run(Date.now(), jobId);
+  }
 }

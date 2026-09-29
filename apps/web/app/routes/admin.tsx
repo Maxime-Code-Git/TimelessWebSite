@@ -301,6 +301,10 @@ export default function AdminPage() {
                 <h3>Pages légales</h3>
                 <p>Mentions légales, CGV, confidentialité et cookies</p>
               </Link>
+              <Link to="/admin/data-retention" className={styles.card}>
+                <h3>Conservation et suppression des données</h3>
+                <p>Gérer l'export et la suppression des données (RGPD)</p>
+              </Link>
             </div>
           </div>
         </main>

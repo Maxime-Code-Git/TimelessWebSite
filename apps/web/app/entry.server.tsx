@@ -17,6 +17,7 @@ import { ServerRouter } from "react-router";
 import type { EntryContext } from "react-router";
 import crypto from "node:crypto";
 import { resumeImports } from "~/lib/gallery-import.server";
+import { resumeGalleryDeletions } from "~/lib/gallery-deletion-worker.server";
 
 const ABORT_DELAY = 5_000;
 
@@ -26,6 +27,7 @@ if (typeof globalThis !== "undefined") {
   };
   if (!galleryWorkerGlobal.__gallery_import_started) {
     resumeImports();
+    resumeGalleryDeletions();
     galleryWorkerGlobal.__gallery_import_started = true;
   }
 }
