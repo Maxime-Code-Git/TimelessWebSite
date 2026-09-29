@@ -13,6 +13,7 @@ import {
   useRouteError,
 } from "react-router";
 import { verifyAdminPassword, constantTimeEqual, getAdminConfig, requireAdminSession, computeCredentialVersion } from "../lib/auth.server";
+import { createAdminHeaders } from "../lib/admin-auth.server";
 import { checkRateLimit, resetRateLimit } from "../lib/rate-limit.server";
 import { commitSession, destroySession } from "../lib/session.server";
 import styles from "./admin.module.css";
@@ -20,6 +21,13 @@ import * as crypto from "node:crypto";
 import { getClientIp, validateOrigin } from "../lib/security.server";
 
 const MAX_BODY_SIZE = 100 * 1024; // 100 KB
+
+export function meta() {
+  return [
+    { title: "Administration - Sempra" },
+    { name: "robots", content: "noindex, nofollow" }
+  ];
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -36,10 +44,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // We only redirect if they actually have a cookie that we want to clear.
   const cookieHeader = request.headers.get("Cookie");
   if (!isValid && cookieHeader && cookieHeader.includes("__admin_session")) {
+    const redirectHeaders = createAdminHeaders();
+    redirectHeaders.set("Set-Cookie", await destroySession(session));
     return redirect("/admin", {
-      headers: {
-        "Set-Cookie": await destroySession(session),
-      },
+      headers: redirectHeaders,
     });
   }
 
@@ -50,6 +58,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     session.set("csrfToken", csrfToken);
     headers.set("Set-Cookie", await commitSession(session));
   }
+
+  createAdminHeaders(headers);
 
   return Response.json(
     { isAuthenticated: isValid, csrfToken },
@@ -171,10 +181,10 @@ export async function action({ request }: ActionFunctionArgs) {
   // 9. Intent routing
   if (intent === "logout") {
     // Only authenticated users can logout, technically, but we just destroy anyway.
+    const redirectHeaders = createAdminHeaders();
+    redirectHeaders.set("Set-Cookie", await destroySession(session));
     return redirect("/admin", {
-      headers: {
-        "Set-Cookie": await destroySession(session),
-      },
+      headers: redirectHeaders,
     });
   }
 
@@ -210,10 +220,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const cookieString = await commitSession(session);
 
+    const redirectHeaders = createAdminHeaders();
+    redirectHeaders.set("Set-Cookie", cookieString);
+
     return redirect("/admin", {
-      headers: {
-        "Set-Cookie": cookieString,
-      },
+      headers: redirectHeaders,
     });
   }
 

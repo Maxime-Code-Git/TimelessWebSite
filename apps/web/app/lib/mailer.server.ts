@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 import { ENV } from "./env.server";
 import type { Booking } from "./booking.server";
 
@@ -24,7 +24,7 @@ export interface BookingRequestData {
   language: 'fr' | 'en';
 }
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 
 function getTransporter() {
   if (!transporter) {
@@ -88,7 +88,7 @@ ${data.message}
       text: textBody,
     });
 
-    if (!info.accepted.includes(toAddress)) {
+    if (!info.accepted || !info.accepted.includes(toAddress)) {
       throw new Error("SMTP Error: Recipient was not accepted by the mail server.");
     }
     return info;

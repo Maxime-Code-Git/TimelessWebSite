@@ -84,7 +84,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
           HOST: "127.0.0.1",
           PORT: String(PORT),
           NODE_ENV: "production",
-          PUBLIC_SITE_URL: BASE_URL,
+          PUBLIC_SITE_URL: BASE_URL.replace("http:", "https:"),
           CONTACT_RATE_LIMIT_SECRET: "test-secret",
           RATE_LIMIT_DB_PATH: dbPath,
           BOOKING_DB_PATH: path.join(tempDir, "booking.db"),
@@ -135,7 +135,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       body: new URLSearchParams({ intent: "login", password: "test", csrfToken }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": anonCookie || "",
         "x-forwarded-for": "127.0.0.1"
       },
@@ -165,7 +165,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
       },
       redirect: "manual",
@@ -188,7 +188,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
         "x-forwarded-for": "127.0.0.1",
       },
@@ -206,7 +206,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
       },
       redirect: "manual",
@@ -253,7 +253,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
         "x-forwarded-for": "127.0.0.1",
       },
@@ -288,7 +288,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
         "x-forwarded-for": "127.0.0.1",
       },
@@ -310,7 +310,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": guestSessionCookie || "",
         "x-forwarded-for": "127.0.0.1"
       },
@@ -388,7 +388,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
         "x-forwarded-for": "127.0.0.1",
       },
@@ -403,7 +403,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": guestSessionCookie || "",
         "x-forwarded-for": "127.0.0.1"
       },
@@ -441,7 +441,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": guestSessionCookie || "",
         "x-forwarded-for": "127.0.0.1"
       },
@@ -475,7 +475,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       body: delFormData,
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
         "x-forwarded-for": "127.0.0.1",
       }
@@ -508,7 +508,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       body: failData,
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
         "x-forwarded-for": "127.0.0.1",
       }
@@ -549,7 +549,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       body: otherData,
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
         "x-forwarded-for": "127.0.0.1",
       }
@@ -573,7 +573,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
         body: pendingData,
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "Origin": BASE_URL,
+          "Origin": BASE_URL.replace("http:", "https:"),
           "Cookie": authCookie,
           "x-forwarded-for": "127.0.0.1",
         }
@@ -598,7 +598,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
           body: rollbackData,
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            "Origin": BASE_URL,
+            "Origin": BASE_URL.replace("http:", "https:"),
             "Cookie": authCookie,
             "x-forwarded-for": "127.0.0.1",
           }
@@ -626,7 +626,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
         body: allForm,
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "Origin": BASE_URL,
+          "Origin": BASE_URL.replace("http:", "https:"),
           "Cookie": authCookie,
           "x-forwarded-for": "127.0.0.1",
         }
@@ -717,7 +717,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
     const adminLoginRes = await fetch(`${BASE_URL}/admin`, {
       method: "POST",
       body: new URLSearchParams({ intent: "login", password: "test", csrfToken: validCsrfToken }),
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cookie": anonCookie, "Origin": BASE_URL, "x-forwarded-for": "127.0.0.1" },
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cookie": anonCookie, "Origin": BASE_URL.replace("http:", "https:"), "x-forwarded-for": "127.0.0.1" },
       redirect: "manual"
     });
     expect(adminLoginRes.status).toBe(302);
@@ -732,7 +732,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
     const noCsrfRes = await fetch(actionUrl, {
       method: "POST",
       body: noCsrfBody,
-      headers: { "Origin": BASE_URL, "Cookie": authCookie, "Content-Type": `multipart/form-data; boundary=${noCsrfBoundary}` }
+      headers: { "Origin": BASE_URL.replace("http:", "https:"), "Cookie": authCookie, "Content-Type": `multipart/form-data; boundary=${noCsrfBoundary}` }
     });
     expect(noCsrfRes.status).toBe(403);
 
@@ -752,7 +752,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       body: jpgBody,
       headers: {
         "Content-Type": `multipart/form-data; boundary=${jpgBoundary}`,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie
       }
     });
@@ -763,7 +763,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       body: jpgBody,
       headers: {
         "Content-Type": `multipart/form-data; boundary=${jpgBoundary}`,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie
       }
     });
@@ -775,7 +775,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       body: jpgBody,
       headers: {
         "Content-Type": `multipart/form-data; boundary=${jpgBoundary}`,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
         "Content-Length": jpgBody.length.toString()
       }
@@ -804,7 +804,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
 
     const guestLoginRes = await fetch(`${BASE_URL}/fr/espace-clients?index`, {
       method: "POST", body: new URLSearchParams({ code: "guest_code", csrf: guestCsrf }),
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cookie": guestAnonCookie, "Origin": BASE_URL, "x-forwarded-for": "127.0.0.1" },
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cookie": guestAnonCookie, "Origin": BASE_URL.replace("http:", "https:"), "x-forwarded-for": "127.0.0.1" },
       redirect: "manual"
     });
     expect(guestLoginRes.status).toBe(302);
@@ -817,7 +817,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
 
     const marieLoginRes = await fetch(`${BASE_URL}/fr/espace-clients?index`, {
       method: "POST", body: new URLSearchParams({ code: "marie_code", csrf: marieCsrf }),
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cookie": marieAnonCookie, "Origin": BASE_URL, "x-forwarded-for": "127.0.0.1" },
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cookie": marieAnonCookie, "Origin": BASE_URL.replace("http:", "https:"), "x-forwarded-for": "127.0.0.1" },
       redirect: "manual"
     });
     expect(marieLoginRes.status).toBe(302);
@@ -851,7 +851,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       body: bigFileBody.body,
       headers: {
         "Content-Type": `multipart/form-data; boundary=${bigFileBody.boundary}`,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
         "Content-Length": bigFileBody.body.length.toString()
       }
@@ -869,7 +869,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       body: pngBody,
       headers: {
         "Content-Type": `multipart/form-data; boundary=${pngBoundary}`,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie,
         "Content-Length": pngBody.length.toString()
       }
@@ -892,7 +892,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       body: deleteData,
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie
       }
     });
@@ -903,7 +903,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
     const { body: wrongCsrfBody, boundary: wrongCsrfBoundary } = buildMultipart(fakePng, "test.png", "image/png", "wrong_csrf");
     const wrongCsrfRes = await fetch(actionUrl, {
       method: "POST", body: wrongCsrfBody,
-      headers: { "Content-Type": `multipart/form-data; boundary=${wrongCsrfBoundary}`, "Origin": BASE_URL, "Cookie": authCookie }
+      headers: { "Content-Type": `multipart/form-data; boundary=${wrongCsrfBoundary}`, "Origin": BASE_URL.replace("http:", "https:"), "Cookie": authCookie }
     });
     expect(wrongCsrfRes.status).toBe(403);
 
@@ -913,7 +913,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
     // First, upload a new poster
     const upRes = await fetch(actionUrl, {
       method: "POST", body: jpgBody,
-      headers: { "Content-Type": `multipart/form-data; boundary=${jpgBoundary}`, "Origin": BASE_URL, "Cookie": authCookie }
+      headers: { "Content-Type": `multipart/form-data; boundary=${jpgBoundary}`, "Origin": BASE_URL.replace("http:", "https:"), "Cookie": authCookie }
     });
     const upJson = await upRes.json();
     const currentRev = upJson.revision;
@@ -924,7 +924,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
 
     const failRes = await fetch(actionUrl, {
       method: "POST", body: pngBody,
-      headers: { "Content-Type": `multipart/form-data; boundary=${pngBoundary}`, "Origin": BASE_URL, "Cookie": authCookie }
+      headers: { "Content-Type": `multipart/form-data; boundary=${pngBoundary}`, "Origin": BASE_URL.replace("http:", "https:"), "Cookie": authCookie }
     });
     expect(failRes.status).toBe(500);
 
@@ -946,7 +946,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
       body: delMediaData,
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": authCookie
       }
     });

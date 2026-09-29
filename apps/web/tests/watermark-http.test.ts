@@ -64,7 +64,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
           HOST: "127.0.0.1",
           PORT: String(PORT),
           NODE_ENV: "production",
-          PUBLIC_SITE_URL: BASE_URL,
+          PUBLIC_SITE_URL: BASE_URL.replace("http:", "https:"),
           CONTACT_RATE_LIMIT_SECRET: "test-secret",
           RATE_LIMIT_DB_PATH: dbPath,
           BOOKING_DB_PATH: path.join(tempDir, "booking.db"),
@@ -131,7 +131,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Cookie": anonCookie,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "x-forwarded-for": "127.0.0.1"
       },
       body: new URLSearchParams({ intent: "login", password: "test", csrfToken }),
@@ -188,7 +188,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Cookie": authCookie,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "x-forwarded-for": "127.0.0.1"
       },
       body: `csrfToken=${encodeURIComponent(csrfToken)}&portfolioRevision=${encodeURIComponent(portfolioRevision)}&watermarkText=Mon+Studio`,
@@ -236,7 +236,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
       headers: {
         "Content-Type": "application/json",
         "Cookie": authCookie,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
       },
       body: JSON.stringify({ watermarkText: "test" }),
       redirect: "manual",
@@ -253,7 +253,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Cookie": authCookie,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
       },
       body: `csrfToken=wrong-csrf-token&portfolioRevision=${encodeURIComponent(portfolioRevision)}&watermarkText=Test`,
       redirect: "manual",
@@ -270,7 +270,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Cookie": authCookie,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Connection": "close"
       },
       body: `csrfToken=test&portfolioRevision=test&watermarkText=${largeBody}`,
@@ -288,7 +288,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Cookie": authCookie,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
       },
       body: `csrfToken=${encodeURIComponent(csrfToken)}&portfolioRevision=stale_stale_stale_stale_stale_s&watermarkText=Test`,
       redirect: "manual",
@@ -306,7 +306,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
         method,
         headers: {
           "Cookie": authCookie,
-          "Origin": BASE_URL,
+          "Origin": BASE_URL.replace("http:", "https:"),
         },
         redirect: "manual",
       });
@@ -339,7 +339,7 @@ describe("Watermark Admin HTTP (Phase 3C.2A)", () => {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           "Cookie": authCookie,
-          "Origin": BASE_URL,
+          "Origin": BASE_URL.replace("http:", "https:"),
         },
         body: `csrfToken=${encodeURIComponent(csrfToken)}&portfolioRevision=${encodeURIComponent(portfolioRevision)}&watermarkText=Test`,
         redirect: "manual",

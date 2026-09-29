@@ -147,5 +147,6 @@ export function createAdminHeaders(headers = new Headers()) {
   headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   headers.set("Pragma", "no-cache");
   headers.set("Expires", "0");
+  headers.set("X-Robots-Tag", "noindex, nofollow");
   return headers;
 }

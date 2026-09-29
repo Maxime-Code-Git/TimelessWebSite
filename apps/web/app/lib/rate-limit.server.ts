@@ -10,13 +10,33 @@ function initDb(): DatabaseSync {
   if (db) return db;
   const dbPath = ENV.RATE_LIMIT_DB_PATH;
 
-  // Ensure directory exists
+  // Ensure directory exists and check permissions
   const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
+  // Always enforce 0700 on the directory
+  const dirStat = fs.statSync(dir);
+  if ((dirStat.mode & 0o777) !== 0o700) {
+    fs.chmodSync(dir, 0o700);
+  }
+
+  // Reject symlinks for the database file itself if it exists
+  if (fs.existsSync(dbPath)) {
+    const stat = fs.lstatSync(dbPath);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`CRITICAL: dbPath cannot be a symbolic link.`);
+    }
+  }
+
   db = new DatabaseSync(dbPath);
+
+  // Always enforce 0600 on the file
+  const fileStat = fs.statSync(dbPath);
+  if ((fileStat.mode & 0o777) !== 0o600) {
+    fs.chmodSync(dbPath, 0o600);
+  }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS requests (

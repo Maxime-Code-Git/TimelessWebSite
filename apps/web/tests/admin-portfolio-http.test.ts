@@ -67,7 +67,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
           HOST: "127.0.0.1",
           PORT: String(PORT),
           NODE_ENV: "production",
-          PUBLIC_SITE_URL: BASE_URL,
+          PUBLIC_SITE_URL: BASE_URL.replace("http:", "https:"),
           CONTACT_RATE_LIMIT_SECRET: "test-secret",
           RATE_LIMIT_DB_PATH: dbPath,
           BOOKING_DB_PATH: path.join(tempDir, "booking.db"),
@@ -181,7 +181,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Cookie": anonCookie,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "x-forwarded-for": "127.0.0.1"
       },
       body: new URLSearchParams({ intent: "login", password: "test", csrfToken }),
@@ -218,7 +218,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
 
     const res = await fetch(`${BASE_URL}/admin/portfolio`, {
       method: "POST",
-      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL },
+      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL.replace("http:", "https:") },
       body: params
     });
 
@@ -245,7 +245,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
     });
     const createRes = await fetch(`${BASE_URL}/admin/portfolio`, {
       method: "POST",
-      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL },
+      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL.replace("http:", "https:") },
       body: createParams
     });
     expect(createRes.status).toBe(200);
@@ -266,7 +266,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
 
     const res = await fetch(`${BASE_URL}/admin/portfolio`, {
       method: "POST",
-      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL },
+      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL.replace("http:", "https:") },
       body: params
     });
 
@@ -295,7 +295,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
 
     const res = await fetch(`${BASE_URL}/admin/portfolio`, {
       method: "POST",
-      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL },
+      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL.replace("http:", "https:") },
       body: params
     });
 
@@ -323,7 +323,7 @@ describe("Real HTTP isolation for Portfolio Admin", () => {
 
     const res = await fetch(`${BASE_URL}/admin/portfolio`, {
       method: "POST",
-      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL },
+      headers: { "Cookie": cookie, "Content-Type": "application/x-www-form-urlencoded", "Origin": BASE_URL.replace("http:", "https:") },
       body: params
     });
 

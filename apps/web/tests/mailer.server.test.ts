@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { sendContactEmail, sendBookingConfirmedEmail } from "../app/lib/mailer.server";
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 
 vi.mock("../app/lib/env.server", () => {
   return {
@@ -23,7 +23,7 @@ describe("Mailer Server", () => {
     sendMailMock.mockClear();
     vi.spyOn(nodemailer, "createTransport").mockReturnValue({
       sendMail: sendMailMock
-    } as unknown as nodemailer.Transporter);
+    } as unknown as Transporter);
   });
 
   afterEach(() => {

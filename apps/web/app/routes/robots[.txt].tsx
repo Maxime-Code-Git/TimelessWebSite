@@ -17,6 +17,7 @@ export async function loader() {
     "Disallow: /en/client-area",
     "Disallow: /fr/galerie/",
     "Disallow: /en/gallery/",
+    "Disallow: /admin",
     "Disallow: /maintenance",
   ];
 

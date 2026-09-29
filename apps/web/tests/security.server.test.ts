@@ -61,11 +61,28 @@ describe("security.server", () => {
   });
 
   describe("getClientIp", () => {
-    it("should return X-Forwarded-For when TRUST_PROXY is true", () => {
+    it("should prefer CF-Connecting-IP over X-Forwarded-For", () => {
+      const req = new Request("https://timeless.example.com", {
+        headers: { 
+          "cf-connecting-ip": "1.1.1.1",
+          "x-forwarded-for": "2.2.2.2" 
+        },
+      });
+      expect(getClientIp(req)).toBe("1.1.1.1");
+    });
+
+    it("should fallback to X-Forwarded-For if CF-Connecting-IP is missing", () => {
       const req = new Request("https://timeless.example.com", {
         headers: { "x-forwarded-for": "192.168.1.1" },
       });
       expect(getClientIp(req)).toBe("192.168.1.1");
+    });
+
+    it("should reject multiple IPs in CF-Connecting-IP to prevent spoofing", () => {
+      const req = new Request("https://timeless.example.com", {
+        headers: { "cf-connecting-ip": "1.1.1.1, 2.2.2.2" },
+      });
+      expect(getClientIp(req)).toBe(null);
     });
 
     it("should reject multiple IPs in X-Forwarded-For to prevent spoofing", () => {

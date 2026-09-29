@@ -54,7 +54,7 @@ describe("Real HTTP isolation WITH valid admin config", () => {
           HOST: "127.0.0.1",
           PORT: String(PORT),
           NODE_ENV: "production",
-          PUBLIC_SITE_URL: BASE_URL,
+          PUBLIC_SITE_URL: BASE_URL.replace("http:", "https:"),
           CONTACT_RATE_LIMIT_SECRET: "test-secret",
           RATE_LIMIT_DB_PATH: dbPath,
           BOOKING_DB_PATH: path.join(tempDir, "booking.db"),
@@ -137,7 +137,7 @@ describe("Real HTTP isolation WITH valid admin config", () => {
         body: new URLSearchParams({ csrfToken, pricing: "{}", business: "{}" }),
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "Origin": BASE_URL,
+          "Origin": BASE_URL.replace("http:", "https:"),
           "Cookie": cookies || "",
           "x-forwarded-for": "127.0.0.1"
         },
@@ -173,7 +173,7 @@ describe("Real HTTP isolation WITH valid admin config", () => {
       body: new URLSearchParams({ intent: "login", password: "test", csrfToken }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Cookie": anonCookie || "",
         "x-forwarded-for": "127.0.0.1"
       },
@@ -206,7 +206,7 @@ describe("Real HTTP isolation WITH valid admin config", () => {
             body: new URLSearchParams({ csrfToken: newCsrfToken, revision, pricing: "{}", business: "{}" }),
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
-              "Origin": BASE_URL,
+              "Origin": BASE_URL.replace("http:", "https:"),
               "Cookie": authCookie,
               "x-forwarded-for": "127.0.0.1"
             },
@@ -247,7 +247,7 @@ describe("Real HTTP isolation WITHOUT admin config", () => {
           HOST: "127.0.0.1",
           PORT: String(PORT),
           NODE_ENV: "production",
-          PUBLIC_SITE_URL: BASE_URL,
+          PUBLIC_SITE_URL: BASE_URL.replace("http:", "https:"),
           CONTACT_RATE_LIMIT_SECRET: "test-secret",
           RATE_LIMIT_DB_PATH: dbPath,
           BOOKING_DB_PATH: path.join(tempDir, "booking.db"),
@@ -329,7 +329,7 @@ describe("Real HTTP isolation WITHOUT admin config", () => {
       body: new URLSearchParams({ password: "anything" }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "x-forwarded-for": "127.0.0.1"
       },
       redirect: "manual",

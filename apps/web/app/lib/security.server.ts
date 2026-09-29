@@ -14,19 +14,35 @@ export function validateOrigin(request: Request): boolean {
   }
 }
 
+/**
+ * Extracts the real client IP address from the request.
+ * SECURITY: When TRUST_PROXY is true, the application MUST run behind a trusted
+ * reverse proxy (like Cloudflare or an internal API gateway) that strictly enforces
+ * CF-Connecting-IP and/or X-Forwarded-For. Direct access to the origin must be blocked.
+ */
 export function getClientIp(request: Request): string | null {
   if (ENV.TRUST_PROXY) {
-    const forwardedFor = request.headers.get("x-forwarded-for") || "";
+    let ip = request.headers.get("cf-connecting-ip");
+    
+    if (!ip) {
+      ip = request.headers.get("x-forwarded-for");
+    }
+
+    if (!ip) {
+      return null;
+    }
+
     // Reject if multiple IPs (comma) indicating spoofing or multiple uncontrolled proxies
-    if (forwardedFor.includes(",") || !forwardedFor.trim()) {
+    if (ip.includes(",") || !ip.trim()) {
       return null;
     }
-    const ip = forwardedFor.trim();
+    const cleanIp = ip.trim();
+    
     // Strict IP validation using net.isIP
-    if (!net.isIP(ip)) {
+    if (!net.isIP(cleanIp)) {
       return null;
     }
-    return ip;
+    return cleanIp;
   }
   return "127.0.0.1";
 }

@@ -29,7 +29,7 @@ describe("Environment Validation - fail-fast on import", () => {
       SMTP_FROM: "from@example.com",
       SMTP_TO: "to@example.com",
       CONTACT_RATE_LIMIT_SECRET: "secret",
-      RATE_LIMIT_DB_PATH: "./db.sqlite",
+      RATE_LIMIT_DB_PATH: path.join(os.tmpdir(), "db.sqlite"),
       ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$...",
       ADMIN_SESSION_SECRET: "admin_secret",
       PORTFOLIO_CONTENT_PATH: path.join(os.tmpdir(), "portfolio.json"),
@@ -132,7 +132,7 @@ describe("Environment Validation - fail-fast on import", () => {
 
       const err = await captureImportError();
       expect(err).not.toBeNull();
-      if (varName.startsWith("PORTFOLIO_") || varName === "BOOKING_DB_PATH") {
+      if (varName.startsWith("PORTFOLIO_") || varName === "BOOKING_DB_PATH" || varName === "RATE_LIMIT_DB_PATH") {
         expect(err!.message).toContain(`${varName} is required in test`);
       } else {
         expect(err!.message).toContain(`${varName} is missing`);
@@ -204,6 +204,34 @@ describe("Environment Validation - fail-fast on import", () => {
     const err = await captureImportError();
     expect(err).not.toBeNull();
     expect(err!.message).toContain("HTTP or HTTPS protocol");
+  });
+
+  it("should fail in production with PUBLIC_SITE_URL=http://example.com", async () => {
+    const env = validEnv();
+    env.PUBLIC_SITE_URL = "http://example.com";
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("CRITICAL: PUBLIC_SITE_URL must use https:// in production");
+  });
+
+  it("should accept PUBLIC_SITE_URL=http://example.com in test", async () => {
+    const env = validEnv();
+    env.PUBLIC_SITE_URL = "http://example.com";
+    setEnv(env);
+    process.env.NODE_ENV = "test";
+    const err = await captureImportError();
+    expect(err).toBeNull();
+  });
+
+  it("should accept PUBLIC_SITE_URL=http://example.com in development", async () => {
+    const env = validEnv();
+    env.PUBLIC_SITE_URL = "http://example.com";
+    setEnv(env);
+    process.env.NODE_ENV = "development";
+    const err = await captureImportError();
+    expect(err).toBeNull();
   });
 
   it("should not leak secret values in error messages", async () => {
@@ -452,6 +480,39 @@ describe("Environment Validation - fail-fast on import", () => {
     const err = await captureImportError();
     expect(err).not.toBeNull();
     expect(err!.message).toContain("Environment variable PORTFOLIO_MEDIA_PATH is missing");
+  });
+
+  it("should fail in production if RATE_LIMIT_DB_PATH is relative", async () => {
+    const env = validEnv();
+    env.RATE_LIMIT_DB_PATH = "data/db/rate-limit.sqlite";
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("RATE_LIMIT_DB_PATH must be an absolute path");
+  });
+
+  it("should fail in production if RATE_LIMIT_DB_PATH is under public", async () => {
+    const env = validEnv();
+    env.RATE_LIMIT_DB_PATH = path.join(process.cwd(), "public", "rate-limit.sqlite");
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("RATE_LIMIT_DB_PATH must not be under public or build directories");
+  });
+
+  it("should fail in production if RATE_LIMIT_DB_PATH is under build", async () => {
+    const env = validEnv();
+    env.RATE_LIMIT_DB_PATH = path.join(process.cwd(), "build", "rate-limit.sqlite");
+    setEnv(env);
+    process.env.NODE_ENV = "production";
+
+    const err = await captureImportError();
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain("RATE_LIMIT_DB_PATH must not be under public or build directories");
   });
 
   it("should resolve symlinks and reject if real path is under public or build", async () => {

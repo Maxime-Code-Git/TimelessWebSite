@@ -18,7 +18,7 @@ vi.mock("../app/lib/env.server", () => ({
   }
 }));
 
-import { requireSecureAdminMutation, ActionSecurityError, requireValidAdminSession } from "../app/lib/admin-auth.server";
+import { requireSecureAdminMutation, ActionSecurityError, requireValidAdminSession, createAdminHeaders } from "../app/lib/admin-auth.server";
 import { requireAdminSession } from "../app/lib/auth.server";
 
 // Mock the dependencies
@@ -160,5 +160,13 @@ describe("admin-auth.server.ts", () => {
       expect(res.headers.get("Location")).toBe("/admin");
       expect(res.headers.get("Set-Cookie")).toBe("destroyed_cookie");
     }
+  });
+
+  it("createAdminHeaders should set correct cache and robots headers", () => {
+    const headers = createAdminHeaders();
+    expect(headers.get("Cache-Control")).toBe("no-store, no-cache, must-revalidate, proxy-revalidate");
+    expect(headers.get("Pragma")).toBe("no-cache");
+    expect(headers.get("Expires")).toBe("0");
+    expect(headers.get("X-Robots-Tag")).toBe("noindex, nofollow");
   });
 });

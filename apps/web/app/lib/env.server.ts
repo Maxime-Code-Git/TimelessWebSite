@@ -73,25 +73,23 @@ function validateProductionPath(val: string, name: string, isMedia: boolean): st
     throw new Error(`CRITICAL: ${name} or its parent directory is not writable or does not exist.`);
   }
 
-  if (isMedia) {
-    let realPathToCheck = val;
+  let realPathToCheck = val;
+  try {
+    realPathToCheck = fs.realpathSync(exists ? val : path.dirname(val));
+  } catch {
+    // Ignored
+  }
+  const forbiddenDirs = ["public", "build"].map(d => path.join(process.cwd(), d));
+  for (const fDir of forbiddenDirs) {
+    let realFDir = fDir;
     try {
-      realPathToCheck = fs.realpathSync(exists ? val : path.dirname(val));
+      realFDir = fs.realpathSync(fDir);
     } catch {
       // Ignored
     }
-    const forbiddenDirs = ["public", "build"].map(d => path.join(process.cwd(), d));
-    for (const fDir of forbiddenDirs) {
-      let realFDir = fDir;
-      try {
-        realFDir = fs.realpathSync(fDir);
-      } catch {
-        // Ignored
-      }
-      const rel = path.relative(realFDir, realPathToCheck);
-      if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
-        throw new Error(`CRITICAL: ${name} must not be under public or build directories.`);
-      }
+    const rel = path.relative(realFDir, realPathToCheck);
+    if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
+      throw new Error(`CRITICAL: ${name} must not be under public or build directories.`);
     }
   }
 
@@ -139,8 +137,14 @@ export const ENV = {
       if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
         throw new Error();
       }
-    } catch {
-      throw new Error("CRITICAL: PUBLIC_SITE_URL is not a valid URL or does not use HTTP or HTTPS protocol.");
+      if (process.env.NODE_ENV === "production" && parsed.protocol !== "https:") {
+        throw new Error("HTTPS_REQUIRED");
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message === "HTTPS_REQUIRED") {
+        throw new Error("CRITICAL: PUBLIC_SITE_URL must use https:// in production.", { cause: e });
+      }
+      throw new Error("CRITICAL: PUBLIC_SITE_URL is not a valid URL or does not use HTTP or HTTPS protocol.", { cause: e });
     }
     return url;
   },
@@ -181,7 +185,15 @@ export const ENV = {
     return requireEnvVar("CONTACT_RATE_LIMIT_SECRET");
   },
   get RATE_LIMIT_DB_PATH() {
-    return requireEnvVar("RATE_LIMIT_DB_PATH");
+    const isProd = process.env.NODE_ENV === "production";
+    const isTest = process.env.NODE_ENV === "test";
+    const val = process.env.RATE_LIMIT_DB_PATH;
+    if (isProd) {
+      if (!val) throw new Error("CRITICAL: Environment variable RATE_LIMIT_DB_PATH is missing. Please check your .env files.");
+      return validateProductionPath(val, "RATE_LIMIT_DB_PATH", false);
+    }
+    if (isTest) return validateTestPath(val, "RATE_LIMIT_DB_PATH");
+    return path.resolve(val || "./data/db/rate-limit.sqlite");
   },
   get CONTACT_RATE_LIMIT_MAX() {
     const val = process.env.CONTACT_RATE_LIMIT_MAX || "5";

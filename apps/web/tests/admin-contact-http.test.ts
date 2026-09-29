@@ -53,7 +53,7 @@ describe("Admin Contact Route", () => {
           HOST: "127.0.0.1",
           PORT: String(PORT),
           NODE_ENV: "production",
-          PUBLIC_SITE_URL: BASE_URL,
+          PUBLIC_SITE_URL: BASE_URL.replace("http:", "https:"),
           // Admin config
           ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$xDSx00u+uSs9AcMqypmthw$ubmjWhg1XWL+Yp496qb5LLlTx0FK4lwqy9pvKa5ills", // password 'test'
           ADMIN_SESSION_SECRET: "12345678901234567890123456789012", // 32 chars
@@ -112,7 +112,7 @@ describe("Admin Contact Route", () => {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Cookie": initialCookie,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Referer": `${BASE_URL}/admin`,
         "x-forwarded-for": "127.0.0.1"
       },
@@ -158,7 +158,7 @@ describe("Admin Contact Route", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "x-forwarded-for": "127.0.0.1"
       },
       body: formData,
@@ -192,7 +192,7 @@ describe("Admin Contact Route", () => {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Cookie": validSessionCookie,
-        "Origin": BASE_URL,
+        "Origin": BASE_URL.replace("http:", "https:"),
         "Referer": `${BASE_URL}/admin/contact`,
         "x-forwarded-for": "127.0.0.1",
         ...headers
