@@ -1,5 +1,21 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { vi } from "vitest";
+
+const mockFetcher = {
+  data: {} as Record<string, unknown>,
+  state: "idle",
+  submit: vi.fn(),
+  Form: ({ children, ...props }: React.FormHTMLAttributes<HTMLFormElement>) => <form {...props}>{children}</form>
+};
+
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  return {
+    ...actual,
+    useFetcher: () => mockFetcher
+  };
+});
 import DataRetentionPage from "../app/routes/admin.data-retention";
 import { createMemoryRouter, RouterProvider } from "react-router";
 
@@ -97,8 +113,11 @@ describe("Admin Data Retention React UI", () => {
     await waitFor(() => expect(deleteJohn).toHaveFocus());
   });
 
-  it("message d'erreur a role=alert", async () => {
-    // Render with error action data
+  it("message d'erreur a role=alert et modale reste ouverte", async () => {
+    // Override fetcher data for this test
+    mockFetcher.data = { error: "Test error message" };
+    mockFetcher.state = "idle";
+    
     const router = createMemoryRouter([
       {
         path: "/",
@@ -109,14 +128,52 @@ describe("Admin Data Retention React UI", () => {
           csrfToken: "mock-csrf",
           q: "",
           deletionJobs: { pending: 0, processing: 0, failed: 0, failedJobs: [] }
-        }),
-        action: async () => ({ error: "Test error message" })
+        })
       }
     ], { initialEntries: ["/"] });
 
     const { unmount } = render(<RouterProvider router={router} />);
-    // We can't easily trigger action data in this test setup,
-    // but the component renders role="alert" when actionData.error exists
+    
+    const buttons = await screen.findAllByRole("button", { name: "Supprimer" });
+    fireEvent.click(buttons[0]);
+    
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Test error message");
+    
+    // Modal is still open
+    expect(screen.getByRole("dialog", { name: "Suppression définitive" })).toBeDefined();
+    
+    // Focus should be returned to the input field
+    const input = screen.getByLabelText(/Veuillez taper SUPPRIMER/i);
+    await waitFor(() => expect(input).toHaveFocus());
+    unmount();
+  });
+
+  it("modale se ferme sur succès et focus est restauré", async () => {
+    mockFetcher.data = { success: true };
+    mockFetcher.state = "idle";
+    
+    const router = createMemoryRouter([
+      {
+        path: "/",
+        element: <DataRetentionPage />,
+        loader: () => ({
+          bookings: mockBookings,
+          galleries: [],
+          csrfToken: "mock-csrf",
+          q: "",
+          deletionJobs: { pending: 0, processing: 0, failed: 0, failedJobs: [] }
+        })
+      }
+    ], { initialEntries: ["/"] });
+
+    const { unmount } = render(<RouterProvider router={router} />);
+    
+    const buttons = await screen.findAllByRole("button", { name: "Supprimer" });
+    fireEvent.click(buttons[0]);
+    
+    // Since fetcher data is already success=true, the effect should close it immediately
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     unmount();
   });
 

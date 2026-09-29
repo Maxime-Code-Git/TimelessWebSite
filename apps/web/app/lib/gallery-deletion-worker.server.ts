@@ -136,7 +136,7 @@ export function processGalleryDeletions(): void {
           "SELECT attempt_count FROM gallery_deletion_jobs WHERE id = ?"
         ).get(job.id) as { attempt_count: number } | undefined;
 
-        if (currentJob && currentJob.attempt_count >= MAX_ATTEMPTS) {
+        if (currentJob && currentJob.attempt_count > MAX_ATTEMPTS) {
           failMaxAttempts.run(Date.now(), job.id, MAX_ATTEMPTS);
           continue;
         }

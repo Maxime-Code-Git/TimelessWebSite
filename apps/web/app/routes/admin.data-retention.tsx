@@ -8,15 +8,17 @@ import {
   useActionData,
   useLoaderData,
   useNavigation,
-  useSubmit
+
+  useFetcher
 } from "react-router";
-import { requireAdminSession, constantTimeEqual } from "../lib/auth.server";
-import { createAdminHeaders } from "../lib/admin-auth.server";
-import { validateOrigin } from "../lib/security.server";
+import { requireAdminSession } from "../lib/auth.server";
+import { createAdminHeaders, validateAdminFormData } from "../lib/admin-auth.server";
+
 import { getBookingDb } from "../lib/db-booking.server";
 import {
   getGalleryDb,
-  deleteGalleryAndQuarantine
+  deleteGalleryAndQuarantine,
+  deleteGalleriesAndQuarantineBulk
 } from "../lib/gallery-db.server";
 import {
   processGalleryDeletions,
@@ -67,7 +69,7 @@ interface LoaderData {
 
 // ── Constants ────────────────────────────────────────────────
 
-const MAX_BODY_SIZE = 131072; // 128 KB
+
 const MAX_BULK_IDS = 50;
 const VALID_INTENTS = [
   "export_booking",
@@ -180,51 +182,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
 // ── Action ───────────────────────────────────────────────────
 
 export async function action({ request }: ActionFunctionArgs) {
-  if (request.method !== "POST") {
-    return new Response("Method Not Allowed", { status: 405, headers: secureHeaders() });
-  }
-
-  if (!validateOrigin(request)) {
-    return errorResponse("Forbidden", 403);
-  }
-
-  // Content-Type validation
-  const rawContentType = request.headers.get("content-type") || "";
-  const mimeType = rawContentType.split(";")[0]?.trim().toLowerCase();
-  if (mimeType !== "application/x-www-form-urlencoded" && mimeType !== "multipart/form-data") {
-    return new Response("Unsupported Media Type", { status: 415, headers: secureHeaders() });
-  }
-
-  // Content-Length validation
-  const clHeader = request.headers.get("content-length");
-  if (clHeader !== null) {
-    if (!/^\d+$/.test(clHeader)) {
-      return errorResponse("Invalid Content-Length", 400);
-    }
-    const cl = Number(clHeader);
-    if (!Number.isInteger(cl) || cl < 0 || cl > MAX_BODY_SIZE) {
-      return errorResponse("Payload Too Large", 413);
-    }
-  }
-
-  // Session validation
-  const { isValid, session } = await requireAdminSession(request);
-  if (!isValid) {
-    return new Response("Unauthorized", { status: 401, headers: secureHeaders() });
-  }
-
   let formData: FormData;
   try {
-    formData = await request.formData();
-  } catch {
-    return errorResponse("Bad Request", 400);
-  }
-
-  // CSRF
-  const formCsrf = String(formData.get("csrfToken") ?? "");
-  const sessionCsrf = session.get("csrfToken") ?? "";
-  if (!formCsrf || !sessionCsrf || !constantTimeEqual(formCsrf, sessionCsrf)) {
-    return errorResponse("Invalid CSRF token", 403);
+    formData = await validateAdminFormData(request);
+  } catch (err: unknown) {
+    if (err instanceof Response) return err;
+    if (err && typeof err === "object" && "name" in err && err.name === "ActionSecurityError") {
+      const secErr = err as unknown as { status: number; message: string };
+      return new Response(secErr.message, { status: secErr.status, headers: secureHeaders() });
+    }
+    return new Response("Bad Request", { status: 400, headers: secureHeaders() });
   }
 
   // Intent validation (closed list)
@@ -399,15 +366,15 @@ export async function action({ request }: ActionFunctionArgs) {
       if (!g) return errorResponse(`Galerie introuvable : ${id}`, 404);
     }
 
-    let successCount = 0;
-    for (const id of uniqueIds) {
-      deleteGalleryAndQuarantine(id);
-      successCount++;
+    try {
+      const deletedCount = deleteGalleriesAndQuarantineBulk(uniqueIds);
+      return Response.json(
+        { success: true, message: `${deletedCount} galeries supprimées et mises en quarantaine.`, deletedCount },
+        { headers: secureHeaders() }
+      );
+    } catch {
+      return errorResponse("Erreur lors de la suppression groupée de galeries", 500);
     }
-    return Response.json(
-      { success: true, message: `${successCount} galeries supprimées et mises en quarantaine.`, deletedCount: successCount },
-      { headers: secureHeaders() }
-    );
   }
 
   // ── Retry failed job ───────────────────────────────────
@@ -444,8 +411,9 @@ export default function DataRetentionPage() {
   const { bookings, galleries, csrfToken, q, deletionJobs } = useLoaderData<LoaderData>();
   const actionData = useActionData<{ error?: string; success?: boolean; message?: string }>();
   const navigation = useNavigation();
-  const submit = useSubmit();
+  const fetcher = useFetcher<{ error?: string; success?: boolean; message?: string }>();
   const isSubmitting = navigation.state !== "idle";
+  const isDeleting = fetcher.state !== "idle";
 
   const [search, setSearch] = useState(q);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -547,12 +515,18 @@ export default function DataRetentionPage() {
     }
   }, [deleteModal.triggerElement]);
 
-  const submitDelete = useCallback((e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    submit(formData, { method: "post" });
-    closeDeleteModal();
-  }, [submit, closeDeleteModal]);
+  // Close modal when fetcher completes successfully
+  useEffect(() => {
+    if (fetcher.state === "idle" && deleteModal.isOpen) {
+      if (fetcher.data?.success) {
+        closeDeleteModal();
+      } else if (fetcher.data?.error) {
+        confirmInputRef.current?.focus();
+      }
+    }
+  }, [fetcher.state, fetcher.data, deleteModal.isOpen, closeDeleteModal]);
+
+
 
   return (
     <div className={styles.container}>
@@ -839,7 +813,12 @@ export default function DataRetentionPage() {
             )}
             <p>Cette action est <strong>irréversible</strong>.</p>
 
-            <Form onSubmit={submitDelete}>
+            <fetcher.Form method="post">
+              {fetcher.data?.error && (
+                <div className={styles.error} role="alert">
+                  {fetcher.data.error}
+                </div>
+              )}
               <input
                 type="hidden"
                 name="intent"
@@ -870,14 +849,14 @@ export default function DataRetentionPage() {
               </div>
 
               <div className={styles.modalActions}>
-                <button type="button" className={styles.cancelButton} onClick={closeDeleteModal}>
+                <button type="button" className={styles.cancelButton} onClick={closeDeleteModal} disabled={isDeleting}>
                   Annuler
                 </button>
-                <button type="submit" className={styles.dangerButton} disabled={isSubmitting}>
+                <button type="submit" className={styles.dangerButton} disabled={isDeleting}>
                   Confirmer la suppression
                 </button>
               </div>
-            </Form>
+            </fetcher.Form>
           </div>
         </div>
       )}

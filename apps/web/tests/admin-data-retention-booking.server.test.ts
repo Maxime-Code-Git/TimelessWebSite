@@ -18,6 +18,10 @@ vi.mock("../app/lib/auth.server", async (importOriginal) => {
   };
 });
 
+vi.mock("../app/lib/session.server", () => ({
+  destroySession: vi.fn().mockResolvedValue("destroyed-cookie")
+}));
+
 vi.mock("../app/lib/security.server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../app/lib/security.server")>();
   return {
@@ -102,16 +106,29 @@ describe("Admin Data Retention Booking API", () => {
     });
     const req = new Request("http://localhost/admin/data-retention", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: { 
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": "21"
+      },
       body: "intent=export_booking"
     });
     const res = await callAction(req);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(302); // Redirects to /admin
   });
 
   it("Origin invalide → 403", async () => {
+    vi.mocked(authServer.requireAdminSession).mockResolvedValue({
+      isValid: true,
+      session: { get: () => "valid-csrf" } as unknown as import("react-router").Session
+    });
     vi.mocked(securityServer.validateOrigin).mockReturnValue(false);
-    const req = new Request("http://localhost/admin/data-retention", { method: "POST" });
+    const req = new Request("http://localhost/admin/data-retention", { 
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": "0"
+      }
+    });
     const res = await callAction(req);
     expect(res.status).toBe(403);
   });
@@ -131,7 +148,10 @@ describe("Admin Data Retention Booking API", () => {
 
     const req = new Request("http://localhost/admin/data-retention", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: { 
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": formData.toString().length.toString()
+      },
       body: formData.toString()
     });
     const res = await callAction(req);
@@ -139,10 +159,17 @@ describe("Admin Data Retention Booking API", () => {
   });
 
   it("Content-Type invalide → 415", async () => {
+    vi.mocked(authServer.requireAdminSession).mockResolvedValue({
+      isValid: true,
+      session: { get: () => "valid-csrf" } as unknown as import("react-router").Session
+    });
     vi.mocked(securityServer.validateOrigin).mockReturnValue(true);
     const req = new Request("http://localhost/admin/data-retention", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Content-Length": "2"
+      },
       body: "{}"
     });
     const res = await callAction(req);
@@ -349,5 +376,63 @@ describe("Admin Data Retention Booking API", () => {
     const req = createRequest("unknown_intent", {});
     const res = await callAction(req);
     expect(res.headers.get("X-Robots-Tag")).toContain("noindex");
+  });
+
+  describe("Payload Limits & Security", () => {
+    it("corps sans Content-Length inférieur à la limite", async () => {
+      const req = createRequest("export_booking", { id: "book-1" });
+      req.headers.delete("content-length");
+      const resp = await callAction(req);
+      expect(resp.status).toBe(200);
+    });
+
+    it("corps sans Content-Length supérieur à la limite", async () => {
+      const largeData = "x".repeat(131073);
+      const req = createRequest("export_booking", { id: "book-1", padding: largeData });
+      req.headers.delete("content-length");
+      const resp = await callAction(req);
+      expect(resp.status).toBe(413);
+    });
+
+    it("longueur décimale, négative, non numérique ou non sûre", async () => {
+      const cases = ["12.5", "-1", "abc", "9007199254740992"];
+      for (const cl of cases) {
+        const req = createRequest("export_booking", { id: "book-1" });
+        req.headers.set("content-length", cl);
+        const resp = await callAction(req);
+        expect(resp.status).toBe(400);
+      }
+    });
+
+    it("corps vide", async () => {
+      const req = new Request("http://localhost/admin/data-retention", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+      vi.mocked(authServer.requireAdminSession).mockResolvedValue({
+        isValid: true,
+        session: { get: () => "valid-csrf" } as unknown as import("react-router").Session
+      });
+      vi.mocked(securityServer.validateOrigin).mockReturnValue(true);
+
+      const resp = await callAction(req);
+      expect(resp.status).toBe(400);
+    });
+
+    it("corps malformé (pas form-urlencoded)", async () => {
+      const req = new Request("http://localhost/admin/data-retention", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intent: "export_booking", id: "book-1" })
+      });
+      vi.mocked(authServer.requireAdminSession).mockResolvedValue({
+        isValid: true,
+        session: { get: () => "valid-csrf" } as unknown as import("react-router").Session
+      });
+      vi.mocked(securityServer.validateOrigin).mockReturnValue(true);
+
+      const resp = await callAction(req);
+      expect(resp.status).toBe(415);
+    });
   });
 });
