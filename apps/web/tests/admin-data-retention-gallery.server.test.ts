@@ -23,7 +23,7 @@ vi.mock("node:fs", async (importOriginal) => {
 let tmpDir: string;
 let db: DatabaseSync;
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-gallery-test-"));
   const dbPath = path.join(tmpDir, "gallery.sqlite");
   vi.spyOn(ENV, "GALLERY_DB_PATH", "get").mockReturnValue(dbPath);
@@ -32,7 +32,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "media"), { recursive: true });
   fs.mkdirSync(path.join(tmpDir, "imports"), { recursive: true });
 
-  db = openGalleryDb(dbPath);
+  db = await import("../app/lib/gallery-db.server").then(m => m.getGalleryDb());
 
   db.prepare(`
     INSERT INTO galleries (id, public_id, bride_names, wedding_date, status, expires_at, created_at, guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted, import_path)
@@ -277,7 +277,9 @@ describe("Gallery Deletion Worker", () => {
     const quarantineDir = path.resolve(trashBase, job.relative_quarantine_path.replace(/^\.trash\/gallery-deletions\//, ""));
 
     // Replace quarantine with symlink
+    (globalThis as unknown as { mockRmSyncThrow: boolean }).mockRmSyncThrow = false;
     fs.rmSync(quarantineDir, { recursive: true, force: true });
+    (globalThis as unknown as { mockRmSyncThrow: boolean }).mockRmSyncThrow = true;
     const fakeTarget = path.join(tmpDir, "fake-target");
     fs.mkdirSync(fakeTarget);
     fs.symlinkSync(fakeTarget, quarantineDir, "dir");

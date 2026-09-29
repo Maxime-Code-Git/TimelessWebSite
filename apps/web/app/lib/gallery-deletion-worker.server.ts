@@ -142,7 +142,7 @@ export function processGalleryDeletions(): void {
         }
 
         // Validate quarantine path is confined within trash
-        const quarantineDir = path.resolve(trashBase, job.relative_quarantine_path);
+        const quarantineDir = path.resolve(baseMedia, job.relative_quarantine_path);
         validateConfinement(trashBase, quarantineDir);
 
         // Reject symlinks

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import DataRetentionPage from "../app/routes/admin.data-retention";
 import { createMemoryRouter, RouterProvider } from "react-router";
 
@@ -94,7 +94,7 @@ describe("Admin Data Retention React UI", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
 
     // Focus returns to trigger button
-    expect(deleteJohn).toHaveFocus();
+    await waitFor(() => expect(deleteJohn).toHaveFocus());
   });
 
   it("message d'erreur a role=alert", async () => {

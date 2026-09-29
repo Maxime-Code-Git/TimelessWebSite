@@ -403,7 +403,7 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
       try {
         fs.renameSync(quarantineDir, mediaDir);
       } catch (restoreErr: unknown) {
-        // Restore failed — critical but we can't expose raw fs errors
+        // Restore failed - critical but we can't expose raw fs errors
         throw new Error("RESTORE_FAILED", { cause: restoreErr });
       }
     }
@@ -420,7 +420,7 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
          WHERE id = ?`
       ).run(Date.now(), jobId);
     } catch {
-      // Cleanup failed — job stays pending for worker retry
+      // Cleanup failed - job stays pending for worker retry
       db.prepare(
         `UPDATE gallery_deletion_jobs
          SET error_message = 'CLEANUP_FAILED', attempt_count = attempt_count + 1, updated_at = ?
