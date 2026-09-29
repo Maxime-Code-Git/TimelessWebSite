@@ -288,7 +288,7 @@ describe("Admin Data Retention React UI", () => {
 
     // Verify value retention for gallery search
     expect((galleryInput as HTMLInputElement).value).toBe("search-gal");
-    
+
     // Verify value retention for booking search
     const bookingInput = await screen.findByLabelText("Email, Nom, ID, Statut ou Date");
     expect((bookingInput as HTMLInputElement).value).toBe("search-book");
@@ -301,4 +301,3 @@ describe("Admin Data Retention React UI", () => {
     expect((hiddenQInGallery as HTMLInputElement).value).toBe("search-book");
   });
 });
-
