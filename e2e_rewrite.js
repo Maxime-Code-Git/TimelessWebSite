@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+const fs = require('fs');
+const content = `import { test, expect } from "@playwright/test";
 import { DatabaseSync } from "node:sqlite";
 import * as path from "node:path";
 import * as fs from "node:fs";
@@ -11,9 +12,9 @@ test.describe("Data Retention & GDPR Administration", () => {
 
     const projectName = testInfo.project.name.replace(/[^a-z0-9]/gi, "-").toLowerCase();
     const uniqueId = crypto.randomUUID().split("-")[0];
-    const suffix = `${projectName}-${testInfo.retry}-${uniqueId}`;
-    const testBookingName = `E2ERetention${suffix}`;
-    const testBookingEmail = `retention-${suffix}@test.local`;
+    const suffix = \`\${projectName}-\${testInfo.retry}-\${uniqueId}\`;
+    const testBookingName = \`E2ERetention\${suffix}\`;
+    const testBookingEmail = \`retention-\${suffix}@test.local\`;
 
     try {
       // 1. Fetch available slots
@@ -37,7 +38,7 @@ test.describe("Data Retention & GDPR Administration", () => {
 
       const createRes = await request.post("/api/booking", {
         data: bookingPayload,
-        headers: {
+        headers: { 
           "Content-Type": "application/json",
           "Origin": "http://127.0.0.1:3000"
         }
@@ -116,38 +117,38 @@ test.describe("Data Retention & GDPR Administration", () => {
     if (!password) throw new Error("E2E_ADMIN_PASSWORD is required");
 
     const uniqueId = crypto.randomUUID().split("-")[0];
-    const galId = `e2e-gal-${uniqueId}`;
-    const galName = `E2E Gallery ${uniqueId}`;
-
+    const galId = \`e2e-gal-\${uniqueId}\`;
+    const galName = \`E2E Gallery \${uniqueId}\`;
+    
     const dbPath = process.env.DB_GALLERY_PATH || path.join(process.cwd(), "data", "gallery.db");
     const mediaRoot = process.env.GALLERIES_DIR || path.join(process.cwd(), "public", "galleries");
     const quarantineRoot = process.env.GALLERIES_TRASH_DIR || path.join(process.cwd(), ".trash", "galleries");
-    const importSourceDir = path.join(process.cwd(), "tmp", `e2e-source-${uniqueId}`);
-
+    const importSourceDir = path.join(process.cwd(), "tmp", \`e2e-source-\${uniqueId}\`);
+    
     let db: DatabaseSync | null = null;
-
+    
     try {
       // 1. Create isolated gallery in DB
       if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath), { recursive: true });
       db = new DatabaseSync(dbPath);
       // Make sure table exists
-      db.exec(`CREATE TABLE IF NOT EXISTS galleries (
+      db.exec(\`CREATE TABLE IF NOT EXISTS galleries (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         slug TEXT UNIQUE,
         description TEXT,
         status TEXT NOT NULL,
         created_at_utc TEXT NOT NULL
-      )`);
+      )\`);
       db.prepare(
         "INSERT INTO galleries (id, name, slug, status, created_at_utc) VALUES (?, ?, ?, 'published', datetime('now'))"
       ).run(galId, galName, galId);
-
+      
       // 2. Create managed media dir
       const mediaDir = path.join(mediaRoot, galId);
       fs.mkdirSync(mediaDir, { recursive: true });
       fs.writeFileSync(path.join(mediaDir, "test.jpg"), "fake image");
-
+      
       // 3. Create separate import source dir
       fs.mkdirSync(importSourceDir, { recursive: true });
       fs.writeFileSync(path.join(importSourceDir, "source.jpg"), "source image");
@@ -161,21 +162,21 @@ test.describe("Data Retention & GDPR Administration", () => {
       // 4. Navigate to data retention and find gallery
       await page.goto("/admin/data-retention");
       await expect(page.getByRole("heading", { name: "Conservation et suppression des données" })).toBeVisible();
-
+      
       await page.getByLabel("Rechercher dans les galeries (ID ou Nom)").fill(galName);
       await page.getByRole("button", { name: "Rechercher", exact: true }).click();
-
+      
       const row = page.getByRole("row").filter({ hasText: galName });
       await expect(row).toBeVisible();
 
       // 5. Confirm deletion
       await row.getByRole("button", { name: "Supprimer" }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
-
+      
       const confirmInput = page.getByLabel("Veuillez taper SUPPRIMER pour confirmer :");
       await expect(confirmInput).toBeFocused();
       await confirmInput.fill("SUPPRIMER");
-
+      
       // 6. Wait & verify HTTP response
       const deleteResponsePromise = page.waitForResponse(
         (response) => response.url().includes("/admin/data-retention") && response.request().method() === "POST"
@@ -187,15 +188,16 @@ test.describe("Data Retention & GDPR Administration", () => {
       // 7. Verify gallery inaccessible
       await expect(page.getByRole("status")).toContainText("supprimée");
       await expect(page.getByRole("dialog")).not.toBeVisible();
-
+      
       // Check in UI
       await page.getByLabel("Rechercher dans les galeries (ID ou Nom)").fill(galName);
       await page.getByRole("button", { name: "Rechercher", exact: true }).click();
       await expect(page.getByText(galName)).not.toBeVisible();
-
+      
       // 8. Verify media dir deleted or quarantined
       expect(fs.existsSync(mediaDir)).toBe(false);
-
+      // Wait a moment for async file moves in background if any (though DB renameSync is sync)
+      
       // 9. Verify import source dir intact
       expect(fs.existsSync(importSourceDir)).toBe(true);
 
@@ -215,3 +217,5 @@ test.describe("Data Retention & GDPR Administration", () => {
     }
   });
 });
+`;
+fs.writeFileSync('apps/web/e2e/data-retention.spec.ts', content);

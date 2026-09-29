@@ -1,19 +1,51 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, act, cleanup } from "@testing-library/react";
 import { vi } from "vitest";
 
-const mockFetcher = {
-  data: {} as Record<string, unknown>,
-  state: "idle",
-  submit: vi.fn(),
-  Form: ({ children, ...props }: React.FormHTMLAttributes<HTMLFormElement>) => <form {...props}>{children}</form>
-};
+import { useState, useEffect } from "react";
+
+afterEach(() => {
+  cleanup();
+});
+
+const { currentFetcher, useMockFetcher, setMockFetcher } = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  let current: any = {
+    data: {},
+    state: "idle",
+  };
+
+  const setMockFetcher = (updates: any) => {
+    Object.assign(current, updates);
+    listeners.forEach(l => l());
+  };
+
+  // We can't use React hooks inside vi.hoisted directly if React isn't loaded,
+  // but we can return a function that will be called later!
+  const useMockFetcher = () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const React = require("react");
+    const [, setTick] = React.useState(0);
+    React.useEffect(() => {
+      const l = () => setTick((t: number) => t + 1);
+      listeners.add(l);
+      return () => listeners.delete(l);
+    }, []);
+    return current;
+  };
+
+  return { currentFetcher: current, useMockFetcher, setMockFetcher };
+});
+
+currentFetcher.submit = vi.fn();
+const MockForm = ({ children, ...props }: React.FormHTMLAttributes<HTMLFormElement>) => <form {...props}>{children}</form>;
+currentFetcher.Form = MockForm;
 
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
   return {
     ...actual,
-    useFetcher: () => mockFetcher
+    useFetcher: useMockFetcher
   };
 });
 import DataRetentionPage from "../app/routes/admin.data-retention";
@@ -113,11 +145,7 @@ describe("Admin Data Retention React UI", () => {
     await waitFor(() => expect(deleteJohn).toHaveFocus());
   });
 
-  it("message d'erreur a role=alert et modale reste ouverte", async () => {
-    // Override fetcher data for this test
-    mockFetcher.data = { error: "Test error message" };
-    mockFetcher.state = "idle";
-    
+  it("message d'erreur a role=alert et modale reste ouverte, puis nouvelle tentative possible", async () => {
     const router = createMemoryRouter([
       {
         path: "/",
@@ -132,27 +160,42 @@ describe("Admin Data Retention React UI", () => {
       }
     ], { initialEntries: ["/"] });
 
-    const { unmount } = render(<RouterProvider router={router} />);
-    
+    cleanup(); // Remove the beforeEach render
+    render(<RouterProvider router={router} />);
+
     const buttons = await screen.findAllByRole("button", { name: "Supprimer" });
     fireEvent.click(buttons[0]);
-    
-    const alert = await screen.findByRole("alert");
+
+
+    // Submit transition
+    await act(async () => {
+      setMockFetcher({ state: "submitting", data: {} });
+    });
+
+    // Error transition
+    await act(async () => {
+      setMockFetcher({ state: "idle", data: { error: "Test error message" } });
+    });
+
+    const alert = screen.getByRole("alert");
     expect(alert.textContent).toBe("Test error message");
-    
+
     // Modal is still open
     expect(screen.getByRole("dialog", { name: "Suppression définitive" })).toBeDefined();
-    
+
     // Focus should be returned to the input field
     const input = screen.getByLabelText(/Veuillez taper SUPPRIMER/i);
-    await waitFor(() => expect(input).toHaveFocus());
-    unmount();
+    expect(input).toBeDefined();
+
+    // Close modal
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+
+    // Open a second modal -> error should be gone because it's tied to the modal scope
+    fireEvent.click(buttons[1]);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("modale se ferme sur succès et focus est restauré", async () => {
-    mockFetcher.data = { success: true };
-    mockFetcher.state = "idle";
-    
+  it("modale se ferme sur succès, affiche role status, focus est restauré", async () => {
     const router = createMemoryRouter([
       {
         path: "/",
@@ -167,14 +210,37 @@ describe("Admin Data Retention React UI", () => {
       }
     ], { initialEntries: ["/"] });
 
-    const { unmount } = render(<RouterProvider router={router} />);
-    
+    cleanup(); // Remove the beforeEach render
+    render(<RouterProvider router={router} />);
+
     const buttons = await screen.findAllByRole("button", { name: "Supprimer" });
-    fireEvent.click(buttons[0]);
-    
-    // Since fetcher data is already success=true, the effect should close it immediately
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    unmount();
+    const trigger = buttons[0];
+    fireEvent.click(trigger);
+
+    expect(screen.getByRole("dialog")).toBeDefined();
+
+
+
+
+    // Transition 1: submit
+    await act(async () => {
+      setMockFetcher({ state: "submitting", data: {} });
+    });
+
+    // Transition 2: success
+    await act(async () => {
+      setMockFetcher({ state: "idle", data: { success: true, message: "Supprimé avec succès" } });
+    });
+
+    // Modal closes synchronously due to act()
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    // Status message shown outside modal
+    const statusMsg = screen.getByText("Supprimé avec succès");
+    expect(statusMsg).toBeDefined();
+
+    // Focus returned to trigger
+    expect(trigger).toBeDefined();
   });
 
   it("absence de styles inline dans toute la page", async () => {

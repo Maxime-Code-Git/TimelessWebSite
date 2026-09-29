@@ -433,6 +433,16 @@ export default function DataRetentionPage() {
     triggerElement: null
   });
 
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [wasSubmitting, setWasSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (fetcher.state === "submitting" || fetcher.state === "loading") {
+      setWasSubmitting(true);
+      setModalError(null);
+    }
+  }, [fetcher.state]);
+
   const confirmInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -509,22 +519,27 @@ export default function DataRetentionPage() {
 
   const closeDeleteModal = useCallback(() => {
     const trigger = deleteModal.triggerElement;
+    setModalError(null);
+    setWasSubmitting(false);
     setDeleteModal({ isOpen: false, id: null, multiple: false, type: "booking", triggerElement: null });
     if (trigger) {
       requestAnimationFrame(() => trigger.focus());
     }
   }, [deleteModal.triggerElement]);
 
-  // Close modal when fetcher completes successfully
   useEffect(() => {
-    if (fetcher.state === "idle" && deleteModal.isOpen) {
-      if (fetcher.data?.success) {
+    if (fetcher.state === "idle" && wasSubmitting && fetcher.data) {
+      setWasSubmitting(false);
+      if (fetcher.data.success && deleteModal.isOpen) {
+        if (deleteModal.type === "booking") setSelectedIds(new Set());
+        if (deleteModal.type === "gallery") setSelectedGalleryIds(new Set());
         closeDeleteModal();
-      } else if (fetcher.data?.error) {
+      } else if (fetcher.data.error && deleteModal.isOpen) {
+        setModalError(fetcher.data.error as string);
         confirmInputRef.current?.focus();
       }
     }
-  }, [fetcher.state, fetcher.data, deleteModal.isOpen, closeDeleteModal]);
+  }, [fetcher.data, fetcher.state, deleteModal.isOpen, closeDeleteModal, deleteModal.type, wasSubmitting]);
 
 
 
@@ -535,15 +550,15 @@ export default function DataRetentionPage() {
         <p className={styles.subtitle}>Espace administrateur - RGPD</p>
       </header>
 
-      {actionData?.error && (
+      {(actionData?.error || fetcher.data?.error) && !deleteModal.isOpen && (
         <div className={styles.error} role="alert">
-          {actionData.error}
+          {actionData?.error || fetcher.data?.error}
         </div>
       )}
 
-      {actionData?.success && (
+      {(actionData?.success || fetcher.data?.success) && (
         <div className={styles.success} role="status">
-          {actionData.message}
+          {actionData?.message || fetcher.data?.message}
         </div>
       )}
 
@@ -676,7 +691,10 @@ export default function DataRetentionPage() {
                       <button
                         type="button"
                         className={styles.dangerButton}
-                        onClick={(e) => setDeleteModal({ isOpen: true, id: booking.id, multiple: false, type: "booking", triggerElement: e.currentTarget })}
+                        onClick={(e) => {
+                          setModalError(null);
+                          setDeleteModal({ isOpen: true, id: booking.id, multiple: false, type: "booking", triggerElement: e.currentTarget });
+                        }}
                       >
                         Supprimer
                       </button>
@@ -698,7 +716,10 @@ export default function DataRetentionPage() {
             <button
               type="button"
               className={styles.dangerButton}
-              onClick={(e) => setDeleteModal({ isOpen: true, id: null, multiple: true, type: "booking", triggerElement: e.currentTarget })}
+              onClick={(e) => {
+                setModalError(null);
+                setDeleteModal({ isOpen: true, id: null, multiple: true, type: "booking", triggerElement: e.currentTarget });
+              }}
             >
               Supprimer les {selectedIds.size} rendez-vous sélectionnés
             </button>
@@ -759,7 +780,10 @@ export default function DataRetentionPage() {
                       <button
                         type="button"
                         className={styles.dangerButton}
-                        onClick={(e) => setDeleteModal({ isOpen: true, id: gallery.id, multiple: false, type: "gallery", triggerElement: e.currentTarget })}
+                        onClick={(e) => {
+                          setModalError(null);
+                          setDeleteModal({ isOpen: true, id: gallery.id, multiple: false, type: "gallery", triggerElement: e.currentTarget });
+                        }}
                       >
                         Supprimer (Quarantaine)
                       </button>
@@ -781,7 +805,10 @@ export default function DataRetentionPage() {
             <button
               type="button"
               className={styles.dangerButton}
-              onClick={(e) => setDeleteModal({ isOpen: true, id: null, multiple: true, type: "gallery", triggerElement: e.currentTarget })}
+              onClick={(e) => {
+                setModalError(null);
+                setDeleteModal({ isOpen: true, id: null, multiple: true, type: "gallery", triggerElement: e.currentTarget });
+              }}
             >
               Supprimer et mettre en quarantaine les {selectedGalleryIds.size} galeries sélectionnées
             </button>
@@ -814,9 +841,9 @@ export default function DataRetentionPage() {
             <p>Cette action est <strong>irréversible</strong>.</p>
 
             <fetcher.Form method="post">
-              {fetcher.data?.error && (
+              {modalError && (
                 <div className={styles.error} role="alert">
-                  {fetcher.data.error}
+                  {modalError}
                 </div>
               )}
               <input

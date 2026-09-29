@@ -106,7 +106,7 @@ describe("Admin Data Retention Booking API", () => {
     });
     const req = new Request("http://localhost/admin/data-retention", {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Content-Length": "21"
       },
@@ -122,9 +122,9 @@ describe("Admin Data Retention Booking API", () => {
       session: { get: () => "valid-csrf" } as unknown as import("react-router").Session
     });
     vi.mocked(securityServer.validateOrigin).mockReturnValue(false);
-    const req = new Request("http://localhost/admin/data-retention", { 
+    const req = new Request("http://localhost/admin/data-retention", {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Content-Length": "0"
       }
@@ -148,7 +148,7 @@ describe("Admin Data Retention Booking API", () => {
 
     const req = new Request("http://localhost/admin/data-retention", {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "Content-Length": formData.toString().length.toString()
       },
@@ -166,7 +166,7 @@ describe("Admin Data Retention Booking API", () => {
     vi.mocked(securityServer.validateOrigin).mockReturnValue(true);
     const req = new Request("http://localhost/admin/data-retention", {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
         "Content-Length": "2"
       },

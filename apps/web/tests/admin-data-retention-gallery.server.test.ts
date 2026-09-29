@@ -385,7 +385,7 @@ describe("Gallery Compensations & Bulk", () => {
     const baseMedia = path.resolve(ENV.GALLERY_MEDIA_PATH);
     const trashBase = path.join(baseMedia, ".trash");
     fs.rmSync(trashBase, { recursive: true, force: true });
-    
+
     const fakeTarget = path.join(os.tmpdir(), "fake-trash");
     if (!fs.existsSync(fakeTarget)) fs.mkdirSync(fakeTarget);
     fs.symlinkSync(fakeTarget, trashBase, "dir");
@@ -393,7 +393,7 @@ describe("Gallery Compensations & Bulk", () => {
     expect(() => {
       deleteGalleryAndQuarantine("gal-1");
     }).toThrow(/Quarantine base is not a valid directory/);
-    
+
     fs.rmSync(trashBase, { force: true });
   });
 
@@ -437,7 +437,7 @@ describe("Gallery Compensations & Bulk", () => {
     const baseMedia = path.resolve(ENV.GALLERY_MEDIA_PATH);
     const mediaDir1 = path.resolve(baseMedia, "gal-1");
     expect(fs.existsSync(mediaDir1)).toBe(true);
-    
+
     // DB rollback verify
     const gal1 = db.prepare("SELECT * FROM galleries WHERE id = 'gal-1'").get();
     expect(gal1).toBeDefined();

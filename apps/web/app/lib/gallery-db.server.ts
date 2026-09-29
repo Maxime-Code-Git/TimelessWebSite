@@ -360,7 +360,7 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
   // Quarantine lives under GALLERY_MEDIA_PATH/.trash to guarantee same filesystem
   const trashRoot = path.join(baseMedia, ".trash");
   const trashBase = path.join(trashRoot, "gallery-deletions");
-  
+
   // Reject if .trash exists and is a symlink
   if (fs.existsSync(trashRoot)) {
     const rootStat = fs.lstatSync(trashRoot);
@@ -368,7 +368,7 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
       throw new Error("Quarantine base is not a valid directory");
     }
   }
-  
+
   if (fs.existsSync(trashBase)) {
     const trashStat = fs.lstatSync(trashBase);
     if (trashStat.isSymbolicLink() || !trashStat.isDirectory()) {
@@ -413,7 +413,7 @@ export function deleteGalleryAndQuarantine(galleryId: string): void {
     } catch {
       // Ignore rollback error, prioritize file restoration
     }
-    
+
     if (hasMediaDir) {
       try {
         fs.renameSync(quarantineDir, mediaDir);
@@ -455,7 +455,7 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
   if (!Array.isArray(galleryIds) || galleryIds.length === 0) return 0;
   const db = getGalleryDb();
   const baseMedia = path.resolve(ENV.GALLERY_MEDIA_PATH);
-  
+
   // Verify .trash base
   const trashBase = path.join(baseMedia, ".trash", "gallery-deletions");
   if (fs.existsSync(trashBase)) {
@@ -469,7 +469,7 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
 
   // Phase 1: Validate all
   const operations: { id: string; mediaDir: string; quarantineDir: string; hasMediaDir: boolean; relativeQuarantinePath: string; jobId: string }[] = [];
-  
+
   for (const galleryId of galleryIds) {
     if (!galleryId || typeof galleryId !== "string" || !/^[0-9a-zA-Z_-]+$/.test(galleryId)) {
       throw new Error(`Invalid gallery ID: ${galleryId}`);
@@ -503,7 +503,7 @@ export function deleteGalleriesAndQuarantineBulk(galleryIds: string[]): number {
     const jobId = crypto.randomUUID();
     const quarantineDir = path.join(trashBase, jobId);
     const relativeQuarantinePath = path.relative(baseMedia, quarantineDir);
-    
+
     operations.push({ id: galleryId, mediaDir, quarantineDir, hasMediaDir, relativeQuarantinePath, jobId });
   }
 
