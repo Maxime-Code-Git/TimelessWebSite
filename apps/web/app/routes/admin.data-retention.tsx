@@ -739,7 +739,7 @@ export default function DataRetentionPage() {
         <Form method="get" className={styles.searchForm}>
           {/* Preserve the booking search if present */}
           <input type="hidden" name="q" value={q} />
-          
+
           <div className={styles.formGroup}>
             <label htmlFor="gq" className={styles.label}>Rechercher des galeries</label>
             <input

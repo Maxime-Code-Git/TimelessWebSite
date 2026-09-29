@@ -137,8 +137,8 @@ test.describe("Data Retention & GDPR Administration", () => {
       // 1. Create isolated gallery in DB
       db = new DatabaseSync(dbPath);
       db.prepare(
-        `INSERT INTO galleries 
-         (id, public_id, bride_names, wedding_date, import_path, guest_code_hash, couple_code_hash, created_at, expires_at, status) 
+        `INSERT INTO galleries
+         (id, public_id, bride_names, wedding_date, import_path, guest_code_hash, couple_code_hash, created_at, expires_at, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published')`
       ).run(galId, galId, galName, "2026-01-01", importSourceDir, "hash1", "hash2", Date.now(), Date.now() + 100000);
 
@@ -195,7 +195,7 @@ test.describe("Data Retention & GDPR Administration", () => {
       // 8. Verify media dir deleted or quarantined
       expect(fs.existsSync(mediaDir)).toBe(false);
 
-      // 9. Verify import source dir intact
+      // 9. Verify import source dir intac
       expect(fs.existsSync(importSourceDir)).toBe(true);
 
     } finally {
