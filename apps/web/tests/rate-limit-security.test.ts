@@ -48,7 +48,7 @@ describe("Rate Limit DB Security", () => {
     fs.chmodSync(tmpDir, 0o777); // too open
 
     checkRateLimit("127.0.0.1", "contact");
-    
+
     const dirStat = fs.statSync(tmpDir);
     expect((dirStat.mode & 0o777)).toBe(0o700);
   });

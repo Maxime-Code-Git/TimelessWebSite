@@ -191,7 +191,7 @@ export function ContactPage({ lang }: ContactPageProps) {
             {contactContent.contactForm.rgpdNotice && (
               <p className={styles.rgpdNotice}>
                 {contactContent.contactForm.rgpdNotice.text[lang]} <br/>
-                <a href={lang === "fr" ? "/fr/privacy" : "/en/privacy"} target="_blank" rel="noopener noreferrer" className={styles.rgpdLink}>
+                <a href={lang === "fr" ? "/fr/confidentialite" : "/en/privacy"} target="_blank" rel="noopener noreferrer" className={styles.rgpdLink}>
                   {contactContent.contactForm.rgpdNotice.linkLabel[lang]}
                 </a>
               </p>

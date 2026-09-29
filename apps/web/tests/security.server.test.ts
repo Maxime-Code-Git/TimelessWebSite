@@ -63,9 +63,9 @@ describe("security.server", () => {
   describe("getClientIp", () => {
     it("should prefer CF-Connecting-IP over X-Forwarded-For", () => {
       const req = new Request("https://timeless.example.com", {
-        headers: { 
+        headers: {
           "cf-connecting-ip": "1.1.1.1",
-          "x-forwarded-for": "2.2.2.2" 
+          "x-forwarded-for": "2.2.2.2"
         },
       });
       expect(getClientIp(req)).toBe("1.1.1.1");

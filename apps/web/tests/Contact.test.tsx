@@ -37,13 +37,28 @@ describe("ContactPage Component", () => {
     const router = createMemoryRouter([{ path: "/", element: <ContactPage lang="fr" /> }]);
     const { container } = render(<RouterProvider router={router} />);
 
-    // Check contact form RGPD notices
+    // Wait for the booking fetch to complete
+    await waitFor(() => {
+      expect(screen.getByLabelText("Choisissez une date :")).toBeInTheDocument();
+    });
+
+    // Select date and time to reveal the booking form
+    fireEvent.change(screen.getByLabelText("Choisissez une date :"), { target: { value: "2024-12-01" } });
+    fireEvent.change(screen.getByLabelText("Choisissez un horaire :"), { target: { value: "10:00" } });
+
+    // Check contact form RGPD notice
     expect(screen.getByText("Les informations transmises sont utilisées pour répondre à votre demande et préparer une éventuelle prestation.")).toBeInTheDocument();
-    
-    // Check privacy links
+
+    // Check visio form RGPD notice
+    expect(screen.getByText("Les informations transmises sont utilisées pour traiter et organiser votre demande de rendez-vous.")).toBeInTheDocument();
+
+    // Check privacy links (should be multiple: one for Visio, one for Contact)
     const links = screen.getAllByRole("link", { name: "Politique de confidentialité" });
-    expect(links.length).toBeGreaterThanOrEqual(1);
-    expect(links[0]).toHaveAttribute("href", "/fr/privacy");
+    expect(links.length).toBeGreaterThanOrEqual(2);
+
+    // Verify that all instances point to /fr/confidentialite
+    expect(links[0]).toHaveAttribute("href", "/fr/confidentialite");
+    expect(links[1]).toHaveAttribute("href", "/fr/confidentialite");
 
     // No undefined classes
     expect(container.innerHTML).not.toContain('class="undefined"');
@@ -53,13 +68,24 @@ describe("ContactPage Component", () => {
     const router = createMemoryRouter([{ path: "/", element: <ContactPage lang="en" /> }]);
     const { container } = render(<RouterProvider router={router} />);
 
+    // Wait for the booking fetch to complete
+    await waitFor(() => {
+      expect(screen.getByLabelText("Select a date:")).toBeInTheDocument();
+    });
+
+    // Select date and time to reveal the booking form
+    fireEvent.change(screen.getByLabelText("Select a date:"), { target: { value: "2024-12-01" } });
+    fireEvent.change(screen.getByLabelText("Select a time:"), { target: { value: "10:00" } });
+
     // Check contact form RGPD notices
     expect(screen.getByText("The submitted information is used to answer your request and prepare a potential service.")).toBeInTheDocument();
-    
+    expect(screen.getByText("The submitted information is used to process and organize your appointment request.")).toBeInTheDocument();
+
     // Check privacy links
     const links = screen.getAllByRole("link", { name: "Privacy Policy" });
-    expect(links.length).toBeGreaterThanOrEqual(1);
+    expect(links.length).toBeGreaterThanOrEqual(2);
     expect(links[0]).toHaveAttribute("href", "/en/privacy");
+    expect(links[1]).toHaveAttribute("href", "/en/privacy");
 
     // No undefined classes
     expect(container.innerHTML).not.toContain('class="undefined"');

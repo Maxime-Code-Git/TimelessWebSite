@@ -23,7 +23,7 @@ export function validateOrigin(request: Request): boolean {
 export function getClientIp(request: Request): string | null {
   if (ENV.TRUST_PROXY) {
     let ip = request.headers.get("cf-connecting-ip");
-    
+
     if (!ip) {
       ip = request.headers.get("x-forwarded-for");
     }
@@ -37,7 +37,7 @@ export function getClientIp(request: Request): string | null {
       return null;
     }
     const cleanIp = ip.trim();
-    
+
     // Strict IP validation using net.isIP
     if (!net.isIP(cleanIp)) {
       return null;

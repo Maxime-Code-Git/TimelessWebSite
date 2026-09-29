@@ -292,11 +292,11 @@ describe("Migration of intermediate V2 content", () => {
     });
   });
 
-  describe("Migration to V8 (Contact Admin)", () => {
+  describe("Migration to V10 (Contact Admin)", () => {
     const versions = [1, 2, 3, 4, 5, 6, 7];
 
     versions.forEach(version => {
-      it(`migrates V${version} to V8 successfully and meets all requirements`, () => {
+      it(`migrates V${version} to V10 successfully and meets all requirements`, () => {
         let inputData: Record<string, unknown>;
         if (version === 1) {
           inputData = JSON.parse(JSON.stringify(V1_CONTENT));
@@ -315,7 +315,7 @@ describe("Migration of intermediate V2 content", () => {
         const originalJson = JSON.stringify(inputData);
         const migrated = validateSiteContent(inputData);
 
-        // résultat en V8
+        // résultat en V10
         expect(migrated.schemaVersion).toBe(10);
 
         // présence de contactPage
@@ -340,30 +340,30 @@ describe("Migration of intermediate V2 content", () => {
       });
     });
 
-    it("rejects incomplete V8 document", () => {
-      const v8Data = JSON.parse(JSON.stringify(defaultContent));
-      delete v8Data.contactPage.seo; // Incomplete
+    it("rejects incomplete document missing contactPage fields", () => {
+      const v10Data = JSON.parse(JSON.stringify(defaultContent));
+      delete v10Data.contactPage.seo; // Incomplete
 
-      expect(() => validateSiteContent(v8Data)).toThrow();
+      expect(() => validateSiteContent(v10Data)).toThrow();
     });
 
-    it("rejects V8 document with unknown root key", () => {
-      const v8Data = JSON.parse(JSON.stringify(defaultContent));
-      v8Data.unknownKey = "test";
+    it("rejects document with unknown root key", () => {
+      const v10Data = JSON.parse(JSON.stringify(defaultContent));
+      v10Data.unknownKey = "test";
 
-      expect(() => validateSiteContent(v8Data)).toThrow();
+      expect(() => validateSiteContent(v10Data)).toThrow();
     });
 
-    it("rejects V8 document with unknown key in contactPage", () => {
-      const v8Data = JSON.parse(JSON.stringify(defaultContent));
-      (v8Data.contactPage as Record<string, unknown>).unknownKey = "test";
+    it("rejects document with unknown key in contactPage", () => {
+      const v10Data = JSON.parse(JSON.stringify(defaultContent));
+      (v10Data.contactPage as Record<string, unknown>).unknownKey = "test";
 
-      expect(() => validateSiteContent(v8Data)).toThrow();
+      expect(() => validateSiteContent(v10Data)).toThrow();
     });
 
-    it("is idempotent for V8", () => {
-      const v8Data = JSON.parse(JSON.stringify(defaultContent));
-      const migrated1 = validateSiteContent(v8Data);
+    it("is idempotent for V10", () => {
+      const v10Data = JSON.parse(JSON.stringify(defaultContent));
+      const migrated1 = validateSiteContent(v10Data);
       const migrated2 = validateSiteContent(migrated1);
       expect(migrated1).toEqual(migrated2);
     });
@@ -416,6 +416,26 @@ describe("Migration of intermediate V2 content", () => {
       v9.legalPages.mentions.draft.unknownKey = "hack";
 
       expect(() => validateSiteContent(v9)).toThrow();
+    });
+  });
+
+  describe("Validation of V10 (Video Consent and RGPD)", () => {
+    it("rejects V10 document missing legalUI video consent fields", () => {
+      const v10 = JSON.parse(JSON.stringify(defaultContent));
+      delete v10.legalUI.videoConsentMessage;
+      expect(() => validateSiteContent(v10)).toThrow();
+    });
+
+    it("rejects V10 document missing contactForm.rgpdNotice", () => {
+      const v10 = JSON.parse(JSON.stringify(defaultContent));
+      delete v10.contactPage.contactForm.rgpdNotice;
+      expect(() => validateSiteContent(v10)).toThrow();
+    });
+
+    it("rejects V10 document missing visioBooking.rgpdNotice", () => {
+      const v10 = JSON.parse(JSON.stringify(defaultContent));
+      delete v10.contactPage.visioBooking.rgpdNotice;
+      expect(() => validateSiteContent(v10)).toThrow();
     });
   });
 });

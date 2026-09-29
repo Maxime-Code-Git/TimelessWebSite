@@ -213,7 +213,7 @@ export function VisioBooking({ language, content }: { language: 'fr' | 'en', con
             {t.rgpdNotice && (
               <p className={styles.rgpdNotice}>
                 {t.rgpdNotice.text[language]} <br/>
-                <a href={language === "fr" ? "/fr/privacy" : "/en/privacy"} target="_blank" rel="noopener noreferrer" className={styles.rgpdLink}>
+                <a href={language === "fr" ? "/fr/confidentialite" : "/en/privacy"} target="_blank" rel="noopener noreferrer" className={styles.rgpdLink}>
                   {t.rgpdNotice.linkLabel[language]}
                 </a>
               </p>

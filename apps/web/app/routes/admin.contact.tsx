@@ -221,7 +221,7 @@ export default function AdminContactPage() {
                 <Field data={data} onChange={handleChange} path={`visioBooking.errTaken.${lang}`} label="Erreur: créneau pris" type="textarea" />
                 <Field data={data} onChange={handleChange} path={`visioBooking.errGeneric.${lang}`} label="Erreur: générique" type="textarea" />
                 <Field data={data} onChange={handleChange} path={`visioBooking.loadingMsg.${lang}`} label="Texte de chargement" />
-                
+
                 <h4>Notice RGPD (Visio)</h4>
                 <Field data={data} onChange={handleChange} path={`visioBooking.rgpdNotice.text.${lang}`} label="Texte notice RGPD" type="textarea" />
                 <Field data={data} onChange={handleChange} path={`visioBooking.rgpdNotice.linkLabel.${lang}`} label="Libellé lien Politique de confidentialité" />
@@ -242,7 +242,7 @@ export default function AdminContactPage() {
                 <Field data={data} onChange={handleChange} path={`contactForm.labels.formula.${lang}`} label="Formule" />
                 <Field data={data} onChange={handleChange} path={`contactForm.labels.message.${lang}`} label="Message" />
                 <Field data={data} onChange={handleChange} path={`contactForm.labels.submit.${lang}`} label="Bouton d'envoi" />
-                
+
                 <h4>Notice RGPD (Contact)</h4>
                 <Field data={data} onChange={handleChange} path={`contactForm.rgpdNotice.text.${lang}`} label="Texte notice RGPD" type="textarea" />
                 <Field data={data} onChange={handleChange} path={`contactForm.rgpdNotice.linkLabel.${lang}`} label="Libellé lien Politique de confidentialité" />

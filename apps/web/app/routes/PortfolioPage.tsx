@@ -162,11 +162,10 @@ export function PortfolioPage({ lang, portfolio }: PortfolioPageProps) {
                           alt=""
                           className={styles.videoCoverImage}
                           loading="lazy"
-                          onClick={() => setVideoPlaying(true)}
                         />
                       </picture>
                     ) : (
-                      <div className={styles.videoPoster} onClick={() => setVideoPlaying(true)}>
+                      <div className={styles.videoPoster}>
                       </div>
                     )}
                     <div className={styles.videoConsentOverlay}>
