@@ -15,6 +15,14 @@ test.describe('Rebranding and ScrollTop', () => {
 
     const png = await request.get('/brand/SempraLogoBlue.png');
     expect(png.ok()).toBeTruthy();
+
+    const fullBlack = await request.get('/brand/SempraFullBlack.png');
+    expect(fullBlack.ok()).toBeTruthy();
+    expect(fullBlack.headers()['content-type']).toContain('image/png');
+
+    const fullWhite = await request.get('/brand/SempraFullWhite.png');
+    expect(fullWhite.ok()).toBeTruthy();
+    expect(fullWhite.headers()['content-type']).toContain('image/png');
   });
 
   test('checks logos, alt, aria-label, and favicon on homepage (FR)', async ({ page }) => {
@@ -29,7 +37,7 @@ test.describe('Rebranding and ScrollTop', () => {
     // Header logo
     const headerLogo = page.locator('header img[alt="Sempra"]').first();
     await expect(headerLogo).toBeVisible();
-    await expect(headerLogo).toHaveAttribute('src', '/brand/SempraFullBlue.png');
+    await expect(headerLogo).toHaveAttribute('src', '/brand/SempraFullBlack.png');
     const headerLink = page.locator('header a[aria-label="Sempra | Accueil"]').first();
     await expect(headerLink).toBeVisible();
 
@@ -37,7 +45,7 @@ test.describe('Rebranding and ScrollTop', () => {
     const footerLogo = page.locator('footer img[alt="Sempra"]').first();
     await footerLogo.scrollIntoViewIfNeeded();
     await expect(footerLogo).toBeVisible();
-    await expect(footerLogo).toHaveAttribute('src', '/brand/sempra_horizontal_ivory.svg');
+    await expect(footerLogo).toHaveAttribute('src', '/brand/SempraFullWhite.png');
     const footerLink = page.locator('footer a[aria-label="Sempra | Accueil"]').first();
     await expect(footerLink).toBeVisible();
 

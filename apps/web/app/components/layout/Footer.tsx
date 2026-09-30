@@ -20,8 +20,10 @@ export function Footer({ lang }: FooterProps) {
       {/* Logo */}
       <Link to={lang === "fr" ? "/fr/" : "/en/"} aria-label="Sempra | Accueil">
         <img
-          src="/brand/sempra_horizontal_ivory.svg"
+          src="/brand/SempraFullWhite.png"
           alt="Sempra"
+          width={2172}
+          height={724}
           className={styles.footerLogo}
           loading="lazy"
         />
