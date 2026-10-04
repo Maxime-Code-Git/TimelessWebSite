@@ -355,6 +355,15 @@
   color: var(--sage);
 }
 
+.input[type="date"]::-webkit-datetime-edit,
+.input[type="date"]::-webkit-datetime-edit-text,
+.input[type="date"]::-webkit-datetime-edit-month-field,
+.input[type="date"]::-webkit-datetime-edit-day-field,
+.input[type="date"]::-webkit-datetime-edit-year-field {
+  color: var(--forest-deep);
+  -webkit-text-fill-color: var(--forest-deep);
+}
+
 .textarea {
   resize: vertical;
   min-height: 140px;
