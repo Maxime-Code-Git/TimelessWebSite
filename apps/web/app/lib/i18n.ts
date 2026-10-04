@@ -201,7 +201,7 @@ const FR: I18nStrings = {
   clients: {
     title: "Votre galerie privée",
     subtitle:
-      "Retrouvez ici vos photos et votre film, avec le code reçu sur votre carte.",
+      "Retrouvez ici vos photos et votre film grâce au code d’accès que vous avez reçu.",
     accessLabel: "Votre code d'accès",
     accessPlaceholder: "Ex. TM-2026-XXXX",
     submitBtn: "Accéder à ma galerie",
@@ -310,7 +310,7 @@ const EN: I18nStrings = {
   clients: {
     title: "Your private gallery",
     subtitle:
-      "Access your photos and film here, with the code from your card.",
+      "Access your photos and film here using the access code you received.",
     accessLabel: "Your access code",
     accessPlaceholder: "E.g. TM-2026-XXXX",
     submitBtn: "Access my gallery",
