@@ -341,16 +341,16 @@
 
 .studioGrid {
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap: 34px;
+  grid-template-columns: 0.85fr 1fr;
+  gap: clamp(28px, 4vw, 52px);
   align-items: center;
-  max-width: 900px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 
 .studioImagePlaceholder {
   background: var(--sage);
-  aspect-ratio: 4/5;
+  aspect-ratio: 5/6;
   border-radius: 14px;
   border: 0.5px solid var(--gold-light);
 }
@@ -358,19 +358,19 @@
 .studioTitle {
   font-family: var(--font-serif);
   font-weight: 500;
-  font-size: 26px;
-  line-height: 1.4;
+  font-size: clamp(30px, 3.5vw, 42px);
+  line-height: 1.25;
   color: var(--forest-deep);
 }
 
 .studioText {
   display: block;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: clamp(15px, 1.3vw, 18px);
   font-weight: 400;
   color: var(--green);
-  line-height: 1.7;
-  margin-top: 16px;
+  line-height: 1.8;
+  margin-top: 22px;
 }
 
 /* ── Responsive ────────────────────────────────────────── */
@@ -390,7 +390,17 @@
 
   .studioGrid {
     grid-template-columns: 1fr;
-    gap: 22px;
+    gap: 28px;
+  }
+
+  .studioImagePlaceholder {
+    aspect-ratio: 3/4;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .studioTitle {
+    text-align: center;
   }
 
   .hero {
