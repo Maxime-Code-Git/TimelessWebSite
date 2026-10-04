@@ -154,7 +154,7 @@
 .differenceTitle {
   font-family: var(--font-serif);
   font-weight: 600;
-  font-size: clamp(14px, 1.4vw, 18px);
+  font-size: clamp(20px, 2vw, 28px);
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--gold-dark);
