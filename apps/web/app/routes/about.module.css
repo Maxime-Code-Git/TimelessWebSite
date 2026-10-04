@@ -147,26 +147,26 @@
 }
 
 .differenceInner {
-  max-width: 640px;
+  max-width: 700px;
   margin: 0 auto;
 }
 
 .differenceTitle {
   font-family: var(--font-serif);
   font-weight: 600;
-  font-size: 16px;
+  font-size: clamp(14px, 1.4vw, 18px);
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--gold-dark);
-  margin: 0 0 32px;
+  margin: 0 0 36px;
 }
 
 .differenceText {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-weight: 400;
-  font-size: clamp(20px, 3vw, 26px);
+  font-size: clamp(16px, 2.2vw, 21px);
   color: var(--forest-deep);
-  line-height: 1.45;
+  line-height: 1.75;
   margin: 0;
 }
 
