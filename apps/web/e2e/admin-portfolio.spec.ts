@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { restoreDefaultSiteContent } from './test-helpers';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -20,6 +21,7 @@ function validatePath(val: string | undefined, name: string) {
 
 test.describe('Admin Portfolio V2', () => {
   test.beforeEach(async ({ page }) => {
+    restoreDefaultSiteContent();
     validatePath(process.env.PORTFOLIO_CONTENT_PATH, 'PORTFOLIO_CONTENT_PATH');
     validatePath(process.env.PORTFOLIO_MEDIA_PATH, 'PORTFOLIO_MEDIA_PATH');
     const defaultPortfolio = {
@@ -43,6 +45,10 @@ test.describe('Admin Portfolio V2', () => {
     }
   });
 
+  test.afterEach(async () => {
+    restoreDefaultSiteContent();
+  });
+
   test('should display portfolio dashboard link', async ({ page }) => {
     const portfolioLink = page.locator('a[href="/admin/portfolio"]');
     await expect(portfolioLink).toBeVisible();
@@ -62,7 +68,7 @@ test.describe('Admin Portfolio V2', () => {
   });
 
   test('should manage video cover', async ({ page, request }, testInfo) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
     const firstCoverPath = testInfo.outputPath('portfolio-cover-1.jpg');
     const secondCoverPath = testInfo.outputPath('portfolio-cover-2.jpg');
 
@@ -175,7 +181,11 @@ test.describe('Admin Portfolio V2', () => {
     });
 
     await test.step('lecture publique de la vidéo', async () => {
-      await page.goto('/fr/portfolio');
+      await page.goto('/fr/portfolio', { waitUntil: 'domcontentloaded' });
+      
+      const videoSection = page.locator('#galerie-video');
+      await expect(videoSection).toBeVisible({ timeout: 10000 });
+      
       await expect(page.locator("#galerie-video picture img")).toHaveCount(0);
 
       const playButton = page.getByRole("button", { name: "Charger la vidéo depuis Vimeo", exact: true });

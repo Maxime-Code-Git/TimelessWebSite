@@ -77,6 +77,7 @@ async function run() {
     process.env.GALLERY_IMPORT_PATH = path.join(e2eTempDir, 'gallery-imports');
     process.env.GALLERY_SECRET = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
     process.env.NODE_ENV = 'test';
+    process.env.E2E_ADMIN_PASSWORD = 'e2e_password';
 
     fs.mkdirSync(process.env.GALLERY_MEDIA_PATH, { recursive: true });
     fs.mkdirSync(process.env.GALLERY_IMPORT_PATH, { recursive: true });
