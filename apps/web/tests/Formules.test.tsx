@@ -150,7 +150,7 @@ describe("Formules Component", () => {
       const optionalElements = screen.getAllByText("Séance couple disponible en option");
       expect(optionalElements.length).toBe(2);
 
-      const priceElements = screen.getAllByText(/\+.*350/);
+      const priceElements = screen.getAllByText(/\(\+350\s*€\)/);
       expect(priceElements.length).toBe(2);
 
       const includedElements = screen.getAllByText("Séance couple incluse");

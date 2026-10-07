@@ -73,6 +73,7 @@ export function FormulesPage({ lang }: FormulesPageProps) {
                   className={`${styles.card} ${
                     tier.featured ? styles.featured : ""
                   }`}
+                  data-testid={`pricing-card-${selectedCat}-${tier.id}`}
                 >
                   {tier.featured && (
                     <span className={styles.featuredBadge}>{t.featuredBadge}</span>
@@ -105,10 +106,10 @@ export function FormulesPage({ lang }: FormulesPageProps) {
 
                         const isIncluded = placement.mode === "included";
                         const labelText = isIncluded ? addOn.includedLabel[lang] : addOn.optionalLabel[lang];
-                        const priceText = isIncluded ? "" : `(+ ${formatPrice(addOn.priceCents, lang).replace("À partir de ", "").replace("From ", "")})`;
+                        const priceText = isIncluded ? "" : `(+${formatPrice(addOn.priceCents, lang).replace("À partir de ", "").replace("From ", "")})`;
 
                         return (
-                          <li key={addOn.id} className={`${styles.featureItem} ${styles.addOnItem} ${isIncluded ? styles.addOnIncluded : styles.addOnOptional}`}>
+                          <li key={addOn.id} className={`${styles.featureItem} ${styles.addOnItem} ${isIncluded ? styles.addOnIncluded : styles.addOnOptional}`} data-testid={`pricing-addon-${selectedCat}-${tier.id}-${addOn.id}`}>
                             <span className={styles.featureDash}>-</span>
                             <span>
                               {labelText} {priceText && <span className={styles.addOnPrice}>{priceText}</span>}

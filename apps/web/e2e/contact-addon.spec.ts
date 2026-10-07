@@ -41,6 +41,7 @@ test.describe('Couple Session Addon Flow', () => {
 
   test('completes full couple session addon flow', async ({ page }) => {
     try {
+      restoreDefaultSiteContent();
       // 1. authentification administrateur réelle via la variable E2E existante
       await page.goto("/admin");
       await page.locator('input[name="password"]').fill("e2e_password");
@@ -64,13 +65,35 @@ test.describe('Couple Session Addon Flow', () => {
 
       // 6 & 7 & 8: Check public UI
       await page.goto('/fr/formules');
-      // Photo Essentiel should have "Séance couple (+ 380 €)" (we'll just check 380 and the included text)
-      await expect(page.locator('body')).toContainText('380');
-      await expect(page.locator('body')).toContainText('(Inclus)');
+      
+      // Photo category
+      await page.getByRole('button', { name: 'Photographie', exact: true }).click();
+      const photoEssentialCard = page.getByTestId('pricing-card-photo-essential');
+      await expect(photoEssentialCard).toContainText('Séance couple disponible en option');
+      await expect(photoEssentialCard).toContainText('380');
+      
+      const photoPrestigeCard = page.getByTestId('pricing-card-photo-prestige');
+      await expect(photoPrestigeCard).toContainText('Séance couple incluse');
 
-      // Film should NOT have "Séance couple" - we can check the Film section
-      const filmSection = page.locator('h2', { hasText: 'Film' }).locator('..');
-      await expect(filmSection).not.toContainText('Séance couple');
+      // Film category
+      await page.getByRole('button', { name: 'Film', exact: true }).click();
+      await expect(page.getByTestId('pricing-card-film-essential')).toBeVisible(); // wait for rendering
+      // Ensure no film addon exists for couple session
+      await expect(page.locator('[data-testid^="pricing-addon-film-"]')).toHaveCount(0);
+      // Ensure no text mentions "Séance couple" in the whole film tab
+      const filmCards = page.locator('[data-testid^="pricing-card-film-"]');
+      for (const card of await filmCards.all()) {
+        await expect(card).not.toContainText('Séance couple');
+      }
+
+      // Duo category
+      await page.getByRole('button', { name: 'Photo & Film', exact: true }).click();
+      const duoEssentialCard = page.getByTestId('pricing-card-duo-essential');
+      await expect(duoEssentialCard).toContainText('Séance couple disponible en option');
+      await expect(duoEssentialCard).toContainText('380');
+      
+      const duoPrestigeCard = page.getByTestId('pricing-card-duo-prestige');
+      await expect(duoPrestigeCard).toContainText('Séance couple incluse');
 
       // 9. ouverture du contact avec ?formula=photo-essential
       await page.goto('/fr/contact?formula=photo-essential');
@@ -106,7 +129,7 @@ test.describe('Couple Session Addon Flow', () => {
       const emails = readReceivedEmails();
       expect(emails.length).toBeGreaterThan(0);
       const lastEmail = emails[emails.length - 1];
-      expect(lastEmail).toContain('Séance couple : ajoutée en supplément (+380 €)');
+      expect(lastEmail).toContain('Séance couple : ajoutée en supplément (+380\u00A0€)');
     } finally {
       restoreDefaultSiteContent();
     }
