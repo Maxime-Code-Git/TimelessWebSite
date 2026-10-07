@@ -42,13 +42,13 @@ test.describe('Couple Session Addon Flow', () => {
   test('completes full couple session addon flow', async ({ page }) => {
     try {
       // 1. authentification administrateur réelle via la variable E2E existante
-      await page.goto('/admin/login');
-      await page.fill('#password', process.env.E2E_ADMIN_PASSWORD!);
-      await page.click('button[type="submit"]');
-      await page.waitForURL('/admin/home');
+      await page.goto("/admin");
+      await page.locator('input[name="password"]').fill("e2e_password");
+      await page.locator('button[type="submit"]').click();
+      await expect(page.locator("h1")).toContainText("Administration Sempra");
 
       // 2. ouverture de /admin/pricing
-      await page.goto('/admin/pricing');
+      await page.goto("/admin/pricing");
 
       // 3. modification du prix de la séance couple
       await page.fill('#addon-price-0', '380');
