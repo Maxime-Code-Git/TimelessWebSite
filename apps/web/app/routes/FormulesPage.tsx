@@ -94,6 +94,28 @@ export function FormulesPage({ lang }: FormulesPageProps) {
                         <span>{item.text[lang]}</span>
                       </li>
                     ))}
+                    {/* Add-ons for this specific formula */}
+                    {siteContent?.pricingPage.addOns
+                      ?.filter((addOn: import("~/lib/site-content.server").PricingAddOn) => addOn.enabled)
+                      ?.map((addOn: import("~/lib/site-content.server").PricingAddOn) => {
+                        const placement = addOn.placements.find(
+                          (p) => p.category === selectedCat && p.formulaId === tier.id
+                        );
+                        if (!placement) return null;
+
+                        const isIncluded = placement.mode === "included";
+                        const labelText = isIncluded ? addOn.includedLabel[lang] : addOn.optionalLabel[lang];
+                        const priceText = isIncluded ? "" : `(+ ${formatPrice(addOn.priceCents, lang).replace("À partir de ", "").replace("From ", "")})`;
+
+                        return (
+                          <li key={addOn.id} className={`${styles.featureItem} ${styles.addOnItem} ${isIncluded ? styles.addOnIncluded : styles.addOnOptional}`}>
+                            <span className={styles.featureDash}>-</span>
+                            <span>
+                              {labelText} {priceText && <span className={styles.addOnPrice}>{priceText}</span>}
+                            </span>
+                          </li>
+                        );
+                      })}
                   </ul>
                   <div className={styles.cardAction}>
                     <Link to={`${contactHref}?formula=${selectedCat}-${tier.id}`} className={`btn btn--primary ${styles.cardActionBtn}`}>

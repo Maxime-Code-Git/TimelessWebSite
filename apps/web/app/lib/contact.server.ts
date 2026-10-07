@@ -123,6 +123,7 @@ export async function processContactAction(
   const formula = formData.get("formula")?.toString().trim();
   const message = formData.get("message")?.toString().trim();
   const phone = formData.get("phone")?.toString().trim() || "";
+  const addons = formData.getAll("addons").map(a => a.toString().trim());
 
   if (!names || !email || !formula || !message || !date || !location) {
     return {
@@ -197,6 +198,35 @@ export async function processContactAction(
     readableFormulaLabel = `[${catLabel}] ${matched.name[lang]} (${formula})`;
   }
 
+  // Validate Addons securely (ignore if formula is custom/unknown)
+  const resolvedAddons: string[] = [];
+  if (formula !== "custom" && formula !== "unknown") {
+    const [cat, fid] = formula.split("-");
+    const siteAddOns = siteContent.pricingPage.addOns || [];
+
+    // Check optional addons submitted by user
+    const uniqueAddons = Array.from(new Set(addons));
+    for (const addonId of uniqueAddons) {
+      const matchedAddon = siteAddOns.find(a => a.enabled && a.id === addonId);
+      if (matchedAddon) {
+        const placement = matchedAddon.placements.find(p => p.category === cat && p.formulaId === fid);
+        if (placement && placement.mode === "optional") {
+          resolvedAddons.push(matchedAddon.name[lang]);
+        }
+      }
+    }
+
+    // Auto-inject included addons
+    for (const siteAddOn of siteAddOns) {
+      if (siteAddOn.enabled) {
+        const placement = siteAddOn.placements.find(p => p.category === cat && p.formulaId === fid);
+        if (placement && placement.mode === "included") {
+          resolvedAddons.push(`${siteAddOn.name[lang]} (Inclus)`);
+        }
+      }
+    }
+  }
+
   // Validate Date
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return {
@@ -244,6 +274,7 @@ export async function processContactAction(
       date,
       location,
       formula: readableFormulaLabel,
+      addons: resolvedAddons,
       message,
       phone,
     });

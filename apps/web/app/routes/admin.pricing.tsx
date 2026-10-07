@@ -171,6 +171,45 @@ function PricingEditor({ initialPricing, initialPricingPage, revision, error, su
     });
   };
 
+  const handleAddOnToggle = (index: number, value: boolean) => {
+    setPricingPage((prev) => {
+      const newAddOns = [...(prev.addOns || [])];
+      if (newAddOns[index]) newAddOns[index] = { ...newAddOns[index], enabled: value };
+      return { ...prev, addOns: newAddOns };
+    });
+  };
+
+  const handleAddOnFieldChange = (index: number, field: "name" | "optionalLabel" | "includedLabel", lang: "fr" | "en", value: string) => {
+    setPricingPage((prev) => {
+      const newAddOns = [...(prev.addOns || [])];
+      if (newAddOns[index]) newAddOns[index] = { ...newAddOns[index], [field]: { ...newAddOns[index][field], [lang]: value } };
+      return { ...prev, addOns: newAddOns };
+    });
+  };
+
+  const handleAddOnPriceChange = (index: number, value: string) => {
+    setPricingPage((prev) => {
+      const newAddOns = [...(prev.addOns || [])];
+      if (newAddOns[index]) newAddOns[index] = { ...newAddOns[index], priceCents: Math.round(Number(value) * 100) };
+      return { ...prev, addOns: newAddOns };
+    });
+  };
+
+  const handleAddOnPlacementChange = (addonIndex: number, cat: "photo" | "film" | "duo", formulaId: "essential" | "signature" | "prestige", mode: "none" | "optional" | "included") => {
+    setPricingPage((prev) => {
+      const newAddOns = [...(prev.addOns || [])];
+      if (newAddOns[addonIndex]) {
+        let placements = [...newAddOns[addonIndex].placements];
+        placements = placements.filter(p => !(p.category === cat && p.formulaId === formulaId));
+        if (mode !== "none") {
+          placements.push({ category: cat, formulaId, mode });
+        }
+        newAddOns[addonIndex] = { ...newAddOns[addonIndex], placements };
+      }
+      return { ...prev, addOns: newAddOns };
+    });
+  };
+
   const handleChange = (cat: keyof PricingCategory, index: number, field: keyof Formula | "priceEuros", value: unknown) => {
     setPricing((prev) => {
       const newPricing = {
@@ -387,6 +426,85 @@ function PricingEditor({ initialPricing, initialPricingPage, revision, error, su
               <input id="caveat-en" type="text" value={pricingPage.caveat.en} onChange={(e) => handlePromoFieldChange("caveat", "en", e.target.value)} className={styles.input} />
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className={styles.faqEditorSection}>
+        <h2 className={styles.faqEditorSectionTitle}>Options (Add-ons)</h2>
+        <div className={styles.faqListEditor}>
+          {(pricingPage.addOns || []).map((addOn, idx) => (
+            <div key={addOn.id} className={styles.faqItemEditor}>
+              <div className={styles.formulaEditorHeader}>
+                <h4 className={styles.formulaIdTitle}>Option: {addOn.id}</h4>
+                <label className={styles.checkboxLabel}>
+                  <input type="checkbox" checked={addOn.enabled} onChange={(e) => handleAddOnToggle(idx, e.target.checked)} />
+                  Activer cette option
+                </label>
+              </div>
+              <div className={styles.formulaEditorGrid}>
+                <div className={styles.formGroup}>
+                  <label htmlFor={`addon-name-fr-${idx}`}>Nom FR (interne)</label>
+                  <input id={`addon-name-fr-${idx}`} type="text" value={addOn.name.fr} onChange={(e) => handleAddOnFieldChange(idx, "name", "fr", e.target.value)} className={styles.input} />
+                </div>
+                <div className={styles.formGroup}>
+                  <label htmlFor={`addon-name-en-${idx}`}>Nom EN (interne)</label>
+                  <input id={`addon-name-en-${idx}`} type="text" value={addOn.name.en} onChange={(e) => handleAddOnFieldChange(idx, "name", "en", e.target.value)} className={styles.input} />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label htmlFor={`addon-opt-fr-${idx}`}>Texte Optionnel FR</label>
+                  <input id={`addon-opt-fr-${idx}`} type="text" value={addOn.optionalLabel.fr} onChange={(e) => handleAddOnFieldChange(idx, "optionalLabel", "fr", e.target.value)} className={styles.input} />
+                </div>
+                <div className={styles.formGroup}>
+                  <label htmlFor={`addon-opt-en-${idx}`}>Texte Optionnel EN</label>
+                  <input id={`addon-opt-en-${idx}`} type="text" value={addOn.optionalLabel.en} onChange={(e) => handleAddOnFieldChange(idx, "optionalLabel", "en", e.target.value)} className={styles.input} />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor={`addon-inc-fr-${idx}`}>Texte Inclus FR</label>
+                  <input id={`addon-inc-fr-${idx}`} type="text" value={addOn.includedLabel.fr} onChange={(e) => handleAddOnFieldChange(idx, "includedLabel", "fr", e.target.value)} className={styles.input} />
+                </div>
+                <div className={styles.formGroup}>
+                  <label htmlFor={`addon-inc-en-${idx}`}>Texte Inclus EN</label>
+                  <input id={`addon-inc-en-${idx}`} type="text" value={addOn.includedLabel.en} onChange={(e) => handleAddOnFieldChange(idx, "includedLabel", "en", e.target.value)} className={styles.input} />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label htmlFor={`addon-price-${idx}`}>Prix supplémentaire (€)</label>
+                  <input id={`addon-price-${idx}`} type="number" step="0.01" value={(addOn.priceCents / 100).toFixed(2)} onChange={(e) => handleAddOnPriceChange(idx, e.target.value)} className={styles.input} />
+                </div>
+              </div>
+
+              <div className={styles.addOnPlacementsContainer}>
+                <h5 className={styles.addOnPlacementsTitle}>Disponibilité par formule</h5>
+                <div className={styles.addOnPlacementsGrid}>
+                  {(["photo", "film", "duo"] as const).map(cat => (
+                    pricing[cat].map(formula => {
+                      const mode = addOn.placements.find(p => p.category === cat && p.formulaId === formula.id)?.mode || "none";
+                      return (
+                        <div key={`${cat}-${formula.id}`} className={styles.formGroup}>
+                          <label htmlFor={`placement-${addOn.id}-${cat}-${formula.id}`}>
+                            {cat.toUpperCase()} {formula.name.fr}
+                          </label>
+                          <select 
+                            id={`placement-${addOn.id}-${cat}-${formula.id}`}
+                            className={styles.select}
+                            value={mode}
+                            onChange={(e) => handleAddOnPlacementChange(idx, cat, formula.id as "essential" | "signature" | "prestige", e.target.value as "none" | "optional" | "included")}
+                          >
+                            <option value="none">Non proposée</option>
+                            <option value="optional">En option</option>
+                            <option value="included">Incluse</option>
+                          </select>
+                        </div>
+                      );
+                    })
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          ))}
         </div>
       </div>
 

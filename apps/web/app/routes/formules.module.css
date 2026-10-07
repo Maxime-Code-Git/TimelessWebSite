@@ -173,6 +173,24 @@
   flex-shrink: 0;
 }
 
+.addOnItem {
+  margin-top: 4px;
+}
+
+.addOnOptional {
+  color: var(--gold-dark);
+  font-style: italic;
+}
+
+.addOnIncluded {
+  font-weight: 500;
+}
+
+.addOnPrice {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .promo {
   text-align: center;
   color: var(--ivory);

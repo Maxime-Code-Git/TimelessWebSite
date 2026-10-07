@@ -26,6 +26,23 @@ export interface PricingCategory {
   duo: Formula[];
 }
 
+export interface PricingAddOnPlacement {
+  category: "photo" | "film" | "duo";
+  formulaId: "essential" | "signature" | "prestige";
+  mode: "optional" | "included";
+}
+
+export interface PricingAddOn {
+  id: string;
+  enabled: boolean;
+  priceCents: number;
+  name: LocalizedString;
+  optionalLabel: LocalizedString;
+  includedLabel: LocalizedString;
+  placements: PricingAddOnPlacement[];
+}
+
+
 export interface BusinessContent {
   legalName: string | null;
   tradeName: string | null;
@@ -91,6 +108,7 @@ export interface PricingPageContent {
   promoText: LocalizedString;
   promoTextBold: LocalizedString;
   caveat: LocalizedString;
+  addOns: PricingAddOn[];
 }
 
 export interface AboutPageContent {
@@ -355,7 +373,7 @@ export interface LegalUI {
 
 export interface SiteContent {
   legalUI: LegalUI;
-  schemaVersion: 10;
+  schemaVersion: 11;
   revision: string;
   updatedAt: string;
   business: BusinessContent;
@@ -866,8 +884,66 @@ function validatePricingFaqItem(data: unknown, context: string): PricingFaqItem 
   };
 }
 
+function validatePricingAddOnPlacement(data: unknown, context: string): PricingAddOnPlacement {
+  assertExactKeys(data, ["category", "formulaId", "mode"], context);
+  const obj = data as Record<string, unknown>;
+
+  if (typeof obj.category !== "string" || !["photo", "film", "duo"].includes(obj.category)) {
+    throw new ValidationError(`Invalid category in ${context}`);
+  }
+  if (typeof obj.formulaId !== "string" || !["essential", "signature", "prestige"].includes(obj.formulaId)) {
+    throw new ValidationError(`Invalid formulaId in ${context}`);
+  }
+  if (typeof obj.mode !== "string" || !["optional", "included"].includes(obj.mode)) {
+    throw new ValidationError(`Invalid mode in ${context}`);
+  }
+
+  return {
+    category: obj.category as "photo" | "film" | "duo",
+    formulaId: obj.formulaId as "essential" | "signature" | "prestige",
+    mode: obj.mode as "optional" | "included"
+  };
+}
+
+function validatePricingAddOn(data: unknown, context: string): PricingAddOn {
+  assertExactKeys(data, ["id", "enabled", "priceCents", "name", "optionalLabel", "includedLabel", "placements"], context);
+  const obj = data as Record<string, unknown>;
+
+  if (typeof obj.id !== "string" || obj.id.trim() === "") {
+    throw new ValidationError(`Invalid id in ${context}`);
+  }
+  if (typeof obj.enabled !== "boolean") {
+    throw new ValidationError(`Invalid enabled boolean in ${context}`);
+  }
+  if (typeof obj.priceCents !== "number" || !Number.isInteger(obj.priceCents) || obj.priceCents < 0 || obj.priceCents > 10000000) {
+    throw new ValidationError(`Invalid priceCents in ${context}`);
+  }
+  if (!Array.isArray(obj.placements)) {
+    throw new ValidationError(`${context}.placements must be an array`);
+  }
+  if (obj.placements.length > 20) {
+    throw new ValidationError(`${context}.placements cannot exceed 20 items`);
+  }
+
+  const placements = obj.placements.map((p, i) => validatePricingAddOnPlacement(p, `${context}.placements[${i}]`));
+  const placementKeys = new Set(placements.map(p => `${p.category}-${p.formulaId}`));
+  if (placementKeys.size !== placements.length) {
+    throw new ValidationError(`${context}.placements must be unique per formula`);
+  }
+
+  return {
+    id: obj.id,
+    enabled: obj.enabled,
+    priceCents: obj.priceCents,
+    name: validateLocalizedString(obj.name, `${context}.name`, 255),
+    optionalLabel: validateLocalizedString(obj.optionalLabel, `${context}.optionalLabel`, 255),
+    includedLabel: validateLocalizedString(obj.includedLabel, `${context}.includedLabel`, 255),
+    placements
+  };
+}
+
 function validatePricingPageContent(data: unknown): PricingPageContent {
-  assertExactKeys(data, ["faqTitle", "faqs", "promoText", "promoTextBold", "caveat"], "pricingPage");
+  assertExactKeys(data, ["faqTitle", "faqs", "promoText", "promoTextBold", "caveat", "addOns"], "pricingPage");
   const obj = data as Record<string, unknown>;
 
   if (!Array.isArray(obj.faqs)) {
@@ -883,12 +959,26 @@ function validatePricingPageContent(data: unknown): PricingPageContent {
     throw new ValidationError("pricingPage.faqs must have unique ids");
   }
 
+  if (!Array.isArray(obj.addOns)) {
+    throw new ValidationError("pricingPage.addOns must be an array");
+  }
+  if (obj.addOns.length > 10) {
+    throw new ValidationError("pricingPage.addOns cannot exceed 10 items");
+  }
+
+  const addOns = obj.addOns.map((a, i) => validatePricingAddOn(a, `pricingPage.addOns[${i}]`));
+  const addOnIds = new Set(addOns.map(a => a.id));
+  if (addOnIds.size !== addOns.length) {
+    throw new ValidationError("pricingPage.addOns must have unique ids");
+  }
+
   return {
     faqTitle: validateLocalizedString(obj.faqTitle, "pricingPage.faqTitle", 255),
     faqs,
     promoText: validateLocalizedString(obj.promoText, "pricingPage.promoText", 255),
     promoTextBold: validateLocalizedString(obj.promoTextBold, "pricingPage.promoTextBold", 255),
-    caveat: validateLocalizedString(obj.caveat, "pricingPage.caveat", 255)
+    caveat: validateLocalizedString(obj.caveat, "pricingPage.caveat", 255),
+    addOns
   };
 }
 
@@ -1374,7 +1464,7 @@ export function validateSiteContent(data: unknown): SiteContent {
   }
   const obj = data as Record<string, unknown>;
 
-  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5 && obj.schemaVersion !== 6 && obj.schemaVersion !== 7 && obj.schemaVersion !== 8 && obj.schemaVersion !== 9 && obj.schemaVersion !== 10) {
+  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5 && obj.schemaVersion !== 6 && obj.schemaVersion !== 7 && obj.schemaVersion !== 8 && obj.schemaVersion !== 9 && obj.schemaVersion !== 10 && obj.schemaVersion !== 11) {
     throw new ValidationError("Unsupported schemaVersion");
   }
 
@@ -1661,6 +1751,38 @@ export function validateSiteContent(data: unknown): SiteContent {
     };
   }
 
+  if ((obj.schemaVersion as number) < 11) {
+    const currentPricingPage = objRef.pricingPage as Record<string, unknown>;
+    const migratedPricingPage = { ...currentPricingPage };
+    if (!('addOns' in migratedPricingPage)) {
+      migratedPricingPage.addOns = JSON.parse(JSON.stringify(defaultContent.pricingPage.addOns));
+    }
+
+    // Remove old manual couple session from Photo Prestige
+    const migratedPricing = { ...(rawPricing as Record<string, unknown>) };
+    if (migratedPricing.photo && Array.isArray(migratedPricing.photo)) {
+      migratedPricing.photo = migratedPricing.photo.map((f: unknown) => {
+        if (typeof f === 'object' && f !== null && (f as Record<string, unknown>).id === 'prestige') {
+          const prestige = f as Record<string, unknown>;
+          if (Array.isArray(prestige.includedItems)) {
+            prestige.includedItems = prestige.includedItems.filter(item => {
+              // 42e1ea5e-a874-4ec2-b549-5c0a365fe814 is the ID of the old couple session item
+              return item.id !== "42e1ea5e-a874-4ec2-b549-5c0a365fe814";
+            });
+          }
+          return prestige;
+        }
+        return f;
+      });
+    }
+    rawPricing = migratedPricing;
+
+    objRef = {
+      ...objRef,
+      pricingPage: migratedPricingPage
+    };
+  }
+
   assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage", "aboutPage", "contactPage", "legalPages", "legalUI"], "root");
 
 
@@ -1669,7 +1791,7 @@ export function validateSiteContent(data: unknown): SiteContent {
   const home = validateHomeContent(objRef.home);
 
   return {
-    schemaVersion: 10,
+    schemaVersion: 11,
     revision: obj.revision,
     updatedAt: updatedAtStr,
     business,

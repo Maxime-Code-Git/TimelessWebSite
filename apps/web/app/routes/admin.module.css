@@ -1445,3 +1445,39 @@
   cursor: pointer;
   font-weight: 600;
 }
+
+.addOnPlacementsContainer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px dashed #d1d5db;
+}
+
+.addOnPlacementsTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.addOnPlacementsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #f9fafb;
+  font-family: inherit;
+  font-size: 14px;
+  color: #374151;
+  outline: none;
+}
+
+.select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}

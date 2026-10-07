@@ -166,8 +166,8 @@ describe("Migration of intermediate V2 content", () => {
     fs.writeFileSync(filePath, JSON.stringify(V1_CONTENT), "utf8");
     const { content } = getRawSiteContent();
 
-    // Check that it's migrated to V3
-    expect(content.schemaVersion).toBe(10);
+    // Check that it's migrated to V11
+    expect(content.schemaVersion).toBe(11);
 
     // Check real fallbacks instead of generic "Description"
     const photoEssential = content.pricing.photo.find(f => f.id === "essential");
@@ -195,6 +195,51 @@ describe("Migration of intermediate V2 content", () => {
     const { content: c1 } = getRawSiteContent();
     const { content: c2 } = getRawSiteContent();
     expect(c1.pricing).toEqual(c2.pricing);
+  });
+
+  it("migrates to V11 correctly (removes old manual couple session and adds addOns)", () => {
+    const v10Data = JSON.parse(JSON.stringify(defaultContent));
+    v10Data.schemaVersion = 10;
+    delete v10Data.pricingPage.addOns;
+    const historicId = "42e1ea5e-a874-4ec2-b549-5c0a365fe814";
+    const customId = "custom-id-same-text";
+    
+    // Add the historic item
+    v10Data.pricing.photo[2].includedItems.push({
+      id: historicId,
+      text: { fr: "Séance couple offerte", en: "Complimentary couple session" }
+    });
+    // Add a custom item with the same text
+    v10Data.pricing.photo[2].includedItems.push({
+      id: customId,
+      text: { fr: "Séance couple offerte", en: "Complimentary couple session" }
+    });
+    
+    const initialItemCount = v10Data.pricing.photo[2].includedItems.length;
+
+    fs.writeFileSync(filePath, JSON.stringify(v10Data), "utf8");
+    const { content: migratedContent1 } = getRawSiteContent();
+    
+    // Check it's migrated
+    expect(migratedContent1.schemaVersion).toBe(11);
+    expect(migratedContent1.pricingPage.addOns).toBeDefined();
+    
+    const prestigeIncluded = migratedContent1.pricing.photo.find(f => f.id === "prestige")?.includedItems;
+    
+    // 1. Historic ID is removed
+    const oldItem = prestigeIncluded?.find(i => i.id === historicId);
+    expect(oldItem).toBeUndefined();
+    
+    // 2. Custom element with different ID but same text is kept
+    const customItem = prestigeIncluded?.find(i => i.id === customId);
+    expect(customItem).toBeDefined();
+    
+    // 3. Other elements are preserved (initial - 1 historic)
+    expect(prestigeIncluded?.length).toBe(initialItemCount - 1);
+    
+    // 4. Idempotency
+    const { content: migratedContent2 } = getRawSiteContent();
+    expect(migratedContent1.pricing.photo).toEqual(migratedContent2.pricing.photo);
   });
 
   it("objet d’entrée totalement inchangé après migration V1", () => {
@@ -247,7 +292,7 @@ describe("Migration of intermediate V2 content", () => {
       const originalJson = JSON.stringify(v3Data);
 
       const migrated = validateSiteContent(v3Data);
-      expect(migrated.schemaVersion).toBe(10);
+      expect(migrated.schemaVersion).toBe(11);
       expect(migrated.business.email).toBe("v3@test.com");
       expect(migrated.pricingPage).toBeDefined();
       expect(migrated.pricingPage.faqs).toHaveLength(defaultContent.pricingPage.faqs.length);
@@ -278,7 +323,7 @@ describe("Migration of intermediate V2 content", () => {
       const originalJson = JSON.stringify(v4Data);
 
       const migrated = validateSiteContent(v4Data);
-      expect(migrated.schemaVersion).toBe(10);
+      expect(migrated.schemaVersion).toBe(11);
       expect(migrated.business.email).toBe("v4@test.com");
       expect(migrated.aboutPage).toBeDefined();
       expect(migrated.aboutPage.seo.title.fr).toBe(defaultContent.aboutPage.seo.title.fr);
@@ -316,7 +361,7 @@ describe("Migration of intermediate V2 content", () => {
         const migrated = validateSiteContent(inputData);
 
         // résultat en V10
-        expect(migrated.schemaVersion).toBe(10);
+        expect(migrated.schemaVersion).toBe(11);
 
         // présence de contactPage
         expect(migrated.contactPage).toBeDefined();
@@ -380,7 +425,7 @@ describe("Migration of intermediate V2 content", () => {
       delete v8.business.vatNumber;
 
       const migrated = validateSiteContent(v8);
-      expect(migrated.schemaVersion).toBe(10);
+      expect(migrated.schemaVersion).toBe(11);
       expect(migrated.legalPages).toBeDefined();
       expect(migrated.legalPages.mentions.draft.publicTitle.fr).toBe("Mentions légales");
       expect(migrated.business.tradeName).toBeNull();
@@ -394,7 +439,7 @@ describe("Migration of intermediate V2 content", () => {
       delete v9.legalUI.versionLabel;
 
       const migrated = validateSiteContent(v9);
-      expect(migrated.schemaVersion).toBe(10);
+      expect(migrated.schemaVersion).toBe(11);
       expect(migrated.legalUI.draftWarning.fr).toBe("Modifié"); // Conservé
       expect(migrated.legalUI.versionLabel.fr).toBe("Version"); // Injecté depuis le défaut
 

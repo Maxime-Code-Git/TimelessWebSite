@@ -8,6 +8,7 @@ export interface ContactFormData {
   date: string;
   location: string;
   formula: string;
+  addons?: string[];
   message: string;
   phone: string;
 }
@@ -70,7 +71,7 @@ Email : ${data.email}
 Téléphone : ${data.phone || "Non précisé"}
 Date : ${data.date || "Non précisée"}
 Lieu : ${data.location || "Non précisé"}
-Formule : ${data.formula}
+Formule : ${data.formula}${data.addons && data.addons.length > 0 ? `\nOptions/Inclusions : ${data.addons.join(', ')}` : ''}
 
 Message :
 ${data.message}

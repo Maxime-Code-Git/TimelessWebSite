@@ -63,10 +63,14 @@ describe('Contact Server Logic', () => {
     vi.restoreAllMocks();
   });
 
-  function createRequest(body: Record<string, string>, headers: Record<string, string> = {}) {
+  function createRequest(body: Record<string, string | string[]>, headers: Record<string, string> = {}) {
     const formData = new FormData();
     for (const [key, value] of Object.entries(body)) {
-      formData.append(key, value);
+      if (Array.isArray(value)) {
+        value.forEach(v => formData.append(key, v));
+      } else {
+        formData.append(key, value);
+      }
     }
     return new Request("http://localhost:4173/fr/contact", {
       method: "POST",
@@ -105,6 +109,63 @@ describe('Contact Server Logic', () => {
     const result = await processContactAction(req, "en");
     expect(result).toEqual({ success: true });
     expect(sendContactEmailMock).toHaveBeenCalled();
+  });
+
+  describe('Add-on validations', () => {
+    it('should accept couple-session for Photo Essentiel', async () => {
+      const req = createRequest({ ...getValidBody(), addons: ["couple-session"] });
+      sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
+      await processContactAction(req, "fr");
+      expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+        addons: ["Séance couple"]
+      }));
+    });
+
+    it('should derive inclusion for Photo Prestige automatically even if not sent', async () => {
+      const req = createRequest({ ...getValidBody(), formula: "photo-prestige" });
+      sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
+      await processContactAction(req, "fr");
+      expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+        addons: ["Séance couple (Inclus)"]
+      }));
+    });
+
+    it('should reject couple-session for Film Essentiel (ignores it if sent as it is not optional)', async () => {
+      const req = createRequest({ ...getValidBody(), formula: "film-essential", addons: ["couple-session"] });
+      sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
+      await processContactAction(req, "fr");
+      // Server will ignore invalid optionals securely
+      expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+        addons: []
+      }));
+    });
+
+    it('should ignore couple-session for custom/unknown formula', async () => {
+      const req = createRequest({ ...getValidBody(), formula: "custom", addons: ["couple-session"] });
+      sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
+      await processContactAction(req, "fr");
+      expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+        addons: []
+      }));
+    });
+
+    it('should ignore unknown add-ons', async () => {
+      const req = createRequest({ ...getValidBody(), addons: ["couple-session", "fake-addon"] });
+      sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
+      await processContactAction(req, "fr");
+      expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+        addons: ["Séance couple"]
+      }));
+    });
+
+    it('should reject a duplicate optional addon (handles it gracefully)', async () => {
+      const req = createRequest({ ...getValidBody(), addons: ["couple-session", "couple-session"] });
+      sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
+      await processContactAction(req, "fr");
+      expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+        addons: ["Séance couple"]
+      }));
+    });
   });
 
   it('should reject photo-essential-extra', async () => {

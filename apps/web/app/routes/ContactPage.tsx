@@ -178,6 +178,44 @@ export function ContactPage({ lang }: ContactPageProps) {
                 <option value="custom">{contactContent.contactForm.options.custom[lang]}</option>
                 <option value="unknown">{contactContent.contactForm.options.unknown[lang]}</option>
               </select>
+
+              {/* Dynamic Add-Ons Section */}
+              {selectedFormula && selectedFormula !== "custom" && selectedFormula !== "unknown" && (
+                <div className={styles.addOnsContainer}>
+                  {(() => {
+                    const [cat, fid] = selectedFormula.split("-");
+                    const applicableAddOns = rootData?.siteContent?.pricingPage.addOns?.filter(a =>
+                      a.enabled && a.placements.some(p => p.category === cat && p.formulaId === fid)
+                    ) || [];
+
+                    if (applicableAddOns.length === 0) return null;
+
+                    return (
+                      <div className={styles.addOnsList}>
+                        {applicableAddOns.map(addOn => {
+                          const placement = addOn.placements.find(p => p.category === cat && p.formulaId === fid)!;
+                          const isIncluded = placement.mode === "included";
+                          return isIncluded ? (
+                            <div key={addOn.id} className={`${styles.addOnCheckboxLabel} ${styles.addOnCheckboxIncluded}`}>
+                              <span className={styles.addOnIncludedIcon}>✓</span>
+                              <span className={styles.addOnCheckboxText}>
+                                {addOn.includedLabel[lang]}
+                              </span>
+                            </div>
+                          ) : (
+                            <label key={addOn.id} className={styles.addOnCheckboxLabel}>
+                              <input type="checkbox" name="addons" value={addOn.id} className={styles.addOnCheckbox} />
+                              <span className={styles.addOnCheckboxText}>
+                                {addOn.optionalLabel[lang]}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
             <div className={styles.formGroup}>

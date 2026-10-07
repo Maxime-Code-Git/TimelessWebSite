@@ -128,4 +128,60 @@ describe("Formules Component", () => {
       expect(btn3).toHaveAttribute("aria-expanded", "false");
     });
   });
+  describe("Add-ons Visibility", () => {
+    let originalAddOns: typeof mockedContent.pricingPage.addOns;
+
+    beforeEach(() => {
+      originalAddOns = JSON.parse(JSON.stringify(mockedContent.pricingPage.addOns || []));
+    });
+
+    afterEach(() => {
+      mockedContent.pricingPage.addOns = originalAddOns;
+    });
+
+    it("displays correct add-on placement across formulas", () => {
+      render(
+        <MemoryRouter>
+          <FormulesFr />
+        </MemoryRouter>
+      );
+
+      // Initially on Duo tab
+      const optionalElements = screen.getAllByText("Séance couple disponible en option");
+      expect(optionalElements.length).toBe(2);
+
+      const priceElements = screen.getAllByText(/\+.*350/);
+      expect(priceElements.length).toBe(2);
+
+      const includedElements = screen.getAllByText("Séance couple incluse");
+      expect(includedElements.length).toBe(1);
+
+      // Switch to Photo tab
+      const photoTab = screen.getByRole("button", { name: "Photographie" });
+      fireEvent.click(photoTab);
+
+      const photoOptional = screen.getAllByText("Séance couple disponible en option");
+      expect(photoOptional.length).toBe(2);
+      
+      const filmTab = screen.getByRole("button", { name: "Film" });
+      fireEvent.click(filmTab);
+
+      const optionalInFilm = screen.queryByText("Séance couple disponible en option");
+      const includedInFilm = screen.queryByText("Séance couple incluse");
+      expect(optionalInFilm).not.toBeInTheDocument();
+      expect(includedInFilm).not.toBeInTheDocument();
+    });
+
+    it("hides disabled add-ons", () => {
+      mockedContent.pricingPage.addOns[0].enabled = false;
+      render(
+        <MemoryRouter>
+          <FormulesFr />
+        </MemoryRouter>
+      );
+      
+      const optionalElements = screen.queryByText("Séance couple disponible en option");
+      expect(optionalElements).not.toBeInTheDocument();
+    });
+  });
 });
