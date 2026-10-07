@@ -15,13 +15,36 @@ function clearInbox() {
   }
 }
 
-function readReceivedEmails(): string[] {
-  if (!inboxPath) return [];
-  const files = fs.readdirSync(inboxPath).filter(f => f.endsWith('.eml'));
-  files.sort((a, b) => {
-    return fs.statSync(path.join(inboxPath, a)).mtimeMs - fs.statSync(path.join(inboxPath, b)).mtimeMs;
-  });
-  return files.map(f => fs.readFileSync(path.join(inboxPath, f), 'utf-8'));
+function decodeQuotedPrintableBody(eml: string): string {
+  const match = eml.match(/^(.*?)(?:\r\n\r\n|\n\n)(.*)$/s);
+  if (!match) return eml;
+
+  const headers = match[1];
+  let body = match[2];
+
+  if (!/content-transfer-encoding:\s*quoted-printable/i.test(headers)) {
+    return body;
+  }
+
+  body = body.replace(/=\r\n/g, '');
+  body = body.replace(/=\n/g, '');
+
+  const bytes: number[] = [];
+  let i = 0;
+  while (i < body.length) {
+    if (body[i] === '=' && i + 2 < body.length) {
+      const hex = body.substring(i + 1, i + 3);
+      if (/^[0-9A-Fa-f]{2}$/.test(hex)) {
+        bytes.push(parseInt(hex, 16));
+        i += 3;
+        continue;
+      }
+    }
+    bytes.push(body.charCodeAt(i));
+    i++;
+  }
+
+  return Buffer.from(bytes).toString('utf8');
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -65,13 +88,13 @@ test.describe('Couple Session Addon Flow', () => {
 
       // 6 & 7 & 8: Check public UI
       await page.goto('/fr/formules');
-      
+
       // Photo category
       await page.getByRole('button', { name: 'Photographie', exact: true }).click();
       const photoEssentialCard = page.getByTestId('pricing-card-photo-essential');
       await expect(photoEssentialCard).toContainText('Séance couple disponible en option');
       await expect(photoEssentialCard).toContainText('380');
-      
+
       const photoPrestigeCard = page.getByTestId('pricing-card-photo-prestige');
       await expect(photoPrestigeCard).toContainText('Séance couple incluse');
 
@@ -91,7 +114,7 @@ test.describe('Couple Session Addon Flow', () => {
       const duoEssentialCard = page.getByTestId('pricing-card-duo-essential');
       await expect(duoEssentialCard).toContainText('Séance couple disponible en option');
       await expect(duoEssentialCard).toContainText('380');
-      
+
       const duoPrestigeCard = page.getByTestId('pricing-card-duo-prestige');
       await expect(duoPrestigeCard).toContainText('Séance couple incluse');
 
@@ -111,6 +134,9 @@ test.describe('Couple Session Addon Flow', () => {
       await page.selectOption('select[name="formula"]', 'photo-essential');
       await addonCheckbox.check();
 
+      // Relever la liste des fichiers .eml présents avant l’envoi du formulaire
+      const initialFiles = new Set(fs.readdirSync(inboxPath).filter(f => f.endsWith('.eml')));
+
       // 13. soumission du formulaire
       await page.fill('#names', 'Test E2E');
       await page.fill('#email', 'test@example.com');
@@ -125,11 +151,23 @@ test.describe('Couple Session Addon Flow', () => {
 
       await expect(page.locator('[role="status"]')).toBeVisible();
 
-      // 14. vérification du contenu de l'e-mail dans l'infrastructure SMTP E2E existante
-      const emails = readReceivedEmails();
-      expect(emails.length).toBeGreaterThan(0);
-      const lastEmail = emails[emails.length - 1];
-      expect(lastEmail).toContain('Séance couple : ajoutée en supplément (+380\u00A0€)');
+      // 14. vérification du contenu de l'e-mail dans l'infrastructure SMTP E2E
+      let latestFile = "";
+      await expect.poll(() => {
+        const currentFiles = fs.readdirSync(inboxPath).filter(f => f.endsWith('.eml'));
+        const newFiles = currentFiles.filter(f => !initialFiles.has(f));
+        if (newFiles.length > 0) {
+          newFiles.sort((a, b) => {
+            return fs.statSync(path.join(inboxPath, b)).mtimeMs - fs.statSync(path.join(inboxPath, a)).mtimeMs;
+          });
+          latestFile = newFiles[0];
+        }
+        return newFiles.length;
+      }, { timeout: 10000 }).toBeGreaterThan(0);
+
+      const rawContent = fs.readFileSync(path.join(inboxPath, latestFile), 'utf-8');
+      const decodedBody = decodeQuotedPrintableBody(rawContent);
+      expect(decodedBody).toContain('Séance couple : ajoutée en supplément (+380\u00A0€)');
     } finally {
       restoreDefaultSiteContent();
     }
