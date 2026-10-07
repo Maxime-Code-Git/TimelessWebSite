@@ -117,7 +117,7 @@ describe('Contact Server Logic', () => {
       sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
       await processContactAction(req, "fr");
       expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
-        addons: ["Séance couple"]
+        addons: [{ name: "Séance couple", status: "added", priceCents: 35000 }]
       }));
     });
 
@@ -126,44 +126,59 @@ describe('Contact Server Logic', () => {
       sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
       await processContactAction(req, "fr");
       expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
-        addons: ["Séance couple (Inclus)"]
+        addons: [{ name: "Séance couple", status: "included" }]
       }));
     });
 
-    it('should reject couple-session for Film Essentiel (ignores it if sent as it is not optional)', async () => {
+    it('should explicitly reject couple-session for Film Essentiel', async () => {
       const req = createRequest({ ...getValidBody(), formula: "film-essential", addons: ["couple-session"] });
-      sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
-      await processContactAction(req, "fr");
-      // Server will ignore invalid optionals securely
-      expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
-        addons: []
-      }));
+      const res = await processContactAction(req, "fr");
+      expect(sendContactEmailMock).not.toHaveBeenCalled();
+      expect(res.error).toBeDefined();
+      expect(res.success).toBeUndefined();
     });
 
-    it('should ignore couple-session for custom/unknown formula', async () => {
+    it('should explicitly reject couple-session for custom formula', async () => {
       const req = createRequest({ ...getValidBody(), formula: "custom", addons: ["couple-session"] });
-      sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
-      await processContactAction(req, "fr");
-      expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
-        addons: []
-      }));
+      const res = await processContactAction(req, "fr");
+      expect(sendContactEmailMock).not.toHaveBeenCalled();
+      expect(res.error).toBeDefined();
+    });
+    
+    it('should explicitly reject couple-session for unknown formula', async () => {
+      const req = createRequest({ ...getValidBody(), formula: "unknown", addons: ["couple-session"] });
+      const res = await processContactAction(req, "fr");
+      expect(sendContactEmailMock).not.toHaveBeenCalled();
+      expect(res.error).toBeDefined();
     });
 
-    it('should ignore unknown add-ons', async () => {
-      const req = createRequest({ ...getValidBody(), addons: ["couple-session", "fake-addon"] });
-      sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
-      await processContactAction(req, "fr");
-      expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
-        addons: ["Séance couple"]
-      }));
+    it('should explicitly reject unknown add-ons', async () => {
+      const req = createRequest({ ...getValidBody(), addons: ["fake-addon"] });
+      const res = await processContactAction(req, "fr");
+      expect(sendContactEmailMock).not.toHaveBeenCalled();
+      expect(res.error).toBeDefined();
     });
 
-    it('should reject a duplicate optional addon (handles it gracefully)', async () => {
+    it('should explicitly reject duplicate optional addon', async () => {
       const req = createRequest({ ...getValidBody(), addons: ["couple-session", "couple-session"] });
+      const res = await processContactAction(req, "fr");
+      expect(sendContactEmailMock).not.toHaveBeenCalled();
+      expect(res.error).toBeDefined();
+    });
+
+    it('should explicitly reject included addon sent manually', async () => {
+      const req = createRequest({ ...getValidBody(), formula: "photo-prestige", addons: ["couple-session"] });
+      const res = await processContactAction(req, "fr");
+      expect(sendContactEmailMock).not.toHaveBeenCalled();
+      expect(res.error).toBeDefined();
+    });
+
+    it('should mark addon as unselected for eligible formulas when not sent', async () => {
+      const req = createRequest({ ...getValidBody(), formula: "photo-essential" });
       sendContactEmailMock.mockResolvedValueOnce({ accepted: ["to@example.com"] });
       await processContactAction(req, "fr");
       expect(sendContactEmailMock).toHaveBeenCalledWith(expect.objectContaining({
-        addons: ["Séance couple"]
+        addons: [{ name: "Séance couple", status: "unselected" }]
       }));
     });
   });

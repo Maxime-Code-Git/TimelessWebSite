@@ -1,5 +1,5 @@
 import { checkRateLimit } from "./rate-limit.server";
-import { sendContactEmail } from "./mailer.server";
+import { sendContactEmail, type ContactAddonInfo } from "./mailer.server";
 
 import { validateOrigin, getClientIp } from "./security.server";
 import { getSiteContent } from "./site-content.server";
@@ -198,30 +198,48 @@ export async function processContactAction(
     readableFormulaLabel = `[${catLabel}] ${matched.name[lang]} (${formula})`;
   }
 
-  // Validate Addons securely (ignore if formula is custom/unknown)
-  const resolvedAddons: string[] = [];
+  // Validate Addons securely
+  const resolvedAddons: ContactAddonInfo[] = [];
+  
+  if (addons.length > 0) {
+    if (formula === "custom" || formula === "unknown") {
+      return { error: siteContent.contactPage.contactForm.errors.invalidRequest[lang] };
+    }
+  }
+
   if (formula !== "custom" && formula !== "unknown") {
     const [cat, fid] = formula.split("-");
     const siteAddOns = siteContent.pricingPage.addOns || [];
 
-    // Check optional addons submitted by user
-    const uniqueAddons = Array.from(new Set(addons));
-    for (const addonId of uniqueAddons) {
-      const matchedAddon = siteAddOns.find(a => a.enabled && a.id === addonId);
-      if (matchedAddon) {
-        const placement = matchedAddon.placements.find(p => p.category === cat && p.formulaId === fid);
-        if (placement && placement.mode === "optional") {
-          resolvedAddons.push(matchedAddon.name[lang]);
-        }
-      }
+    // reject duplicate
+    if (new Set(addons).size !== addons.length) {
+      return { error: siteContent.contactPage.contactForm.errors.invalidRequest[lang] };
     }
 
-    // Auto-inject included addons
+    for (const addonId of addons) {
+      const matchedAddon = siteAddOns.find(a => a.id === addonId);
+      if (!matchedAddon || !matchedAddon.enabled) {
+        return { error: siteContent.contactPage.contactForm.errors.invalidRequest[lang] };
+      }
+      const placement = matchedAddon.placements.find(p => p.category === cat && p.formulaId === fid);
+      if (!placement || placement.mode !== "optional") {
+        return { error: siteContent.contactPage.contactForm.errors.invalidRequest[lang] };
+      }
+      resolvedAddons.push({
+        name: matchedAddon.name[lang],
+        status: "added",
+        priceCents: matchedAddon.priceCents
+      });
+    }
+
+    // Auto-inject included/unselected addons
     for (const siteAddOn of siteAddOns) {
       if (siteAddOn.enabled) {
         const placement = siteAddOn.placements.find(p => p.category === cat && p.formulaId === fid);
         if (placement && placement.mode === "included") {
-          resolvedAddons.push(`${siteAddOn.name[lang]} (Inclus)`);
+           resolvedAddons.push({ name: siteAddOn.name[lang], status: "included" });
+        } else if (placement && placement.mode === "optional" && !addons.includes(siteAddOn.id)) {
+           resolvedAddons.push({ name: siteAddOn.name[lang], status: "unselected" });
         }
       }
     }

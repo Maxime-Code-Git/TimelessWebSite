@@ -54,6 +54,55 @@ describe("Mailer Server", () => {
     expect(callArgs.from).not.toContain(data.names);
   });
 
+  describe("Contact Email Addons formatting", () => {
+    it("should format added paid option with price from priceCents", async () => {
+      await sendContactEmail({
+        names: "Test", email: "a@b.com", date: "2027-01-01", location: "A", message: "B", phone: "123", formula: "photo",
+        addons: [{ name: "Séance couple", status: "added", priceCents: 35000 }]
+      });
+      const text = sendMailMock.mock.calls[0][0].text;
+      expect(text).toContain("Séance couple : ajoutée en supplément (+350 €)");
+    });
+
+    it("should format added paid option with different administrable price", async () => {
+      await sendContactEmail({
+        names: "Test", email: "a@b.com", date: "2027-01-01", location: "A", message: "B", phone: "123", formula: "photo",
+        addons: [{ name: "Séance VIP", status: "added", priceCents: 120050 }]
+      });
+      const text = sendMailMock.mock.calls[0][0].text;
+      expect(text).toContain("Séance VIP : ajoutée en supplément (+1200.5 €)");
+    });
+
+    it("should format unselected paid option", async () => {
+      await sendContactEmail({
+        names: "Test", email: "a@b.com", date: "2027-01-01", location: "A", message: "B", phone: "123", formula: "photo",
+        addons: [{ name: "Séance couple", status: "unselected" }]
+      });
+      const text = sendMailMock.mock.calls[0][0].text;
+      expect(text).toContain("Séance couple : non sélectionnée");
+    });
+
+    it("should format included option", async () => {
+      await sendContactEmail({
+        names: "Test", email: "a@b.com", date: "2027-01-01", location: "A", message: "B", phone: "123", formula: "photo",
+        addons: [{ name: "Séance couple", status: "included" }]
+      });
+      const text = sendMailMock.mock.calls[0][0].text;
+      expect(text).toContain("Séance couple : incluse dans la formule");
+    });
+
+    it("should not output any addon line for Film formulas (no addons passed)", async () => {
+      await sendContactEmail({
+        names: "Test", email: "a@b.com", date: "2027-01-01", location: "A", message: "B", phone: "123", formula: "film",
+        addons: []
+      });
+      const text = sendMailMock.mock.calls[0][0].text;
+      expect(text).not.toContain("Séance couple");
+      expect(text).not.toContain("supplément");
+      expect(text).toContain("Formule : film\n\nMessage");
+    });
+  });
+
   describe("sendBookingConfirmedEmail", () => {
     it("should include admin note for FR emails", async () => {
       const data = {

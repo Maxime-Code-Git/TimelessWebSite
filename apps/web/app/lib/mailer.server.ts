@@ -2,13 +2,19 @@ import nodemailer, { type Transporter } from "nodemailer";
 import { ENV } from "./env.server";
 import type { Booking } from "./booking.server";
 
+export interface ContactAddonInfo {
+  name: string;
+  status: "added" | "included" | "unselected";
+  priceCents?: number;
+}
+
 export interface ContactFormData {
   names: string;
   email: string;
   date: string;
   location: string;
   formula: string;
-  addons?: string[];
+  addons?: ContactAddonInfo[];
   message: string;
   phone: string;
 }
@@ -63,6 +69,14 @@ function formatDate(dateStr: string, language: 'fr' | 'en'): string {
 export async function sendContactEmail(data: ContactFormData) {
   const mailer = getTransporter();
 
+  const addonsText = data.addons?.length
+    ? '\n' + data.addons.map(a => {
+        if (a.status === "added") return `${a.name} : ajoutée en supplément (+${a.priceCents! / 100} €)`;
+        if (a.status === "included") return `${a.name} : incluse dans la formule`;
+        return `${a.name} : non sélectionnée`;
+      }).join('\n')
+    : '';
+
   const textBody = `
 Nouvelle demande de contact:
 
@@ -71,7 +85,7 @@ Email : ${data.email}
 Téléphone : ${data.phone || "Non précisé"}
 Date : ${data.date || "Non précisée"}
 Lieu : ${data.location || "Non précisé"}
-Formule : ${data.formula}${data.addons && data.addons.length > 0 ? `\nOptions/Inclusions : ${data.addons.join(', ')}` : ''}
+Formule : ${data.formula}${addonsText}
 
 Message :
 ${data.message}
