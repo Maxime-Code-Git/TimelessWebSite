@@ -30,7 +30,7 @@ test.describe('Couple Session Addon Flow', () => {
   test.beforeAll(async () => {
     restoreDefaultSiteContent();
   });
-  
+
   test.beforeEach(() => {
     clearInbox();
   });
@@ -52,7 +52,7 @@ test.describe('Couple Session Addon Flow', () => {
 
       // 3. modification du prix de la séance couple
       await page.fill('#addon-price-0', '380');
-      
+
       // 4. sauvegarde avec attente de la réponse HTTP
       const savePromise = page.waitForResponse(r => r.url().includes('/admin/pricing') && r.status() === 200);
       await page.click('button[type="submit"]');
@@ -67,7 +67,7 @@ test.describe('Couple Session Addon Flow', () => {
       // Photo Essentiel should have "Séance couple (+ 380 €)" (we'll just check 380 and the included text)
       await expect(page.locator('body')).toContainText('380');
       await expect(page.locator('body')).toContainText('(Inclus)');
-      
+
       // Film should NOT have "Séance couple" - we can check the Film section
       const filmSection = page.locator('h2', { hasText: 'Film' }).locator('..');
       await expect(filmSection).not.toContainText('Séance couple');
@@ -95,7 +95,7 @@ test.describe('Couple Session Addon Flow', () => {
       await page.fill('#date', '2028-05-15');
       await page.fill('#location', 'Paris');
       await page.fill('#message', 'Hello addon E2E');
-      
+
       const submitPromise = page.waitForResponse(r => r.url().includes('/contact') && r.status() === 200);
       await page.click('button[type="submit"]');
       await submitPromise;

@@ -52,7 +52,7 @@ describe("Admin Pricing UI", () => {
     expect(select).toHaveValue("optional");
 
     fireEvent.change(select, { target: { value: "included" } });
-    
+
     // Check that it updated visually
     expect(select).toHaveValue("included");
 
@@ -61,7 +61,7 @@ describe("Admin Pricing UI", () => {
     const hiddenInput = form.querySelector('input[name="pricingPage"]') as HTMLInputElement;
     const parsed = JSON.parse(hiddenInput.value);
     const addon = parsed.addOns[0];
-    
+
     // The mode should be updated to 'included'
     expect(addon.placements).toEqual([
       { category: "photo", formulaId: "photo-essential", mode: "included" }

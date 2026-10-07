@@ -203,7 +203,7 @@ describe("Migration of intermediate V2 content", () => {
     delete v10Data.pricingPage.addOns;
     const historicId = "42e1ea5e-a874-4ec2-b549-5c0a365fe814";
     const customId = "custom-id-same-text";
-    
+
     // Add the historic item
     v10Data.pricing.photo[2].includedItems.push({
       id: historicId,
@@ -214,29 +214,29 @@ describe("Migration of intermediate V2 content", () => {
       id: customId,
       text: { fr: "Séance couple offerte", en: "Complimentary couple session" }
     });
-    
+
     const initialItemCount = v10Data.pricing.photo[2].includedItems.length;
 
     fs.writeFileSync(filePath, JSON.stringify(v10Data), "utf8");
     const { content: migratedContent1 } = getRawSiteContent();
-    
+
     // Check it's migrated
     expect(migratedContent1.schemaVersion).toBe(11);
     expect(migratedContent1.pricingPage.addOns).toBeDefined();
-    
+
     const prestigeIncluded = migratedContent1.pricing.photo.find(f => f.id === "prestige")?.includedItems;
-    
+
     // 1. Historic ID is removed
     const oldItem = prestigeIncluded?.find(i => i.id === historicId);
     expect(oldItem).toBeUndefined();
-    
+
     // 2. Custom element with different ID but same text is kept
     const customItem = prestigeIncluded?.find(i => i.id === customId);
     expect(customItem).toBeDefined();
-    
+
     // 3. Other elements are preserved (initial - 1 historic)
     expect(prestigeIncluded?.length).toBe(initialItemCount - 1);
-    
+
     // 4. Idempotency
     const { content: migratedContent2 } = getRawSiteContent();
     expect(migratedContent1.pricing.photo).toEqual(migratedContent2.pricing.photo);

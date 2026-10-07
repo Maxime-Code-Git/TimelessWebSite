@@ -162,7 +162,7 @@ describe("Formules Component", () => {
 
       const photoOptional = screen.getAllByText("Séance couple disponible en option");
       expect(photoOptional.length).toBe(2);
-      
+
       const filmTab = screen.getByRole("button", { name: "Film" });
       fireEvent.click(filmTab);
 
@@ -179,7 +179,7 @@ describe("Formules Component", () => {
           <FormulesFr />
         </MemoryRouter>
       );
-      
+
       const optionalElements = screen.queryByText("Séance couple disponible en option");
       expect(optionalElements).not.toBeInTheDocument();
     });

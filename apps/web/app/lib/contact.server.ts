@@ -200,7 +200,7 @@ export async function processContactAction(
 
   // Validate Addons securely
   const resolvedAddons: ContactAddonInfo[] = [];
-  
+
   if (addons.length > 0) {
     if (formula === "custom" || formula === "unknown") {
       return { error: siteContent.contactPage.contactForm.errors.invalidRequest[lang] };

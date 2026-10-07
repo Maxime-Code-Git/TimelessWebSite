@@ -450,7 +450,7 @@ function PricingEditor({ initialPricing, initialPricingPage, revision, error, su
                   <label htmlFor={`addon-name-en-${idx}`}>Nom EN (interne)</label>
                   <input id={`addon-name-en-${idx}`} type="text" value={addOn.name.en} onChange={(e) => handleAddOnFieldChange(idx, "name", "en", e.target.value)} className={styles.input} />
                 </div>
-                
+
                 <div className={styles.formGroup}>
                   <label htmlFor={`addon-opt-fr-${idx}`}>Texte Optionnel FR</label>
                   <input id={`addon-opt-fr-${idx}`} type="text" value={addOn.optionalLabel.fr} onChange={(e) => handleAddOnFieldChange(idx, "optionalLabel", "fr", e.target.value)} className={styles.input} />
@@ -468,7 +468,7 @@ function PricingEditor({ initialPricing, initialPricingPage, revision, error, su
                   <label htmlFor={`addon-inc-en-${idx}`}>Texte Inclus EN</label>
                   <input id={`addon-inc-en-${idx}`} type="text" value={addOn.includedLabel.en} onChange={(e) => handleAddOnFieldChange(idx, "includedLabel", "en", e.target.value)} className={styles.input} />
                 </div>
-                
+
                 <div className={styles.formGroup}>
                   <label htmlFor={`addon-price-${idx}`}>Prix supplémentaire (€)</label>
                   <input id={`addon-price-${idx}`} type="number" step="0.01" value={(addOn.priceCents / 100).toFixed(2)} onChange={(e) => handleAddOnPriceChange(idx, e.target.value)} className={styles.input} />
@@ -486,7 +486,7 @@ function PricingEditor({ initialPricing, initialPricingPage, revision, error, su
                           <label htmlFor={`placement-${addOn.id}-${cat}-${formula.id}`}>
                             {cat.toUpperCase()} {formula.name.fr}
                           </label>
-                          <select 
+                          <select
                             id={`placement-${addOn.id}-${cat}-${formula.id}`}
                             className={styles.select}
                             value={mode}

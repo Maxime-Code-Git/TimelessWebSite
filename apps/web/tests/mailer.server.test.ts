@@ -61,7 +61,7 @@ describe("Mailer Server", () => {
         addons: [{ name: "Séance couple", status: "added", priceCents: 35000 }]
       });
       const text = sendMailMock.mock.calls[0][0].text;
-      expect(text).toContain("Séance couple : ajoutée en supplément (+350 €)");
+      expect(text).toContain("Séance couple : ajoutée en supplément (+350\u00A0€)");
     });
 
     it("should format added paid option with different administrable price", async () => {
@@ -70,7 +70,7 @@ describe("Mailer Server", () => {
         addons: [{ name: "Séance VIP", status: "added", priceCents: 120050 }]
       });
       const text = sendMailMock.mock.calls[0][0].text;
-      expect(text).toContain("Séance VIP : ajoutée en supplément (+1200.5 €)");
+      expect(text).toContain("Séance VIP : ajoutée en supplément (+1\u202F200,50\u00A0€)");
     });
 
     it("should format unselected paid option", async () => {

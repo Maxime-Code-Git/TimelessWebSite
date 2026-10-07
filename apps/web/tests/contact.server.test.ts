@@ -144,7 +144,7 @@ describe('Contact Server Logic', () => {
       expect(sendContactEmailMock).not.toHaveBeenCalled();
       expect(res.error).toBeDefined();
     });
-    
+
     it('should explicitly reject couple-session for unknown formula', async () => {
       const req = createRequest({ ...getValidBody(), formula: "unknown", addons: ["couple-session"] });
       const res = await processContactAction(req, "fr");
