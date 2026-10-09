@@ -1,7 +1,7 @@
-import { execSync, spawn } from 'child_process';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import { execSync, spawn } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { fileURLToPath } from 'url';
 import { SMTPServer } from 'smtp-server';
 import crypto from 'crypto';
@@ -76,6 +76,7 @@ async function run() {
     process.env.GALLERY_MEDIA_PATH = path.join(e2eTempDir, 'gallery-media');
     process.env.GALLERY_IMPORT_PATH = path.join(e2eTempDir, 'gallery-imports');
     process.env.GALLERY_SECRET = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    process.env.E2E_ADMIN_PASSWORD = 'e2e_password';
     process.env.NODE_ENV = 'test';
 
     fs.mkdirSync(process.env.GALLERY_MEDIA_PATH, { recursive: true });
@@ -159,7 +160,11 @@ async function run() {
   }
 }
 
-run().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+export { run };
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  run().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+}

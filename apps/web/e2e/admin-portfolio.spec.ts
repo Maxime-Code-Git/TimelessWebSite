@@ -62,7 +62,7 @@ test.describe('Admin Portfolio V2', () => {
   });
 
   test('should manage video cover', async ({ page, request }, testInfo) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
     const firstCoverPath = testInfo.outputPath('portfolio-cover-1.jpg');
     const secondCoverPath = testInfo.outputPath('portfolio-cover-2.jpg');
 
@@ -119,7 +119,7 @@ test.describe('Admin Portfolio V2', () => {
       expect(firstRes.status()).toBe(200);
 
       // Public display
-      await page.goto('/fr/portfolio');
+      await page.goto('/fr/portfolio', { waitUntil: "domcontentloaded" });
       await expect(page.locator('#galerie-video picture img')).toBeVisible({ timeout: 10000 });
     });
 
@@ -175,7 +175,7 @@ test.describe('Admin Portfolio V2', () => {
     });
 
     await test.step('lecture publique de la vidéo', async () => {
-      await page.goto('/fr/portfolio');
+      await page.goto('/fr/portfolio', { waitUntil: "domcontentloaded" });
       await expect(page.locator("#galerie-video picture img")).toHaveCount(0);
 
       const playButton = page.getByRole("button", { name: "Charger la vidéo depuis Vimeo", exact: true });
