@@ -47,7 +47,7 @@ async function generateSinglePreview(
   }
 
   const tempPath = `${previewPath}.tmp.${crypto.randomUUID()}`;
-  
+
   try {
     const dir = path.dirname(previewPath);
     if (!fs.existsSync(dir)) {
@@ -86,7 +86,7 @@ export async function ensurePreview(
   sourcePath?: string
 ): Promise<boolean> {
   const originalPath = sourcePath || path.join(ENV.GALLERY_MEDIA_PATH, galleryId, mediaId);
-  
+
   if (!isSafePath(ENV.GALLERY_MEDIA_PATH, originalPath) && !sourcePath) {
     throw new Error('Unsafe original path');
   }
@@ -104,7 +104,7 @@ export async function ensurePreview(
   }
 
   const generationKey = `${galleryId}/${mediaId}/${width}`;
-  
+
   if (pendingGenerations.has(generationKey)) {
     await pendingGenerations.get(generationKey);
     return false;
@@ -114,7 +114,7 @@ export async function ensurePreview(
     .finally(() => {
       pendingGenerations.delete(generationKey);
     });
-    
+
   pendingGenerations.set(generationKey, generationPromise);
   await generationPromise;
 

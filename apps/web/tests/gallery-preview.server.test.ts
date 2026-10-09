@@ -16,13 +16,13 @@ describe("Persistent Gallery Previews", () => {
     tempDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "previews-test-")));
     // Override ENV for test by using defineProperty
     Object.defineProperty(ENV, "GALLERY_MEDIA_PATH", { value: tempDir, writable: true });
-    
+
     galleryId = "gal1";
     mediaId = "media1";
-    
+
     fs.mkdirSync(path.join(tempDir, galleryId));
     originalPath = path.join(tempDir, galleryId, mediaId);
-    
+
     // Create a dummy image (1000x2000)
     await sharp({ create: { width: 1000, height: 2000, channels: 3, background: { r: 255, g: 0, b: 0 } } })
       .jpeg()
@@ -36,18 +36,18 @@ describe("Persistent Gallery Previews", () => {
 
   test("1,2,3,4. generates WebP variants preserving ratio", async () => {
     await generateAllPreviews(galleryId, mediaId);
-    
+
     const previewsDir = path.join(tempDir, galleryId, ".previews", mediaId);
     expect(fs.existsSync(previewsDir)).toBe(true);
-    
+
     const w480 = path.join(previewsDir, "480.webp");
     const w960 = path.join(previewsDir, "960.webp");
     const w1920 = path.join(previewsDir, "1920.webp");
-    
+
     expect(fs.existsSync(w480)).toBe(true);
     expect(fs.existsSync(w960)).toBe(true);
     expect(fs.existsSync(w1920)).toBe(true);
-    
+
     const meta480 = await sharp(w480).metadata();
     expect(meta480.format).toBe("webp");
     expect(meta480.width).toBeLessThanOrEqual(480);
@@ -68,7 +68,7 @@ describe("Persistent Gallery Previews", () => {
 
     await generateAllPreviews(galleryId, rotatedMediaId);
     const meta480 = await sharp(path.join(tempDir, galleryId, ".previews", rotatedMediaId, "480.webp")).metadata();
-    
+
     // Rotated 1000x2000 -> 240x480
     expect(meta480.width).toBe(240);
     expect(meta480.height).toBe(480);
@@ -82,7 +82,7 @@ describe("Persistent Gallery Previews", () => {
       .toFile(smallPath);
 
     await generateAllPreviews(galleryId, smallId);
-    
+
     const meta960 = await sharp(path.join(tempDir, galleryId, ".previews", smallId, "960.webp")).metadata();
     expect(meta960.width).toBe(300);
     expect(meta960.height).toBe(200);
@@ -98,14 +98,14 @@ describe("Persistent Gallery Previews", () => {
 
   test("8. file and folder permissions are correct", async () => {
     await generateAllPreviews(galleryId, mediaId);
-    
+
     const previewsDir = path.join(tempDir, galleryId, ".previews");
     const mediaPreviewDir = path.join(previewsDir, mediaId);
     const w480 = path.join(mediaPreviewDir, "480.webp");
-    
+
     const dirStat = fs.statSync(mediaPreviewDir);
     expect((dirStat.mode & 0o777)).toBe(0o700);
-    
+
     const fileStat = fs.statSync(w480);
     expect((fileStat.mode & 0o777)).toBe(0o600);
   });
@@ -126,9 +126,9 @@ describe("Persistent Gallery Previews", () => {
     const corruptId = "corrupt";
     const corruptPath = path.join(tempDir, galleryId, corruptId);
     fs.writeFileSync(corruptPath, "not an image");
-    
+
     await expect(ensurePreview(galleryId, corruptId, 480)).rejects.toThrow();
-    
+
     const previewsDir = path.join(tempDir, galleryId, ".previews", corruptId);
     // tmp file should not exist
     if (fs.existsSync(previewsDir)) {
@@ -137,15 +137,22 @@ describe("Persistent Gallery Previews", () => {
     }
   });
 
-  test("12. idempotent generation", async () => {
+  test("12. idempotent generation does not re-run Sharp", async () => {
+    const renameSpy = vi.spyOn(fs, "renameSync");
     await ensurePreview(galleryId, mediaId, 480);
     const stat1 = fs.statSync(path.join(tempDir, galleryId, ".previews", mediaId, "480.webp"));
-    
-    // Call again
+
+    // The first generation should have written to a temp file and renamed it
+    const renameCalls = renameSpy.mock.calls.length;
+    expect(renameCalls).toBeGreaterThan(0);
+
+    // Call again (idempotent)
     await ensurePreview(galleryId, mediaId, 480);
     const stat2 = fs.statSync(path.join(tempDir, galleryId, ".previews", mediaId, "480.webp"));
-    
+
     expect(stat1.mtimeMs).toBe(stat2.mtimeMs);
+    // Prove that renameSync was not called again (sharp generation skipped)
+    expect(renameSpy.mock.calls.length).toBe(renameCalls);
   });
 
   test("13. deduplication of concurrent generations", async () => {
@@ -157,9 +164,9 @@ describe("Persistent Gallery Previews", () => {
 
     const p1 = ensurePreview(galleryId, mediaId, 480);
     const p2 = ensurePreview(galleryId, mediaId, 480);
-    
+
     await Promise.all([p1, p2]);
-    
+
     // sharp should only be called once, indicated by temp file creation if we could spy sharp, but deduplication promise resolves this
     const stat = fs.statSync(path.join(tempDir, galleryId, ".previews", mediaId, "480.webp"));
     expect(stat.size).toBeGreaterThan(0);
@@ -169,7 +176,7 @@ describe("Persistent Gallery Previews", () => {
     await generateAllPreviews(galleryId, mediaId);
     const previewsDir = path.join(tempDir, galleryId, ".previews", mediaId);
     expect(fs.existsSync(previewsDir)).toBe(true);
-    
+
     removePreviews(galleryId, mediaId);
     expect(fs.existsSync(previewsDir)).toBe(false);
   });
