@@ -3,7 +3,6 @@ import { requireGalleryAccess, GALLERY_PRIVATE_HEADERS } from "~/lib/gallery-aut
 import { ENV } from "~/lib/env.server";
 import fs from "node:fs";
 import path from "node:path";
-import sharp from "sharp";
 import { Readable } from "node:stream";
 import { parseRangeHeader, parseWidth, parseFormat } from "~/lib/media-utils";
 
@@ -73,42 +72,55 @@ const chunksize = (end - start) + 1;
     }
   }
 
-  // Photo: resize on the fly with width parameter support
-
+  // Photo: persistent previews
   const url = new URL(request.url);
   const widthParam = url.searchParams.get("width");
-    const formatParam = url.searchParams.get("format");
-  let targetWidth = 1920;
-  let targetFormat: "jpeg" | "webp" | "avif" | null;
+  const formatParam = url.searchParams.get("format");
 
+  if (!widthParam || !formatParam) {
+    return new Response("Bad Request: width and format are required", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
+  }
 
+  let targetWidth: number;
   try {
     const parsedW = parseWidth(widthParam);
-    if (parsedW) targetWidth = parsedW;
-    targetFormat = parseFormat(formatParam);
+    if (!parsedW) throw new Error();
+    targetWidth = parsedW;
   } catch {
-    return new Response("Bad Request", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
+    return new Response("Bad Request: invalid width", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
   }
 
-  const accept = request.headers.get("Accept") || "";
-  let format: "jpeg" | "webp" | "avif" = "jpeg";
-
-  if (targetFormat === "avif" || (!targetFormat && accept.includes("image/avif"))) {
-    format = "avif";
-  } else if (targetFormat === "webp" || (!targetFormat && accept.includes("image/webp"))) {
-    format = "webp";
+  const targetFormat = parseFormat(formatParam);
+  if (targetFormat !== "webp") {
+    return new Response("Bad Request: only webp format is supported", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
   }
 
-  const transform = sharp(filePath)
-    .resize(targetWidth, targetWidth, { fit: "inside", withoutEnlargement: true })
-    .toFormat(format, { quality: 80 });
+  const isAllowedWidth = (w: number): w is 480 | 960 | 1920 => [480, 960, 1920].includes(w);
 
-  return new Response(Readable.toWeb(transform) as ReadableStream, {
-    status: 200,
-    headers: {
-      "Content-Type": `image/${format}`,
-      "Vary": "Accept",
-      ...GALLERY_PRIVATE_HEADERS
-    }
-  });
+  if (!isAllowedWidth(targetWidth)) {
+    return new Response("Bad Request: invalid width", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
+  }
+
+  try {
+    const { ensurePreview, getPreviewPath } = await import("~/lib/gallery-preview.server");
+    await ensurePreview(galleryId, mediaIdStr, targetWidth);
+    
+    const previewPath = getPreviewPath(galleryId, mediaIdStr, targetWidth);
+    const previewStat = fs.statSync(previewPath);
+    const fileStream = fs.createReadStream(previewPath);
+    const webStream = Readable.toWeb(fileStream) as ReadableStream;
+
+    return new Response(webStream, {
+      status: 200,
+      headers: {
+        "Content-Length": previewStat.size.toString(),
+        "Content-Type": "image/webp",
+        "X-Content-Type-Options": "nosniff",
+        ...GALLERY_PRIVATE_HEADERS
+      }
+    });
+  } catch (error) {
+    console.error("Failed to serve preview:", error);
+    return new Response("Internal Server Error", { status: 500, headers: GALLERY_PRIVATE_HEADERS });
+  }
 }

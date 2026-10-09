@@ -97,3 +97,43 @@ describe("Lightbox interactions", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Unable to load the image.");
   });
 });
+
+describe("Responsive image optimization", () => {
+  const p = (id: string): GalleryMedia => ({ id, type: "photo", mime_type: "image/jpeg", width: 800, height: 1200, visibility: "maries", poster_revision: null });
+
+  const galleryProps = {
+    public_id: "test",
+    bride_names: "A & B",
+    wedding_date: "2026",
+    location: null,
+    intro_fr: null,
+    intro_en: null,
+    signature_fr: null,
+    signature_en: null,
+    cover_image_id: "cover123",
+  };
+
+  test("grid images only use 480 and 960 WebP", () => {
+    const { container } = render(<MemoryRouter><GalleryView lang="fr" gallery={galleryProps} media={[p("media1")]} /></MemoryRouter>);
+    const picture = container.querySelector('[data-testid="gallery-photo"] picture');
+    expect(picture).not.toBeNull();
+    
+    // Check that we don't use 1440w or 1920w in srcset
+    const source = picture!.querySelector('source');
+    expect(source?.getAttribute("srcSet")).toContain("width=480");
+    expect(source?.getAttribute("srcSet")).toContain("width=960");
+    expect(source?.getAttribute("srcSet")).not.toContain("width=1440");
+    expect(source?.getAttribute("srcSet")).not.toContain("width=1920");
+    expect(source?.getAttribute("type")).toBe("image/webp");
+  });
+
+  test("lightbox only uses up to 1920px", () => {
+    render(<MemoryRouter><GalleryView lang="fr" gallery={galleryProps} media={[p("media1")]} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "Photo de A & B" }));
+    
+    const img = screen.getByTestId("lightbox-full-image");
+    expect(img.getAttribute("srcSet")).toContain("width=960");
+    expect(img.getAttribute("srcSet")).toContain("width=1920");
+    expect(img.getAttribute("srcSet")).not.toContain("width=1440");
+  });
+});

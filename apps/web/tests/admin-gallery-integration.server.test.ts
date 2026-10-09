@@ -42,7 +42,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
   const PORT = Math.floor(Math.random() * 20000) + 40000;
   const BASE_URL = `http://localhost:${PORT}`;
 
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-gallery-e2e-"));
+  const tempDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "timeless-gallery-e2e-")));
   const dbPath = path.join(tempDir, "rate-limit.db");
   const galleryDbPath = path.join(tempDir, "gallery.db");
   const siteContentPath = path.join(tempDir, "site-content.json");
@@ -60,14 +60,12 @@ describe("Admin Gallery Integration Lifecycle", () => {
     fs.mkdirSync(path.join(importPath, "maries", "photos"), { recursive: true });
     fs.mkdirSync(path.join(importPath, "maries", "videos"), { recursive: true });
 
-    // Valid 1x1 JPEG base64
-    const validJpeg = Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64");
-
-    // Valid 1x1 PNG base64
-    const validPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
-
-    fs.writeFileSync(path.join(importPath, "invites", "photos", "test.jpg"), validJpeg);
-    fs.writeFileSync(path.join(importPath, "maries", "photos", "couple.png"), validPng);
+    // Use sharp to create a valid 10x10 JPEG
+    const jpegPath = path.join(importPath, "invites", "photos", "test.jpg");
+    const pngPath = path.join(importPath, "maries", "photos", "couple.png");
+    
+    await sharp({ create: { width: 10, height: 10, channels: 3, background: { r: 255, g: 0, b: 0 } } }).jpeg().toFile(jpegPath);
+    await sharp({ create: { width: 10, height: 10, channels: 3, background: { r: 0, g: 255, b: 0 } } }).png().toFile(pngPath);
 
     // Valid mp4 header: length (4 bytes), 'ftyp' (4 bytes), 'mp42' (4 bytes)
     const validMp4_1 = Buffer.concat([Buffer.from([0,0,0,0x18]), Buffer.from("ftypmp42"), Buffer.from("video1")]);
@@ -268,13 +266,13 @@ describe("Admin Gallery Integration Lifecycle", () => {
     publicIdDb.close();
 
     // Verify Admin can load a thumbnail directly without a gallery session
-    const adminThumbnailRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${cover_image_id}?variant=thumbnail`, {
+    const adminThumbnailRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${cover_image_id}?width=480&format=webp`, {
       headers: { "Cookie": authCookie }
     });
     expect(adminThumbnailRes.status).toBe(200);
 
     // Verify Public session cannot bypass
-    const publicThumbnailRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${cover_image_id}?variant=thumbnail`);
+    const publicThumbnailRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${cover_image_id}?width=480&format=webp`);
     expect(publicThumbnailRes.status).toBe(401);
 
     // Rotate guest code to a known value

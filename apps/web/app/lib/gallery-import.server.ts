@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { ENV } from "./env.server";
 import { getGalleryDb } from "./gallery-db.server";
 import sharp from "sharp";
+import { generateAllPreviews, removePreviews } from "./gallery-preview.server";
 
 const MAX_MEDIA_COUNT = 1000;
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB per file
@@ -367,6 +368,8 @@ export async function processImport(importId: string, galleryId: string, folderN
       let tmpPath: string | null = null;
       let destPath: string | null = null;
       let inserted = false;
+      let mediaId: string | null = null;
+      let type: "photo" | "video" | null = null;
 
       try {
         const flags = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0);
@@ -396,8 +399,8 @@ export async function processImport(importId: string, galleryId: string, folderN
           continue;
         }
 
-        const type = PHOTO_MIME_TYPES.has(mimeType) ? "photo" : "video";
-        const mediaId = crypto.randomUUID();
+        type = PHOTO_MIME_TYPES.has(mimeType) ? "photo" : "video";
+        mediaId = crypto.randomUUID();
         destPath = path.join(mediaDir, mediaId);
         tmpPath = destPath + ".tmp";
 
@@ -437,6 +440,9 @@ export async function processImport(importId: string, galleryId: string, folderN
             width = metadata.height || null;
             height = metadata.width || null;
           }
+          
+          if (!checkLease()) throw new Error("Lease lost");
+          await generateAllPreviews(galleryId, mediaId, tmpPath);
         }
 
         if (!checkLease()) throw new Error("Lease lost");
@@ -458,6 +464,9 @@ export async function processImport(importId: string, galleryId: string, folderN
            try {
              db.prepare("DELETE FROM gallery_media WHERE id = ?").run(destPath ? path.basename(destPath) : "");
            } catch { /* ignore */ }
+        }
+        if (type === "photo" && mediaId) {
+          removePreviews(galleryId, mediaId);
         }
         results.ignored.push({ file: file.name, reason: "Erreur: " + (err instanceof Error ? err.message : String(err)) });
       } finally {

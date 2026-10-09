@@ -283,6 +283,25 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
     await expect(guestVideo).toHaveCount(1);
     await expect(guestVideo).toHaveAttribute("controls", "");
 
+    // Vérification des previews persistantes (grille)
+    const firstGridImgSource = guestPage.getByTestId('gallery-photo').first().locator('source').first();
+    const firstGridSrcSet = await firstGridImgSource.getAttribute("srcSet");
+    expect(firstGridSrcSet).toContain("width=480");
+    expect(firstGridSrcSet).toContain("width=960");
+    expect(firstGridSrcSet).not.toContain("width=1440");
+    expect(firstGridSrcSet).not.toContain("width=1920");
+    expect(await firstGridImgSource.getAttribute("type")).toBe("image/webp");
+
+    // Vérification de la lightbox (max 1920)
+    await guestPage.getByTestId('gallery-photo').first().locator('button').first().click();
+    const lightboxImg = guestPage.getByTestId('lightbox-full-image');
+    await expect(lightboxImg).toBeVisible();
+    const lightboxSrcSet = await lightboxImg.getAttribute("srcSet");
+    expect(lightboxSrcSet).toContain("width=960");
+    expect(lightboxSrcSet).toContain("width=1920");
+    expect(lightboxSrcSet).not.toContain("width=1440");
+    await guestPage.locator('.lightboxClose').click(); // close lightbox
+
     // 14. Réponse 206 à Range valide sur vidéo
     const videoSrc = await guestVideo.locator("source").getAttribute("src");
     const rangeRes = await guestContext.request.get(videoSrc!, {
@@ -310,6 +329,9 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
 
     const forbidPhotoRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/media/${coupleMediaId}`);
     expect(forbidPhotoRes.status()).toBe(404);
+
+    const forbidPreviewRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/media/${coupleMediaId}?width=480&format=webp`);
+    expect(forbidPreviewRes.status()).toBe(404);
 
     const forbidVideoRes = await guestContext.request.get(`/api/gallery/${galleryPublicId}/media/${coupleVideoId}`);
     expect(forbidVideoRes.status()).toBe(404);

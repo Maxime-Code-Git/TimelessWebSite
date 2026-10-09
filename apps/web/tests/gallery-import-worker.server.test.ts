@@ -28,6 +28,13 @@ describe("Gallery Import Worker Logic", () => {
   let importDir = "";
 
   beforeAll(async () => {
+    // Override ENV for tests to use realpath so symlink checks pass
+    if (fs.existsSync(ENV.GALLERY_IMPORT_PATH)) {
+      Object.defineProperty(ENV, "GALLERY_IMPORT_PATH", { value: fs.realpathSync(ENV.GALLERY_IMPORT_PATH) });
+    }
+    if (fs.existsSync(ENV.GALLERY_MEDIA_PATH)) {
+      Object.defineProperty(ENV, "GALLERY_MEDIA_PATH", { value: fs.realpathSync(ENV.GALLERY_MEDIA_PATH) });
+    }
     importDir = path.join(ENV.GALLERY_IMPORT_PATH, "worker-test");
     fs.mkdirSync(path.join(importDir, "invites/photos"), { recursive: true });
 
@@ -197,7 +204,7 @@ describe("Gallery Import Worker Logic", () => {
 
     const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId);
     const files = fs.readdirSync(mediaDir);
-    expect(files.filter(f => !f.endsWith(".tmp")).length).toBe(0); // No final files created
+    expect(files.filter(f => !f.endsWith(".tmp") && f !== ".previews").length).toBe(0); // No final files created
   });
 
   it("perte du bail pendant la copie", async () => {
