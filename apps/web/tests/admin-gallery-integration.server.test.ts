@@ -231,11 +231,32 @@ describe("Admin Gallery Integration Lifecycle", () => {
 
     // Get the imported media ID for the cover image (specifically the maries photo)
     const mediaDb = new DatabaseSync(galleryDbPath);
+    const galleryRow = mediaDb.prepare("SELECT public_id FROM galleries WHERE id = ?").get(galleryId!) as { public_id: string } | undefined;
+    const galleryPublicId = galleryRow?.public_id || "";
     const mariesPhotoRow = mediaDb.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND visibility = 'maries' AND type = 'photo'").get(galleryId!) as { id: string } | undefined;
     const mariesVideoRow = mediaDb.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND visibility = 'maries' AND type = 'video'").get(galleryId!) as { id: string } | undefined;
     mediaDb.close();
     const cover_image_id = mariesPhotoRow?.id || "";
+
+    // Test API Admin preview urls
+    const previewRes = await fetch(`${BASE_URL}/api/gallery/${galleryPublicId}/media/${cover_image_id}?width=480&format=webp`, {
+      headers: { Cookie: authCookie }
+    });
+    expect(previewRes.status).toBe(200);
+    expect(previewRes.headers.get("content-type")).toContain("image/webp");
+
+    const failResPreview = await fetch(`${BASE_URL}/api/gallery/${galleryPublicId}/media/${cover_image_id}?width=480`, {
+      headers: { Cookie: authCookie }
+    });
+    expect(failResPreview.status).toBe(400);
+
     const couple_video_id = mariesVideoRow?.id || "";
+    if (couple_video_id) {
+      const posterRes = await fetch(`${BASE_URL}/api/gallery/${galleryPublicId}/media/${couple_video_id}/poster?width=480`, {
+        headers: { Cookie: authCookie }
+      });
+      expect(posterRes.status).not.toBe(400);
+    }
 
     // 8. Publish successfully
     const pubRes = await fetch(`${BASE_URL}/admin/galleries/${galleryId}?_data=routes/admin.galleries.$id`, {
@@ -260,6 +281,13 @@ describe("Admin Gallery Integration Lifecycle", () => {
     const pubText = await pubRes.text();
     expect(pubRes.status).toBe(200);
     expect(pubText).toContain("success");
+
+    // Verify HTML output for Admin previews
+    const htmlRes = await fetch(`${BASE_URL}/admin/galleries/${galleryId}`, {
+      headers: { "Cookie": authCookie }
+    });
+    const html = await htmlRes.text();
+    expect(html).toContain(`/api/gallery/${galleryPublicId}/media/${cover_image_id}?width=480&amp;format=webp`);
 
     const publicIdDb = new DatabaseSync(galleryDbPath);
     const public_id = (publicIdDb.prepare("SELECT public_id FROM galleries WHERE id = ?").get(galleryId as string) as { public_id: string }).public_id;

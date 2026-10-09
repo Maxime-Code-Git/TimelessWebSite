@@ -201,11 +201,13 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
     for (let i = 0; i < thumbnailCount; i++) {
        const img = thumbnails.nth(i);
        const src = await img.getAttribute("src");
-       expect(src).toContain("?width=480");
+       const url = new URL(src!, "http://localhost:3000");
+       expect(url.searchParams.get("width")).toBe("480");
+       expect(url.searchParams.get("format")).toBe("webp");
 
        const res = await adminContext.request.get(src!);
        expect(res.status()).toBe(200);
-       expect(res.status()).not.toBe(400);
+       expect(res.headers()["content-type"]).toContain("image/webp");
 
        await img.scrollIntoViewIfNeeded();
        await expect(async () => {
