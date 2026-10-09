@@ -1,7 +1,6 @@
 import "../../../scripts/env-loader.js";
 import { getGalleryDb } from "../app/lib/gallery-db.server";
-import { generateAllPreviews } from "../app/lib/gallery-preview.server";
-import pLimit from "p-limit";
+import { generateAllPreviews, ConcurrencyLimiter } from "../app/lib/gallery-preview.server";
 
 async function main() {
   console.log("Démarrage de la génération des previews...");
@@ -20,9 +19,9 @@ async function main() {
   let ignored = 0; // well, technically ensurePreview ignores if already present
   let failed = 0;
 
-  const limit = pLimit(2);
+  const limit = new ConcurrencyLimiter(2);
 
-  const tasks = photos.map(photo => limit(async () => {
+  const tasks = photos.map(photo => limit.run(async () => {
     try {
       const { generated: gen, ignored: ign } = await generateAllPreviews(photo.gallery_id, photo.id);
       generated += gen;

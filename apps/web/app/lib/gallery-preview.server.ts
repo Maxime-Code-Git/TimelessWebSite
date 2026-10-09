@@ -3,27 +3,61 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
 import { ENV } from './env.server';
-import pLimit from 'p-limit';
 
-const ALLOWED_WIDTHS = [480, 960, 1920] as const;
+export const ALLOWED_WIDTHS = [480, 960, 1920] as const;
 export type AllowedWidth = typeof ALLOWED_WIDTHS[number];
 
-const pendingGenerations = new Map<string, Promise<void>>();
-const sharpLimit = pLimit(2);
+type Task<T> = () => Promise<T>;
 
-function isSafePath(base: string, target: string): boolean {
-  const resolvedBase = path.resolve(base);
-  const resolvedTarget = path.resolve(target);
-  return resolvedTarget.startsWith(resolvedBase + path.sep) && !resolvedTarget.includes('\0');
+export class ConcurrencyLimiter {
+  private queue: Array<{ task: Task<unknown>; resolve: (v: unknown) => void; reject: (e: unknown) => void }> = [];
+  private active = 0;
+
+  constructor(private readonly limit: number) {}
+
+  public async run<T>(task: Task<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.queue.push({ task: task as Task<unknown>, resolve: resolve as (v: unknown) => void, reject });
+      this.next();
+    });
+  }
+
+  private next() {
+    if (this.active >= this.limit || this.queue.length === 0) return;
+    this.active++;
+    const { task, resolve, reject } = this.queue.shift()!;
+    task().then(resolve, reject).finally(() => {
+      this.active--;
+      this.next();
+    });
+  }
 }
 
-function checkSymlink(target: string): void {
-  let current = target;
-  while (current !== path.parse(current).root) {
-    if (fs.existsSync(current) && fs.lstatSync(current).isSymbolicLink()) {
-      throw new Error(`Symlinks are not allowed: ${current}`);
+const pendingGenerations = new Map<string, Promise<void>>();
+const sharpLimiter = new ConcurrencyLimiter(2);
+
+function enforceSafePath(base: string, target: string): void {
+  const resolvedBase = path.resolve(base);
+  const resolvedTarget = path.resolve(target);
+
+  const rel = path.relative(resolvedBase, resolvedTarget);
+  if (rel.startsWith('..') || path.isAbsolute(rel) || resolvedTarget.includes('\0')) {
+    throw new Error('Unsafe path: outside allowed root');
+  }
+
+  if (fs.existsSync(resolvedBase)) {
+    if (fs.lstatSync(resolvedBase).isSymbolicLink()) {
+      throw new Error('Symlink restriction: root cannot be a symlink');
     }
-    current = path.dirname(current);
+  }
+
+  const parts = rel.split(path.sep).filter(Boolean);
+  let current = resolvedBase;
+  for (const part of parts) {
+    current = path.join(current, part);
+    if (fs.existsSync(current) && fs.lstatSync(current).isSymbolicLink()) {
+      throw new Error('Symlink restriction: symlinks not allowed inside root');
+    }
   }
 }
 
@@ -33,11 +67,13 @@ export function isAllowedWidth(width: number): width is AllowedWidth {
 
 export function getPreviewPath(galleryId: string, mediaId: string, width: AllowedWidth): string {
   const previewsDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId, '.previews', mediaId);
-  if (!isSafePath(ENV.GALLERY_MEDIA_PATH, previewsDir)) {
-    throw new Error('Unsafe preview directory path');
-  }
+  enforceSafePath(ENV.GALLERY_MEDIA_PATH, previewsDir);
   return path.join(previewsDir, `${width}.webp`);
 }
+
+export const dependencies = {
+  sharp
+};
 
 async function generateSinglePreview(
   originalPath: string,
@@ -61,8 +97,8 @@ async function generateSinglePreview(
     else if (width === 960) quality = 80;
     else if (width === 1920) quality = 84;
 
-    await sharpLimit(async () => {
-      await sharp(originalPath)
+    await sharpLimiter.run(async () => {
+      await dependencies.sharp(originalPath)
         .rotate()
         .resize(width, width, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality })
@@ -91,17 +127,16 @@ export async function ensurePreview(
 ): Promise<boolean> {
   const originalPath = sourcePath || path.join(ENV.GALLERY_MEDIA_PATH, galleryId, mediaId);
 
-  if (!isSafePath(ENV.GALLERY_MEDIA_PATH, originalPath) && !sourcePath) {
-    throw new Error('Unsafe original path');
-  }
-  checkSymlink(originalPath);
+  // Both the original path (if not using sourcePath) and sourcePath MUST be inside GALLERY_MEDIA_PATH
+  enforceSafePath(ENV.GALLERY_MEDIA_PATH, originalPath);
 
   if (!fs.existsSync(originalPath)) {
     throw new Error('Original media not found');
   }
 
   const previewPath = getPreviewPath(galleryId, mediaId, width);
-  checkSymlink(path.dirname(previewPath));
+  // enforceSafePath for previewPath is already done inside getPreviewPath
+
 
   if (fs.existsSync(previewPath)) {
     return false;
@@ -140,13 +175,12 @@ export async function generateAllPreviews(galleryId: string, mediaId: string, so
 
 export function removePreviews(galleryId: string, mediaId: string): void {
   const previewsDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId, '.previews', mediaId);
-  if (isSafePath(ENV.GALLERY_MEDIA_PATH, previewsDir)) {
+  try {
+    enforceSafePath(ENV.GALLERY_MEDIA_PATH, previewsDir);
     if (fs.existsSync(previewsDir)) {
-      try {
-        fs.rmSync(previewsDir, { recursive: true, force: true });
-      } catch {
-        // Ignore
-      }
+      fs.rmSync(previewsDir, { recursive: true, force: true });
     }
+  } catch {
+    // Ignore error, we just don't remove if it's unsafe or fails
   }
 }
