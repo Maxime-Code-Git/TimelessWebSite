@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 
-import { createE2EEnvironment } from "../scripts/run-e2e.js";
+import { createE2EEnvironment, getE2ESmtpPaths } from "../scripts/run-e2e.js";
 
 describe("run-e2e script environment", () => {
   let tempRoot: string;
@@ -61,5 +61,43 @@ describe("run-e2e script environment", () => {
       expect(p).not.toContain("/public/");
       expect(p).not.toContain("/build/");
     }
+  });
+
+  it("should extract SMTP paths correctly and reject missing or empty ones", () => {
+    const resultEnv = createE2EEnvironment(tempRoot, sourceEnv);
+
+    const paths = getE2ESmtpPaths(resultEnv);
+    expect(paths.smtpInboxPath).toBe(path.join(tempRoot, 'smtp-inbox'));
+    expect(paths.smtpModePath).toBe(path.join(tempRoot, 'smtp-mode.txt'));
+
+    // Rejects missing INBOX path
+    expect(() => {
+      const badEnv: NodeJS.ProcessEnv = { ...resultEnv };
+      delete badEnv.E2E_SMTP_INBOX_PATH;
+      getE2ESmtpPaths(badEnv);
+    }).toThrow('E2E_SMTP_INBOX_PATH is missing or empty');
+    
+    // Rejects empty INBOX path
+    expect(() => {
+      const badEnv: NodeJS.ProcessEnv = { ...resultEnv, E2E_SMTP_INBOX_PATH: '' };
+      getE2ESmtpPaths(badEnv);
+    }).toThrow('E2E_SMTP_INBOX_PATH is missing or empty');
+
+    // Rejects missing MODE path
+    expect(() => {
+      const badEnv: NodeJS.ProcessEnv = { ...resultEnv };
+      delete badEnv.E2E_SMTP_MODE_PATH;
+      getE2ESmtpPaths(badEnv);
+    }).toThrow('E2E_SMTP_MODE_PATH is missing or empty');
+
+    // Rejects empty MODE path
+    expect(() => {
+      const badEnv: NodeJS.ProcessEnv = { ...resultEnv, E2E_SMTP_MODE_PATH: '' };
+      getE2ESmtpPaths(badEnv);
+    }).toThrow('E2E_SMTP_MODE_PATH is missing or empty');
+
+    // Verify no .certs directory or generated files were accidentally written to the workspace
+    const certsDir = path.resolve(__dirname, '../scripts/.certs');
+    expect(fs.existsSync(certsDir)).toBe(false);
   });
 });

@@ -75,6 +75,24 @@ export function createE2EEnvironment(tempRoot, sourceEnv) {
   };
 }
 
+/**
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {{smtpInboxPath: string, smtpModePath: string}}
+ */
+export function getE2ESmtpPaths(env) {
+  const smtpInboxPath = env.E2E_SMTP_INBOX_PATH;
+  const smtpModePath = env.E2E_SMTP_MODE_PATH;
+  
+  if (typeof smtpInboxPath !== 'string' || !smtpInboxPath) {
+    throw new Error('E2E_SMTP_INBOX_PATH is missing or empty');
+  }
+  if (typeof smtpModePath !== 'string' || !smtpModePath) {
+    throw new Error('E2E_SMTP_MODE_PATH is missing or empty');
+  }
+
+  return { smtpInboxPath, smtpModePath };
+}
+
 async function run() {
   let e2eTempDir = '';
   let smtpServer = null;
@@ -84,13 +102,14 @@ async function run() {
     e2eTempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'timeless-e2e-'));
 
     const e2eEnv = createE2EEnvironment(e2eTempDir, process.env);
+    const { smtpInboxPath, smtpModePath } = getE2ESmtpPaths(e2eEnv);
     
     // Assign back to process.env so that current process has it for SMTP/generateCerts etc., 
     // or we can just use e2eEnv for spawn.
     Object.assign(process.env, e2eEnv);
 
-    fs.mkdirSync(process.env.E2E_SMTP_INBOX_PATH, { recursive: true });
-    fs.writeFileSync(process.env.E2E_SMTP_MODE_PATH, 'accept');
+    fs.mkdirSync(smtpInboxPath, { recursive: true });
+    fs.writeFileSync(smtpModePath, 'accept');
     fs.mkdirSync(process.env.GALLERY_MEDIA_PATH, { recursive: true });
     fs.mkdirSync(process.env.GALLERY_IMPORT_PATH, { recursive: true });
 
