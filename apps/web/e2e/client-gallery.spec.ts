@@ -536,8 +536,11 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
     const deletedMediaId = await guestPhotoItem.getAttribute("data-media-id");
     expect(deletedMediaId).not.toBeNull();
 
-    const beforeDeleteRes = await newGuestContext.request.get(`/api/gallery/${galleryPublicId}/media/${deletedMediaId}`);
+    const deletedMediaPreviewUrl = `/api/gallery/${galleryPublicId}/media/${deletedMediaId}?width=480&format=webp`;
+
+    const beforeDeleteRes = await newGuestContext.request.get(deletedMediaPreviewUrl);
     expect(beforeDeleteRes.status()).toBe(200);
+    expect(beforeDeleteRes.headers()["content-type"]).toContain("image/webp");
 
     await guestPhotoItem.locator('input[type="checkbox"]').check();
 
@@ -552,7 +555,7 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
 
     await expect(adminPage.getByTestId("gallery-media-item")).toHaveCount(mediaCountBefore - 1);
 
-    const deletedMediaRes = await newGuestContext.request.get(`/api/gallery/${galleryPublicId}/media/${deletedMediaId}`);
+    const deletedMediaRes = await newGuestContext.request.get(deletedMediaPreviewUrl);
     expect(deletedMediaRes.status()).toBe(404);
   });
 });
