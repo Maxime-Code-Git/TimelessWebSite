@@ -82,7 +82,7 @@ export function createE2EEnvironment(tempRoot, sourceEnv) {
 export function getE2ESmtpPaths(env) {
   const smtpInboxPath = env.E2E_SMTP_INBOX_PATH;
   const smtpModePath = env.E2E_SMTP_MODE_PATH;
-  
+
   if (typeof smtpInboxPath !== 'string' || !smtpInboxPath) {
     throw new Error('E2E_SMTP_INBOX_PATH is missing or empty');
   }
@@ -103,8 +103,8 @@ async function run() {
 
     const e2eEnv = createE2EEnvironment(e2eTempDir, process.env);
     const { smtpInboxPath, smtpModePath } = getE2ESmtpPaths(e2eEnv);
-    
-    // Assign back to process.env so that current process has it for SMTP/generateCerts etc., 
+
+    // Assign back to process.env so that current process has it for SMTP/generateCerts etc.,
     // or we can just use e2eEnv for spawn.
     Object.assign(process.env, e2eEnv);
 

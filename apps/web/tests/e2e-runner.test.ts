@@ -11,7 +11,7 @@ describe("run-e2e script environment", () => {
 
   beforeEach(() => {
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-e2e-test-"));
-    sourceEnv = { 
+    sourceEnv = {
       PATH: "/usr/bin",
       NODE_ENV: "development",
       USER: "testuser"
@@ -76,7 +76,7 @@ describe("run-e2e script environment", () => {
       delete badEnv.E2E_SMTP_INBOX_PATH;
       getE2ESmtpPaths(badEnv);
     }).toThrow('E2E_SMTP_INBOX_PATH is missing or empty');
-    
+
     // Rejects empty INBOX path
     expect(() => {
       const badEnv: NodeJS.ProcessEnv = { ...resultEnv, E2E_SMTP_INBOX_PATH: '' };
