@@ -54,7 +54,7 @@ describe("run-e2e script environment", () => {
 
     // Verify it was injected globally (since run-e2e.js sets it on process.env)
     expect(process.env.E2E_ADMIN_PASSWORD).toBe("e2e_password");
-    
+
     // Verify it does not rely on a production DB path
     expect(process.env.RATE_LIMIT_DB_PATH).toContain("timeless-e2e-");
   });

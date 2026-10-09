@@ -182,7 +182,7 @@ test.describe('Admin Portfolio V2', () => {
 
     await test.step('lecture publique de la vidéo', async () => {
       await page.goto('/fr/portfolio', { waitUntil: 'domcontentloaded' });
-      
+
       const videoSection = page.locator('#galerie-video');
       await expect(videoSection).toBeVisible({ timeout: 10000 });
       await expect(page.locator("#galerie-video picture img")).toHaveCount(0);
