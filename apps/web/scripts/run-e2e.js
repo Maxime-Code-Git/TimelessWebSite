@@ -50,6 +50,31 @@ function cleanupCerts() {
   }
 }
 
+/**
+ * @param {string} tempRoot
+ * @param {NodeJS.ProcessEnv} sourceEnv
+ * @returns {NodeJS.ProcessEnv}
+ */
+export function createE2EEnvironment(tempRoot, sourceEnv) {
+  return {
+    ...sourceEnv,
+    E2E_SMTP_INBOX_PATH: path.join(tempRoot, 'smtp-inbox'),
+    E2E_SMTP_MODE_PATH: path.join(tempRoot, 'smtp-mode.txt'),
+    SITE_CONTENT_PATH: path.join(tempRoot, 'site-content.json'),
+    PORTFOLIO_CONTENT_PATH: path.join(tempRoot, 'portfolio.json'),
+    PORTFOLIO_MEDIA_PATH: path.join(tempRoot, 'portfolio-media'),
+    SITE_MEDIA_PATH: path.join(tempRoot, 'site-media'),
+    RATE_LIMIT_DB_PATH: path.join(tempRoot, 'rate-limit.sqlite'),
+    BOOKING_DB_PATH: path.join(tempRoot, 'bookings.sqlite'),
+    GALLERY_DB_PATH: path.join(tempRoot, 'galleries.sqlite'),
+    GALLERY_MEDIA_PATH: path.join(tempRoot, 'gallery-media'),
+    GALLERY_IMPORT_PATH: path.join(tempRoot, 'gallery-imports'),
+    GALLERY_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+    E2E_ADMIN_PASSWORD: 'e2e_password',
+    NODE_ENV: 'test'
+  };
+}
+
 async function run() {
   let e2eTempDir = '';
   let smtpServer = null;
@@ -58,28 +83,14 @@ async function run() {
     generateCerts();
     e2eTempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'timeless-e2e-'));
 
-    const smtpInboxPath = path.join(e2eTempDir, 'smtp-inbox');
-    const smtpModePath = path.join(e2eTempDir, 'smtp-mode.txt');
+    const e2eEnv = createE2EEnvironment(e2eTempDir, process.env);
+    
+    // Assign back to process.env so that current process has it for SMTP/generateCerts etc., 
+    // or we can just use e2eEnv for spawn.
+    Object.assign(process.env, e2eEnv);
 
-    fs.mkdirSync(smtpInboxPath, { recursive: true });
-    fs.writeFileSync(smtpModePath, 'accept');
-
-    process.env.E2E_SMTP_INBOX_PATH = smtpInboxPath;
-    process.env.E2E_SMTP_MODE_PATH = smtpModePath;
-    process.env.SITE_CONTENT_PATH = path.join(e2eTempDir, 'site-content.json');
-    process.env.PORTFOLIO_CONTENT_PATH = path.join(e2eTempDir, 'portfolio.json');
-    process.env.PORTFOLIO_MEDIA_PATH = path.join(e2eTempDir, 'portfolio-media');
-    process.env.SITE_MEDIA_PATH = path.join(e2eTempDir, 'site-media');
-    process.env.RATE_LIMIT_DB_PATH = path.join(e2eTempDir, 'rate-limit.sqlite');
-    process.env.BOOKING_DB_PATH = path.join(e2eTempDir, 'bookings.sqlite');
-    process.env.GALLERY_DB_PATH = path.join(e2eTempDir, 'galleries.sqlite');
-    process.env.GALLERY_MEDIA_PATH = path.join(e2eTempDir, 'gallery-media');
-    process.env.GALLERY_IMPORT_PATH = path.join(e2eTempDir, 'gallery-imports');
-    process.env.GALLERY_SECRET = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
-    process.env.E2E_ADMIN_PASSWORD = 'e2e_password';
-    process.env.NODE_ENV = 'test';
-    process.env.E2E_ADMIN_PASSWORD = 'e2e_password';
-
+    fs.mkdirSync(process.env.E2E_SMTP_INBOX_PATH, { recursive: true });
+    fs.writeFileSync(process.env.E2E_SMTP_MODE_PATH, 'accept');
     fs.mkdirSync(process.env.GALLERY_MEDIA_PATH, { recursive: true });
     fs.mkdirSync(process.env.GALLERY_IMPORT_PATH, { recursive: true });
 

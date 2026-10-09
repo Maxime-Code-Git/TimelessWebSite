@@ -3,59 +3,63 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 
-import { vi } from "vitest";
-
-vi.mock("smtp-server", () => ({
-  SMTPServer: class {
-    listen(port: unknown, host: unknown, cb: unknown) {
-      if (typeof cb === 'function') cb();
-      else if (typeof host === 'function') host();
-    }
-    close(cb: unknown) { if (typeof cb === 'function') cb(); }
-    on() {}
-  }
-}));
+import { createE2EEnvironment } from "../scripts/run-e2e.js";
 
 describe("run-e2e script environment", () => {
-  let originalEnv: NodeJS.ProcessEnv;
-  let tempBin: string;
+  let tempRoot: string;
+  let sourceEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    originalEnv = { ...process.env };
-    tempBin = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-bin-"));
-    // Create a fake npx that just exits immediately so we don't really run Playwright
-    fs.writeFileSync(path.join(tempBin, "npx"), `#!/bin/sh\nexit 0\n`, { mode: 0o755 });
-    // Also create a fake openssl to avoid generating certs during the test
-    fs.writeFileSync(path.join(tempBin, "openssl"), `#!/bin/sh\nexit 0\n`, { mode: 0o755 });
-    process.env.PATH = `${tempBin}:${process.env.PATH}`;
+    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-e2e-test-"));
+    sourceEnv = { 
+      PATH: "/usr/bin",
+      NODE_ENV: "development",
+      USER: "testuser"
+    };
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    if (fs.existsSync(tempBin)) fs.rmSync(tempBin, { recursive: true, force: true });
+    if (fs.existsSync(tempRoot)) {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
-  it("should securely inject E2E_ADMIN_PASSWORD into environment", async () => {
-    delete process.env.E2E_ADMIN_PASSWORD;
+  it("should securely inject E2E_ADMIN_PASSWORD and isolated paths into environment", () => {
+    const resultEnv = createE2EEnvironment(tempRoot, sourceEnv);
 
-    // Create dummy certs so generateCerts doesn't throw ENOENT when it reads them
-    const certsDir = path.join(__dirname, "../e2e/certs");
-    fs.mkdirSync(certsDir, { recursive: true });
-    fs.writeFileSync(path.join(certsDir, "test-key.pem"), "dummy key");
-    fs.writeFileSync(path.join(certsDir, "test-cert.pem"), "dummy cert");
+    // Verify password injection
+    expect(resultEnv.E2E_ADMIN_PASSWORD).toBe("e2e_password");
 
-    // @ts-expect-error script lacks type definitions
-    const runner = await import("../scripts/run-e2e.js");
-    try {
-      await runner.run();
-    } catch (err) {
-      console.error("RUNNER ERROR", err);
+    // Verify source env is not mutated
+    expect(sourceEnv.E2E_ADMIN_PASSWORD).toBeUndefined();
+    expect(sourceEnv.NODE_ENV).toBe("development");
+
+    // Verify result env inherited correctly and overrides where expected
+    expect(resultEnv.USER).toBe("testuser");
+    expect(resultEnv.NODE_ENV).toBe("test");
+
+    // Verify paths are mapped within tempRoot
+    const pathKeys = [
+      "E2E_SMTP_INBOX_PATH",
+      "E2E_SMTP_MODE_PATH",
+      "SITE_CONTENT_PATH",
+      "PORTFOLIO_CONTENT_PATH",
+      "PORTFOLIO_MEDIA_PATH",
+      "SITE_MEDIA_PATH",
+      "RATE_LIMIT_DB_PATH",
+      "BOOKING_DB_PATH",
+      "GALLERY_DB_PATH",
+      "GALLERY_MEDIA_PATH",
+      "GALLERY_IMPORT_PATH",
+    ];
+
+    for (const key of pathKeys) {
+      const p = resultEnv[key] as string;
+      expect(p).toBeDefined();
+      expect(p.startsWith(tempRoot)).toBe(true);
+      expect(p).not.toContain("/data/");
+      expect(p).not.toContain("/public/");
+      expect(p).not.toContain("/build/");
     }
-
-    // Verify it was injected globally (since run-e2e.js sets it on process.env)
-    expect(process.env.E2E_ADMIN_PASSWORD).toBe("e2e_password");
-
-    // Verify it does not rely on a production DB path
-    expect(process.env.RATE_LIMIT_DB_PATH).toContain("timeless-e2e-");
   });
 });
