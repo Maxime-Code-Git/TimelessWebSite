@@ -125,7 +125,7 @@ test.describe('Admin Portfolio V2', () => {
       expect(firstRes.status()).toBe(200);
 
       // Public display
-      await page.goto('/fr/portfolio');
+      await page.goto('/fr/portfolio', { waitUntil: "domcontentloaded" });
       await expect(page.locator('#galerie-video picture img')).toBeVisible({ timeout: 10000 });
     });
 
@@ -185,7 +185,6 @@ test.describe('Admin Portfolio V2', () => {
       
       const videoSection = page.locator('#galerie-video');
       await expect(videoSection).toBeVisible({ timeout: 10000 });
-      
       await expect(page.locator("#galerie-video picture img")).toHaveCount(0);
 
       const playButton = page.getByRole("button", { name: "Charger la vidéo depuis Vimeo", exact: true });

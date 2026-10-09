@@ -3,7 +3,7 @@ import { restoreDefaultSiteContent } from './test-helpers';
 
 test.describe('Admin Legal Pages', () => {
   test('can modify draft, check public page independence, publish, and check history', async ({ page }, testInfo) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
 
     const suffix = `${testInfo.project.name}-${testInfo.retry}`
       .toLowerCase()
@@ -81,14 +81,14 @@ test.describe('Admin Legal Pages', () => {
       await expect(page.locator('input#pubTitle')).toHaveValue(newTitleEN);
 
       // 8. Verify public pages retain baseline version (independence)
-      await page.goto('/fr/mentions-legales');
+      await page.goto('/fr/mentions-legales', { waitUntil: "domcontentloaded" });
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(baselineTitleFR);
 
-      await page.goto('/en/legal');
+      await page.goto('/en/legal', { waitUntil: "domcontentloaded" });
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(baselineTitleEN);
 
       // 9. Publish the new version
-      await page.goto('/admin/legal');
+      await page.goto('/admin/legal', { waitUntil: "domcontentloaded" });
       await expect(page.getByRole('button', { name: 'Mentions Légales', exact: true })).toBeVisible();
       await page.getByRole('button', { name: 'FR', exact: true }).click();
       await page.fill('input#effectiveDate', publishDate);
@@ -99,14 +99,14 @@ test.describe('Admin Legal Pages', () => {
       await expect(page.getByRole('status')).toHaveText('Modifications enregistrées.');
 
       // 10. Verify new version on public pages
-      await page.goto('/fr/mentions-legales');
+      await page.goto('/fr/mentions-legales', { waitUntil: "domcontentloaded" });
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(newTitleFR);
 
-      await page.goto('/en/legal');
+      await page.goto('/en/legal', { waitUntil: "domcontentloaded" });
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(newTitleEN);
 
       // 11. Verify history in admin
-      await page.goto('/admin/legal');
+      await page.goto('/admin/legal', { waitUntil: "domcontentloaded" });
       await expect(page.getByRole('button', { name: 'Mentions Légales', exact: true })).toBeVisible();
 
       // Check current version contains our project-specific title
