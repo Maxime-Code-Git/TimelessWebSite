@@ -241,37 +241,53 @@ describe("Gallery Import Worker Logic", () => {
     expect(jobRow.result_json as string).toBeNull();
   });
 
-  it("test de charge avec 25 photos (deadlock & sémaphore)", async () => {
-    const importDir25 = path.join(ENV.GALLERY_IMPORT_PATH, "worker-test-25");
-    fs.mkdirSync(path.join(importDir25, "invites/photos"), { recursive: true });
-    
-    for (let i = 1; i <= 25; i++) {
-      const p = path.join(importDir25, `invites/photos/test${i}.jpg`);
+  it("test de charge avec 26 photos et 2 vidéos (deadlock & sémaphore)", async () => {
+    const importDir28 = path.join(ENV.GALLERY_IMPORT_PATH, "worker-test-28");
+    fs.mkdirSync(path.join(importDir28, "invites/photos"), { recursive: true });
+    fs.mkdirSync(path.join(importDir28, "invites/videos"), { recursive: true });
+
+    // 26 photos
+    for (let i = 1; i <= 26; i++) {
+      const p = path.join(importDir28, `invites/photos/test${i}.jpg`);
       await sharp({ create: { width: 10 + i, height: 10, channels: 3, background: { r: 255, g: i, b: 0 } } }).jpeg().toFile(p);
     }
-    
-    const importId = startGalleryImport(galleryId, "worker-test-25");
+
+    // 2 vidéos
+    const fakeMp4_1 = Buffer.alloc(16);
+    fakeMp4_1.write("1111ftypmp42", 0, "ascii");
+    fs.writeFileSync(path.join(importDir28, "invites/videos/vid1.mp4"), fakeMp4_1);
+
+    const fakeMp4_2 = Buffer.alloc(16);
+    fakeMp4_2.write("2222ftypmp42", 0, "ascii");
+    fs.writeFileSync(path.join(importDir28, "invites/videos/vid2.mp4"), fakeMp4_2);
+
+    const importId = startGalleryImport(galleryId, "worker-test-28");
     const job = acquireNextJob();
     expect(job).toBeDefined();
-    
-    await processImport(importId, galleryId, "worker-test-25", job!.lease_token);
-    
+
+    await processImport(importId, galleryId, "worker-test-28", job!.lease_token);
+
     const row = db.prepare("SELECT status, progress, result_json FROM gallery_imports WHERE id = ?").get(importId) as Record<string, unknown>;
     expect(row.status).toBe("completed");
-    expect(row.progress).toBe(25);
+    expect(row.progress).toBe(28);
     const res = JSON.parse(row.result_json as string);
-    expect(res.imported).toBe(25);
+    expect(res.imported).toBe(28);
     expect(res.ignored.length).toBe(0);
-    
-    const medias = db.prepare("SELECT id FROM gallery_media WHERE gallery_id = ?").all(galleryId) as { id: string }[];
-    expect(medias.length).toBe(25);
-    
+
+    const medias = db.prepare("SELECT id, type FROM gallery_media WHERE gallery_id = ?").all(galleryId) as { id: string; type: string }[];
+    expect(medias.length).toBe(28);
+
     for (const m of medias) {
-       expect(fs.existsSync(path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".previews", m.id, "480.webp"))).toBe(true);
-       expect(fs.existsSync(path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".previews", m.id, "960.webp"))).toBe(true);
-       expect(fs.existsSync(path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".previews", m.id, "1920.webp"))).toBe(true);
+      if (m.type === "photo") {
+         expect(fs.existsSync(path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".previews", m.id, "480.webp"))).toBe(true);
+         expect(fs.existsSync(path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".previews", m.id, "960.webp"))).toBe(true);
+         expect(fs.existsSync(path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".previews", m.id, "1920.webp"))).toBe(true);
+      } else {
+         // Videos don't get generated previews during import yet (or handled differently)
+         expect(fs.existsSync(path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".previews", m.id, "480.webp"))).toBe(false);
+      }
     }
-    
+
     const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId);
     const files = fs.readdirSync(mediaDir);
     expect(files.some(f => f.endsWith(".tmp"))).toBe(false);

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import sharp from "sharp";
-import { ensurePreview, generateAllPreviews, removePreviews } from "../app/lib/gallery-preview.server";
+import { ensurePreview, generateAllPreviews, removePreviews, dependencies } from "../app/lib/gallery-preview.server";
 import { ENV } from "../app/lib/env.server";
 
 describe("Persistent Gallery Previews", () => {
@@ -111,14 +111,14 @@ describe("Persistent Gallery Previews", () => {
   });
 
   test("9. refuses path outside GALLERY_MEDIA_PATH", async () => {
-    await expect(ensurePreview("../outside", mediaId, 480)).rejects.toThrow("Unsafe original path");
+    await expect(ensurePreview("../outside", mediaId, 480)).rejects.toThrow("outside allowed root");
   });
 
-  test("10. refuses symlinks", async () => {
+  test("10. refuses symlinks inside root", async () => {
     const symId = "symlink";
     const symPath = path.join(tempDir, galleryId, symId);
     fs.symlinkSync(originalPath, symPath);
-    await expect(ensurePreview(galleryId, symId, 480)).rejects.toThrow("Symlinks are not allowed");
+    await expect(ensurePreview(galleryId, symId, 480)).rejects.toThrow("symlinks not allowed inside root");
   });
 
   test("11. atomic write and cleanup on error", async () => {
@@ -156,7 +156,7 @@ describe("Persistent Gallery Previews", () => {
   });
 
   test("13. deduplication of concurrent generations", async () => {
-    const renameSpy = vi.spyOn(fs, "renameSync");
+    const sharpSpy = vi.spyOn(dependencies, "sharp");
 
     const p1 = ensurePreview(galleryId, mediaId, 480);
     const p2 = ensurePreview(galleryId, mediaId, 480);
@@ -164,10 +164,8 @@ describe("Persistent Gallery Previews", () => {
 
     await Promise.all([p1, p2, p3]);
 
-    // ensurePreview will only generate it once because pendingGenerations catches it.
-    // So renameSync should be called exactly once.
-    expect(renameSpy).toHaveBeenCalledTimes(1);
-    
+    expect(sharpSpy).toHaveBeenCalledTimes(1);
+
     const stat = fs.statSync(path.join(tempDir, galleryId, ".previews", mediaId, "480.webp"));
     expect(stat.size).toBeGreaterThan(0);
   });
@@ -179,5 +177,54 @@ describe("Persistent Gallery Previews", () => {
 
     removePreviews(galleryId, mediaId);
     expect(fs.existsSync(previewsDir)).toBe(false);
+  });
+
+  test("14. refuses arbitrary sourcePath outside GALLERY_MEDIA_PATH", async () => {
+    const outsidePath = path.join(os.tmpdir(), "outside.jpg");
+    fs.writeFileSync(outsidePath, "fake image");
+    await expect(ensurePreview(galleryId, mediaId, 480, outsidePath)).rejects.toThrow("outside allowed root");
+    if (fs.existsSync(outsidePath)) fs.unlinkSync(outsidePath);
+  });
+
+  test("15. works when GALLERY_MEDIA_PATH is accessed via a system symlink above it", async () => {
+    const realDir = fs.mkdtempSync(path.join(os.tmpdir(), "real-sys-"));
+    const symDir = path.join(os.tmpdir(), "sym-sys-" + crypto.randomUUID());
+    fs.symlinkSync(realDir, symDir);
+
+    const oldEnv = ENV.GALLERY_MEDIA_PATH;
+    Object.defineProperty(ENV, "GALLERY_MEDIA_PATH", { value: symDir, writable: true });
+    fs.mkdirSync(path.join(symDir, galleryId), { recursive: true });
+    const mediaSymPath = path.join(symDir, galleryId, "sys-media");
+    await dependencies.sharp({ create: { width: 10, height: 10, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+      .jpeg().toFile(mediaSymPath);
+
+    // This should NOT throw symlink error because the symlink is at `symDir`, which is the root itself
+    // Wait, the logic says "if (fs.lstatSync(resolvedBase).isSymbolicLink()) throw Error('root cannot be a symlink')".
+    // Wait!! `path.resolve(symDir)` will still be `symDir` because it's absolute.
+    // If `symDir` itself is the root, `lstatSync(symDir).isSymbolicLink()` will be TRUE!
+    // But the user said: "accepter le cas macOS où /var est un lien symbolique extérieur à GALLERY_MEDIA_PATH"
+    // In that case, GALLERY_MEDIA_PATH is `/var/folders/xyz/GALLERY`, so the root is `GALLERY`, NOT `/var`.
+    // So the root itself is a real directory, but a PARENT is a symlink.
+    // Let's model exactly this:
+
+    const parentSymDir = path.join(os.tmpdir(), "parent-sym-" + crypto.randomUUID());
+    fs.symlinkSync(realDir, parentSymDir);
+    const configuredMediaRoot = path.join(parentSymDir, "my-media-root");
+    fs.mkdirSync(configuredMediaRoot, { recursive: true });
+
+    Object.defineProperty(ENV, "GALLERY_MEDIA_PATH", { value: configuredMediaRoot, writable: true });
+
+    fs.mkdirSync(path.join(configuredMediaRoot, galleryId), { recursive: true });
+    const testMedia = path.join(configuredMediaRoot, galleryId, "test-media");
+    await dependencies.sharp({ create: { width: 10, height: 10, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+      .jpeg().toFile(testMedia);
+
+    // This should work
+    const res = await ensurePreview(galleryId, "test-media", 480);
+    expect(res).toBe(true);
+
+    Object.defineProperty(ENV, "GALLERY_MEDIA_PATH", { value: oldEnv, writable: true });
+    fs.unlinkSync(parentSymDir);
+    fs.rmSync(realDir, { recursive: true, force: true });
   });
 });
