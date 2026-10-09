@@ -159,9 +159,8 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
       <section className={styles.hero}>
         <div className={styles.heroBg}>
           <picture>
-            <source srcSet={gallery.cover_image_id ? `${mediaUrl(gallery.cover_image_id)}?width=1920&format=avif` : coverUrl} type="image/avif" />
             <source srcSet={gallery.cover_image_id ? `${mediaUrl(gallery.cover_image_id)}?width=1920&format=webp` : coverUrl} type="image/webp" />
-            <img src={coverUrl} alt="Cover" className={styles.heroImage} />
+            <img src={gallery.cover_image_id ? `${mediaUrl(gallery.cover_image_id)}?width=1920&format=webp` : coverUrl} alt="Cover" className={styles.heroImage} />
           </picture>
           <div className={styles.heroOverlay} />
         </div>
@@ -259,20 +258,20 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
                           >
                             <picture>
                               <source
-                                srcSet={`${mediaUrl(p.id)}?width=480&format=avif 480w, ${mediaUrl(p.id)}?width=960&format=avif 960w, ${mediaUrl(p.id)}?width=1440&format=avif 1440w, ${mediaUrl(p.id)}?width=1920&format=avif 1920w`}
-                                sizes="(max-width: 480px) 480px, (max-width: 960px) 960px, (max-width: 1440px) 1440px, 1920px"
-                                type="image/avif"
-                              />
-                              <source
-                                srcSet={`${mediaUrl(p.id)}?width=480&format=webp 480w, ${mediaUrl(p.id)}?width=960&format=webp 960w, ${mediaUrl(p.id)}?width=1440&format=webp 1440w, ${mediaUrl(p.id)}?width=1920&format=webp 1920w`}
-                                sizes="(max-width: 480px) 480px, (max-width: 960px) 960px, (max-width: 1440px) 1440px, 1920px"
+                                srcSet={`${mediaUrl(p.id)}?width=480&format=webp 480w, ${mediaUrl(p.id)}?width=960&format=webp 960w`}
+                                sizes={
+                                  row.isSinglePortrait ? "(max-width: 720px) calc(100vw - 32px), 600px" :
+                                  row.units === 4 ? "(max-width: 720px) calc(100vw - 32px), 25vw" :
+                                  row.units === 3 ? "(max-width: 720px) calc(100vw - 32px), 33vw" :
+                                  row.units === 2 ? "(max-width: 720px) calc(100vw - 32px), 50vw" :
+                                  "(max-width: 720px) calc(100vw - 32px), 25vw"
+                                }
                                 type="image/webp"
                               />
                               <img
-                                src={`${mediaUrl(p.id)}?width=960`}
-                                srcSet={`${mediaUrl(p.id)}?width=480 480w, ${mediaUrl(p.id)}?width=960 960w, ${mediaUrl(p.id)}?width=1440 1440w, ${mediaUrl(p.id)}?width=1920 1920w`}
-                                sizes="(max-width: 480px) 480px, (max-width: 960px) 960px, (max-width: 1440px) 1440px, 1920px"
+                                src={`${mediaUrl(p.id)}?width=960&format=webp`}
                                 loading="lazy"
+                                decoding="async"
                                 alt={`${t.photoOf} ${gallery.bride_names}`}
                                 className={styles.photoImg}
                                 width={p.width || undefined}
@@ -361,7 +360,8 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
                   className={styles.lightboxImagePreview}
                 />
                 <img
-                  srcSet={`${mediaUrl(photos[lightboxIndex].id)}?width=960&format=webp 960w, ${mediaUrl(photos[lightboxIndex].id)}?width=1440&format=webp 1440w, ${mediaUrl(photos[lightboxIndex].id)}?width=1920&format=webp 1920w`}
+                  src={`${mediaUrl(photos[lightboxIndex].id)}?width=1920&format=webp`}
+                  srcSet={`${mediaUrl(photos[lightboxIndex].id)}?width=960&format=webp 960w, ${mediaUrl(photos[lightboxIndex].id)}?width=1920&format=webp 1920w`}
                   sizes="90vw"
                   alt={`${t.photoOf} ${gallery.bride_names}`}
                   className={`${styles.lightboxImageHd} ${lightboxLoading ? styles.lightboxImageHidden : ""}`}

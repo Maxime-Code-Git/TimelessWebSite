@@ -240,6 +240,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     const quarantined: string[] = [];
     const quarantinedPosters: string[] = [];
+    const quarantinedPreviews: string[] = [];
 
     try {
       for (const id of validMediaIds) {
@@ -255,6 +256,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
         if (fs.existsSync(posterSrc)) {
           fs.renameSync(posterSrc, posterDest);
           quarantinedPosters.push(id);
+        }
+
+        const previewSrc = path.join(mediaDir, ".previews", id);
+        const previewDest = path.join(quarantineDir, ".previews_" + id);
+        if (fs.existsSync(previewSrc)) {
+          fs.renameSync(previewSrc, previewDest);
+          quarantinedPreviews.push(id);
         }
       }
 
@@ -284,6 +292,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
       for (const id of quarantinedPosters) {
         try { fs.rmSync(path.join(quarantineDir, ".posters_" + id), { recursive: true, force: true }); } catch { /* ignore */ }
       }
+      for (const id of quarantinedPreviews) {
+        try { fs.rmSync(path.join(quarantineDir, ".previews_" + id), { recursive: true, force: true }); } catch { /* ignore */ }
+      }
       try { fs.rmdirSync(quarantineDir); } catch { /* ignore */ }
 
       return Response.json({ success: true, intent, deletedCount: validMediaIds.length });
@@ -298,11 +309,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const dest = path.join(mediaDir, ".posters", id);
         try {
           if (fs.existsSync(src)) {
-            fs.mkdirSync(path.dirname(dest), { recursive: true });
+            if (!fs.existsSync(path.join(mediaDir, ".posters"))) fs.mkdirSync(path.join(mediaDir, ".posters"), { recursive: true });
             fs.renameSync(src, dest);
           }
         } catch { /* ignore */ }
       }
+      for (const id of quarantinedPreviews) {
+        const src = path.join(quarantineDir, ".previews_" + id);
+        const dest = path.join(mediaDir, ".previews", id);
+        try {
+          if (fs.existsSync(src)) {
+            if (!fs.existsSync(path.join(mediaDir, ".previews"))) fs.mkdirSync(path.join(mediaDir, ".previews"), { recursive: true });
+            fs.renameSync(src, dest);
+          }
+        } catch { /* ignore */ }
+      }
+
       try { fs.rmdirSync(quarantineDir); } catch { /* ignore */ }
       return Response.json({ error: "Erreur lors de la suppression.", intent }, { status: 500 });
     }
