@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { parseRangeHeader, parseWidth, parseFormat } from "~/lib/media-utils";
+import { ensurePreview, getPreviewPath } from "~/lib/gallery-preview.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { publicId, mediaId } = params;
@@ -107,7 +108,6 @@ const chunksize = (end - start) + 1;
   }
 
   try {
-    const { ensurePreview, getPreviewPath } = await import("~/lib/gallery-preview.server");
     await ensurePreview(galleryId, mediaIdStr, targetWidth);
 
     const previewPath = getPreviewPath(galleryId, mediaIdStr, targetWidth);

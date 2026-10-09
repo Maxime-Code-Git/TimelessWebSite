@@ -3,11 +3,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
 import { ENV } from './env.server';
+import pLimit from 'p-limit';
 
 const ALLOWED_WIDTHS = [480, 960, 1920] as const;
 export type AllowedWidth = typeof ALLOWED_WIDTHS[number];
 
 const pendingGenerations = new Map<string, Promise<void>>();
+const sharpLimit = pLimit(2);
 
 function isSafePath(base: string, target: string): boolean {
   const resolvedBase = path.resolve(base);
@@ -59,11 +61,13 @@ async function generateSinglePreview(
     else if (width === 960) quality = 80;
     else if (width === 1920) quality = 84;
 
-    await sharp(originalPath)
-      .rotate()
-      .resize(width, width, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality })
-      .toFile(tempPath);
+    await sharpLimit(async () => {
+      await sharp(originalPath)
+        .rotate()
+        .resize(width, width, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality })
+        .toFile(tempPath);
+    });
 
     fs.chmodSync(tempPath, 0o600);
     fs.renameSync(tempPath, previewPath);
@@ -105,15 +109,19 @@ export async function ensurePreview(
 
   const generationKey = `${galleryId}/${mediaId}/${width}`;
 
-  if (pendingGenerations.has(generationKey)) {
-    await pendingGenerations.get(generationKey);
+  let generationPromise = pendingGenerations.get(generationKey);
+  if (generationPromise) {
+    await generationPromise;
     return false;
   }
 
-  const generationPromise = generateSinglePreview(originalPath, previewPath, width)
-    .finally(() => {
+  generationPromise = (async () => {
+    try {
+      await generateSinglePreview(originalPath, previewPath, width);
+    } finally {
       pendingGenerations.delete(generationKey);
-    });
+    }
+  })();
 
   pendingGenerations.set(generationKey, generationPromise);
   await generationPromise;
@@ -122,13 +130,11 @@ export async function ensurePreview(
 }
 
 export async function generateAllPreviews(galleryId: string, mediaId: string, sourcePath?: string): Promise<{ generated: number; ignored: number }> {
-  let generated = 0;
-  let ignored = 0;
-  for (const width of ALLOWED_WIDTHS) {
-    const wasGenerated = await ensurePreview(galleryId, mediaId, width, sourcePath);
-    if (wasGenerated) generated++;
-    else ignored++;
-  }
+  const results = await Promise.all(
+    ALLOWED_WIDTHS.map(width => ensurePreview(galleryId, mediaId, width, sourcePath))
+  );
+  const generated = results.filter(r => r).length;
+  const ignored = results.length - generated;
   return { generated, ignored };
 }
 

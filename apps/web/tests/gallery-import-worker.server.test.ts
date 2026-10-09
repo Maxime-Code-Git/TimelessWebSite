@@ -41,7 +41,7 @@ describe("Gallery Import Worker Logic", () => {
     const dummyJpegPath1 = path.join(importDir, "invites/photos/test1.jpg");
     const dummyJpegPath2 = path.join(importDir, "invites/photos/test2.jpg");
     await sharp({ create: { width: 10, height: 10, channels: 3, background: { r: 255, g: 0, b: 0 } } }).jpeg().toFile(dummyJpegPath1);
-    await sharp({ create: { width: 10, height: 10, channels: 3, background: { r: 255, g: 0, b: 0 } } }).jpeg().toFile(dummyJpegPath2);
+    await sharp({ create: { width: 11, height: 10, channels: 3, background: { r: 255, g: 0, b: 0 } } }).jpeg().toFile(dummyJpegPath2);
 
     db = getGalleryDb();
 
@@ -232,9 +232,6 @@ describe("Gallery Import Worker Logic", () => {
     vi.mocked(fs.renameSync).mockImplementationOnce(() => {
       // Steal lease right before renaming
       db.prepare("UPDATE gallery_imports SET lease_expires_at = ?, worker_id = 'thief' WHERE id = ?").run(Date.now() + 10000, importId);
-      // Wait, processImport checks lease BEFORE renameSync.
-      // So this intercept might not even trigger the failure if checkLease caught it before!
-      // But if we steal it HERE, it's during rename. We just throw an error.
       throw new Error("Stolen lease");
     });
 
@@ -242,5 +239,41 @@ describe("Gallery Import Worker Logic", () => {
 
     const jobRow = db.prepare("SELECT result_json FROM gallery_imports WHERE id = ?").get(importId) as Record<string, unknown>;
     expect(jobRow.result_json as string).toBeNull();
+  });
+
+  it("test de charge avec 25 photos (deadlock & sémaphore)", async () => {
+    const importDir25 = path.join(ENV.GALLERY_IMPORT_PATH, "worker-test-25");
+    fs.mkdirSync(path.join(importDir25, "invites/photos"), { recursive: true });
+    
+    for (let i = 1; i <= 25; i++) {
+      const p = path.join(importDir25, `invites/photos/test${i}.jpg`);
+      await sharp({ create: { width: 10 + i, height: 10, channels: 3, background: { r: 255, g: i, b: 0 } } }).jpeg().toFile(p);
+    }
+    
+    const importId = startGalleryImport(galleryId, "worker-test-25");
+    const job = acquireNextJob();
+    expect(job).toBeDefined();
+    
+    await processImport(importId, galleryId, "worker-test-25", job!.lease_token);
+    
+    const row = db.prepare("SELECT status, progress, result_json FROM gallery_imports WHERE id = ?").get(importId) as Record<string, unknown>;
+    expect(row.status).toBe("completed");
+    expect(row.progress).toBe(25);
+    const res = JSON.parse(row.result_json as string);
+    expect(res.imported).toBe(25);
+    expect(res.ignored.length).toBe(0);
+    
+    const medias = db.prepare("SELECT id FROM gallery_media WHERE gallery_id = ?").all(galleryId) as { id: string }[];
+    expect(medias.length).toBe(25);
+    
+    for (const m of medias) {
+       expect(fs.existsSync(path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".previews", m.id, "480.webp"))).toBe(true);
+       expect(fs.existsSync(path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".previews", m.id, "960.webp"))).toBe(true);
+       expect(fs.existsSync(path.join(ENV.GALLERY_MEDIA_PATH, galleryId, ".previews", m.id, "1920.webp"))).toBe(true);
+    }
+    
+    const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId);
+    const files = fs.readdirSync(mediaDir);
+    expect(files.some(f => f.endsWith(".tmp"))).toBe(false);
   });
 });

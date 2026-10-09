@@ -156,18 +156,18 @@ describe("Persistent Gallery Previews", () => {
   });
 
   test("13. deduplication of concurrent generations", async () => {
-    // mock fs.existsSync to trace
-    const origExists = fs.existsSync;
-    vi.spyOn(fs, "existsSync").mockImplementation((p) => {
-      return origExists(p);
-    });
+    const renameSpy = vi.spyOn(fs, "renameSync");
 
     const p1 = ensurePreview(galleryId, mediaId, 480);
     const p2 = ensurePreview(galleryId, mediaId, 480);
+    const p3 = ensurePreview(galleryId, mediaId, 480);
 
-    await Promise.all([p1, p2]);
+    await Promise.all([p1, p2, p3]);
 
-    // sharp should only be called once, indicated by temp file creation if we could spy sharp, but deduplication promise resolves this
+    // ensurePreview will only generate it once because pendingGenerations catches it.
+    // So renameSync should be called exactly once.
+    expect(renameSpy).toHaveBeenCalledTimes(1);
+    
     const stat = fs.statSync(path.join(tempDir, galleryId, ".previews", mediaId, "480.webp"));
     expect(stat.size).toBeGreaterThan(0);
   });
