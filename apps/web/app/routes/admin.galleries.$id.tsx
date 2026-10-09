@@ -371,6 +371,10 @@ type ImportActionData = {
   error?: string;
 };
 
+function getAdminPhotoPreviewUrl(publicId: string, mediaId: string, width: number): string {
+  return `/api/gallery/${publicId}/media/${mediaId}?width=${width}&format=webp`;
+}
+
 export default function AdminGalleryEdit() {
   const { gallery, stats, imports, folders, guestCode, coupleCode, csrfToken, galleryPhotos, allMedia } = useLoaderData<LoaderData>();
   const actionData = useActionData<ActionData>();
@@ -561,7 +565,7 @@ export default function AdminGalleryEdit() {
                   {galleryPhotos.map(p => (
                     <label key={p.id} className={styles.coverOption}>
                       <input type="radio" name="cover_image_id" value={p.id} defaultChecked={gallery.cover_image_id === p.id} />
-                      <img className={styles.coverImage} src={`/api/gallery/${gallery.public_id}/media/${p.id}?width=480`} alt={p.original_name} loading="lazy" />
+                      <img className={styles.coverImage} src={getAdminPhotoPreviewUrl(gallery.public_id, p.id, 480)} alt={p.original_name} loading="lazy" />
                     </label>
                   ))}
                 </div>
@@ -814,7 +818,7 @@ export default function AdminGalleryEdit() {
                 <input type="checkbox" className={styles.mediaCheckbox} checked={selectedMedia.has(m.id)} onChange={() => toggleMediaSelection(m.id)} aria-label={`Sélectionner ${m.original_name}`} />
               </label>
               {m.type === "photo" ? (
-                <img className={styles.mediaItemImage} src={`/api/gallery/${gallery.public_id}/media/${m.id}?width=480`} alt={m.original_name} loading="lazy" data-testid="gallery-media-image" />
+                <img className={styles.mediaItemImage} src={getAdminPhotoPreviewUrl(gallery.public_id, m.id, 480)} alt={m.original_name} loading="lazy" data-testid="gallery-media-image" />
               ) : (
                 <div className={styles.videoPosterContainer}>
                   {m.poster_revision ? (
