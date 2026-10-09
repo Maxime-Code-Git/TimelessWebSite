@@ -117,7 +117,7 @@ describe("Responsive image optimization", () => {
     const { container } = render(<MemoryRouter><GalleryView lang="fr" gallery={galleryProps} media={[p("media1")]} /></MemoryRouter>);
     const picture = container.querySelector('[data-testid="gallery-photo"] picture');
     expect(picture).not.toBeNull();
-    
+
     // Check that we don't use 1440w or 1920w in srcset
     const source = picture!.querySelector('source');
     expect(source?.getAttribute("srcSet")).toContain("width=480");
@@ -130,7 +130,7 @@ describe("Responsive image optimization", () => {
   test("lightbox only uses up to 1920px", () => {
     render(<MemoryRouter><GalleryView lang="fr" gallery={galleryProps} media={[p("media1")]} /></MemoryRouter>);
     fireEvent.click(screen.getByRole("button", { name: "Photo de A & B" }));
-    
+
     const img = screen.getByTestId("lightbox-full-image");
     expect(img.getAttribute("srcSet")).toContain("width=960");
     expect(img.getAttribute("srcSet")).toContain("width=1920");

@@ -440,7 +440,7 @@ export async function processImport(importId: string, galleryId: string, folderN
             width = metadata.height || null;
             height = metadata.width || null;
           }
-          
+
           if (!checkLease()) throw new Error("Lease lost");
           await generateAllPreviews(galleryId, mediaId, tmpPath);
         }

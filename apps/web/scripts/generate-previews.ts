@@ -1,4 +1,4 @@
-import "./env-loader.js";
+import "../../../scripts/env-loader.js";
 import { getGalleryDb } from "../app/lib/gallery-db.server";
 import { generateAllPreviews } from "../app/lib/gallery-preview.server";
 import pLimit from "p-limit";
@@ -6,9 +6,9 @@ import pLimit from "p-limit";
 async function main() {
   console.log("Démarrage de la génération des previews...");
   const db = getGalleryDb();
-  
+
   const photos = db.prepare(`SELECT id, gallery_id FROM gallery_media WHERE type = 'photo'`).all() as { id: string; gallery_id: string }[];
-  
+
   if (photos.length === 0) {
     console.log("Aucune photo trouvée dans la base de données.");
     process.exit(0);
@@ -21,7 +21,7 @@ async function main() {
   let failed = 0;
 
   const limit = pLimit(2);
-  
+
   const tasks = photos.map(photo => limit(async () => {
     try {
       const { generated: gen, ignored: ign } = await generateAllPreviews(photo.gallery_id, photo.id);

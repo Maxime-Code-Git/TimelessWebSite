@@ -90,7 +90,12 @@ const chunksize = (end - start) + 1;
     return new Response("Bad Request: invalid width", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
   }
 
-  const targetFormat = parseFormat(formatParam);
+  let targetFormat: string | null | undefined;
+  try {
+    targetFormat = parseFormat(formatParam);
+  } catch {
+    return new Response("Bad Request: invalid format", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
+  }
   if (targetFormat !== "webp") {
     return new Response("Bad Request: only webp format is supported", { status: 400, headers: GALLERY_PRIVATE_HEADERS });
   }
@@ -104,7 +109,7 @@ const chunksize = (end - start) + 1;
   try {
     const { ensurePreview, getPreviewPath } = await import("~/lib/gallery-preview.server");
     await ensurePreview(galleryId, mediaIdStr, targetWidth);
-    
+
     const previewPath = getPreviewPath(galleryId, mediaIdStr, targetWidth);
     const previewStat = fs.statSync(previewPath);
     const fileStream = fs.createReadStream(previewPath);

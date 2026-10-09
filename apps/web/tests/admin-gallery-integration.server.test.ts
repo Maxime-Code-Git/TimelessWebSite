@@ -63,7 +63,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
     // Use sharp to create a valid 10x10 JPEG
     const jpegPath = path.join(importPath, "invites", "photos", "test.jpg");
     const pngPath = path.join(importPath, "maries", "photos", "couple.png");
-    
+
     await sharp({ create: { width: 10, height: 10, channels: 3, background: { r: 255, g: 0, b: 0 } } }).jpeg().toFile(jpegPath);
     await sharp({ create: { width: 10, height: 10, channels: 3, background: { r: 0, g: 255, b: 0 } } }).png().toFile(pngPath);
 
@@ -366,9 +366,56 @@ describe("Admin Gallery Integration Lifecycle", () => {
     expect(guestPhotosJson.hasMore).toBe(false);
     expect(guestPhotosJson.photos.length).toBe(1);
 
+    // Verify fallback generation for legacy galleries
+    const legacyPhotoId = guestPhotosJson.photos[0].id;
+    const legacyPreviewDir = path.join(mediaPath, galleryId!, ".previews", legacyPhotoId);
+    if (fs.existsSync(legacyPreviewDir)) {
+      fs.rmSync(legacyPreviewDir, { recursive: true, force: true });
+    }
+
+    // First request should generate and serve the preview
+    const firstLegacyRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${legacyPhotoId}?width=480&format=webp`, { headers: { "Cookie": guestCookie! } });
+    expect(firstLegacyRes.status).toBe(200);
+    expect(firstLegacyRes.headers.get("Content-Type")).toBe("image/webp");
+    expect(firstLegacyRes.headers.get("Cache-Control")).toBe("no-store");
+    expect(firstLegacyRes.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(firstLegacyRes.headers.get("Content-Length")).toBeTruthy();
+
+    // Check it's on disk
+    expect(fs.existsSync(path.join(legacyPreviewDir, "480.webp"))).toBe(true);
+
+    // Second request should serve the existing one
+    const secondLegacyRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${legacyPhotoId}?width=480&format=webp`, { headers: { "Cookie": guestCookie! } });
+    expect(secondLegacyRes.status).toBe(200);
+
+    // Delete preview again for concurrent test
+    if (fs.existsSync(legacyPreviewDir)) {
+      fs.rmSync(legacyPreviewDir, { recursive: true, force: true });
+    }
+
+    // Send two requests at the exact same time
+    const [concurrent1, concurrent2] = await Promise.all([
+      fetch(`${BASE_URL}/api/gallery/${public_id}/media/${legacyPhotoId}?width=480&format=webp`, { headers: { "Cookie": guestCookie! } }),
+      fetch(`${BASE_URL}/api/gallery/${public_id}/media/${legacyPhotoId}?width=480&format=webp`, { headers: { "Cookie": guestCookie! } })
+    ]);
+
+    expect(concurrent1.status).toBe(200);
+    expect(concurrent2.status).toBe(200);
+
+    // Verify tmp files are cleaned up
+    const previewsFiles = fs.readdirSync(legacyPreviewDir);
+    expect(previewsFiles.filter(f => f.includes(".tmp")).length).toBe(0);
+
     // Verify 404 for direct accesses
     const forbidPhotoRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${cover_image_id}`, { headers: { "Cookie": guestCookie! } });
     expect(forbidPhotoRes.status).toBe(404);
+
+    // Verify invalid parameters
+    const invalidWidthRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${legacyPhotoId}?width=1000&format=webp`, { headers: { "Cookie": guestCookie! } });
+    expect(invalidWidthRes.status).toBe(400);
+    const invalidFormatRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${legacyPhotoId}?width=480&format=png`, { headers: { "Cookie": guestCookie! } });
+    expect(invalidFormatRes.status).toBe(400);
+
     const forbidVideoRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/media/${couple_video_id}`, { headers: { "Cookie": guestCookie! } });
     expect(forbidVideoRes.status).toBe(404);
     const forbidDownloadRes = await fetch(`${BASE_URL}/api/gallery/${public_id}/download/original/${cover_image_id}`, { headers: { "Cookie": guestCookie! } });
