@@ -302,7 +302,8 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
     expect(lightboxSrcSet).toContain("width=960");
     expect(lightboxSrcSet).toContain("width=1920");
     expect(lightboxSrcSet).not.toContain("width=1440");
-    await guestPage.locator('.lightboxClose').click(); // close lightbox
+    await guestPage.getByRole("button", { name: "Fermer", exact: true }).click(); // close lightbox
+    await expect(guestPage.getByTestId("lightbox-full-image")).not.toBeAttached();
 
     // 14. Réponse 206 à Range valide sur vidéo
     const videoSrc = await guestVideo.locator("source").getAttribute("src");
