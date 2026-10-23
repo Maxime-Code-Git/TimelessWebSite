@@ -22,7 +22,8 @@
     "smtp:verify": "node apps/web/scripts/smtp-verify.js",
     "convert-fonts": "bash scripts/convert-fonts.sh",
     "setup-admin": "bash scripts/set-admin-password.sh",
-    "admin:hash": "npm run admin:hash --workspace=apps/web"
+    "admin:hash": "npm run admin:hash --workspace=apps/web",
+    "legal:apply-drafts": "npm run legal:apply-drafts --workspace=apps/web --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1327,16 +1327,16 @@
           "en": "Legal Notice | Sempra"
         },
         "seoDescription": {
-          "fr": "Mentions légales du site Sempra : éditeur, forme juridique, coordonnées, hébergement et propriété intellectuelle.",
-          "en": "Legal notice for the Sempra website: publisher, legal status, contact details, hosting, and intellectual property."
+          "fr": "Mentions légales du site Sempra : éditeur, coordonnées, hébergement et propriété intellectuelle.",
+          "en": "Legal notice for the Sempra website: publisher, contact details, hosting, and intellectual property."
         },
         "publicTitle": {
           "fr": "Mentions légales",
           "en": "Legal Notice"
         },
         "intro": {
-          "fr": "Conformément au Code de droit économique belge et aux réglementations relatives aux services de la société de l'information, la présente page précise l'identité de l'éditeur du site Sempra, ses coordonnées, son statut juridique ainsi que les conditions d'utilisation de ce site.",
-          "en": "In accordance with the Belgian Code of Economic Law and applicable information society regulations, this page outlines the identity of the Sempra website publisher, contact details, legal status, and website terms of use."
+          "fr": "Conformément au Code de droit économique belge et aux réglementations applicables aux services de la société de l'information, la présente page précise les informations relatives à l'éditeur du site Sempra, ses coordonnées officielles et les règles d'utilisation du site.",
+          "en": "In accordance with the Belgian Code of Economic Law and applicable information society service regulations, this page outlines information concerning the Sempra website publisher, official contact details, and website terms of use."
         },
         "sections": [
           {
@@ -1347,22 +1347,12 @@
             },
             "paragraphs": [
               {
-                "fr": "Le site internet https://sempra.be est édité par Sempra, association de fait, joignable par e-mail à contact@sempra.be ou par téléphone au +32 477 86 37 42.",
-                "en": "The website https://sempra.be is published by Sempra, a de facto partnership, reachable by email at contact@sempra.be or by phone at +32 477 86 37 42."
+                "fr": "Les informations d'identification de l'éditeur du site et ses coordonnées officielles de contact sont présentées ci-dessus conformément aux dispositions du Code de droit économique.",
+                "en": "The identification details of the website publisher and its official contact information are presented above in accordance with the provisions of the Code of Economic Law."
               },
               {
-                "fr": "Dénomination juridique et forme : Association de fait. Co-directeurs de la publication : À compléter avant publication.",
-                "en": "Legal designation and status: De facto partnership. Co-directors of publication: To be completed before publication."
-              }
-            ],
-            "listItems": [
-              {
-                "fr": "Numéro d'entreprise (BCE) : À compléter avant publication",
-                "en": "Enterprise number (CBE): To be completed before publication"
-              },
-              {
-                "fr": "Numéro de TVA : À compléter avant publication",
-                "en": "VAT number: To be completed before publication"
+                "fr": "Le numéro d'entreprise (BCE) doit être obligatoirement renseigné dans les paramètres du site avant toute publication officielle. Le numéro de TVA est affiché dès lors qu'un numéro d'assujettissement est attribué.",
+                "en": "The enterprise number (CBE) must be completed in the website settings prior to official publication. The VAT number is displayed once an applicable registration number is assigned."
               }
             ]
           },
@@ -1374,12 +1364,12 @@
             },
             "paragraphs": [
               {
-                "fr": "Le site est auto-hébergé sur une infrastructure privée sécurisée opérée par Sempra, située à l'adresse suivante : À compléter avant publication.",
-                "en": "The website is self-hosted on a secured private infrastructure operated by Sempra, located at: To be completed before publication."
+                "fr": "Le site est hébergé sur une infrastructure privée exploitée par Sempra.",
+                "en": "The website is hosted on a private infrastructure operated by Sempra."
               },
               {
-                "fr": "Pour toute question technique relative à l'infrastructure d'hébergement, vous pouvez contacter Sempra par e-mail à l'adresse contact@sempra.be.",
-                "en": "For any technical inquiry concerning hosting infrastructure, you can contact Sempra by email at contact@sempra.be."
+                "fr": "Pour toute question technique relative à l'infrastructure d'hébergement, vous pouvez contacter Sempra via les coordonnées indiquées sur cette page.",
+                "en": "For any technical inquiry concerning hosting infrastructure, you can contact Sempra via the contact details provided on this page."
               }
             ]
           },
@@ -1395,8 +1385,8 @@
                 "en": "All elements comprising this website (texts, photographs, videos, visual identity, logos, illustrations, and source code) are protected by copyright and Belgian Code of Economic Law intellectual property provisions."
               },
               {
-                "fr": "Sauf mention contraire explicite, ces contenus constituent la propriété exclusive de Sempra ou de ses auteurs. Toute reproduction, représentation, modification ou diffusion, totale ou partielle, est strictement interdite sans autorisation écrite préalable.",
-                "en": "Unless explicitly stated otherwise, these contents are the exclusive property of Sempra or its authors. Any reproduction, representation, modification, or distribution, whether total or partial, is strictly prohibited without prior written authorization."
+                "fr": "Sauf mention contraire explicite, ces contenus constituent la propriété exclusive de Sempra ou de leurs auteurs respectifs. Toute reproduction, représentation, modification ou diffusion, totale ou partielle, est strictement interdite sans autorisation écrite préalable.",
+                "en": "Unless explicitly stated otherwise, these contents are the exclusive property of Sempra or their respective authors. Any reproduction, representation, modification, or distribution, whether total or partial, is strictly prohibited without prior written authorization."
               }
             ]
           },
@@ -1412,8 +1402,8 @@
                 "en": "Sempra uses reasonable efforts to provide verified information and maintain continuous website access. Inadvertent errors or temporary interruptions for maintenance may nevertheless occur."
               },
               {
-                "fr": "La responsabilité de Sempra ne saurait être engagée pour des dommages indirects ou des interruptions techniques indépendantes de sa volonté, sous réserve des règles impératives applicables.",
-                "en": "Sempra cannot be held liable for indirect damages or technical interruptions beyond its reasonable control, subject to applicable mandatory legal rules."
+                "fr": "Dans les limites autorisées par la loi, la responsabilité de Sempra ne saurait être engagée pour des dommages indirects ou des interruptions techniques indépendantes de sa volonté.",
+                "en": "To the extent permitted by law, Sempra cannot be held liable for indirect damages or technical interruptions beyond its reasonable control."
               },
               {
                 "fr": "Le site peut contenir des liens vers des services externes (notamment les plateformes vidéo YouTube et Vimeo). Sempra n'exerce aucun contrôle sur ces services tiers et décline toute responsabilité quant à leurs contenus ou pratiques.",
@@ -1429,19 +1419,19 @@
             },
             "paragraphs": [
               {
-                "fr": "Les présentes mentions légales sont régies par le droit belge. En cas de contestation concernant l'utilisation du site, l'utilisateur est invité à contacter Sempra par e-mail à l'adresse contact@sempra.be afin de rechercher une issue amiable.",
-                "en": "This legal notice is governed by Belgian law. In the event of a dispute concerning website usage, the user is invited to contact Sempra by email at contact@sempra.be to seek an amicable resolution."
+                "fr": "Les présentes mentions légales sont régies par le droit belge. En cas de contestation concernant l'utilisation du site, l'utilisateur est invité à contacter Sempra via les coordonnées indiquées sur cette page afin de rechercher une issue amiable.",
+                "en": "This legal notice is governed by Belgian law. In the event of a dispute concerning website usage, the user is invited to contact Sempra via the contact details provided on this page to seek an amicable resolution."
               },
               {
-                "fr": "À défaut d'accord amiable, les litiges relèvent de la compétence exclusive des tribunaux belges de l'arrondissement judiciaire compétent pour le siège de Sempra, sauf règle légale impérative contraire.",
-                "en": "Failing amicable resolution, disputes shall fall under the exclusive jurisdiction of the competent Belgian courts within the judicial district of Sempra's address, unless mandatory legal rules require otherwise."
+                "fr": "À défaut d'accord amiable, les litiges relèvent de la compétence des cours et tribunaux belges compétents en vertu des règles légales applicables.",
+                "en": "Failing amicable resolution, disputes shall fall under the jurisdiction of the competent Belgian courts pursuant to applicable legal rules."
               }
             ]
           }
         ],
         "version": 1,
         "effectiveDate": null,
-        "lastModified": "2026-10-23T09:14:25.581Z"
+        "lastModified": "2026-10-23T09:34:01.404Z"
       },
       "published": null,
       "history": []
@@ -1461,8 +1451,8 @@
           "en": "Privacy Policy"
         },
         "intro": {
-          "fr": "La protection de votre vie privée et de vos données personnelles est essentielle pour Sempra. La présente politique détaille les données que nous collectons, les finalités et bases juridiques de chaque traitement, les durées de conservation appliquées, nos mesures de sécurité et les modalités d'exercice de vos droits en vertu du Règlement général sur la protection des données (RGPD).",
-          "en": "Protecting your privacy and personal data is essential to Sempra. This policy details the data we collect, the purposes and legal bases of each processing activity, applied retention periods, our security safeguards, and how you can exercise your rights under the General Data Protection Regulation (GDPR)."
+          "fr": "La protection de votre vie privée et de vos données personnelles est essentielle pour Sempra. La présente politique détaille les données traitées, les finalités et bases juridiques de chaque traitement, les durées de conservation appliquées, nos mesures de sécurité et les modalités d'exercice de vos droits en vertu du Règlement général sur la protection des données (RGPD).",
+          "en": "Protecting your privacy and personal data is essential to Sempra. This policy details processed data, the purposes and legal bases of each processing activity, applied retention periods, our security safeguards, and how you can exercise your rights under the General Data Protection Regulation (GDPR)."
         },
         "sections": [
           {
@@ -1473,16 +1463,12 @@
             },
             "paragraphs": [
               {
-                "fr": "Le responsable du traitement des données personnelles collectées via le site https://sempra.be est Sempra, association de fait, joignable par e-mail à contact@sempra.be ou par téléphone au +32 477 86 37 42.",
-                "en": "The data controller for personal data collected through https://sempra.be is Sempra, a de facto partnership, reachable by email at contact@sempra.be or by phone at +32 477 86 37 42."
+                "fr": "Le responsable du traitement des données personnelles collectées sur ce site est l'entité éditrice identifiée dans les mentions légales ci-dessus.",
+                "en": "The data controller for personal data collected on this site is the publishing entity identified in the legal notice above."
               },
               {
-                "fr": "Adresse du responsable : À compléter avant publication.",
-                "en": "Controller address: To be completed before publication."
-              },
-              {
-                "fr": "Sempra n'a pas désigné de délégué à la protection des données (DPO), cette fonction n'étant pas requise au sens de l'article 37 du RGPD au regard de ses activités.",
-                "en": "Sempra has not appointed a Data Protection Officer (DPO), as this appointment is not mandatory under Article 37 of the GDPR given its activities."
+                "fr": "Pour toute demande relative à vos données personnelles ou pour exercer vos droits, vous pouvez contacter le responsable du traitement aux coordonnées indiquées sur cette page.",
+                "en": "For any inquiry regarding your personal data or to exercise your rights, you may reach the data controller at the contact details provided on this page."
               }
             ]
           },
@@ -1500,12 +1486,12 @@
             ],
             "listItems": [
               {
-                "fr": "Formulaire de contact : collecte des noms, adresse e-mail, numéro de téléphone (optionnel), date de l'événement, lieu, formule souhaitée, options et message. Finalité : répondre aux demandes de renseignements et établir un devis. Base juridique : mesures précontractuelles prises à votre demande (art. 6.1.b RGPD). Ces informations sont transmises par e-mail et ne sont pas stockées dans la base de données du site.",
+                "fr": "Formulaire de contact : collecte des noms, adresse e-mail, numéro de téléphone (optionnel), date de l'événement, lieu, formule souhaitée, options et message. Finalité : répondre aux demandes de renseignements et établir un devis. Base juridique : mesures précontractuelles prises à votre demande (art. 6.1.b RGPD). Ces informations sont transmises par e-mail et ne sont pas stockées dans la base de données du site web.",
                 "en": "Contact form: collection of names, email address, phone number (optional), event date, location, requested package, options, and message. Purpose: responding to inquiries and preparing quotes. Legal basis: pre-contractual steps taken at your request (Art. 6.1.b GDPR). This information is transmitted by email and is not stored in the website database."
               },
               {
-                "fr": "Prise de rendez-vous visio : collecte des noms, adresse e-mail, téléphone, date de mariage, formule, créneau horaire, message et lien de visioconférence. Finalité : organiser et assurer l'entretien préparatoire. Base juridique : mesures précontractuelles (art. 6.1.b RGPD). Les données sont enregistrées dans la base de données locale sécurisée (SQLite) du site.",
-                "en": "Video consultation booking: collection of names, email address, phone number, wedding date, package, time slot, message, and meeting link. Purpose: scheduling and conducting preparatory meetings. Legal basis: pre-contractual steps (Art. 6.1.b GDPR). Data is stored in the site's local secure database (SQLite)."
+                "fr": "Prise de rendez-vous visio : collecte des noms, adresse e-mail, téléphone, date de mariage, formule, créneau horaire, message et lien de visioconférence. Finalité : organiser et assurer l'entretien préparatoire. Base juridique : mesures précontractuelles (art. 6.1.b RGPD). Les données sont enregistrées dans la base de données locale du site.",
+                "en": "Video consultation booking: collection of names, email address, phone number, wedding date, package, time slot, message, and meeting link. Purpose: scheduling and conducting preparatory meetings. Legal basis: pre-contractual steps (Art. 6.1.b GDPR). Data is stored in the site's local database."
               },
               {
                 "fr": "Galeries privées clients : gestion des codes d'accès uniques (format SEMPRA-XXXX-XXXX), des sessions sécurisées et des niveaux d'accès (invités ou mariés). Finalité : permettre l'accès restreint et sécurisé aux photographies et vidéos livrées. Base juridique : exécution du contrat de prestation (art. 6.1.b RGPD) et intérêt légitime à préserver la confidentialité des images familiales (art. 6.1.f RGPD).",
@@ -1516,8 +1502,8 @@
                 "en": "Security and rate limiting: processing of the IP address in hashed form via cryptographic digest (HMAC-SHA256). Purpose: preventing brute force attacks, denial of service, and automated form spam. Legal basis: Sempra's legitimate interest in safeguarding system security (Art. 6.1.f GDPR). Raw IP addresses are never stored in the database."
               },
               {
-                "fr": "Lecteurs vidéo externes (portfolio) : chargement conditionnel des lecteurs YouTube ou Vimeo uniquement après clic explicite de l'utilisateur. Base juridique : consentement libre et actif (art. 6.1.a RGPD). Aucun cookie ou traceur tiers n'est déclenché avant votre action.",
-                "en": "External video players (portfolio): conditional loading of YouTube or Vimeo players strictly upon explicit user click. Legal basis: free and active consent (Art. 6.1.a GDPR). No third-party cookie or tracker is activated before your action."
+                "fr": "Lecteurs vidéo externes (portfolio) : chargement conditionnel des lecteurs YouTube ou Vimeo uniquement après clic explicite de l'utilisateur. Base juridique : consentement libre et actif (art. 6.1.a RGPD). Aucun traceur tiers n'est déclenché avant votre action.",
+                "en": "External video players (portfolio): conditional loading of YouTube or Vimeo players strictly upon explicit user click. Legal basis: free and active consent (Art. 6.1.a GDPR). No third-party tracker is activated before your action."
               }
             ]
           },
@@ -1529,18 +1515,18 @@
             },
             "paragraphs": [
               {
-                "fr": "Sempra ne commercialise aucune donnée personnelle. Les données recueillies sont destinées exclusivement aux membres de l'équipe Sempra et à des prestataires techniques intervenant pour des besoins opérationnels stricts :",
+                "fr": "Sempra ne commercialise aucune donnée personnelle. Les données recueillies sont destinées exclusivement à l'équipe de Sempra et à des prestataires techniques intervenant pour des besoins opérationnels stricts :",
                 "en": "Sempra does not sell personal data. Collected data is intended solely for Sempra team members and technical providers acting for strict operational requirements:"
               }
             ],
             "listItems": [
               {
-                "fr": "Brevo (France / EEE) : prestataire de relais SMTP pour l'acheminement sécurisé des e-mails du formulaire de contact et des confirmations de rendez-vous.",
-                "en": "Brevo (France / EEA): SMTP relay provider for secure delivery of contact form emails and booking confirmations."
+                "fr": "Brevo (société établie en France, au sein de l'Espace économique européen) : relais SMTP pour l'acheminement sécurisé des e-mails du formulaire de contact et des confirmations de rendez-vous.",
+                "en": "Brevo (a company established in France, within the European Economic Area): SMTP relay for secure delivery of contact form emails and booking confirmations."
               },
               {
-                "fr": "Infrastructure d'hébergement privé (Belgique) : serveur physique sécurisé hébergeant l'application, les bases de données locales et les galeries privées.",
-                "en": "Private hosting infrastructure (Belgium): secure physical server hosting the web application, local databases, and private galleries."
+                "fr": "Infrastructure d'hébergement privé : serveur privé exploité par Sempra pour héberger l'application web, les bases de données locales et les galeries privées.",
+                "en": "Private hosting infrastructure: private server operated by Sempra hosting the web application, local databases, and private galleries."
               },
               {
                 "fr": "Fournisseurs vidéo tiers (YouTube / Google LLC et Vimeo.com, Inc.) : sollicités uniquement lors de l'activation volontaire d'un lecteur vidéo dans le portfolio.",
@@ -1551,17 +1537,17 @@
           {
             "id": "transfers",
             "title": {
-              "fr": "Transferts de données hors de l'Espace économique européen",
-              "en": "Data Transfers Outside the European Economic Area"
+              "fr": "Transferts de données et localisation",
+              "en": "Data Transfers and Localization"
             },
             "paragraphs": [
               {
-                "fr": "L'hébergement principal du site et les bases de données sont situés en Belgique. Les e-mails sont acheminés par un prestataire établi en France, au sein de l'Espace économique européen (EEE).",
-                "en": "Primary website hosting and databases are located in Belgium. Emails are routed through a provider established in France, within the European Economic Area (EEA)."
+                "fr": "L'hébergement principal de l'application et des bases de données locales est assuré sur l'infrastructure privée de Sempra. L'acheminement des e-mails est opéré au sein de l'Espace économique européen via le prestataire Brevo.",
+                "en": "Primary hosting of the application and local databases is maintained on Sempra's private infrastructure. Email routing is operated within the European Economic Area via provider Brevo."
               },
               {
-                "fr": "En cas d'activation volontaire d'un lecteur vidéo YouTube ou Vimeo, certaines données techniques de connexion peuvent être traitées par ces entreprises établies aux États-Unis. Ces transferts sont encadrés par le Cadre de protection des données Union européenne - États-Unis (Data Privacy Framework) ou par des clauses contractuelles types de la Commission européenne.",
-                "en": "In the event of voluntary activation of a YouTube or Vimeo video player, certain technical connection data may be processed by these companies located in the United States. Such transfers are governed by the EU-US Data Privacy Framework or European Commission Standard Contractual Clauses."
+                "fr": "En cas d'activation volontaire d'un lecteur vidéo externe par l'utilisateur, des données techniques de connexion peuvent être traitées par ces plateformes tierces conformément à leurs politiques de protection des données respectives.",
+                "en": "Upon voluntary activation of an external video player by the user, technical connection data may be processed by these third-party platforms in accordance with their respective privacy policies."
               }
             ]
           },
@@ -1579,24 +1565,24 @@
             ],
             "listItems": [
               {
-                "fr": "Demandes de contact : conservées dans notre messagerie le temps de traiter la demande et pendant un maximum de 3 ans après le dernier échange en l'absence de suite contractuelle.",
-                "en": "Contact inquiries: retained in our inbox for the time needed to process the inquiry and up to 3 years after the last exchange if no contract is concluded."
+                "fr": "Demandes de contact : les e-mails reçus sont conservés dans notre messagerie le temps de traiter votre demande, dans le cadre d'une règle d'organisation interne prévoyant un archivage maximal de 3 ans après le dernier échange et faisant l'objet d'une vérification périodique.",
+                "en": "Contact inquiries: received emails are retained in our inbox for the time needed to handle your request, under an internal organizational policy providing for a maximum 3-year retention after the last interaction, subject to periodic verification."
               },
               {
-                "fr": "Rendez-vous visio : les rendez-vous enregistrés dans la base locale sont conservés pour la préparation de l'événement et peuvent être exportés ou supprimés via l'administration. En l'absence de contrat conclu, ils sont supprimés dans un délai maximal d'un an.",
-                "en": "Video appointments: bookings recorded in the local database are retained for event preparation and may be exported or deleted via admin. If no contract is concluded, they are deleted within a maximum of one year."
+                "fr": "Rendez-vous visio : les informations de rendez-vous enregistrées dans la base de données locale sont conservées pour l'organisation et la préparation de l'événement. En l'absence de contrat conclu, leur suppression est réalisée par l'administration lors des contrôles périodiques de conservation dans un délai maximal d'un an.",
+                "en": "Video appointments: booking information recorded in the local database is retained for event organization and preparation. If no contract is concluded, deletion is carried out by administration during periodic retention reviews within a maximum of one year."
               },
               {
-                "fr": "Galeries privées clients : les galeries sont hébergées en ligne pendant une durée de 24 mois (2 ans) à compter de leur ouverture, sauf accord écrit particulier. Les clients doivent télécharger et sauvegarder leurs fichiers durant cette période.",
+                "fr": "Galeries privées clients : les galeries sont hébergées en ligne pendant une durée de 24 mois (2 ans) à compter de leur ouverture, sauf accord écrit particulier. Les clients sont invités à télécharger et sauvegarder leurs fichiers durant cette période.",
                 "en": "Private client galleries: galleries are hosted online for a period of 24 months (2 years) from opening, unless otherwise agreed in writing. Clients are responsible for downloading and archiving their files during this period."
               },
               {
-                "fr": "Empreintes de limitation de débit : les hachages d'adresses IP sont automatiquement effacés après un délai d'une heure.",
-                "en": "Rate limiting digests: hashed IP records are automatically erased after a one-hour period."
+                "fr": "Empreintes de limitation de débit : les hachages d'adresses IP servant à prévenir les abus sont purgés lors des contrôles de requêtes après un délai d'une heure.",
+                "en": "Rate limiting digests: hashed IP records used to prevent abuse are purged during request checks after a one-hour period."
               },
               {
-                "fr": "Données contractuelles et comptables : en cas de conclusion de contrat, les devis signés, contrats et pièces comptables sont archivés pendant 7 à 10 ans selon les obligations légales belges.",
-                "en": "Contractual and accounting records: upon contract conclusion, signed quotes, contracts, and accounting documents are archived for 7 to 10 years according to Belgian legal obligations."
+                "fr": "Données contractuelles et comptables : en cas de conclusion de contrat, les devis signés, contrats et pièces comptables sont archivés pendant 7 à 10 ans selon les obligations légales applicables.",
+                "en": "Contractual and accounting records: upon contract conclusion, signed quotes, contracts, and accounting documents are archived for 7 to 10 years according to applicable statutory obligations."
               }
             ]
           },
@@ -1626,8 +1612,8 @@
                 "en": "Strict access control to private galleries using randomized unique codes and anti-CSRF tokens."
               },
               {
-                "fr": "Permissions d'accès restreintes (modes 0600 et 0700) sur les fichiers et bases de données SQLite sur le serveur.",
-                "en": "Restricted filesystem permissions (0600 and 0700 modes) on SQLite database files on the server."
+                "fr": "Permissions d'accès restreintes (modes 0600 et 0700) sur les fichiers et bases de données sur le serveur.",
+                "en": "Restricted filesystem permissions (0600 and 0700 modes) on database files on the server."
               }
             ]
           },
@@ -1639,12 +1625,38 @@
             },
             "paragraphs": [
               {
-                "fr": "Conformément aux articles 15 à 22 du RGPD, vous disposez des droits suivants sur vos données personnelles : droit d'accès, de rectification, d'effacement, de limitation du traitement, d'opposition et de portabilité.",
-                "en": "In accordance with Articles 15 to 22 of the GDPR, you hold the following rights regarding your personal data: rights of access, rectification, erasure, restriction of processing, objection, and data portability."
+                "fr": "Conformément aux articles 15 à 22 du RGPD, vous disposez des droits suivants sur vos données personnelles :",
+                "en": "In accordance with Articles 15 to 22 of the GDPR, you hold the following rights regarding your personal data:"
               },
               {
-                "fr": "Pour exercer l'un de ces droits, adressez votre demande par e-mail à contact@sempra.be en justifiant de votre identité. Une réponse vous sera apportée dans un délai maximal d'un mois.",
-                "en": "To exercise any of these rights, submit your request by email to contact@sempra.be with proof of identity. A response will be provided within a maximum of one month."
+                "fr": "Pour exercer l'un de ces droits, vous pouvez adresser votre demande via les coordonnées de contact indiquées sur cette page. En cas de doute raisonnable sur votre identité, un justificatif pourra vous être demandé afin de prévenir toute usurpation.",
+                "en": "To exercise any of these rights, you can submit your request via the contact details provided on this page. In case of reasonable doubt regarding your identity, proof of identity may be requested to prevent identity theft."
+              }
+            ],
+            "listItems": [
+              {
+                "fr": "Droit d'accès : obtenir la confirmation que des données vous concernant sont traitées et en recevoir communication.",
+                "en": "Right of access: obtain confirmation whether data concerning you is processed and receive a copy."
+              },
+              {
+                "fr": "Droit de rectification : demander la correction des données inexactes ou incomplètes.",
+                "en": "Right to rectification: request correction of inaccurate or incomplete data."
+              },
+              {
+                "fr": "Droit à l'effacement : demander la suppression de vos données dans les conditions prévues par la réglementation.",
+                "en": "Right to erasure: request deletion of your data under regulatory conditions."
+              },
+              {
+                "fr": "Droit à la limitation du traitement : demander le gel temporaire du traitement de vos données dans les cas prévus par la loi.",
+                "en": "Right to restriction of processing: request temporary restriction of your data processing under statutory conditions."
+              },
+              {
+                "fr": "Droit d'opposition : vous opposer à tout moment, pour des motifs légitimes, à un traitement fondé sur notre intérêt légitime, lorsque ce droit est applicable.",
+                "en": "Right to object: object at any time, on legitimate grounds, to processing based on our legitimate interest, where this right is applicable."
+              },
+              {
+                "fr": "Droit à la portabilité : recevoir les données fournies dans un format structuré et couramment utilisé, lorsque ce droit est applicable.",
+                "en": "Right to data portability: receive the data you provided in a structured, commonly used format, where this right is applicable."
               }
             ]
           },
@@ -1691,7 +1703,7 @@
         ],
         "version": 1,
         "effectiveDate": null,
-        "lastModified": "2026-10-23T09:14:25.581Z"
+        "lastModified": "2026-10-23T09:34:01.404Z"
       },
       "published": null,
       "history": []
@@ -1757,12 +1769,12 @@
             },
             "paragraphs": [
               {
-                "fr": "Le site internet https://sempra.be est un espace de présentation et de prise de contact. Il ne permet pas de passer commande directement ni de procéder à un paiement en ligne. L'envoi d'un formulaire de contact ou la réservation d'un entretien visio ne constitue pas un engagement contractuel ferme.",
-                "en": "The website https://sempra.be is a presentation and inquiry platform. It does not allow direct online ordering or payment processing. Submitting a contact form or booking a video consultation does not constitute a binding contractual commitment."
+                "fr": "Le site internet de Sempra est un espace de présentation et de prise de contact. Il ne permet pas de passer commande directement ni de procéder à un paiement en ligne. L'envoi d'un formulaire de contact ou la réservation d'un entretien visio ne constitue pas un engagement contractuel ferme.",
+                "en": "Sempra's website is a presentation and inquiry platform. It does not allow direct online ordering or payment processing. Submitting a contact form or booking a video consultation does not constitute a binding contractual commitment."
               },
               {
-                "fr": "Le contrat est définitivement formé lorsque le client signe le devis ou contrat de prestation écrit et s'acquitte de l'acompte prévu. La réservation de la date n'est garantie qu'après réception effective de cet acompte.",
-                "en": "The contract is definitively formed once the client signs the written quote or service agreement and pays the required deposit. Date reservation is guaranteed only upon effective receipt of this deposit."
+                "fr": "Le contrat est définitivement formé lorsque le client signe le devis ou contrat de prestation écrit et s'acquitte de l'acompte convenu. La réservation de la date n'est garantie qu'après réception effective de cet acompte.",
+                "en": "The contract is definitively formed once the client signs the written quote or service agreement and pays the agreed deposit. Date reservation is guaranteed only upon effective receipt of this deposit."
               }
             ]
           },
@@ -1816,8 +1828,8 @@
                 "en": "Any date change request must be submitted in writing as promptly as possible. Acceptance remains subject to Sempra's calendar availability."
               },
               {
-                "fr": "En cas d'annulation émanant du client, hors exercice régulier du droit de rétractation légal ou force majeure démontrée, le sort de l'acompte et les éventuelles indemnités sont strictement déterminés selon les clauses fixées dans le devis ou contrat signé.",
-                "en": "In the event of cancellation by the client outside statutory withdrawal or proven force majeure, deposit treatment and any cancellation fees are strictly determined by clauses set forth in the signed quote or contract."
+                "fr": "En cas d'annulation émanant du client, hors exercice régulier du droit de rétractation légal ou force majeure démontrée, le sort de l'acompte et les éventuelles indemnités sont strictement déterminés selon les clauses fixées dans le devis ou contrat individuel signé.",
+                "en": "In the event of cancellation by the client outside statutory withdrawal or proven force majeure, deposit treatment and any cancellation fees are strictly determined by clauses set forth in the signed individual quote or contract."
               },
               {
                 "fr": "En cas d'empêchement fortuit majeur d'un intervenant de Sempra (maladie soudaine ou accident), Sempra met tout en oeuvre pour désigner un professionnel remplaçant aux compétences reconnues. Si aucune solution de remplacement ne peut être trouvée, l'intégralité des sommes versées au titre de la prestation non exécutée est restituée au client.",
@@ -1913,8 +1925,12 @@
                 "en": "Sempra exercises professional diligence and utilizes high-quality equipment featuring redundant recording to ensure footage safety."
               },
               {
-                "fr": "En cas d'incident technique fortuit ou de perte accidentelle de données non imputable à une faute lourde ou intentionnelle, la responsabilité financière de Sempra est expressément plafonnée au montant total hors taxes effectivement perçu pour la prestation concernée.",
-                "en": "In the event of an unforeseen technical malfunction or accidental data loss not attributable to gross negligence or willful misconduct, Sempra's financial liability is strictly capped at the total net amount received for the service."
+                "fr": "Dans les limites autorisées par la loi, en cas d'incident technique fortuit ou de perte accidentelle de données, la responsabilité financière de Sempra est expressément plafonnée au montant total hors taxes perçu au titre de la prestation concernée.",
+                "en": "To the extent permitted by law, in the event of an unforeseen technical malfunction or accidental data loss, Sempra's financial liability is strictly capped at the total net amount received for the service in question."
+              },
+              {
+                "fr": "Ce plafond de responsabilité ne s'applique pas dans les cas où la loi interdit toute limitation de responsabilité, notamment en cas de dol, de faute lourde lorsque la loi ne permet pas d'en limiter les effets, d'atteinte à la vie ou à l'intégrité physique d'une personne, ou de manquement à une obligation essentielle du contrat ne pouvant être valablement limitée.",
+                "en": "This liability cap does not apply in circumstances where the law prohibits liability limitations, notably in cases of intentional fraud (dol), gross negligence where statutory rules disallow limitation, injury to life or physical integrity, or failure to perform an essential contractual obligation that cannot be lawfully limited."
               }
             ]
           },
@@ -1926,12 +1942,12 @@
             },
             "paragraphs": [
               {
-                "fr": "Lorsque le client a la qualité de consommateur au sens du Code de droit économique et que le contrat est conclu à distance ou hors établissement, il bénéficie d'un droit de rétractation de 14 jours calendrier à compter de la conclusion du contrat, sans pénalité ni obligation de motivation.",
-                "en": "When the client qualifies as a consumer under the Code of Economic Law and the contract is concluded at a distance or off-premises, they have a 14-calendar-day right of withdrawal from contract conclusion, without penalty or justification requirement."
+                "fr": "Lorsque le contrat est conclu à distance ou hors établissement avec un client ayant la qualité de consommateur au sens du Code de droit économique belge, celui-ci bénéficie d'un droit de rétractation de 14 jours calendrier à compter de la conclusion du contrat, sans pénalité ni obligation de motivation.",
+                "en": "When the contract is concluded at a distance or off-premises with a client qualifying as a consumer under the Belgian Code of Economic Law, they have a 14-calendar-day right of withdrawal from contract conclusion, without penalty or justification requirement."
               },
               {
-                "fr": "Pour faire valoir ce droit, le client doit transmettre une déclaration claire par e-mail à contact@sempra.be avant l'échéance des 14 jours. Sempra procède au remboursement des montants perçus dans les 14 jours suivant la réception de la notification.",
-                "en": "To exercise this right, the client must send a clear written statement by email to contact@sempra.be before expiration of the 14 days. Sempra will refund all received payments within 14 days of receiving notice."
+                "fr": "Pour faire valoir ce droit, le client doit transmettre une déclaration claire par écrit via l'adresse de contact officielle de Sempra avant l'échéance des 14 jours. Sempra procède au remboursement des montants perçus dans les 14 jours suivant la réception de la notification.",
+                "en": "To exercise this right, the client must send a clear written statement via Sempra's official contact address before expiration of the 14 days. Sempra will refund all received payments within 14 days of receiving notice."
               },
               {
                 "fr": "Si le client demande expressément par écrit que l'exécution commence avant le terme des 14 jours, il conserve son droit jusqu'à l'achèvement complet de la prestation. Si le service est intégralement réalisé, le droit de rétractation s'éteint. En cas de rétractation en cours d'exécution, le client est redevable d'un montant proportionnel aux prestations accomplies jusqu'à la notification.",
@@ -1947,23 +1963,23 @@
             },
             "paragraphs": [
               {
-                "fr": "Toute réclamation doit être notifiée par écrit à Sempra (contact@sempra.be) dans un délai raisonnable après la réalisation de la prestation, avec les justificatifs pertinents.",
-                "en": "Any complaint must be notified in writing to Sempra (contact@sempra.be) within a reasonable period following service delivery, accompanied by relevant documentation."
+                "fr": "Toute réclamation doit être notifiée par écrit à Sempra via ses coordonnées officielles de contact dans un délai raisonnable après la réalisation de la prestation, avec les justificatifs pertinents.",
+                "en": "Any complaint must be notified in writing to Sempra via its official contact details within a reasonable period following service delivery, accompanied by relevant documentation."
               },
               {
                 "fr": "En cas de litige non résolu à l'amiable, le client consommateur peut saisir gratuitement le Service de Médiation pour le Consommateur en Belgique (Boulevard du Roi Albert II 8 bte 1, 1000 Bruxelles, contact@mediationconsommateur.be, www.mediationconsommateur.be).",
                 "en": "In the event of an unresolved dispute, consumer clients may turn free of charge to the Belgian Consumer Mediation Service (Boulevard du Roi Albert II 8 bte 1, 1000 Brussels, contact@mediationconsommateur.be, www.mediationconsommateur.be)."
               },
               {
-                "fr": "Les présentes conditions sont régies par le droit belge. En cas de litige persistant, les juridictions belges compétentes sont seules habilitées à trancher le différend.",
-                "en": "These terms are governed by Belgian law. In case of persistent dispute, competent Belgian courts shall have sole authority to resolve the matter."
+                "fr": "Les présentes conditions sont régies par le droit belge. En cas de litige qui ne pourrait être résolu à l'amiable ou par voie de médiation, les tribunaux compétents sont déterminés conformément aux règles légales impératives applicables, notamment celles protectrices des consommateurs.",
+                "en": "These terms are governed by Belgian law. In the event of a dispute that cannot be resolved amicably or through mediation, jurisdiction is determined in accordance with applicable mandatory statutory rules, including consumer protection provisions."
               }
             ]
           }
         ],
         "version": 1,
         "effectiveDate": null,
-        "lastModified": "2026-10-23T09:14:25.581Z"
+        "lastModified": "2026-10-23T09:34:01.404Z"
       },
       "published": null,
       "history": []
@@ -1999,8 +2015,8 @@
                 "en": "A cookie is a small temporary text file placed on your device (computer, tablet, or smartphone) by the visited website's server. It enables the application to keep your session active or remember essential browsing data."
               },
               {
-                "fr": "Le responsable du traitement des données relatives aux cookies est Sempra (contact@sempra.be).",
-                "en": "The data controller for cookie-related data is Sempra (contact@sempra.be)."
+                "fr": "Le responsable du traitement des données relatives aux cookies est l'éditeur du site Sempra.",
+                "en": "The data controller for cookie-related data is the Sempra site publisher."
               }
             ]
           },
@@ -2016,29 +2032,33 @@
                 "en": "The Sempra website uses only cookies strictly necessary to provide services you explicitly request. In accordance with Article 129 of the Belgian Electronic Communications Act and APD guidance, these trackers are exempt from prior consent as they are indispensable for technical operations requested by the user."
               },
               {
-                "fr": "Ces cookies comprennent : le cookie de session de galerie privée (permettant aux mariés et invités d'accéder à leurs photos avec leur code d'accès) et le cookie de session d'administration (réservé aux gestionnaires du site). Sempra ne dépose aucun cookie publicitaire, aucun pixel de ciblage et aucun outil d'analyse d'audience tiers.",
-                "en": "These cookies include: the private gallery session cookie (enabling clients and guests to view photos using their access code) and the administration session cookie (restricted to site managers). Sempra places no advertising cookies, no tracking pixels, and no third-party analytics tools."
+                "fr": "Ces cookies comprennent : le cookie de session de galerie privée (sempra_gallery_session, permettant aux mariés et invités d'accéder à leurs photos avec leur code d'accès) et le cookie de session d'administration (__admin_session). Le cookie de session d'administration (__admin_session) est réservé exclusivement aux gestionnaires autorisés du site lors de leur connexion à l'interface d'administration ; il n'est jamais déposé sur les terminaux des visiteurs ordinaires du site public.",
+                "en": "These cookies include: the private gallery session cookie (sempra_gallery_session, enabling clients and guests to view photos using their access code) and the administration session cookie (__admin_session). The administration session cookie (__admin_session) is restricted exclusively to authorized site managers logging into the admin interface; it is never deposited on devices of ordinary visitors to the public website."
+              },
+              {
+                "fr": "Sempra ne dépose aucun cookie publicitaire, aucun pixel de ciblage et aucun outil d'analyse d'audience tiers.",
+                "en": "Sempra places no advertising cookies, no tracking pixels, and no third-party analytics tools."
               }
             ]
           },
           {
             "id": "video_content",
             "title": {
-              "fr": "Contenus vidéo externes et chargement conditionnel",
-              "en": "External Video Content and Conditional Loading"
+              "fr": "Services vidéo externes et chargement conditionnel",
+              "en": "External Video Services and Conditional Loading"
             },
             "paragraphs": [
               {
-                "fr": "Le portfolio de Sempra intègre des vidéos hébergées sur YouTube ou Vimeo. Pour protéger votre vie privée, aucun lecteur vidéo tiers n'est préchargé lors de votre arrivée sur la page.",
-                "en": "Sempra's portfolio incorporates videos hosted on YouTube or Vimeo. To protect your privacy, no third-party video player is preloaded when you arrive on the page."
+                "fr": "Le portfolio de Sempra propose des extraits vidéo hébergés sur des plateformes externes spécialisées (YouTube et Vimeo). Pour protéger votre vie privée, aucun lecteur vidéo tiers n'est préchargé lors de votre arrivée sur la page.",
+                "en": "Sempra's portfolio features video excerpts hosted on specialized external platforms (YouTube and Vimeo). To protect your privacy, no third-party video player is preloaded when you arrive on the page."
               },
               {
-                "fr": "Ces lecteurs sont intégrés via un mécanisme conditionnel en deux étapes : une image de couverture locale est affichée avec un avertissement explicite. Les lecteurs externes ne sont chargés que si vous cliquez sur le bouton de lecture. Ce clic constitue un consentement ponctuel au chargement du lecteur externe et au dépôt éventuel de cookies tiers par ces plateformes.",
-                "en": "These players are integrated through a two-step conditional mechanism: a local preview image is shown with an explicit notice. External players load only if you click the playback button. This click constitutes point-in-time consent for loading the external player and potential third-party cookies set by those platforms."
+                "fr": "Ces lecteurs sont intégrés via un mécanisme conditionnel en deux étapes : une image de couverture locale est affichée avec un avertissement explicite. Les lecteurs externes ne sont chargés que si vous cliquez sur le bouton de lecture. Ce clic constitue un consentement ponctuel au chargement du lecteur externe et au dépôt éventuel de traceurs tiers par ces plateformes.",
+                "en": "These players are integrated through a two-step conditional mechanism: a local preview image is shown with an explicit notice. External players load only if you click the playback button. This click constitutes point-in-time consent for loading the external player and potential third-party trackers set by those platforms."
               },
               {
-                "fr": "Sempra configure ces intégrations pour limiter les traceurs : utilisation du domaine youtube-nocookie.com pour YouTube et du paramètre Do Not Track (dnt=1) pour Vimeo. Vous pouvez décharger le lecteur à tout moment en fermant la vidéo.",
-                "en": "Sempra configures these integrations to minimize trackers: using the youtube-nocookie.com domain for YouTube and the Do Not Track parameter (dnt=1) for Vimeo. You can unload the player at any time by closing the video."
+                "fr": "Sempra configure ces intégrations pour limiter les traceurs : utilisation du domaine youtube-nocookie.com pour YouTube et du paramètre Do Not Track (dnt=1) pour Vimeo. La fermeture du lecteur dans l'interface interrompt son affichage et la lecture, mais ne supprime pas automatiquement les éventuels traceurs qui auraient déjà été déposés par le fournisseur tiers. Pour supprimer ces éléments, l'utilisateur doit utiliser les paramètres de gestion des cookies de son navigateur.",
+                "en": "Sempra configures these integrations to minimize trackers: using the youtube-nocookie.com domain for YouTube and the Do Not Track parameter (dnt=1) for Vimeo. Closing the video player in the interface stops playback and display, but does not automatically delete trackers that may already have been placed by the third-party provider. To remove these elements, the user should utilize their browser's cookie management settings."
               }
             ]
           },
@@ -2050,31 +2070,31 @@
             },
             "paragraphs": [
               {
-                "fr": "Dans la mesure où aucun cookie non essentiel n'est déposé avant une action volontaire de votre part, aucun bandeau de consentement intrusif n'apparaît à l'ouverture du site.",
-                "en": "Since no non-essential cookie is set prior to voluntary action on your part, no intrusive blanket consent banner appears upon opening the site."
+                "fr": "Dans la mesure où aucun traceur non essentiel n'est déposé avant une action volontaire de votre part, aucun bandeau de consentement intrusif n'apparaît à l'ouverture du site.",
+                "en": "Since no non-essential tracker is set prior to voluntary action on your part, no intrusive blanket consent banner appears upon opening the site."
               },
               {
                 "fr": "Vous pouvez paramétrer votre navigateur à tout moment pour refuser ou effacer les cookies. Veuillez noter que la suppression ou le blocage des cookies de session empêchera l'accès à votre galerie privée.",
                 "en": "You can configure your browser at any time to reject or delete cookies. Please note that deleting or blocking session cookies will prevent access to your private gallery."
               },
               {
-                "fr": "Pour toute question relative aux cookies sur ce site, vous pouvez nous écrire à contact@sempra.be.",
-                "en": "For any question regarding cookies on this site, you can write to us at contact@sempra.be."
+                "fr": "Pour toute question relative aux cookies sur ce site, vous pouvez contacter Sempra aux coordonnées indiquées sur cette page.",
+                "en": "For any question regarding cookies on this site, you can contact Sempra at the contact details provided on this page."
               }
             ]
           },
           {
             "id": "cookies-inventory",
             "title": {
-              "fr": "Inventaire complet des cookies et stockages",
-              "en": "Complete Cookie and Storage Inventory"
+              "fr": "Inventaire complet des cookies et traceurs",
+              "en": "Complete Cookie and Tracker Inventory"
             },
             "paragraphs": []
           }
         ],
         "version": 1,
         "effectiveDate": null,
-        "lastModified": "2026-10-23T09:14:25.581Z",
+        "lastModified": "2026-10-23T09:34:01.404Z",
         "inventory": [
           {
             "id": "admin-session",
@@ -2088,8 +2108,8 @@
               "en": "Sempra"
             },
             "purpose": {
-              "fr": "Maintien sécurisé de la session d'authentification pour les administrateurs du site.",
-              "en": "Secure authentication session maintenance for website administrators."
+              "fr": "Maintien sécurisé de la session d'authentification pour les administrateurs du site. Jamais déposé chez les visiteurs ordinaires.",
+              "en": "Secure authentication session maintenance for website administrators. Never deposited on ordinary visitors."
             },
             "duration": {
               "fr": "8 heures",
@@ -2108,8 +2128,8 @@
               "en": "Sempra"
             },
             "purpose": {
-              "fr": "Authentification et maintien de la session sécurisée d'accès aux galeries privées clients.",
-              "en": "Authentication and secure session maintenance for private client gallery access."
+              "fr": "Authentification et maintien de la session sécurisée d'accès aux galeries privées clients après saisie du code.",
+              "en": "Authentication and secure session maintenance for private client gallery access upon entering access code."
             },
             "duration": {
               "fr": "Session de navigation (fermeture du navigateur)",
@@ -2120,8 +2140,8 @@
             "id": "youtube",
             "category": "video",
             "name": {
-              "fr": "Lecteur vidéo YouTube",
-              "en": "YouTube Video Player"
+              "fr": "Lecteur vidéo externe YouTube (services tiers)",
+              "en": "YouTube External Video Player (third-party services)"
             },
             "provider": {
               "fr": "Google LLC / YouTube",
@@ -2132,16 +2152,16 @@
               "en": "Video playback in portfolio (youtube-nocookie.com domain). Loaded strictly upon explicit user click."
             },
             "duration": {
-              "fr": "Variable selon YouTube (session à 24 mois)",
-              "en": "Variable according to YouTube (session to 24 months)"
+              "fr": "Durée variable définie par le fournisseur tiers",
+              "en": "Variable duration determined by the third-party provider"
             }
           },
           {
             "id": "vimeo",
             "category": "video",
             "name": {
-              "fr": "Lecteur vidéo Vimeo",
-              "en": "Vimeo Video Player"
+              "fr": "Lecteur vidéo externe Vimeo (services tiers)",
+              "en": "Vimeo External Video Player (third-party services)"
             },
             "provider": {
               "fr": "Vimeo.com, Inc.",
@@ -2152,8 +2172,8 @@
               "en": "Video playback in portfolio (dnt=1 parameter). Loaded strictly upon explicit user click."
             },
             "duration": {
-              "fr": "Variable selon Vimeo (session à 24 mois)",
-              "en": "Variable according to Vimeo (session to 24 months)"
+              "fr": "Durée variable définie par le fournisseur tiers",
+              "en": "Variable duration determined by the third-party provider"
             }
           }
         ]

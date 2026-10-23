@@ -15,7 +15,8 @@
     "typecheck": "react-router typegen && tsc",
     "smtp:verify": "node scripts/smtp-verify.js",
     "admin:hash": "node scripts/admin-hash.js",
-    "gallery:generate-previews": "node --experimental-strip-types scripts/generate-previews.ts"
+    "gallery:generate-previews": "node --experimental-strip-types scripts/generate-previews.ts",
+    "legal:apply-drafts": "node scripts/apply-legal-drafts.js"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.1.0",

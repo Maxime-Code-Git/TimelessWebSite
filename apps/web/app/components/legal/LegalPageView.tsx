@@ -30,14 +30,14 @@ export function LegalPageView({ mode = "public", lang, alternateLangHref, docume
     return (
       <address>
         <strong>{business.legalName || business.tradeName || STUDIO_NAME}</strong><br />
+        {business.legalForm && <>{business.legalForm}<br /></>}
         {business.address && (
           <>
             <span className={styles.preLine}>{business.address}</span><br />
           </>
         )}
         {business.email && <><a href={`mailto:${business.email}`}>{business.email}</a><br /></>}
-        {business.phoneDisplay && <a href={`tel:${business.phoneE164}`}>{business.phoneDisplay}</a>}
-        <br />
+        {business.phoneDisplay && <><a href={`tel:${business.phoneE164 || business.phoneDisplay}`}>{business.phoneDisplay}</a><br /></>}
         {business.enterpriseNumber && <>{legalUI?.enterpriseNumber[lang]} : {business.enterpriseNumber}<br /></>}
         {business.vatNumber && <>{legalUI?.vatNumber[lang]} : {business.vatNumber}<br /></>}
       </address>
@@ -45,11 +45,10 @@ export function LegalPageView({ mode = "public", lang, alternateLangHref, docume
   };
 
   const formatHosting = () => {
-    if (!business || !legalUI) return null;
+    if (!business || !legalUI || !business.hostingProvider) return null;
     return (
       <p>
-        {legalUI?.hostedBy[lang]} {business.hostingProvider || legalUI.toBeDefined[lang]}.
-        {business.hostingAddress && <><br /><span className={styles.preLine}>{business.hostingAddress}</span></>}
+        {legalUI.hostedBy[lang]} {business.hostingProvider}.
       </p>
     );
   };

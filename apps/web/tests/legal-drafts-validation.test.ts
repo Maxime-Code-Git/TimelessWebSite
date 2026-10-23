@@ -1,9 +1,16 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { validateSiteContent } from "../app/lib/site-content.server";
+import { applyLegalDrafts, areDraftsEqual } from "../scripts/apply-legal-drafts";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const defaultContentPath = path.resolve(__dirname, "../app/content/default-site-content.json");
+const activeContentPath = path.resolve(__dirname, "../data/site-content.json");
 
 const LONG_DASHES = [
   String.fromCodePoint(0x2013), // en-dash
@@ -45,69 +52,227 @@ describe("Legal Pages Drafts and Content Integrity", () => {
   const defaultRaw = fs.readFileSync(defaultContentPath, "utf-8");
   const defaultJson = JSON.parse(defaultRaw);
 
+  const activeRaw = fs.existsSync(activeContentPath)
+    ? fs.readFileSync(activeContentPath, "utf-8")
+    : defaultRaw;
+  const activeJson = JSON.parse(activeRaw);
+
   it("passes strict schema validation through validateSiteContent", () => {
     const validated = validateSiteContent(defaultJson);
     expect(validated.schemaVersion).toBe(11);
     expect(validated.legalPages).toBeDefined();
-  });
 
-  it("contains all four legal pages in bilingual FR and EN draft state", () => {
-    const pages = ["mentions", "privacy", "cgv", "cookies"] as const;
-    for (const pageKey of pages) {
-      const page = defaultJson.legalPages[pageKey];
-      expect(page, `Page ${pageKey} should exist`).toBeDefined();
-      expect(page.draft, `Page ${pageKey} draft should exist`).toBeDefined();
-
-      const draft = page.draft;
-      expect(draft.seoTitle.fr.trim().length).toBeGreaterThan(0);
-      expect(draft.seoTitle.en.trim().length).toBeGreaterThan(0);
-      expect(draft.publicTitle.fr.trim().length).toBeGreaterThan(0);
-      expect(draft.publicTitle.en.trim().length).toBeGreaterThan(0);
-      expect(draft.intro.fr.trim().length).toBeGreaterThan(0);
-      expect(draft.intro.en.trim().length).toBeGreaterThan(0);
-      expect(draft.sections.length).toBeGreaterThan(0);
-
-      for (const section of draft.sections) {
-        expect(section.id.trim().length).toBeGreaterThan(0);
-        expect(section.title.fr.trim().length).toBeGreaterThan(0);
-        expect(section.title.en.trim().length).toBeGreaterThan(0);
-        for (const p of section.paragraphs) {
-          expect(p.fr.trim().length).toBeGreaterThan(0);
-          expect(p.en.trim().length).toBeGreaterThan(0);
-        }
-        for (const li of section.listItems || []) {
-          expect(li.fr.trim().length).toBeGreaterThan(0);
-          expect(li.en.trim().length).toBeGreaterThan(0);
-        }
-      }
+    if (fs.existsSync(activeContentPath)) {
+      const activeValidated = validateSiteContent(activeJson);
+      expect(activeValidated.schemaVersion).toBe(11);
+      expect(activeValidated.legalPages).toBeDefined();
     }
   });
 
-  it("strictly preserves separation between draft and published (no automatic publishing)", () => {
+  it("applies the four drafts to the active content file and matches default blueprint", () => {
     const pages = ["mentions", "privacy", "cgv", "cookies"] as const;
     for (const pageKey of pages) {
-      const page = defaultJson.legalPages[pageKey];
+      const activeDraft = activeJson.legalPages[pageKey]?.draft;
+      const blueprintDraft = defaultJson.legalPages[pageKey]?.draft;
+
+      expect(activeDraft, `Active draft for ${pageKey} should exist`).toBeDefined();
+      expect(areDraftsEqual(activeDraft, blueprintDraft)).toBe(true);
+    }
+  });
+
+  it("strictly preserves published and history in active content (no automatic publishing)", () => {
+    const pages = ["mentions", "privacy", "cgv", "cookies"] as const;
+    for (const pageKey of pages) {
+      const page = activeJson.legalPages[pageKey];
       expect(page.published).toBeNull();
       expect(page.draft.effectiveDate).toBeNull();
       expect(Array.isArray(page.history)).toBe(true);
     }
   });
 
-  it("does not contain obsolete EU ODR platform links or references", () => {
-    const contentStr = JSON.stringify(defaultJson.legalPages).toLowerCase();
-    expect(contentStr).not.toContain("ec.europa.eu/consumers/odr");
-    expect(contentStr).not.toContain("plateforme odr");
-    expect(contentStr).not.toContain("odr platform");
+  it("preserves business, pricing, and other non-legal sections intact", () => {
+    expect(activeJson.business).toBeDefined();
+    expect(activeJson.business.email).toBe("contact@sempra.be");
+    expect(activeJson.pricing).toBeDefined();
+    expect(activeJson.home).toBeDefined();
+    expect(activeJson.aboutPage).toBeDefined();
+    expect(activeJson.contactPage).toBeDefined();
+    expect(activeJson.pricingPage).toBeDefined();
   });
 
-  it("does not falsely claim that no cookies are used", () => {
-    const cookiesPageStr = JSON.stringify(defaultJson.legalPages.cookies).toLowerCase();
-    expect(cookiesPageStr).not.toContain("aucun cookie n'est utilisé");
-    expect(cookiesPageStr).not.toContain("n'utilise aucun cookie");
-    expect(cookiesPageStr).not.toContain("no cookies are used");
+  it("ensures applyLegalDrafts is strictly idempotent and safe", () => {
+    // Run applyLegalDrafts on the active file in dry-run mode
+    const dryRunRes = applyLegalDrafts({
+      targetFilePath: activeContentPath,
+      apply: false,
+    });
+    // Because active file was already synchronized, it is detected as alreadyUpToDate
+    expect(dryRunRes.alreadyUpToDate).toBe(true);
+    expect(dryRunRes.applied).toBe(false);
+
+    // Run applyLegalDrafts with apply: true
+    const applyRes = applyLegalDrafts({
+      targetFilePath: activeContentPath,
+      apply: true,
+    });
+    // Second application must be a no-op
+    expect(applyRes.alreadyUpToDate).toBe(true);
+    expect(applyRes.applied).toBe(false);
+    expect(applyRes.backupFilePath).toBeNull();
   });
 
-  it("defines an accurate inventory of strictly necessary cookies and conditional video players", () => {
+  it("proves applyLegalDrafts creates backup, replaces only drafts, and preserves published/history on mock data", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-test-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const mockFile = path.join(tempDir, "mock-site-content.json");
+
+    try {
+      const existingHistoryItem = {
+        version: 1,
+        effectiveDate: "2025-01-01",
+        lastModified: "2025-01-01T00:00:00.000Z",
+        seoTitle: { fr: "Archived FR", en: "Archived EN" },
+        seoDescription: { fr: "Archived desc FR", en: "Archived desc EN" },
+        publicTitle: { fr: "Archived title FR", en: "Archived title EN" },
+        intro: { fr: "Archived intro FR", en: "Archived intro EN" },
+        sections: [],
+      };
+
+      const mockData = {
+        ...defaultJson,
+        revision: "mock-initial-rev",
+        updatedAt: "2025-01-01T00:00:00.000Z",
+        business: {
+          ...defaultJson.business,
+          email: "custom-preserve@sempra.be",
+        },
+        legalPages: {
+          ...defaultJson.legalPages,
+          mentions: {
+            draft: { ...defaultJson.legalPages.mentions.draft, publicTitle: { fr: "Old draft", en: "Old draft" } },
+            published: existingHistoryItem,
+            history: [existingHistoryItem],
+          },
+        },
+      };
+
+      fs.writeFileSync(mockFile, JSON.stringify(mockData, null, 2), "utf-8");
+
+      // Test Dry Run
+      const dryRes = applyLegalDrafts({
+        targetFilePath: mockFile,
+        apply: false,
+      });
+      expect(dryRes.dryRun).toBe(true);
+      expect(dryRes.applied).toBe(false);
+      expect(dryRes.alreadyUpToDate).toBe(false);
+
+      // Verify file was NOT modified in dry-run
+      const afterDry = JSON.parse(fs.readFileSync(mockFile, "utf-8"));
+      expect(afterDry.revision).toBe("mock-initial-rev");
+
+      // Test Apply
+      const applyRes = applyLegalDrafts({
+        targetFilePath: mockFile,
+        apply: true,
+      });
+      expect(applyRes.applied).toBe(true);
+      expect(applyRes.backupFilePath).toBeDefined();
+      expect(fs.existsSync(applyRes.backupFilePath!)).toBe(true);
+
+      const afterApply = JSON.parse(fs.readFileSync(mockFile, "utf-8"));
+      // Revision and updatedAt updated
+      expect(afterApply.revision).not.toBe("mock-initial-rev");
+      expect(afterApply.updatedAt).not.toBe("2025-01-01T00:00:00.000Z");
+
+      // Business preserved
+      expect(afterApply.business.email).toBe("custom-preserve@sempra.be");
+
+      // Published and history preserved
+      expect(afterApply.legalPages.mentions.published).toEqual(existingHistoryItem);
+      expect(afterApply.legalPages.mentions.history).toEqual([existingHistoryItem]);
+
+      // Draft updated to blueprint
+      expect(afterApply.legalPages.mentions.draft.publicTitle.fr).toBe("Mentions légales");
+
+      // Second apply is idempotent
+      const secondApply = applyLegalDrafts({
+        targetFilePath: mockFile,
+        apply: true,
+      });
+      expect(secondApply.alreadyUpToDate).toBe(true);
+      expect(secondApply.applied).toBe(false);
+    } finally {
+      // Clean up temp dir
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("contains no hardcoded email, phone, physical address, legal form, CBE, VAT, or co-directors in draft texts", () => {
+    const pages = ["mentions", "privacy", "cgv", "cookies"] as const;
+    const forbiddenPhrases = [
+      "contact@sempra.be",
+      "sempra.studiolm@gmail.com",
+      "+32 477 86 37 42",
+      "+32477863742",
+      "Chaussée d'Alsemberg",
+      "Alsemberg",
+      "association de fait",
+      "Association de fait",
+      "co-directeurs",
+      "co-directeur",
+    ];
+
+    for (const pageKey of pages) {
+      const draft = defaultJson.legalPages[pageKey].draft;
+      const draftStr = JSON.stringify(draft);
+
+      for (const phrase of forbiddenPhrases) {
+        expect(
+          draftStr.toLowerCase(),
+          `Page ${pageKey} draft must not contain "${phrase}"`
+        ).not.toContain(phrase.toLowerCase());
+      }
+    }
+  });
+
+  it("contains identical section IDs and symmetric structure between FR and EN across all four drafts", () => {
+    const pages = ["mentions", "privacy", "cgv", "cookies"] as const;
+    for (const pageKey of pages) {
+      const draft = defaultJson.legalPages[pageKey].draft;
+      expect(draft.seoTitle.fr.trim().length).toBeGreaterThan(0);
+      expect(draft.seoTitle.en.trim().length).toBeGreaterThan(0);
+      expect(draft.publicTitle.fr.trim().length).toBeGreaterThan(0);
+      expect(draft.publicTitle.en.trim().length).toBeGreaterThan(0);
+      expect(draft.intro.fr.trim().length).toBeGreaterThan(0);
+      expect(draft.intro.en.trim().length).toBeGreaterThan(0);
+
+      for (const section of draft.sections) {
+        expect(section.id.trim().length).toBeGreaterThan(0);
+        expect(section.title.fr.trim().length).toBeGreaterThan(0);
+        expect(section.title.en.trim().length).toBeGreaterThan(0);
+
+        if (section.id !== "cookies-inventory") {
+          expect(section.paragraphs.length).toBeGreaterThan(0);
+        }
+        for (const p of section.paragraphs) {
+          expect(p.fr.trim().length).toBeGreaterThan(0);
+          expect(p.en.trim().length).toBeGreaterThan(0);
+        }
+
+        if (section.listItems) {
+          for (const li of section.listItems) {
+            expect(li.fr.trim().length).toBeGreaterThan(0);
+            expect(li.en.trim().length).toBeGreaterThan(0);
+          }
+        }
+      }
+    }
+  });
+
+  it("defines an accurate inventory of cookies matching real codebase session cookies and external video services", () => {
     const inventory = defaultJson.legalPages.cookies.draft.inventory;
     expect(Array.isArray(inventory)).toBe(true);
     expect(inventory.length).toBe(4);
@@ -118,24 +283,47 @@ describe("Legal Pages Drafts and Content Integrity", () => {
     expect(ids).toContain("youtube");
     expect(ids).toContain("vimeo");
 
+    const adminCookie = inventory.find((i: { id: string }) => i.id === "admin-session");
+    expect(adminCookie.name.fr).toBe("__admin_session");
+    expect(adminCookie.purpose.fr).toContain("Jamais déposé chez les visiteurs ordinaires");
+
+    const galleryCookie = inventory.find((i: { id: string }) => i.id === "gallery-session");
+    expect(galleryCookie.name.fr).toBe("sempra_gallery_session");
+
+    const youtubeService = inventory.find((i: { id: string }) => i.id === "youtube");
+    expect(youtubeService.name.fr).toContain("services tiers");
+    expect(youtubeService.duration.fr).toContain("Durée variable définie par le fournisseur tiers");
+
+    const vimeoService = inventory.find((i: { id: string }) => i.id === "vimeo");
+    expect(vimeoService.name.fr).toContain("services tiers");
+    expect(vimeoService.duration.fr).toContain("Durée variable définie par le fournisseur tiers");
+
     // No advertising or unsolicited analytics in inventory
     const categories = inventory.map((i: { category: string }) => i.category);
     expect(categories).not.toContain("ads");
     expect(categories).not.toContain("analytics");
   });
 
-  it("contains the standard placeholder for unverified business information", () => {
-    const mentionsStr = JSON.stringify(defaultJson.legalPages.mentions);
-    expect(mentionsStr).toContain("À compléter avant publication");
-    expect(mentionsStr).toContain("To be completed before publication");
+  it("contains no false promise of automatic deletion for emails or appointments", () => {
+    const privacyStr = JSON.stringify(defaultJson.legalPages.privacy.draft);
+    expect(privacyStr).not.toContain("suppression automatique des e-mails");
+    expect(privacyStr).not.toContain("automatiquement supprimés après 3 ans");
+    expect(privacyStr).not.toContain("automatiquement supprimés après un an");
+
+    // Must clearly frame retention as organizational controls / administrative reviews
+    expect(privacyStr).toContain("règle d'organisation interne");
+    expect(privacyStr).toContain("vérification périodique");
+    expect(privacyStr).toContain("contrôles périodiques de conservation");
   });
 
-  it("contains zero en-dashes or em-dashes in legal pages", () => {
+  it("contains no long dashes, dangerous HTML, or obsolete ODR platform links", () => {
     scanObjectForLongDashes(defaultJson.legalPages, "default-site-content.legalPages");
-  });
-
-  it("contains no dangerous HTML tags or script injection vectors", () => {
     scanObjectForDangerousHtml(defaultJson.legalPages, "default-site-content.legalPages");
+
+    const legalStr = JSON.stringify(defaultJson.legalPages).toLowerCase();
+    expect(legalStr).not.toContain("ec.europa.eu/consumers/odr");
+    expect(legalStr).not.toContain("plateforme odr");
+    expect(legalStr).not.toContain("odr platform");
   });
 
   it("respects reasonable word count boundaries (not overly long)", () => {

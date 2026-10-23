@@ -1,76 +1,78 @@
-# Checklist de verification humaine des contenus legaux de Sempra
+# Checklist de vérification humaine des contenus légaux de Sempra
 
-Date de creation : 23 octobre 2026.
+Date de mise à jour : 23 octobre 2026.
 Branche : `content/finalize-legal-pages`
 
-Ce document dresse l'etat des lieux exhaustif des informations d'entreprise et des clauses contractuelles pour les quatre pages legales de Sempra (Mentions legales, Politique de confidentialite, Conditions generales de vente, Politique relative aux cookies). Il distingue les donnees dument verifiees, les champs indispensables restant a completer avant publication, et les points de conformite a confronter avec les devis et contrats reels.
+Ce document dresse l'état des lieux exhaustif des informations d'entreprise, des paramètres techniques et des clauses contractuelles pour les quatre pages légales bilingues de Sempra (Mentions légales, Politique de confidentialité, Conditions générales de vente, Politique relative aux cookies).
+
+Pour garantir une gouvernance claire et éviter toute double source de vérité, cette checklist distingue cinq catégories opérationnelles strictes :
+1. Données venant automatiquement de l'administration
+2. Champs bloquant la publication
+3. Engagements opérationnels manuels
+4. Clauses à harmoniser avec les devis et contrats
+5. Points nécessitant une validation humaine ou juridique
 
 ---
 
-## 1. Informations deja verifiees dans l'administration et le code
+## 1. Données venant automatiquement de l'administration
 
-Les informations suivantes proviennent directement des parametres enregistres dans l'application (`apps/web/data/site-content.json` et `apps/web/app/lib/site-content.server.ts`), de l'infrastructure ou du fonctionnement technique reel du site :
+Ces informations ne sont jamais codées en dur dans le corps des textes légaux. Elles sont injectées dynamiquement par le composant `LegalPageView` depuis les paramètres globaux d'entreprise (`siteContent.business`) gérés dans `/admin/settings` :
 
-- **Nom commercial** : Sempra
-- **Forme juridique actuelle** : Association de fait
-- **Co-gestionnaires et representants legaux** : Maxime Schneider et Ludovic Bariaux
-- **Co-directeurs de la publication** : Maxime Schneider et Ludovic Bariaux
-- **Adresse professionnelle et siege d'exploitation** : Chaussée d'Alsemberg 721, Uccle, Belgique
-- **Adresse e-mail de contact** : contact@sempra.be (e-mail principal)
-- **Numero de telephone de contact** : +32 477 86 37 42 (format international : +32477863742)
-- **Hebergeur du site** : Sempra (site auto-heberge sur infrastructure serveur privee)
-- **Adresse physique du serveur d'hebergement** : Chaussée d'Alsemberg 721, Uccle, Belgique
-- **Domaine public officiel** : https://sempra.be
-- **Reseau social verifie** : https://www.instagram.com/sempra.studio/
-- **Zone de couverture principale** : Belgique et mariages a l'etranger
-- **Prestataire de routage SMTP des e-mails** : Brevo (societe francaise, serveurs au sein de l'UE)
-- **Traitement des formulaires de contact** : acheminement par SMTP sans enregistrement dans la base de donnees du site web
-- **Stockage des rendez-vous visio** : base SQLite locale (`bookings.db`), securisee avec permissions restreintes
-- **Stockage et acces aux galeries privees** : base SQLite locale (`galleries.db`), acces par code secret dedie (`SEMPRA-XXXX-XXXX`) et session temporaire
-- **Duree d'hebergement par defaut des galeries en ligne** : 24 mois (2 ans) a compter de la mise en ligne
-- **Protection anti-brute force et rate limiting** : empreinte hachee HMAC-SHA256 de l'adresse IP avec purge automatique sous 1 heure (aucune IP en clair stockee)
-- **Lecteurs video externes** : YouTube (`youtube-nocookie.com`) et Vimeo (`dnt=1`), charges exclusivement apres clic volontaire de l'internaute (mode 2 clics)
-- **Absence de traceurs publicitaires ou analytics** : aucun pixel Meta, aucun cookie publicitaire, aucun outil d'audience tiers invasif depose par defaut
+- **Dénomination et nom commercial** : injectés depuis `business.legalName` ou `business.tradeName` (avec fallback "Sempra").
+- **Forme juridique** : injectée depuis `business.legalForm` dès qu'elle est renseignée dans les paramètres.
+- **Adresse professionnelle** : injectée dynamiquement depuis `business.address` dans le bloc d'adresse légale.
+- **Adresse e-mail officielle** : injectée depuis `business.email` avec lien `mailto:` accessible.
+- **Numéro de téléphone officiel** : injecté depuis `business.phoneDisplay` avec lien `tel:` conforme E.164.
+- **Numéro d'entreprise (BCE)** : injecté dynamiquement depuis `business.enterpriseNumber` dès qu'il est complété.
+- **Numéro de TVA** : injecté dynamiquement depuis `business.vatNumber` uniquement s'il est renseigné.
+- **Prestataire d'hébergement** : injecté depuis `business.hostingProvider` dans la section hébergement.
+- **Inventaire des cookies nécessaires** : injecté dynamiquement depuis `document.inventory` (`__admin_session`, `sempra_gallery_session`, et services vidéo externes YouTube et Vimeo).
 
 ---
 
-## 2. Informations a completer avant publication
+## 2. Champs bloquant la publication
 
-Les documents legaux sont actuellement enregistres en mode brouillon (`draft`). La publication definitive necessite de renseigner prealablement les donnees suivantes dans l'onglet Parametres de l'administration (`/admin/settings`) :
+Tant que les éléments ci-dessous ne sont pas dument confirmés et saisis dans l'application, les quatre documents légaux doivent impérativement demeurer à l'état de brouillon (`draft`). La publication effective est bloquée administrativement et techniquement par ces prérequis :
 
-- **Numero d'entreprise (BCE / CBE)** : obligatoire en vertu du Code de droit economique belge (Livre XII et Livre III). Dans le brouillon actuel, la mention de substitution est : `À compléter avant publication` (FR) / `To be completed before publication` (EN).
-- **Numero de TVA intracommunautaire** : obligatoire si l'entreprise est assujettie a la TVA (ex. BE 0XXX.XXX.XXX) ou mention specifique d'exemption (ex. regime de la franchise pour petites entreprises, art. 56bis du Code de la TVA). Mention actuelle : `À compléter avant publication` / `To be completed before publication`.
-- **Statut juridique definitif** : confirmer si l'activite reste en `Association de fait` ou si une societe (ex. SRL) ou deux statuts d'independant a titre principal / complementaire sont constitues.
-- **Acompte (pourcentage ou montant standard)** : le parametre `depositPercent` est actuellement non defini (`null`). A renseigner dans les parametres et a formaliser sur chaque devis.
-- **Adresse e-mail juridique dediee** : confirmer si `contact@sempra.be` fait office d'adresse officielle pour les notifications juridiques et l'exercice des droits RGPD, ou si une adresse specialisee (ex. `legal@sempra.be`) doit etre creee.
-- **Identite d'un eventuel hebergeur tiers de secours** : si une passerelle cloud, un DNS externe ou un proxy WAF additionnel est utilise en production (ex. Cloudflare), s'assurer que ses coordonnees figurent dans les sous-traitants.
-
-> [!IMPORTANT]
-> Le systeme technique d'administration `/admin/legal` bloque automatiquement la publication d'un document si l'adresse, le numero d'entreprise ou l'hebergeur sont manquants dans les parametres.
+- **Numéro BCE (Banque-Carrefour des Entreprises)** : obligatoire en vertu du Code de droit économique belge (Livre III et Livre XII) avant toute mise en ligne officielle.
+- **Statut juridique définitif** : confirmation formelle de la structure d'exercice (association de fait formalisée, indépendant à titre principal, ou société de type SRL).
+- **Régime TVA ou numéro de TVA** : confirmation du numéro d'assujettissement à la TVA (format BE 0XXX.XXX.XXX) ou du régime applicable (ex. régime de la franchise pour petites entreprises, art. 56bis du Code de la TVA).
+- **Adresse professionnelle** : confirmation du siège d'activité officiel de Sempra en Belgique.
+- **Cohérence des acomptes, annulations et délais avec les contrats** : concordance stricte entre les conditions annoncées sur le site et les modèles de devis et contrats écrits.
+- **Date d'entrée en vigueur (`effectiveDate`)** : attribution obligatoire d'une date d'effet lors du passage de l'état de brouillon à l'état publié.
 
 ---
 
-## 3. Verifications contractuelles recommandees (Devis et Contrats Sempra)
+## 3. Engagements opérationnels manuels
 
-Avant la mise en ligne des Conditions generales de vente (CGV), les points suivants doivent etre confrontes avec les modeles de devis et contrats personnalises reellement envoyes aux maries :
+La politique de confidentialité et les CGV décrivent des règles qui reposent sur des contrôles et interventions manuelles de l'administration de Sempra, et non sur des purges automatiques par le code :
 
-1. **Modalites precises de l'acompte et des echeances** :
-   - Verifier si l'acompte exige a la signature est de 30 %, 40 % ou 50 % ;
-   - Verifier l'echeance du solde : a la veille du mariage, le jour J, ou a la livraison des photos/films.
+- **Conservation des e-mails (maximum 3 ans)** : règle d'organisation interne prévoyant la conservation dans la messagerie professionnelle pour le suivi de la relation client, soumise à une vérification périodique manuelle par l'équipe.
+- **Conservation des rendez-vous visio (maximum 1 an)** : en l'absence de contrat conclu, la suppression des fiches de rendez-vous dans la base locale est réalisée manuellement par l'administration lors des contrôles périodiques de conservation des données.
+- **Hébergement des galeries privées (durée de 24 mois)** : ouverture manuelle avec code secret unique (`SEMPRA-XXXX-XXXX`), suivi de l'échéance des 2 ans, et rappel aux mariés de télécharger leurs clichés en haute définition avant la clôture.
+- **Traitement des demandes d'exercice de droits RGPD** : traitement sous 30 jours calendrier, avec demande d'un justificatif d'identité uniquement en cas de doute raisonnable sur l'identité du demandeur.
+- **Notification des retraits de consentement vidéo** : gestion des demandes individuelles si des mariés souhaitent retirer ultérieurement une autorisation de diffusion de portraits.
 
-2. **Politique d'annulation et indemnites** :
-   - Verifier le sort de l'acompte en cas d'annulation par les maries a plus de 6 mois, entre 6 et 2 mois, ou a moins de 30 jours du mariage ;
-   - S'assurer que les clauses ne creent pas de desequilibre manifeste entre les parties.
+---
 
-3. **Delais d'execution et de livraison** :
-   - Confirmer les delais annonces selon les formules : ex. galerie photo sous 4 a 8 semaines, film de mariage sous 8 a 12 semaines selon la saison.
+## 4. Clauses à harmoniser avec les devis et contrats
 
-4. **Droit de retractation et demande d'execution anticipee** :
-   - Si un contrat est signe a moins de 14 jours de l'evenement (ou d'une seance engagement), verifier que le devis ou contrat papier contient bien la mention expresse de demande d'execution anticipee conformement aux articles VI.46 et VI.51 du CDE.
+Les CGV fixent le cadre général de vente mais renvoient expressément aux devis et contrats signés pour les paramètres commerciaux variables :
 
-5. **Droit a l'image et publication dans le portfolio** :
-   - S'assurer que le bon de commande ou contrat comporte une case a cocher specifique et distincte permettant aux maries d'autoriser ou de refuser la publication d'extraits sur le site internet et les reseaux sociaux de Sempra.
-   - Ne jamais presumer l'accord des maries par defaut.
+- **Montant ou pourcentage de l'acompte** : non fixé dans les CGV publiques générales ; doit être expressément mentionné sur chaque devis personnalisé (ex. 30 % ou 40 % à la réservation).
+- **Calendrier de règlement du solde** : date d'exigibilité du solde (ex. la veille du mariage, le jour J, ou avant la mise à disposition de la galerie privée).
+- **Barème d'indemnité en cas d'annulation** : clauses d'indemnisation graduées selon le délai avant l'événement (ex. plus de 6 mois, entre 6 et 2 mois, ou moins de 30 jours), sans clause pénale abusive.
+- **Délais indicatifs de livraison** : harmonisation des délais de post-production annoncés (photos sous 4 à 6 semaines, films sous 6 à 10 semaines selon la saison).
+- **Clause spécifique d'autorisation de droit à l'image** : présence impérative dans chaque contrat signé d'une case à cocher distincte pour la publication éventuelle sur le portfolio ou les réseaux sociaux de Sempra.
+- **Demande expresse d'exécution anticipée** : mention manuscrite ou électronique explicite si un contrat est conclu à moins de 14 jours de la prestation.
 
-6. **Mediation de la consommation** :
-   - Les CGV mentionnent le Service de Mediation pour le Consommateur (Belgique). Verifier si Sempra adhere a une commission sectorielle specifique ou s'appuie sur le service universel de mediation.
+---
+
+## 5. Points nécessitant une validation humaine ou juridique
+
+Avant tout passage en production, les points suivants doivent faire l'objet d'une relecture et validation finale par un conseil juridique ou les gestionnaires :
+
+- **Plafond de responsabilité contractuelle** : validation du libellé limitant la responsabilité financière au montant perçu hors taxes, sous réserve expresse des cas d'exclusion légaux (dol, faute lourde non limitable, atteinte à l'intégrité physique, obligations essentielles).
+- **Compétence juridictionnelle et droits des consommateurs** : vérification de la formulation respectant les compétences légales impératives protectrices du consommateur (Code judiciaire belge et droit européen de la consommation).
+- **Absence de déséquilibre manifeste** : vérification de la réciprocité des obligations en matière de force majeure et d'empêchement fortuit.
+- **Contrôle des flux transfrontaliers** : confirmation de la localisation des serveurs et de l'absence de transfert de données hors EEE sans garanties appropriées.
