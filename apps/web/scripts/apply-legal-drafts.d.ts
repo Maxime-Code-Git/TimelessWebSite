@@ -18,6 +18,10 @@ export interface ApplyResult {
   updatedPages?: string[];
 }
 
+export const EXPECTED_SCHEMA_VERSION: number;
+export function validateLegalDocumentStructure(doc: unknown, context: string): void;
+export function validateTargetData(data: unknown): void;
+export function validateSourceDrafts(sourceDrafts: unknown): void;
 export function resolveDefaultContentPath(): string;
 export function resolveActiveContentPath(customPath?: string | null): string;
 export function createBackup(filePath: string): string | null;

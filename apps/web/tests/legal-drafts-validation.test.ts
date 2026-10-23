@@ -1,10 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { validateSiteContent } from "../app/lib/site-content.server";
-import { applyLegalDrafts, areDraftsEqual } from "../scripts/apply-legal-drafts";
+import {
+  applyLegalDrafts,
+  areDraftsEqual,
+  rotateBackups,
+} from "../scripts/apply-legal-drafts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +20,21 @@ const LONG_DASHES = [
   String.fromCodePoint(0x2013), // en-dash
   String.fromCodePoint(0x2014), // em-dash
 ];
+
+interface MinimalHistoryItem {
+  version: number;
+  effectiveDate: string | null;
+  lastModified: string;
+  seoTitle: { fr: string; en: string };
+  seoDescription: { fr: string; en: string };
+  publicTitle: { fr: string; en: string };
+  intro: { fr: string; en: string };
+  sections: Array<{
+    id: string;
+    title: { fr: string; en: string };
+    paragraphs: Array<{ fr: string; en: string }>;
+  }>;
+}
 
 function scanObjectForLongDashes(obj: unknown, loc = "root"): void {
   if (typeof obj === "string") {
@@ -100,110 +119,488 @@ describe("Legal Pages Drafts and Content Integrity", () => {
     expect(activeJson.pricingPage).toBeDefined();
   });
 
-  it("ensures applyLegalDrafts is strictly idempotent and safe", () => {
-    // Run applyLegalDrafts on the active file in dry-run mode
-    const dryRunRes = applyLegalDrafts({
-      targetFilePath: activeContentPath,
-      apply: false,
-    });
-    // Because active file was already synchronized, it is detected as alreadyUpToDate
-    expect(dryRunRes.alreadyUpToDate).toBe(true);
-    expect(dryRunRes.applied).toBe(false);
+  it("rejects content missing legalPages without creating backup or writing", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-err-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "no-legal-pages.json");
+    try {
+      const invalidData = {
+        schemaVersion: 11,
+        revision: "0123456789abcdef0123456789abcdef",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      };
+      fs.writeFileSync(targetFile, JSON.stringify(invalidData, null, 2), "utf-8");
 
-    // Run applyLegalDrafts with apply: true
-    const applyRes = applyLegalDrafts({
-      targetFilePath: activeContentPath,
-      apply: true,
-    });
-    // Second application must be a no-op
-    expect(applyRes.alreadyUpToDate).toBe(true);
-    expect(applyRes.applied).toBe(false);
-    expect(applyRes.backupFilePath).toBeNull();
+      expect(() => {
+        applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      }).toThrow(/legalPages must be an object/);
+
+      const filesInDir = fs.readdirSync(tempDir);
+      expect(filesInDir.filter((f) => f.endsWith(".bak"))).toHaveLength(0);
+      expect(JSON.parse(fs.readFileSync(targetFile, "utf-8"))).toEqual(invalidData);
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
   });
 
-  it("proves applyLegalDrafts creates backup, replaces only drafts, and preserves published/history on mock data", () => {
-    const tempDir = path.resolve(__dirname, `../data/temp-test-${crypto.randomBytes(4).toString("hex")}`);
+  it("rejects content where a legal page lacks history property without creating backup or writing", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-err-${crypto.randomBytes(4).toString("hex")}`);
     fs.mkdirSync(tempDir, { recursive: true });
-    const mockFile = path.join(tempDir, "mock-site-content.json");
-
+    const targetFile = path.join(tempDir, "no-history.json");
     try {
-      const existingHistoryItem = {
-        version: 1,
-        effectiveDate: "2025-01-01",
-        lastModified: "2025-01-01T00:00:00.000Z",
-        seoTitle: { fr: "Archived FR", en: "Archived EN" },
-        seoDescription: { fr: "Archived desc FR", en: "Archived desc EN" },
-        publicTitle: { fr: "Archived title FR", en: "Archived title EN" },
-        intro: { fr: "Archived intro FR", en: "Archived intro EN" },
-        sections: [],
-      };
-
-      const mockData = {
+      const invalidData = {
         ...defaultJson,
-        revision: "mock-initial-rev",
-        updatedAt: "2025-01-01T00:00:00.000Z",
-        business: {
-          ...defaultJson.business,
-          email: "custom-preserve@sempra.be",
-        },
         legalPages: {
           ...defaultJson.legalPages,
           mentions: {
-            draft: { ...defaultJson.legalPages.mentions.draft, publicTitle: { fr: "Old draft", en: "Old draft" } },
-            published: existingHistoryItem,
-            history: [existingHistoryItem],
+            draft: defaultJson.legalPages.mentions.draft,
+            published: null,
+          },
+        },
+      };
+      fs.writeFileSync(targetFile, JSON.stringify(invalidData, null, 2), "utf-8");
+
+      expect(() => {
+        applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      }).toThrow(/must contain a history property/);
+
+      const filesInDir = fs.readdirSync(tempDir);
+      expect(filesInDir.filter((f) => f.endsWith(".bak"))).toHaveLength(0);
+      expect(JSON.parse(fs.readFileSync(targetFile, "utf-8"))).toEqual(invalidData);
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("rejects content where history is not an array", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-err-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "invalid-history.json");
+    try {
+      const invalidData = {
+        ...defaultJson,
+        legalPages: {
+          ...defaultJson.legalPages,
+          privacy: {
+            draft: defaultJson.legalPages.privacy.draft,
+            published: null,
+            history: "invalid-not-an-array",
+          },
+        },
+      };
+      fs.writeFileSync(targetFile, JSON.stringify(invalidData, null, 2), "utf-8");
+
+      expect(() => {
+        applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      }).toThrow(/history must be an array/);
+
+      const filesInDir = fs.readdirSync(tempDir);
+      expect(filesInDir.filter((f) => f.endsWith(".bak"))).toHaveLength(0);
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("rejects content where published property is invalid", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-err-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "invalid-published.json");
+    try {
+      const invalidData = {
+        ...defaultJson,
+        legalPages: {
+          ...defaultJson.legalPages,
+          cgv: {
+            draft: defaultJson.legalPages.cgv.draft,
+            published: {
+              invalidDoc: true,
+              version: "not-a-number",
+            },
+            history: [],
+          },
+        },
+      };
+      fs.writeFileSync(targetFile, JSON.stringify(invalidData, null, 2), "utf-8");
+
+      expect(() => {
+        applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      }).toThrow(/Invalid legalPages\.cgv\.published/);
+
+      const filesInDir = fs.readdirSync(tempDir);
+      expect(filesInDir.filter((f) => f.endsWith(".bak"))).toHaveLength(0);
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("rejects missing or invalid source drafts", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-err-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "target.json");
+    try {
+      fs.writeFileSync(targetFile, JSON.stringify(defaultJson, null, 2), "utf-8");
+
+      const incompleteDrafts: Record<string, unknown> = {
+        mentions: {
+          ...defaultJson.legalPages.mentions.draft,
+          sections: [],
+        },
+        privacy: defaultJson.legalPages.privacy.draft,
+        cgv: defaultJson.legalPages.cgv.draft,
+        cookies: defaultJson.legalPages.cookies.draft,
+      };
+
+      expect(() => {
+        applyLegalDrafts({
+          targetFilePath: targetFile,
+          drafts: incompleteDrafts,
+          apply: true,
+        });
+      }).toThrow(/sections must not be empty/);
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("strictly preserves published property by exact structural identity without normalization", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-test-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "preserve-published.json");
+
+    try {
+      const customPublished: MinimalHistoryItem = {
+        version: 4,
+        effectiveDate: "2026-06-01",
+        lastModified: "2026-06-01T12:00:00.000Z",
+        seoTitle: { fr: "Titre Publie FR", en: "Published Title EN" },
+        seoDescription: { fr: "Desc FR", en: "Desc EN" },
+        publicTitle: { fr: "Publie FR", en: "Published EN" },
+        intro: { fr: "Intro FR", en: "Intro EN" },
+        sections: [
+          {
+            id: "custom-section",
+            title: { fr: "Titre Sec", en: "Sec Title" },
+            paragraphs: [{ fr: "Contenu", en: "Content" }],
+          },
+        ],
+      };
+
+      const initialData = {
+        ...defaultJson,
+        legalPages: {
+          ...defaultJson.legalPages,
+          cgv: {
+            draft: {
+              ...defaultJson.legalPages.cgv.draft,
+              publicTitle: { fr: "Ancien Brouillon", en: "Old Draft" },
+            },
+            published: customPublished,
+            history: [],
           },
         },
       };
 
-      fs.writeFileSync(mockFile, JSON.stringify(mockData, null, 2), "utf-8");
+      fs.writeFileSync(targetFile, JSON.stringify(initialData, null, 2), "utf-8");
 
-      // Test Dry Run
-      const dryRes = applyLegalDrafts({
-        targetFilePath: mockFile,
-        apply: false,
+      const applyRes = applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      expect(applyRes.applied).toBe(true);
+
+      const afterData = JSON.parse(fs.readFileSync(targetFile, "utf-8"));
+      expect(afterData.legalPages.cgv.published).toEqual(customPublished);
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("strictly preserves history property by exact structural identity without normalization", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-test-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "preserve-history.json");
+
+    try {
+      const historyItem1: MinimalHistoryItem = {
+        version: 1,
+        effectiveDate: "2025-01-01",
+        lastModified: "2025-01-01T00:00:00.000Z",
+        seoTitle: { fr: "V1 FR", en: "V1 EN" },
+        seoDescription: { fr: "Desc 1", en: "Desc 1" },
+        publicTitle: { fr: "Titre V1", en: "Title V1" },
+        intro: { fr: "Intro 1", en: "Intro 1" },
+        sections: [],
+      };
+      const historyItem2: MinimalHistoryItem = {
+        version: 2,
+        effectiveDate: "2025-06-01",
+        lastModified: "2025-06-01T00:00:00.000Z",
+        seoTitle: { fr: "V2 FR", en: "V2 EN" },
+        seoDescription: { fr: "Desc 2", en: "Desc 2" },
+        publicTitle: { fr: "Titre V2", en: "Title V2" },
+        intro: { fr: "Intro 2", en: "Intro 2" },
+        sections: [],
+      };
+      const customHistory = [historyItem1, historyItem2];
+
+      const initialData = {
+        ...defaultJson,
+        legalPages: {
+          ...defaultJson.legalPages,
+          privacy: {
+            draft: {
+              ...defaultJson.legalPages.privacy.draft,
+              publicTitle: { fr: "Ancien Brouillon", en: "Old Draft" },
+            },
+            published: null,
+            history: customHistory,
+          },
+        },
+      };
+
+      fs.writeFileSync(targetFile, JSON.stringify(initialData, null, 2), "utf-8");
+
+      const applyRes = applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      expect(applyRes.applied).toBe(true);
+
+      const afterData = JSON.parse(fs.readFileSync(targetFile, "utf-8"));
+      expect(afterData.legalPages.privacy.history).toEqual(customHistory);
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("strictly preserves business and all non-legal sections untouched", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-test-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "preserve-non-legal.json");
+
+    try {
+      const customBusiness = {
+        ...defaultJson.business,
+        email: "unique-admin@sempra.be",
+        depositPercent: 45,
+      };
+      const customPricing = { ...defaultJson.pricing };
+      const customHome = { ...defaultJson.home };
+      const customAboutPage = { ...defaultJson.aboutPage };
+      const customContactPage = { ...defaultJson.contactPage };
+      const customPricingPage = { ...defaultJson.pricingPage };
+      const customLegalUI = { ...defaultJson.legalUI };
+
+      const initialData = {
+        ...defaultJson,
+        business: customBusiness,
+        pricing: customPricing,
+        home: customHome,
+        aboutPage: customAboutPage,
+        contactPage: customContactPage,
+        pricingPage: customPricingPage,
+        legalUI: customLegalUI,
+        legalPages: {
+          ...defaultJson.legalPages,
+          mentions: {
+            ...defaultJson.legalPages.mentions,
+            draft: {
+              ...defaultJson.legalPages.mentions.draft,
+              publicTitle: { fr: "Draft distinct", en: "Distinct draft" },
+            },
+          },
+        },
+      };
+
+      fs.writeFileSync(targetFile, JSON.stringify(initialData, null, 2), "utf-8");
+
+      const applyRes = applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      expect(applyRes.applied).toBe(true);
+
+      const afterData = JSON.parse(fs.readFileSync(targetFile, "utf-8"));
+      expect(afterData.business).toEqual(customBusiness);
+      expect(afterData.pricing).toEqual(customPricing);
+      expect(afterData.home).toEqual(customHome);
+      expect(afterData.aboutPage).toEqual(customAboutPage);
+      expect(afterData.contactPage).toEqual(customContactPage);
+      expect(afterData.pricingPage).toEqual(customPricingPage);
+      expect(afterData.legalUI).toEqual(customLegalUI);
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("leaves target file intact and cleans up temporary file if write fails", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-fail-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "write-failure.json");
+
+    try {
+      const initialData = {
+        ...defaultJson,
+        legalPages: {
+          ...defaultJson.legalPages,
+          mentions: {
+            ...defaultJson.legalPages.mentions,
+            draft: {
+              ...defaultJson.legalPages.mentions.draft,
+              publicTitle: { fr: "Draft avant echec", en: "Draft before failure" },
+            },
+          },
+        },
+      };
+      fs.writeFileSync(targetFile, JSON.stringify(initialData, null, 2), "utf-8");
+
+      const renameSpy = vi.spyOn(fs, "renameSync").mockImplementationOnce(() => {
+        throw new Error("Simulated I/O disk failure during atomic rename");
       });
+
+      expect(() => {
+        applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      }).toThrow(/Simulated I\/O disk failure/);
+
+      renameSpy.mockRestore();
+
+      // Original target file must remain strictly identical
+      const targetAfter = JSON.parse(fs.readFileSync(targetFile, "utf-8"));
+      expect(targetAfter).toEqual(initialData);
+
+      // No leftover temporary files
+      const leftoverFiles = fs.readdirSync(tempDir);
+      const tmpFiles = leftoverFiles.filter((f) => f.includes(".tmp."));
+      expect(tmpFiles).toHaveLength(0);
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("logs explicit warning instead of failing silently when best-effort cleanup fails", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-warn-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "test-rotate.json");
+
+    try {
+      fs.writeFileSync(targetFile, "initial", "utf-8");
+      // Create 6 dummy backup files
+      for (let i = 0; i < 6; i++) {
+        fs.writeFileSync(path.join(tempDir, `test-rotate.json.10000${i}-abcd.bak`), "bak", "utf-8");
+      }
+
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const unlinkSpy = vi.spyOn(fs, "unlinkSync").mockImplementationOnce(() => {
+        throw new Error("Simulated permission denied for backup removal");
+      });
+
+      rotateBackups(targetFile, 5);
+
+      expect(warnSpy).toHaveBeenCalled();
+      const warningMessage = warnSpy.mock.calls.flat().join(" ");
+      expect(warningMessage).toContain("Failed to rotate old backup file");
+
+      unlinkSpy.mockRestore();
+      warnSpy.mockRestore();
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("ensures repeated application is strictly idempotent without redundant writes or backups", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-idem-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "idempotent.json");
+
+    try {
+      const initialData = {
+        ...defaultJson,
+        legalPages: {
+          ...defaultJson.legalPages,
+          mentions: {
+            ...defaultJson.legalPages.mentions,
+            draft: {
+              ...defaultJson.legalPages.mentions.draft,
+              publicTitle: { fr: "Draft different", en: "Different draft" },
+            },
+          },
+        },
+      };
+      fs.writeFileSync(targetFile, JSON.stringify(initialData, null, 2), "utf-8");
+
+      // First run: applies changes
+      const firstRes = applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      expect(firstRes.applied).toBe(true);
+      expect(firstRes.backupFilePath).toBeDefined();
+
+      const filesAfterFirst = fs.readdirSync(tempDir);
+      const bakFilesCount = filesAfterFirst.filter((f) => f.endsWith(".bak")).length;
+      expect(bakFilesCount).toBe(1);
+
+      const contentAfterFirst = fs.readFileSync(targetFile, "utf-8");
+
+      // Second run: should be completely idempotent
+      const secondRes = applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      expect(secondRes.alreadyUpToDate).toBe(true);
+      expect(secondRes.applied).toBe(false);
+      expect(secondRes.backupFilePath).toBeNull();
+
+      // No new backup file created
+      const filesAfterSecond = fs.readdirSync(tempDir);
+      expect(filesAfterSecond.filter((f) => f.endsWith(".bak")).length).toBe(1);
+
+      // Content byte-for-byte identical
+      const contentAfterSecond = fs.readFileSync(targetFile, "utf-8");
+      expect(contentAfterSecond).toBe(contentAfterFirst);
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("ensures dry-run mode creates neither backup nor temporary files", () => {
+    const tempDir = path.resolve(__dirname, `../data/temp-dry-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "dry-run.json");
+
+    try {
+      const initialData = {
+        ...defaultJson,
+        legalPages: {
+          ...defaultJson.legalPages,
+          mentions: {
+            ...defaultJson.legalPages.mentions,
+            draft: {
+              ...defaultJson.legalPages.mentions.draft,
+              publicTitle: { fr: "Draft a mettre a jour", en: "Draft to update" },
+            },
+          },
+        },
+      };
+      fs.writeFileSync(targetFile, JSON.stringify(initialData, null, 2), "utf-8");
+
+      const dryRes = applyLegalDrafts({ targetFilePath: targetFile, apply: false });
       expect(dryRes.dryRun).toBe(true);
       expect(dryRes.applied).toBe(false);
       expect(dryRes.alreadyUpToDate).toBe(false);
+      expect(dryRes.backupFilePath).toBeNull();
 
-      // Verify file was NOT modified in dry-run
-      const afterDry = JSON.parse(fs.readFileSync(mockFile, "utf-8"));
-      expect(afterDry.revision).toBe("mock-initial-rev");
-
-      // Test Apply
-      const applyRes = applyLegalDrafts({
-        targetFilePath: mockFile,
-        apply: true,
-      });
-      expect(applyRes.applied).toBe(true);
-      expect(applyRes.backupFilePath).toBeDefined();
-      expect(fs.existsSync(applyRes.backupFilePath!)).toBe(true);
-
-      const afterApply = JSON.parse(fs.readFileSync(mockFile, "utf-8"));
-      // Revision and updatedAt updated
-      expect(afterApply.revision).not.toBe("mock-initial-rev");
-      expect(afterApply.updatedAt).not.toBe("2025-01-01T00:00:00.000Z");
-
-      // Business preserved
-      expect(afterApply.business.email).toBe("custom-preserve@sempra.be");
-
-      // Published and history preserved
-      expect(afterApply.legalPages.mentions.published).toEqual(existingHistoryItem);
-      expect(afterApply.legalPages.mentions.history).toEqual([existingHistoryItem]);
-
-      // Draft updated to blueprint
-      expect(afterApply.legalPages.mentions.draft.publicTitle.fr).toBe("Mentions légales");
-
-      // Second apply is idempotent
-      const secondApply = applyLegalDrafts({
-        targetFilePath: mockFile,
-        apply: true,
-      });
-      expect(secondApply.alreadyUpToDate).toBe(true);
-      expect(secondApply.applied).toBe(false);
+      const allFiles = fs.readdirSync(tempDir);
+      expect(allFiles).toEqual(["dry-run.json"]);
+      expect(JSON.parse(fs.readFileSync(targetFile, "utf-8"))).toEqual(initialData);
     } finally {
-      // Clean up temp dir
       if (fs.existsSync(tempDir)) {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
