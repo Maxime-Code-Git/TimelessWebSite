@@ -56,10 +56,38 @@ export function LegalPageView({ mode = "public", lang, alternateLangHref, docume
 
   const renderSectionContent = (section: LegalSection) => {
     if (section.id === "editor" || section.id === "identity" || section.id === "controller") {
-      return formatIdentity();
+      return (
+        <>
+          {formatIdentity()}
+          {section.paragraphs.map((p, i) => (
+            <p key={i} className={styles.preLine}>{p[lang]}</p>
+          ))}
+          {section.listItems && section.listItems.length > 0 && (
+            <ul>
+              {section.listItems.map((li, i) => (
+                <li key={i}>{li[lang]}</li>
+              ))}
+            </ul>
+          )}
+        </>
+      );
     }
     if (section.id === "hosting") {
-      return formatHosting();
+      return (
+        <>
+          {formatHosting()}
+          {section.paragraphs.map((p, i) => (
+            <p key={i} className={styles.preLine}>{p[lang]}</p>
+          ))}
+          {section.listItems && section.listItems.length > 0 && (
+            <ul>
+              {section.listItems.map((li, i) => (
+                <li key={i}>{li[lang]}</li>
+              ))}
+            </ul>
+          )}
+        </>
+      );
     }
     if (section.id === "cookies-inventory") {
       if (!document.inventory || document.inventory.length === 0) {
