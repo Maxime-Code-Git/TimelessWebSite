@@ -1,19 +1,33 @@
-import type { SiteContent } from "~/lib/site-content.server";
 import type { Route } from "./+types/fr.privacy";
 import { LegalPageView } from "~/components/legal/LegalPageView";
-import { useRouteLoaderData } from "react-router";
-import type { loader as rootLoader } from "../root";
 import { getSeoMeta } from "~/lib/seo";
+import { getPublishedLegalDocument, getLegalRouteHeaders } from "~/lib/legal.server";
+import NotFound from "./404";
 
-export function meta({ matches }: Route.MetaArgs) {
-  const rootData = matches.find((m) => m?.id === "root")?.loaderData as { PUBLIC_SITE_URL?: string, siteContent?: SiteContent } | undefined;
+export function headers(args: Route.HeadersArgs) {
+  return getLegalRouteHeaders(args);
+}
+
+export function loader() {
+  const document = getPublishedLegalDocument("privacy");
+  return { document };
+}
+
+export function meta({ loaderData, matches }: Route.MetaArgs) {
+  if (!loaderData?.document) {
+    return [
+      { title: "Page introuvable | Sempra Photo & Video" },
+      { name: "robots", content: "noindex, nofollow" },
+    ];
+  }
+
+  const rootData = matches.find((m) => m?.id === "root")?.loaderData as { PUBLIC_SITE_URL?: string } | undefined;
   const siteUrl = rootData?.PUBLIC_SITE_URL || "http://localhost:5173";
-  const content = rootData?.siteContent?.legalPages?.privacy;
-  const doc = content?.published || content?.draft;
+  const doc = loaderData.document;
 
   return getSeoMeta({
-    title: doc?.seoTitle?.fr || "",
-    description: doc?.seoDescription?.fr || "",
+    title: doc.seoTitle.fr || "",
+    description: doc.seoDescription.fr || "",
     path: "/fr/confidentialite",
     alternatePath: "/en/privacy",
     lang: "fr",
@@ -22,21 +36,17 @@ export function meta({ matches }: Route.MetaArgs) {
   });
 }
 
-export default function LegalRoute() {
-  const rootData = useRouteLoaderData<typeof rootLoader>("root");
-  const content = rootData?.siteContent?.legalPages?.privacy;
-
-  if (!content) return null;
-
-  const isDraft = !content.published;
-  const doc = content.published || content.draft;
-
+export default function LegalRoute({ loaderData }: Route.ComponentProps) {
   return (
     <LegalPageView
       lang="fr"
       alternateLangHref="/en/privacy"
-      document={doc}
-      isDraft={isDraft}
+      document={loaderData.document}
+      isDraft={false}
     />
   );
+}
+
+export function ErrorBoundary() {
+  return <NotFound />;
 }

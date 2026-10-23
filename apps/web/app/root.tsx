@@ -20,10 +20,11 @@ const PRELOAD_FONTS = [
 ];
 
 import { getSiteContent } from "./lib/site-content.server";
+import { sanitizeSiteContentForPublic } from "./lib/legal.server";
 
 export function loader() {
   const url = process.env.PUBLIC_SITE_URL || "http://localhost:5173";
-  const siteContent = getSiteContent();
+  const siteContent = sanitizeSiteContentForPublic(getSiteContent());
   // Remove trailing slash if any
   return data({
     PUBLIC_SITE_URL: url.replace(/\/$/, ""),
