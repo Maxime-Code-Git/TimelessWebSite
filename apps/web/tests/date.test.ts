@@ -43,9 +43,33 @@ describe("formatEuropeanDate", () => {
     expect(formatEuropeanDate("2023-12-25", "en")).toBe("25/12/2023");
   });
 
-  it("handles empty or invalid strings gracefully", () => {
+  it("formats numeric timestamps (SQLite created_at / expires_at) deterministically in UTC", () => {
+    // 2023-12-25T00:00:00.000Z
+    const timestamp = 1703462400000;
+    expect(formatEuropeanDate(timestamp, "fr")).toBe("25/12/2023");
+    expect(formatEuropeanDate(timestamp, "en")).toBe("25/12/2023");
+  });
+
+  it("formats Date instances deterministically in UTC", () => {
+    const date = new Date("2024-06-15T18:30:00.000Z");
+    expect(formatEuropeanDate(date, "fr")).toBe("15/06/2024");
+    expect(formatEuropeanDate(date, "en")).toBe("15/06/2024");
+  });
+
+  it("formats ISO strings with time component deterministically", () => {
+    expect(formatEuropeanDate("2025-08-20T23:45:00.000Z", "fr")).toBe("20/08/2025");
+  });
+
+  it("handles null, undefined, empty and invalid values gracefully", () => {
     expect(formatEuropeanDate("", "fr")).toBe("");
+    expect(formatEuropeanDate(null, "fr")).toBe("");
+    expect(formatEuropeanDate(undefined, "fr")).toBe("");
     expect(formatEuropeanDate("invalid", "en")).toBe("invalid");
+  });
+
+  it("defaults language parameter to fr", () => {
+    expect(formatEuropeanDate("2023-12-25")).toBe("25/12/2023");
+    expect(formatEuropeanDate(1703462400000)).toBe("25/12/2023");
   });
 });
 

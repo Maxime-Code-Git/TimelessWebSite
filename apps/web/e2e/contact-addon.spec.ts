@@ -121,18 +121,25 @@ test.describe('Couple Session Addon Flow', () => {
       // 9. ouverture du contact avec ?formula=photo-essential
       await page.goto('/fr/contact?formula=photo-essential');
 
-      // 10. affichage et sélection de la case
-      const addonCheckbox = page.locator('input[name="addons"][value="couple-session"]');
+      // Attente d'un état applicatif déterministe prouvant que React a terminé l'hydratation
+      await expect(page.locator('body')).toHaveAttribute('data-hydrated', 'true');
+
+      // 10. affichage et sélection de la case avec locator stable
+      const addonCheckbox = page.getByTestId('addon-checkbox-couple-session');
       await expect(addonCheckbox).toBeVisible();
       await addonCheckbox.check();
+      await expect(addonCheckbox).toBeChecked();
 
       // 11. changement vers Film et vérification que la case disparaît
       await page.selectOption('select[name="formula"]', 'film-essential');
       await expect(addonCheckbox).not.toBeVisible();
 
-      // 12. retour vers Photo Essentiel et sélection de l'option
+      // 12. retour vers Photo Essentiel, vérification qu'elle réapparaît décochée, puis re-sélection
       await page.selectOption('select[name="formula"]', 'photo-essential');
+      await expect(addonCheckbox).toBeVisible();
+      await expect(addonCheckbox).not.toBeChecked();
       await addonCheckbox.check();
+      await expect(addonCheckbox).toBeChecked();
 
       // Relever la liste des fichiers .eml présents avant l’envoi du formulaire
       const initialFiles = new Set(fs.readdirSync(inboxPath).filter(f => f.endsWith('.eml')));

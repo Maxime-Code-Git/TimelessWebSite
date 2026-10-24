@@ -48,7 +48,7 @@ export default function AdminGalleries() {
               <strong>Statut :</strong> {g.status === 'published' ? "Publié" : g.status === 'archived' ? "Archivé" : "Brouillon"}
             </p>
             <p>
-              <strong>Expiration :</strong> {new Date(g.expires_at).toLocaleDateString()}
+              <strong>Expiration :</strong> {formatEuropeanDate(g.expires_at, "fr")}
               {g.expires_at < now && <span className={styles.errorText}> (Expirée)</span>}
             </p>
             <Link to={`/admin/galleries/${g.id}`} className={styles.button}>Gérer</Link>

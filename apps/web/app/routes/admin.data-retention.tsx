@@ -25,6 +25,7 @@ import {
   retryFailedJob
 } from "../lib/gallery-deletion-worker.server";
 import styles from "./admin.data-retention.module.css";
+import { formatEuropeanDate } from "../lib/date";
 import { useState, useRef, useEffect, useCallback } from "react";
 
 // ── Types ────────────────────────────────────────────────────
@@ -767,7 +768,7 @@ export default function DataRetentionPage() {
                       aria-label={`Sélectionner la galerie de ${gallery.bride_names}`}
                     />
                   </td>
-                  <td>{new Date(gallery.created_at).toLocaleDateString()}</td>
+                  <td>{formatEuropeanDate(gallery.created_at, "fr")}</td>
                   <td>
                     <span className={`${styles.statusBadge} ${styles["status-" + gallery.status] || ""}`}>
                       {gallery.status}
@@ -777,7 +778,7 @@ export default function DataRetentionPage() {
                   <td>{gallery.photo_count}</td>
                   <td>{gallery.video_count}</td>
                   <td>{formatSize(gallery.total_size)}</td>
-                  <td>{new Date(gallery.expires_at).toLocaleDateString()}</td>
+                  <td>{formatEuropeanDate(gallery.expires_at, "fr")}</td>
                   <td>
                     <div className={styles.actions}>
                       <button

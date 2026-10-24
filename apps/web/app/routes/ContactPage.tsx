@@ -203,8 +203,15 @@ export function ContactPage({ lang }: ContactPageProps) {
                               </span>
                             </div>
                           ) : (
-                            <label key={addOn.id} className={styles.addOnCheckboxLabel}>
-                              <input type="checkbox" name="addons" value={addOn.id} className={styles.addOnCheckbox} />
+                            <label key={addOn.id} htmlFor={`addon-${addOn.id}`} className={styles.addOnCheckboxLabel}>
+                              <input
+                                type="checkbox"
+                                id={`addon-${addOn.id}`}
+                                name="addons"
+                                value={addOn.id}
+                                data-testid={`addon-checkbox-${addOn.id}`}
+                                className={styles.addOnCheckbox}
+                              />
                               <span className={styles.addOnCheckboxText}>
                                 {addOn.optionalLabel[lang]}
                               </span>

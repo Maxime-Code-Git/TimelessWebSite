@@ -1,4 +1,5 @@
 import type { Route } from "./+types/root";
+import { useEffect } from "react";
 import { ScrollTop } from "./components/ui/ScrollTop";
 import { data } from "react-router";
 import stylesheet from "./app.css?url";
@@ -96,6 +97,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  useEffect(() => {
+    document.body.dataset.hydrated = "true";
+  }, []);
+
   return <Outlet />;
 }
 
