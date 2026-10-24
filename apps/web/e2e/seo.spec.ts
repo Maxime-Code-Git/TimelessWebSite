@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const ROUTES = [
+const ORDINARY_ROUTES = [
   { path: '/fr/', alt: '/en/', noindex: false },
   { path: '/en/', alt: '/fr/', noindex: false },
   { path: '/fr/portfolio', alt: '/en/portfolio', noindex: false },
@@ -13,16 +13,21 @@ const ROUTES = [
   { path: '/en/contact', alt: '/fr/contact', noindex: false },
   { path: '/fr/espace-clients', alt: '/en/client-area', noindex: true },
   { path: '/en/client-area', alt: '/fr/espace-clients', noindex: true },
-  { path: '/fr/mentions-legales', alt: '/en/legal', noindex: true },
-  { path: '/en/legal', alt: '/fr/mentions-legales', noindex: true },
-  { path: '/fr/confidentialite', alt: '/en/privacy', noindex: true },
-  { path: '/en/privacy', alt: '/fr/confidentialite', noindex: true },
-  { path: '/fr/cgv', alt: '/en/terms', noindex: true },
-  { path: '/en/terms', alt: '/fr/cgv', noindex: true },
 ];
 
-test.describe('SEO & Meta Tags for all routes', () => {
-  for (const route of ROUTES) {
+const UNPUBLISHED_LEGAL_ROUTES = [
+  { path: '/fr/mentions-legales', lang: 'fr', expectedTitle: 'Page introuvable' },
+  { path: '/en/legal', lang: 'en', expectedTitle: 'Page not found' },
+  { path: '/fr/confidentialite', lang: 'fr', expectedTitle: 'Page introuvable' },
+  { path: '/en/privacy', lang: 'en', expectedTitle: 'Page not found' },
+  { path: '/fr/cgv', lang: 'fr', expectedTitle: 'Page introuvable' },
+  { path: '/en/terms', lang: 'en', expectedTitle: 'Page not found' },
+  { path: '/fr/cookies', lang: 'fr', expectedTitle: 'Page introuvable' },
+  { path: '/en/cookies', lang: 'en', expectedTitle: 'Page not found' },
+];
+
+test.describe('SEO & Meta Tags for ordinary public routes', () => {
+  for (const route of ORDINARY_ROUTES) {
     test(`route ${route.path} should have correct canonical, alternate and robots`, async ({ page }) => {
       const response = await page.goto(route.path);
       expect(response?.status()).not.toBe(404);
@@ -71,4 +76,51 @@ test.describe('SEO & Meta Tags for all routes', () => {
     expect(xml).not.toContain('galerie');
     expect(xml).not.toContain('gallery');
   });
+});
+
+test.describe('Unpublished Legal Routes 404 Contract', () => {
+  for (const route of UNPUBLISHED_LEGAL_ROUTES) {
+    test(`route ${route.path} returns secure 404 with noindex when published is null`, async ({ page }) => {
+      const response = await page.goto(route.path);
+      expect(response).not.toBeNull();
+
+      // 1. statut HTTP 404
+      expect(response!.status()).toBe(404);
+
+      // 2. header X-Robots-Tag contenant noindex, nofollow
+      const headers = response!.headers();
+      const xRobotsTag = headers['x-robots-tag'] || '';
+      expect(xRobotsTag.toLowerCase()).toContain('noindex');
+      expect(xRobotsTag.toLowerCase()).toContain('nofollow');
+
+      // 3. header Cache-Control contenant no-store
+      const cacheControl = headers['cache-control'] || '';
+      expect(cacheControl.toLowerCase()).toContain('no-store');
+
+      // 4. meta robots égale à noindex, nofollow
+      const robotsMeta = await page.locator('meta[name="robots"]').getAttribute('content');
+      expect(robotsMeta).toBe('noindex, nofollow');
+
+      // 5. titre générique “Page introuvable” ou “Page not found” selon la langue
+      const title = await page.title();
+      expect(title).toContain(route.expectedTitle);
+
+      // 6. absence de contenu provenant du brouillon
+      const bodyText = await page.locator('body').innerText();
+      const pageHtml = await page.content();
+      expect(bodyText).not.toContain('Code de droit économique');
+      expect(bodyText).not.toContain('RGPD');
+      expect(bodyText).not.toContain('Droit de rétractation');
+      expect(bodyText).not.toContain('Brouillon');
+      expect(pageHtml).not.toContain('Code de droit économique');
+
+      // 7. absence d’attente de canonical ou hreflang propre au document non publié
+      const canonicalMatch = await page.locator(`link[rel="canonical"][href*="${route.path}"]`).count();
+      expect(canonicalMatch).toBe(0);
+      const hreflangMatch = await page.locator(`link[rel="alternate"][href*="${route.path}"]`).count();
+      expect(hreflangMatch).toBe(0);
+      const totalCanonical = await page.locator('link[rel="canonical"]').count();
+      expect(totalCanonical).toBe(0);
+    });
+  }
 });

@@ -11,7 +11,7 @@ const defaultContentPath = path.resolve(__dirname, '../app/content/default-site-
 export function writeSiteContent(content: string) {
   const targetPath = process.env.SITE_CONTENT_PATH;
   if (!targetPath) {
-    return;
+    throw new Error('SITE_CONTENT_PATH environment variable is not defined');
   }
 
   const tmpDir = os.tmpdir();

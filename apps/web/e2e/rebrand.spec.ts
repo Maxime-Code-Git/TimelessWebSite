@@ -1,6 +1,17 @@
 import { test, expect } from '@playwright/test';
+import { restoreDefaultSiteContent } from './test-helpers';
+
+declare global {
+  interface Window {
+    __scrollBehavior?: ScrollBehavior;
+  }
+}
 
 test.describe('Rebranding and ScrollTop', () => {
+  test.beforeEach(async () => {
+    restoreDefaultSiteContent();
+  });
+
   test('serves new SVGs and PNGs successfully', async ({ request }) => {
     const navy = await request.get('/brand/sempra_horizontal_navy.svg');
     expect(navy.ok()).toBeTruthy();
@@ -54,7 +65,12 @@ test.describe('Rebranding and ScrollTop', () => {
   });
 
   test('ScrollTop behavior on desktop', async ({ page }) => {
-    await page.goto('/fr/cgv'); // A long page
+    const response = await page.goto('/fr/');
+    expect(response).not.toBeNull();
+    expect(response!.status()).toBe(200);
+
+    const isScrollable = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
+    expect(isScrollable).toBe(true);
 
     // Ensure only one scroll top button exists
     const scrollBtns = page.locator('button[aria-label="Retour en haut de page"]');
@@ -66,9 +82,12 @@ test.describe('Rebranding and ScrollTop', () => {
     await expect(btn).toHaveCSS('visibility', 'hidden');
     await expect(btn).toHaveCSS('pointer-events', 'none');
 
-    // Scroll down
-    await page.setViewportSize({ width: 500, height: 300 });
-    await page.mouse.wheel(0, 5000);
+    // Scroll down deterministically
+    await page.evaluate(() => {
+      window.scrollTo(0, Math.max(1000, window.innerHeight + 200));
+    });
+    await page.waitForFunction(() => window.scrollY > window.innerHeight * 0.8);
+
     // Button should appear
     await expect(btn).toHaveAttribute('aria-hidden', 'false');
     await expect(btn).toHaveCSS('visibility', 'visible');
@@ -88,78 +107,92 @@ test.describe('Rebranding and ScrollTop', () => {
   });
 
   test('ScrollTop English label', async ({ page }) => {
-    await page.goto('/en/terms');
+    const response = await page.goto('/en/');
+    expect(response).not.toBeNull();
+    expect(response!.status()).toBe(200);
     const btn = page.locator('button[aria-label="Back to top"]');
     await expect(btn).toHaveCount(1);
   });
+
   test('ScrollTop respects reduced motion', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/fr/cgv');
+    const response = await page.goto('/fr/');
+    expect(response).not.toBeNull();
+    expect(response!.status()).toBe(200);
+
+    const isScrollable = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
+    expect(isScrollable).toBe(true);
+
     const scrollBtns = page.locator('button[aria-label="Retour en haut de page"]');
     await expect(scrollBtns).toHaveCount(1);
-
-    await page.setViewportSize({ width: 500, height: 300 });
-    await page.mouse.wheel(0, 5000);
     const btn = scrollBtns.first();
-    await expect(btn).toHaveAttribute('aria-hidden', 'false');
 
-    // Setup the mock before clicking
+    // Descends d'abord la page de maniere deterministe
     await page.evaluate(() => {
-      interface TestWindow extends Window {
-        __scrollBehavior?: ScrollBehavior;
-      }
-      const testWindow = window as unknown as TestWindow;
-      testWindow.__scrollBehavior = 'smooth';
-      window.scrollTo = function(optionsOrX?: ScrollToOptions | number, _y?: number) {
+      window.scrollTo(0, Math.max(1000, window.innerHeight + 200));
+    });
+    await page.waitForFunction(() => window.scrollY > window.innerHeight * 0.8);
+
+    // Verifie que le bouton est reellement actif
+    await expect(btn).toHaveAttribute('aria-hidden', 'false');
+    await expect(btn).toHaveCSS('visibility', 'visible');
+    await expect(btn).toHaveCSS('pointer-events', 'auto');
+    await expect(btn).toHaveCSS('opacity', '1');
+
+    // Installe ensuite le mock de window.scrollTo utilise pour controler le comportement du clic
+    await page.evaluate(() => {
+      window.__scrollBehavior = undefined;
+      window.scrollTo = (optionsOrX?: ScrollToOptions | number) => {
         if (typeof optionsOrX === 'object' && optionsOrX !== null && optionsOrX.behavior) {
-          testWindow.__scrollBehavior = optionsOrX.behavior;
+          window.__scrollBehavior = optionsOrX.behavior;
         }
       };
     });
 
     await btn.click();
 
-    const behavior = await page.evaluate(() => {
-      interface TestWindow extends Window {
-        __scrollBehavior?: ScrollBehavior;
-      }
-      return (window as unknown as TestWindow).__scrollBehavior;
-    });
+    const behavior = await page.evaluate(() => window.__scrollBehavior);
     expect(behavior).toBe('auto');
   });
 
   test('ScrollTop smooth motion by default', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await page.goto('/fr/cgv');
+    const response = await page.goto('/fr/');
+    expect(response).not.toBeNull();
+    expect(response!.status()).toBe(200);
+
+    const isScrollable = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
+    expect(isScrollable).toBe(true);
+
     const scrollBtns = page.locator('button[aria-label="Retour en haut de page"]');
     await expect(scrollBtns).toHaveCount(1);
-
-    await page.setViewportSize({ width: 500, height: 300 });
-    await page.mouse.wheel(0, 5000);
     const btn = scrollBtns.first();
-    await expect(btn).toHaveAttribute('aria-hidden', 'false');
 
+    // Descends d'abord la page de maniere deterministe
     await page.evaluate(() => {
-      interface TestWindow extends Window {
-        __scrollBehavior?: ScrollBehavior;
-      }
-      const testWindow = window as unknown as TestWindow;
-      testWindow.__scrollBehavior = 'auto';
-      window.scrollTo = function(optionsOrX?: ScrollToOptions | number, _y?: number) {
+      window.scrollTo(0, Math.max(1000, window.innerHeight + 200));
+    });
+    await page.waitForFunction(() => window.scrollY > window.innerHeight * 0.8);
+
+    // Verifie que le bouton est reellement actif
+    await expect(btn).toHaveAttribute('aria-hidden', 'false');
+    await expect(btn).toHaveCSS('visibility', 'visible');
+    await expect(btn).toHaveCSS('pointer-events', 'auto');
+    await expect(btn).toHaveCSS('opacity', '1');
+
+    // Installe ensuite le mock de window.scrollTo utilise pour controler le comportement du clic
+    await page.evaluate(() => {
+      window.__scrollBehavior = undefined;
+      window.scrollTo = (optionsOrX?: ScrollToOptions | number) => {
         if (typeof optionsOrX === 'object' && optionsOrX !== null && optionsOrX.behavior) {
-          testWindow.__scrollBehavior = optionsOrX.behavior;
+          window.__scrollBehavior = optionsOrX.behavior;
         }
       };
     });
 
     await btn.click();
 
-    const behavior = await page.evaluate(() => {
-      interface TestWindow extends Window {
-        __scrollBehavior?: ScrollBehavior;
-      }
-      return (window as unknown as TestWindow).__scrollBehavior;
-    });
+    const behavior = await page.evaluate(() => window.__scrollBehavior);
     expect(behavior).toBe('smooth');
   });
 });

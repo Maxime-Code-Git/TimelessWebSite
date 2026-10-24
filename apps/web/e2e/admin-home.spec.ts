@@ -185,56 +185,61 @@ test.describe('Admin Home Management', () => {
   });
 
   test('migrates intermediate V2 content without data loss', async ({ page, request }) => {
-    // Inject intermediate V2 fixture
-    writeSiteContent(JSON.stringify(intermediateV2Fixture, null, 2));
+    restoreDefaultSiteContent();
+    try {
+      // Inject intermediate V2 fixture
+      writeSiteContent(JSON.stringify(intermediateV2Fixture, null, 2));
 
-    // Login and navigate
-    await page.goto('/admin');
-    await expect(page.locator('h1')).toContainText('Administration Sempra');
-    await page.click('text=Accueil');
-    await expect(page.locator('h1')).toContainText("Édition de l'Accueil");
+      // Login and navigate
+      await page.goto('/admin');
+      await expect(page.locator('h1')).toContainText('Administration Sempra');
+      await page.click('text=Accueil');
+      await expect(page.locator('h1')).toContainText("Édition de l'Accueil");
 
-    // The corruption alert should not be visible
-    await expect(page.locator('div[role="alert"]')).not.toBeVisible();
+      // The corruption alert should not be visible
+      await expect(page.locator('div[role="alert"]')).not.toBeVisible();
 
-    const imageBuffer = await sharp({
-      create: {
-        width: 800,
-        height: 1200,
-        channels: 3,
-        background: { r: 100, g: 150, b: 200 },
-      },
-    }).jpeg().toBuffer();
+      const imageBuffer = await sharp({
+        create: {
+          width: 800,
+          height: 1200,
+          channels: 3,
+          background: { r: 100, g: 150, b: 200 },
+        },
+      }).jpeg().toBuffer();
 
-    const fileInput = page.locator('input[type="file"]').first();
+      const fileInput = page.locator('input[type="file"]').first();
 
-    const uploadResponsePromise = page.waitForResponse(
-      response =>
-        response.url().includes("/api/admin/home-image") &&
-        response.request().method() === "POST"
-    );
+      const uploadResponsePromise = page.waitForResponse(
+        response =>
+          response.url().includes("/api/admin/home-image") &&
+          response.request().method() === "POST"
+      );
 
-    await fileInput.setInputFiles({
-      name: "migration-test.jpg",
-      mimeType: "image/jpeg",
-      buffer: imageBuffer,
-    });
+      await fileInput.setInputFiles({
+        name: "migration-test.jpg",
+        mimeType: "image/jpeg",
+        buffer: imageBuffer,
+      });
 
-    const uploadResponse = await uploadResponsePromise;
-    expect(uploadResponse.status()).toBe(200);
+      const uploadResponse = await uploadResponsePromise;
+      expect(uploadResponse.status()).toBe(200);
 
-    // Save changes
-    await page.click('button[type="submit"]');
-    await expect(page.locator('div[role="status"]')).toContainText("Les modifications ont été enregistrées avec succès.");
+      // Save changes
+      await page.click('button[type="submit"]');
+      await expect(page.locator('div[role="status"]')).toContainText("Les modifications ont été enregistrées avec succès.");
 
-    // Check public image
-    const imgPreview = page.getByTestId("home-image-preview-hero-0");
-    const publicUrl = await imgPreview.getAttribute('src');
-    expect(publicUrl).toBeTruthy();
+      // Check public image
+      const imgPreview = page.getByTestId("home-image-preview-hero-0");
+      const publicUrl = await imgPreview.getAttribute('src');
+      expect(publicUrl).toBeTruthy();
 
-    await expect.poll(async () => {
-      const res = await request.get(publicUrl!);
-      return res.status();
-    }).toBe(200);
+      await expect.poll(async () => {
+        const res = await request.get(publicUrl!);
+        return res.status();
+      }).toBe(200);
+    } finally {
+      restoreDefaultSiteContent();
+    }
   });
 });

@@ -141,8 +141,10 @@ test.describe('Admin Content Management (Phase 3B)', () => {
   });
 
   test('should display warning and disable submit when JSON is corrupted', async ({ page }) => {
-    // Corrupt the JSON file directly
-    writeSiteContent('{ corrupted json');
+    restoreDefaultSiteContent();
+    try {
+      // Corrupt the JSON file directly
+      writeSiteContent('{ corrupted json');
 
       // Go to admin pricing
       await page.goto('/admin/pricing');
@@ -157,7 +159,10 @@ test.describe('Admin Content Management (Phase 3B)', () => {
       // Check settings as well
       await page.goto('/admin/settings');
       await expect(page.locator('div[role="alert"]')).toContainText('Le stockage du contenu doit être vérifié avant toute modification.');
-    await expect(page.locator('form button[type="submit"]')).toBeDisabled();
+      await expect(page.locator('form button[type="submit"]')).toBeDisabled();
+    } finally {
+      restoreDefaultSiteContent();
+    }
   });
 
 });
