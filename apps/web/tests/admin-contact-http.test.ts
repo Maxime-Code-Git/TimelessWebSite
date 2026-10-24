@@ -39,13 +39,21 @@ describe("Admin Contact Route", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeless-admin-contact-"));
   const siteContentPath = path.join(tempDir, "site-content.json");
   const defaultContentPath = path.resolve(__dirname, "../app/content/default-site-content.json");
+  const portfolioMediaPath = path.join(tempDir, "portfolio-media");
+  const galleryMediaPath = path.join(tempDir, "gallery-media");
+  const galleryImportPath = path.join(tempDir, "gallery-imports");
   let validSessionCookie: string;
   let validCsrfToken: string;
 
   beforeAll(async () => {
     fs.copyFileSync(defaultContentPath, siteContentPath);
+    fs.mkdirSync(portfolioMediaPath, { recursive: true });
+    fs.mkdirSync(galleryMediaPath, { recursive: true });
+    fs.mkdirSync(galleryImportPath, { recursive: true });
 
     return new Promise((resolve, reject) => {
+      let stderrOutput = "";
+
       serverProcess = spawn(process.execPath, [serveBin, "./build/server/index.js"], {
         cwd: path.resolve(__dirname, ".."),
         env: {
@@ -53,17 +61,33 @@ describe("Admin Contact Route", () => {
           HOST: "127.0.0.1",
           PORT: String(PORT),
           NODE_ENV: "production",
+          TRUST_PROXY: "true",
           PUBLIC_SITE_URL: BASE_URL.replace("http:", "https:"),
-          // Admin config
-          ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$xDSx00u+uSs9AcMqypmthw$ubmjWhg1XWL+Yp496qb5LLlTx0FK4lwqy9pvKa5ills", // password 'test'
-          ADMIN_SESSION_SECRET: "12345678901234567890123456789012", // 32 chars
+          ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$xDSx00u+uSs9AcMqypmthw$ubmjWhg1XWL+Yp496qb5LLlTx0FK4lwqy9pvKa5ills",
+          ADMIN_SESSION_SECRET: "12345678901234567890123456789012",
+          CONTACT_RATE_LIMIT_SECRET: "test-contact-rate-limit-secret-12345",
+          RATE_LIMIT_DB_PATH: path.join(tempDir, "rate-limit.db"),
+          BOOKING_DB_PATH: path.join(tempDir, "booking.db"),
           SITE_CONTENT_PATH: siteContentPath,
+          PORTFOLIO_CONTENT_PATH: path.join(tempDir, "portfolio.json"),
+          PORTFOLIO_MEDIA_PATH: portfolioMediaPath,
+          GALLERY_DB_PATH: path.join(tempDir, "gallery.db"),
+          GALLERY_MEDIA_PATH: galleryMediaPath,
+          GALLERY_IMPORT_PATH: galleryImportPath,
+          GALLERY_SECRET: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          SMTP_HOST: "localhost",
+          SMTP_PORT: "2525",
+          SMTP_USER: "test",
+          SMTP_PASS: "test",
+          SMTP_FROM: "from@example.com",
+          SMTP_TO: "to@example.com",
+          CONTACT_RATE_LIMIT_MAX: "10",
         },
         stdio: ["ignore", "pipe", "pipe"]
       });
 
       const timeout = setTimeout(() => {
-        stopServer(serverProcess).finally(() => reject(new Error("Server startup timeout")));
+        stopServer(serverProcess).finally(() => reject(new Error(`Server startup timeout. Stderr: ${stderrOutput}`)));
       }, 15000);
 
       serverProcess.stdout?.on("data", (data) => {
@@ -72,7 +96,10 @@ describe("Admin Contact Route", () => {
           resolve(undefined);
         }
       });
-      serverProcess.stderr?.on("data", (data) => console.error("Server error:", data.toString()));
+      serverProcess.stderr?.on("data", (data) => {
+        stderrOutput += data.toString();
+        console.error("Server error:", data.toString());
+      });
       serverProcess.on("error", (err) => {
         clearTimeout(timeout);
         stopServer(serverProcess).finally(() => reject(err));
@@ -80,7 +107,7 @@ describe("Admin Contact Route", () => {
       serverProcess.on("exit", (code) => {
         clearTimeout(timeout);
         if (code !== 0 && code !== null) {
-          reject(new Error(`Server exited with code ${code}`));
+          reject(new Error(`Server exited with code ${code}. Stderr: ${stderrOutput}`));
         }
       });
     });

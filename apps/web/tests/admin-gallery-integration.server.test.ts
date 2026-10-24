@@ -48,11 +48,13 @@ describe("Admin Gallery Integration Lifecycle", () => {
   const siteContentPath = path.join(tempDir, "site-content.json");
   const defaultContentPath = path.resolve(__dirname, "../app/content/default-site-content.json");
   const mediaPath = path.join(tempDir, "media");
+  const portfolioMediaPath = path.join(tempDir, "portfolio-media");
   const importPath = path.join(tempDir, "imports", "mock-wedding");
 
   beforeAll(async () => {
     fs.copyFileSync(defaultContentPath, siteContentPath);
     fs.mkdirSync(mediaPath, { recursive: true });
+    fs.mkdirSync(portfolioMediaPath, { recursive: true });
 
     // Create a mock import folder structure
     fs.mkdirSync(path.join(importPath, "invites", "photos"), { recursive: true });
@@ -75,6 +77,24 @@ describe("Admin Gallery Integration Lifecycle", () => {
     fs.writeFileSync(path.join(importPath, "maries", "videos", "couple-vid.mp4"), validMp4_2);
 
     return new Promise((resolve, reject) => {
+      let started = false;
+      let stderrOutput = "";
+      let pollInterval: ReturnType<typeof setInterval> | null = null;
+      let timeout: ReturnType<typeof setTimeout> | null = null;
+
+      const cleanup = () => {
+        if (pollInterval) clearInterval(pollInterval);
+        if (timeout) clearTimeout(timeout);
+      };
+
+      const setReady = () => {
+        if (!started) {
+          started = true;
+          cleanup();
+          resolve(undefined);
+        }
+      };
+
       serverProcess = spawn(process.execPath, [serveBin, "./build/server/index.js"], {
         cwd: path.resolve(__dirname, ".."),
         env: {
@@ -82,6 +102,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
           HOST: "127.0.0.1",
           PORT: String(PORT),
           NODE_ENV: "production",
+          TRUST_PROXY: "true",
           PUBLIC_SITE_URL: BASE_URL.replace("http:", "https:"),
           CONTACT_RATE_LIMIT_SECRET: "test-secret",
           RATE_LIMIT_DB_PATH: dbPath,
@@ -89,27 +110,71 @@ describe("Admin Gallery Integration Lifecycle", () => {
           GALLERY_DB_PATH: galleryDbPath,
           GALLERY_MEDIA_PATH: mediaPath,
           GALLERY_IMPORT_PATH: path.join(tempDir, "imports"),
+          PORTFOLIO_CONTENT_PATH: path.join(tempDir, "portfolio.json"),
+          PORTFOLIO_MEDIA_PATH: portfolioMediaPath,
           SITE_CONTENT_PATH: siteContentPath,
           ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=19456,t=2,p=1$xDSx00u+uSs9AcMqypmthw$ubmjWhg1XWL+Yp496qb5LLlTx0FK4lwqy9pvKa5ills",
           ADMIN_SESSION_SECRET: "12345678901234567890123456789012",
           GALLERY_SESSION_SECRET: "01234567890123456789012345678901",
           GALLERY_JWT_SECRET: "01234567890123456789012345678901",
-          GALLERY_SECRET: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+          GALLERY_SECRET: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          SMTP_HOST: "localhost",
+          SMTP_PORT: "2525",
+          SMTP_USER: "test",
+          SMTP_PASS: "test",
+          SMTP_FROM: "from@example.com",
+          SMTP_TO: "to@example.com",
+          CONTACT_RATE_LIMIT_MAX: "10",
         },
       });
 
-      let started = false;
       serverProcess.stdout?.on("data", (d) => {
-                if (!started && d.toString().includes(String(PORT))) {
-          started = true;
-          resolve(undefined);
+        if (d.toString().includes(String(PORT))) {
+          setReady();
         }
       });
+
       serverProcess.stderr?.on("data", (d) => {
-        if (d.toString().includes("EADDRINUSE")) reject(new Error("PORT IN USE"));
+        const text = d.toString();
+        stderrOutput += text;
+        if (text.includes("EADDRINUSE")) {
+          cleanup();
+          stopServer(serverProcess).finally(() => reject(new Error("PORT IN USE")));
+        }
       });
-      setTimeout(() => {
-        if (!started) reject(new Error("Timeout waiting for server to start"));
+
+      serverProcess.on("error", (err) => {
+        cleanup();
+        stopServer(serverProcess).finally(() => reject(err));
+      });
+
+      serverProcess.on("exit", (code) => {
+        cleanup();
+        if (!started && code !== 0 && code !== null) {
+          reject(new Error(`Server exited unexpectedly with code ${code}. Stderr: ${stderrOutput}`));
+        }
+      });
+
+      // Deterministic availability polling
+      pollInterval = setInterval(async () => {
+        if (started) return;
+        try {
+          const res = await fetch(`${BASE_URL}/admin`, { redirect: "manual" });
+          if (res.status) {
+            setReady();
+          }
+        } catch {
+          // Server not ready yet
+        }
+      }, 50);
+
+      timeout = setTimeout(() => {
+        cleanup();
+        if (!started) {
+          stopServer(serverProcess).finally(() => {
+            reject(new Error(`Timeout waiting for server to start. Stderr: ${stderrOutput}`));
+          });
+        }
       }, 5000);
     });
   });

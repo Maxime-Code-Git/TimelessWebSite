@@ -5,6 +5,7 @@ import { getClientIp } from "./security.server";
 import { checkRateLimit, resetRateLimit } from "./rate-limit.server";
 import { getGalleryDb } from "./gallery-db.server";
 import { redirect } from "react-router";
+import { requireAdminSession } from "./auth.server";
 
 // Derive keys from GALLERY_SECRET
 const MASTER_SECRET = Buffer.from(ENV.GALLERY_SECRET, "hex");
@@ -170,9 +171,6 @@ export function getAuthorizedGalleryCoverId(
 }
 
 export async function requireGalleryAccess(request: Request, publicId: string, requiredMediaId?: string, isApi = false) {
-
-  const { requireAdminSession } = await import("./auth.server");
-
   const { isValid: isAdmin } = await requireAdminSession(request);
 
   if (isAdmin) {

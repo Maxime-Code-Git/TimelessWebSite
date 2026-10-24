@@ -1,5 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { addCalendarMonths, formatEuropeanDate } from "../app/lib/date";
+
+vi.mock("../app/lib/env.server", () => ({
+  ENV: {
+    PUBLIC_SITE_URL: "https://timeless.example.com",
+    TRUST_PROXY: false,
+  }
+}));
 
 describe("addCalendarMonths", () => {
   it("handles normal month addition", () => {
@@ -43,18 +50,6 @@ describe("formatEuropeanDate", () => {
 });
 
 describe("readStrictFormUrlEncoded", () => {
-  beforeEach(() => {
-    vi.mock("../app/lib/env.server", () => ({
-      ENV: {
-        PUBLIC_SITE_URL: "https://timeless.example.com",
-        TRUST_PROXY: false,
-      }
-    }));
-  });
-
-  afterEach(() => {
-    vi.resetModules();
-  });
 
   it("should accept valid urlencoded payload", async () => {
     const { readStrictFormUrlEncoded } = await import("../app/lib/security.server");

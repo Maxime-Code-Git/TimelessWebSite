@@ -110,13 +110,58 @@ describe("Legal Pages Drafts and Content Integrity", () => {
   });
 
   it("preserves business, pricing, and other non-legal sections intact", () => {
-    expect(activeJson.business).toBeDefined();
-    expect(activeJson.business.email).toBe("contact@sempra.be");
-    expect(activeJson.pricing).toBeDefined();
-    expect(activeJson.home).toBeDefined();
-    expect(activeJson.aboutPage).toBeDefined();
-    expect(activeJson.contactPage).toBeDefined();
-    expect(activeJson.pricingPage).toBeDefined();
+    // Capturer le document actif avant l'application des brouillons
+    const beforeContent = JSON.parse(JSON.stringify(activeJson));
+
+    const tempDir = path.resolve(__dirname, `../data/temp-preserve-${crypto.randomBytes(4).toString("hex")}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const targetFile = path.join(tempDir, "active-content-preserve.json");
+
+    try {
+      fs.writeFileSync(targetFile, JSON.stringify(beforeContent, null, 2), "utf-8");
+
+      const applyRes = applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      expect(applyRes.success).toBe(true);
+
+      const afterContent = JSON.parse(fs.readFileSync(targetFile, "utf-8"));
+
+      // Vérifier que business et toutes les sections non légales sont strictement identiques avant et après
+      expect(afterContent.business).toEqual(beforeContent.business);
+      expect(afterContent.pricing).toEqual(beforeContent.pricing);
+      expect(afterContent.home).toEqual(beforeContent.home);
+      expect(afterContent.aboutPage).toEqual(beforeContent.aboutPage);
+      expect(afterContent.contactPage).toEqual(beforeContent.contactPage);
+      expect(afterContent.pricingPage).toEqual(beforeContent.pricingPage);
+      expect(afterContent.legalUI).toEqual(beforeContent.legalUI);
+
+      // Ne contenir aucune adresse métier codée en dur : vérifier la cohérence dynamique de l'email
+      expect(typeof afterContent.business.email).toBe("string");
+      expect(afterContent.business.email.length).toBeGreaterThan(0);
+      expect(afterContent.business.email).toBe(beforeContent.business.email);
+
+      // Vérifier que seules les zones légales attendues changent (drafts mis à jour, published et history inchangés)
+      const pages = ["mentions", "privacy", "cgv", "cookies"] as const;
+      for (const pageKey of pages) {
+        expect(afterContent.legalPages[pageKey].published).toEqual(beforeContent.legalPages[pageKey].published);
+        expect(afterContent.legalPages[pageKey].history).toEqual(beforeContent.legalPages[pageKey].history);
+        expect(areDraftsEqual(afterContent.legalPages[pageKey].draft, defaultJson.legalPages[pageKey].draft)).toBe(true);
+      }
+
+      // Continuer à garantir l'idempotence et l'absence de publication automatique
+      for (const pageKey of pages) {
+        expect(afterContent.legalPages[pageKey].published).toBeNull();
+        expect(afterContent.legalPages[pageKey].draft.effectiveDate).toBeNull();
+      }
+
+      const secondRes = applyLegalDrafts({ targetFilePath: targetFile, apply: true });
+      expect(secondRes.success).toBe(true);
+      expect(secondRes.applied).toBe(false);
+      expect(secondRes.alreadyUpToDate).toBe(true);
+    } finally {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
   });
 
   it("rejects content missing legalPages without creating backup or writing", () => {

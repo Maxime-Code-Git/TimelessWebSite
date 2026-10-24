@@ -26,6 +26,7 @@ const mockContent = {
     team: {
       members: [
         {
+          id: "photographer",
           name: { fr: "Team Name FR", en: "Team Name EN" },
           role: { fr: "Role FR", en: "Role EN" },
           bio: { fr: "Bio FR", en: "Bio EN" },
@@ -36,6 +37,7 @@ const mockContent = {
           },
         },
         {
+          id: "videographer",
           name: { fr: "Team Name 2 FR", en: "Team Name 2 EN" },
           role: { fr: "Role 2 FR", en: "Role 2 EN" },
           bio: { fr: "Bio 2 FR", en: "Bio 2 EN" },
