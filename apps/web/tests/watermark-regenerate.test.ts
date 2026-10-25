@@ -461,6 +461,73 @@ describe("Portfolio Watermark Regeneration Engine & HTTP Route", () => {
       expect(data.portfolioRevision).not.toBe(INITIAL_REV);
     });
 
+    it("action regenerate_one renvoie success: true et done: false puis done: true avec outdatedPhotos: 0", async () => {
+      // Add a second photo to portfolio that is also outdated
+      const SECOND_PHOTO_ID = "4e5a408b-59d8-4f81-a75d-8547434a36b4";
+      const SECOND_FILE_ID = "11111111111111111111111111111111";
+      const photo2Dir = path.join(mediaPath, "global-v2", "photos", SECOND_PHOTO_ID);
+      fs.mkdirSync(path.join(photo2Dir, "originals"), { recursive: true, mode: 0o700 });
+      fs.mkdirSync(path.join(photo2Dir, "480p"), { recursive: true, mode: 0o700 });
+      const origJpeg = await sharp({
+        create: { width: 800, height: 600, channels: 3, background: { r: 100, g: 100, b: 100 } }
+      }).jpeg({ quality: 80 }).toBuffer();
+      fs.writeFileSync(path.join(photo2Dir, "originals", `${SECOND_FILE_ID}.jpeg`), origJpeg);
+      fs.writeFileSync(path.join(photo2Dir, "480p", `${SECOND_FILE_ID}-480p.webp`), origJpeg);
+
+      const currentPortfolio = JSON.parse(fs.readFileSync(contentPath, "utf-8"));
+      // Ensure photo 1 is outdated as well
+      currentPortfolio.photos[0].appliedWatermarkRevision = OLD_WM_REV;
+      currentPortfolio.photos.push({
+        id: SECOND_PHOTO_ID,
+        fileId: SECOND_FILE_ID,
+        originalFormat: "jpeg",
+        originalWidth: 800,
+        originalHeight: 600,
+        categoryId: "99999999-9999-4000-8000-999999999999",
+        alt: { fr: "P2", en: "P2" },
+        visible: true,
+        variants: [
+          {
+            name: "480p",
+            width: 480,
+            height: 360,
+            fileId: `${SECOND_FILE_ID}-480p`,
+            sizeBytes: origJpeg.length,
+          }
+        ],
+        appliedWatermarkRevision: OLD_WM_REV,
+        processedAt: new Date().toISOString(),
+        order: 1,
+      });
+      fs.writeFileSync(contentPath, JSON.stringify(currentPortfolio, null, 2), "utf-8");
+
+      // First step: processes 1 photo, done must be false, outdatedPhotos must be 1
+      const req1 = await createRequest({
+        intent: "regenerate_one",
+        csrfToken: "valid-csrf-token",
+        portfolioRevision: currentPortfolio.revision,
+      });
+      const res1 = await action({ request: req1 } as Parameters<typeof action>[0]) as Response;
+      expect(res1.status).toBe(200);
+      const data1 = await res1.json();
+      expect(data1.success).toBe(true);
+      expect(data1.done).toBe(false);
+      expect(data1.outdatedPhotos).toBe(1);
+
+      // Second step: processes the last photo, done must be true, outdatedPhotos must be 0
+      const req2 = await createRequest({
+        intent: "regenerate_one",
+        csrfToken: "valid-csrf-token",
+        portfolioRevision: data1.portfolioRevision,
+      });
+      const res2 = await action({ request: req2 } as Parameters<typeof action>[0]) as Response;
+      expect(res2.status).toBe(200);
+      const data2 = await res2.json();
+      expect(data2.success).toBe(true);
+      expect(data2.done).toBe(true);
+      expect(data2.outdatedPhotos).toBe(0);
+    });
+
     it("loader renvoie les compteurs de photos total, à jour et obsolètes", async () => {
       const cookie = await createAdminCookie();
       const req = new Request("https://example.com/admin/portfolio/watermark", {

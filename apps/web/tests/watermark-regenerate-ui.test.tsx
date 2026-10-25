@@ -161,6 +161,10 @@ describe("AdminPortfolioWatermark UI and State Machine", () => {
       });
     });
 
+    // Success message must NOT appear when done is false
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(document.getElementById("regeneration-success-message")).toBeNull();
+
     // 2nd submit called automatically
     expect(mockFetcher.submit).toHaveBeenCalledTimes(2);
     expect(mockFetcher.submit).toHaveBeenLastCalledWith(
@@ -217,6 +221,10 @@ describe("AdminPortfolioWatermark UI and State Machine", () => {
         screen.getByRole("button", { name: "Régénérer le filigrane des photos existantes" })
       );
     });
+
+    // Success message is absent while in running state prior to completion
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(document.getElementById("regeneration-success-message")).toBeNull();
 
     // Simulate single photo done === true
     act(() => {
