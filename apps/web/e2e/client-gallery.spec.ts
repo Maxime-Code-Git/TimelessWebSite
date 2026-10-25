@@ -238,14 +238,30 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
 
     // 8. Connexion invités (old guest context as well)
     await guestPage.goto("/fr/espace-clients");
+    await guestPage.waitForSelector('body[data-hydrated="true"]');
+    const guestLoginPromise = guestPage.waitForResponse(
+      res => res.url().includes("/fr/espace-clients") && res.request().method() === "POST"
+    );
     await guestPage.fill('input[name="code"]', guestCode);
     await guestPage.click('button[type="submit"]');
-    await guestPage.waitForURL(`/fr/galerie/${galleryPublicId}`);
+    const guestLoginResponse = await guestLoginPromise;
+    expect(guestLoginResponse.status()).toBeLessThan(400);
+    await guestPage.waitForURL(url => url.pathname.includes(`/fr/galerie/${galleryPublicId}`));
+    await expect(guestPage.locator('form[action*="/fr/espace-clients"]')).not.toBeAttached();
+    await expect(guestPage.getByTestId("gallery-view")).toBeVisible();
 
     await oldGuestPage.goto("/fr/espace-clients");
+    await oldGuestPage.waitForSelector('body[data-hydrated="true"]');
+    const oldGuestLoginPromise = oldGuestPage.waitForResponse(
+      res => res.url().includes("/fr/espace-clients") && res.request().method() === "POST"
+    );
     await oldGuestPage.fill('input[name="code"]', guestCode);
     await oldGuestPage.click('button[type="submit"]');
-    await oldGuestPage.waitForURL(`/fr/galerie/${galleryPublicId}`);
+    const oldGuestLoginResponse = await oldGuestLoginPromise;
+    expect(oldGuestLoginResponse.status()).toBeLessThan(400);
+    await oldGuestPage.waitForURL(url => url.pathname.includes(`/fr/galerie/${galleryPublicId}`));
+    await expect(oldGuestPage.locator('form[action*="/fr/espace-clients"]')).not.toBeAttached();
+    await expect(oldGuestPage.getByTestId("gallery-view")).toBeVisible();
 
     // 22-25. En-têtes de confidentialité (sur la page invité)
     const galleryRes = await guestContext.request.get(`/fr/galerie/${galleryPublicId}`);
@@ -256,6 +272,10 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
     expect(headers["referrer-policy"]).toContain("no-referrer");
 
     // Vérifier que la cover mariés est invisible pour l'invité (ni src, ni data-id)
+    const guestCoverImg = guestPage.locator('img[data-testid="gallery-cover"]');
+    await expect(guestCoverImg).toBeVisible();
+    await expect(guestCoverImg).not.toHaveAttribute("data-media-id", coupleMediaId as string);
+    await expect(guestPage.locator(`img[data-testid="gallery-cover"][src*="${coupleMediaId}"]`)).toHaveCount(0);
     const guestHtmlContent = await guestPage.content();
     expect(guestHtmlContent).not.toContain(coupleMediaId as string);
 
@@ -374,13 +394,25 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
 
     // 18. Connexion mariés
     await couplePage.goto("/fr/espace-clients");
+    await couplePage.waitForSelector('body[data-hydrated="true"]');
+
+    const coupleLoginPromise = couplePage.waitForResponse(
+      res => res.url().includes("/fr/espace-clients") && res.request().method() === "POST"
+    );
     await couplePage.fill('input[name="code"]', coupleCode);
     await couplePage.click('button[type="submit"]');
-    await couplePage.waitForURL(`/fr/galerie/${galleryPublicId}`);
+    const coupleLoginResponse = await coupleLoginPromise;
+    expect(coupleLoginResponse.status()).toBeLessThan(400);
+
+    await couplePage.waitForURL(url => url.pathname.includes(`/fr/galerie/${galleryPublicId}`));
+    await expect(couplePage.locator('form[action*="/fr/espace-clients"]')).not.toBeAttached();
+    await expect(couplePage.getByTestId("gallery-view")).toBeVisible();
 
     // Vérifier que la cover mariés est visible pour le marié
-    const coupleHtmlContent = await couplePage.content();
-    expect(coupleHtmlContent).toContain(coupleMediaId as string);
+    const coupleCoverImg = couplePage.locator('img[data-testid="gallery-cover"]');
+    await expect(coupleCoverImg).toBeVisible();
+    await expect(coupleCoverImg).toHaveAttribute("data-media-id", coupleMediaId as string);
+    await expect(coupleCoverImg).toHaveAttribute("src", new RegExp(coupleMediaId as string));
 
     // 19. Visibilité des médias invités et mariés
     // 25 guest photos + 1 couple photo + 1 guest video + 1 couple video = 28
@@ -445,8 +477,14 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
     const invalidGuestContext = await browser.newContext();
     const invalidGuestPage = await invalidGuestContext.newPage();
     await invalidGuestPage.goto("/fr/espace-clients");
+    await invalidGuestPage.waitForSelector('body[data-hydrated="true"]');
+    const invalidGuestPromise = invalidGuestPage.waitForResponse(
+      res => res.url().includes("/fr/espace-clients") && res.request().method() === "POST"
+    );
     await invalidGuestPage.fill('input[name="code"]', originalGuestCode);
     await invalidGuestPage.click('button[type="submit"]');
+    const invalidGuestResponse = await invalidGuestPromise;
+    expect(invalidGuestResponse.status()).toBe(401);
     await expect(invalidGuestPage.locator("text=invalide")).toBeVisible();
 
     // 28. Invalidation d'une session invitée déjà connectée avant la rotation
@@ -458,9 +496,17 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
     const newGuestContext = await browser.newContext();
     const newGuestPage = await newGuestContext.newPage();
     await newGuestPage.goto("/fr/espace-clients");
+    await newGuestPage.waitForSelector('body[data-hydrated="true"]');
+    const newGuestPromise = newGuestPage.waitForResponse(
+      res => res.url().includes("/fr/espace-clients") && res.request().method() === "POST"
+    );
     await newGuestPage.fill('input[name="code"]', newGuestCode);
     await newGuestPage.click('button[type="submit"]');
-    await newGuestPage.waitForURL(`/fr/galerie/${galleryPublicId}`);
+    const newGuestResponse = await newGuestPromise;
+    expect(newGuestResponse.status()).toBeLessThan(400);
+    await newGuestPage.waitForURL(url => url.pathname.includes(`/fr/galerie/${galleryPublicId}`));
+    await expect(newGuestPage.locator('form[action*="/fr/espace-clients"]')).not.toBeAttached();
+    await expect(newGuestPage.getByTestId("gallery-view")).toBeVisible();
 
     // 30. Expiration forcée avec DatabaseSync, suivie d'un refus d'accès
     const expireDb = new DatabaseSync(galleryDbPath);

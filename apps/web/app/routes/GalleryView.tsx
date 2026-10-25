@@ -153,14 +153,20 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
   const rows = packRows(photos);
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} data-testid="gallery-view">
       <Header lang={lang} alternateLangHref={alternateLangHref} />
 
       <section className={styles.hero}>
         <div className={styles.heroBg}>
           <picture>
             <source srcSet={gallery.cover_image_id ? `${mediaUrl(gallery.cover_image_id)}?width=1920&format=webp` : coverUrl} type="image/webp" />
-            <img src={gallery.cover_image_id ? `${mediaUrl(gallery.cover_image_id)}?width=1920&format=webp` : coverUrl} alt="Cover" className={styles.heroImage} />
+            <img
+              src={gallery.cover_image_id ? `${mediaUrl(gallery.cover_image_id)}?width=1920&format=webp` : coverUrl}
+              alt="Cover"
+              className={styles.heroImage}
+              data-testid="gallery-cover"
+              data-media-id={gallery.cover_image_id ?? undefined}
+            />
           </picture>
           <div className={styles.heroOverlay} />
         </div>
