@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const EXPECTED_SCHEMA_VERSION = 11;
+export const EXPECTED_SCHEMA_VERSION = 12;
 
 export function resolveDefaultContentPath() {
   const candidates = [

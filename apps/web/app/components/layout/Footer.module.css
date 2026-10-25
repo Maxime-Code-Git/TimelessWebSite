@@ -15,8 +15,17 @@
   display: block;
 }
 
-/* Social row: display:flex; gap:30px; margin-bottom:32px */
+/* Social row: display:flex; gap:30px; margin-bottom:24px */
 .socialRow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 30px;
+  margin-bottom: 24px;
+}
+
+.contactRow {
   display: flex;
   justify-content: center;
   align-items: center;

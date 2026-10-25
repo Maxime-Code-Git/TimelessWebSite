@@ -2,6 +2,18 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import defaultContent from "../content/default-site-content.json";
+import {
+  SOCIAL_PLATFORMS,
+  SOCIAL_PLATFORM_IDS,
+  isValidSocialUrl,
+} from "./social-networks";
+import type {
+  SocialNetworksState,
+  SocialPlatformId,
+  SocialNetworkEntry,
+} from "./social-networks";
+
+export type { SocialNetworksState, SocialPlatformId, SocialNetworkEntry };
 
 export interface FormulaIncludedItem {
   id: string;
@@ -63,6 +75,7 @@ export interface BusinessContent {
     fr: string | null;
     en: string | null;
   };
+  socialNetworks: SocialNetworksState;
 }
 
 export interface LocalizedString {
@@ -373,7 +386,7 @@ export interface LegalUI {
 
 export interface SiteContent {
   legalUI: LegalUI;
-  schemaVersion: 11;
+  schemaVersion: 12;
   revision: string;
   updatedAt: string;
   business: BusinessContent;
@@ -569,12 +582,63 @@ function validateDepositPercent(value: unknown): number | null {
   return value;
 }
 
+function validateSocialNetworks(data: unknown): SocialNetworksState {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    throw new ValidationError("socialNetworks must be an object");
+  }
+
+  assertExactKeys(data, SOCIAL_PLATFORM_IDS as unknown as string[], "socialNetworks");
+
+  const obj = data as Record<string, unknown>;
+  const result: Partial<SocialNetworksState> = {};
+
+  for (const config of SOCIAL_PLATFORMS) {
+    const entry = obj[config.id];
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      throw new ValidationError(`socialNetworks.${config.id} must be an object`);
+    }
+
+    assertExactKeys(entry, ["url", "enabled"], `socialNetworks.${config.id}`);
+
+    const entryObj = entry as Record<string, unknown>;
+    if (typeof entryObj.enabled !== "boolean") {
+      throw new ValidationError(`socialNetworks.${config.id}.enabled must be a boolean`);
+    }
+    if (typeof entryObj.url !== "string") {
+      throw new ValidationError(`socialNetworks.${config.id}.url must be a string`);
+    }
+
+    const trimmedUrl = entryObj.url.trim();
+
+    if (entryObj.enabled) {
+      if (!trimmedUrl) {
+        throw new ValidationError(`L'URL pour ${config.name} est requise lorsqu'elle est activée.`);
+      }
+      if (!isValidSocialUrl(config.id, trimmedUrl)) {
+        throw new ValidationError(`L'URL pour ${config.name} est invalide ou ne correspond pas au domaine de la plateforme.`);
+      }
+    } else {
+      if (trimmedUrl && !isValidSocialUrl(config.id, trimmedUrl)) {
+        throw new ValidationError(`L'URL pour ${config.name} est invalide ou ne correspond pas au domaine de la plateforme.`);
+      }
+    }
+
+    result[config.id] = {
+      url: trimmedUrl,
+      enabled: entryObj.enabled,
+    };
+  }
+
+  return result as SocialNetworksState;
+}
+
 function validateBusiness(data: unknown): BusinessContent {
   assertExactKeys(data, [
     "legalName", "tradeName", "vatNumber",
     "email", "phoneDisplay", "phoneE164", "address", "enterpriseNumber",
     "legalForm", "legalRepresentative", "hostingProvider", "hostingAddress",
-    "depositPercent", "instagramUrl", "linkedinUrl", "serviceArea"
+    "depositPercent", "instagramUrl", "linkedinUrl", "serviceArea",
+    "socialNetworks"
   ], "business");
 
   const obj = data as Record<string, unknown>;
@@ -587,6 +651,8 @@ function validateBusiness(data: unknown): BusinessContent {
   if (!frArea || !enArea) {
     throw new ValidationError("serviceArea fr and en are required");
   }
+
+  const socialNetworks = validateSocialNetworks(obj.socialNetworks);
 
   return {
     legalName: validateStringOrNull(obj.legalName, "legalName", 100),
@@ -602,12 +668,17 @@ function validateBusiness(data: unknown): BusinessContent {
     hostingProvider: validateStringOrNull(obj.hostingProvider, "hostingProvider", 100),
     hostingAddress: validateStringOrNull(obj.hostingAddress, "hostingAddress", 255),
     depositPercent: validateDepositPercent(obj.depositPercent),
-    instagramUrl: validateHttpsUrl(obj.instagramUrl, "instagramUrl"),
-    linkedinUrl: validateHttpsUrl(obj.linkedinUrl, "linkedinUrl"),
+    instagramUrl: socialNetworks.instagram.enabled && socialNetworks.instagram.url
+      ? socialNetworks.instagram.url
+      : validateHttpsUrl(obj.instagramUrl, "instagramUrl"),
+    linkedinUrl: socialNetworks.linkedin.enabled && socialNetworks.linkedin.url
+      ? socialNetworks.linkedin.url
+      : validateHttpsUrl(obj.linkedinUrl, "linkedinUrl"),
     serviceArea: {
       fr: frArea,
       en: enArea,
-    }
+    },
+    socialNetworks,
   };
 }
 
@@ -1464,7 +1535,7 @@ export function validateSiteContent(data: unknown): SiteContent {
   }
   const obj = data as Record<string, unknown>;
 
-  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5 && obj.schemaVersion !== 6 && obj.schemaVersion !== 7 && obj.schemaVersion !== 8 && obj.schemaVersion !== 9 && obj.schemaVersion !== 10 && obj.schemaVersion !== 11) {
+  if (obj.schemaVersion !== 1 && obj.schemaVersion !== 2 && obj.schemaVersion !== 3 && obj.schemaVersion !== 4 && obj.schemaVersion !== 5 && obj.schemaVersion !== 6 && obj.schemaVersion !== 7 && obj.schemaVersion !== 8 && obj.schemaVersion !== 9 && obj.schemaVersion !== 10 && obj.schemaVersion !== 11 && obj.schemaVersion !== 12) {
     throw new ValidationError("Unsupported schemaVersion");
   }
 
@@ -1477,8 +1548,6 @@ export function validateSiteContent(data: unknown): SiteContent {
   if (isNaN(d.getTime()) || d.toISOString() !== updatedAtStr) {
     throw new ValidationError("updatedAt must be a valid ISO Date string");
   }
-
-  const business = validateBusiness(obj.business);
 
   const objCopy = JSON.parse(JSON.stringify(obj));
   let objRef = objCopy;
@@ -1714,7 +1783,7 @@ export function validateSiteContent(data: unknown): SiteContent {
     objRef.business = {
       ...currentBusiness,
       legalName: currentBusiness.legalName ?? null,
-      tradeName: currentBusiness.tradeName ?? "Sempra",
+      tradeName: currentBusiness.tradeName ?? null,
       vatNumber: currentBusiness.vatNumber ?? null
     };
   }
@@ -1783,15 +1852,39 @@ export function validateSiteContent(data: unknown): SiteContent {
     };
   }
 
+  if ((obj.schemaVersion as number) < 12) {
+    const currentBusiness = objRef.business as Record<string, unknown>;
+    const existingSocials =
+      typeof currentBusiness.socialNetworks === "object" && currentBusiness.socialNetworks !== null
+        ? (currentBusiness.socialNetworks as Record<string, unknown>)
+        : {};
+
+    const mergedSocials: Record<string, unknown> = {};
+    for (const platformId of SOCIAL_PLATFORM_IDS) {
+      const existingEntry = existingSocials[platformId] as Record<string, unknown> | undefined;
+      mergedSocials[platformId] = {
+        url: typeof existingEntry?.url === "string" ? existingEntry.url : "",
+        enabled: typeof existingEntry?.enabled === "boolean" ? existingEntry.enabled : false,
+      };
+    }
+
+    objRef = {
+      ...objRef,
+      business: {
+        ...currentBusiness,
+        socialNetworks: mergedSocials,
+      },
+    };
+  }
+
   assertExactKeys(objRef, ["schemaVersion", "revision", "updatedAt", "business", "pricing", "home", "pricingPage", "aboutPage", "contactPage", "legalPages", "legalUI"], "root");
 
-
-
+  const business = validateBusiness(objRef.business);
   const pricing = validatePricing(rawPricing);
   const home = validateHomeContent(objRef.home);
 
   return {
-    schemaVersion: 11,
+    schemaVersion: 12,
     revision: obj.revision,
     updatedAt: updatedAtStr,
     business,

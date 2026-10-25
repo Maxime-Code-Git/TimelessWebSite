@@ -125,6 +125,7 @@ describe("Admin Gallery Integration Lifecycle", () => {
           SMTP_FROM: "from@example.com",
           SMTP_TO: "to@example.com",
           CONTACT_RATE_LIMIT_MAX: "10",
+          __TEST_DISABLE_WORKER: "",
         },
       });
 

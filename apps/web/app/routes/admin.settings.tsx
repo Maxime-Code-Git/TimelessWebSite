@@ -15,6 +15,8 @@ import * as crypto from "node:crypto";
 import styles from "./admin.module.css";
 import type { BusinessContent } from "../lib/site-content.server";
 import { useState } from "react";
+import { SOCIAL_PLATFORMS, DEFAULT_SOCIAL_NETWORKS } from "~/lib/social-networks";
+import type { SocialPlatformId } from "~/lib/social-networks";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await requireValidAdminSession(request);
@@ -85,6 +87,32 @@ export default function AdminSettingsPage() {
 
   const [data, setData] = useState<BusinessContent>(business);
 
+  const handleSocialUrlChange = (platformId: SocialPlatformId, url: string) => {
+    setData((prev) => ({
+      ...prev,
+      socialNetworks: {
+        ...(prev.socialNetworks || DEFAULT_SOCIAL_NETWORKS),
+        [platformId]: {
+          ...(prev.socialNetworks?.[platformId] || { url: "", enabled: false }),
+          url,
+        },
+      },
+    }));
+  };
+
+  const handleSocialToggle = (platformId: SocialPlatformId, enabled: boolean) => {
+    setData((prev) => ({
+      ...prev,
+      socialNetworks: {
+        ...(prev.socialNetworks || DEFAULT_SOCIAL_NETWORKS),
+        [platformId]: {
+          ...(prev.socialNetworks?.[platformId] || { url: "", enabled: false }),
+          enabled,
+        },
+      },
+    }));
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name.startsWith("serviceArea.")) {
@@ -141,13 +169,39 @@ export default function AdminSettingsPage() {
 
               <div className={styles.settingsSection}>
                 <h3>Réseaux Sociaux</h3>
-                <div className={styles.formGroup}>
-                  <label htmlFor="instagramUrl" className={styles.label}>Instagram (URL HTTPS)</label>
-                  <input id="instagramUrl" type="url" name="instagramUrl" value={data.instagramUrl || ""} onChange={handleChange} className={styles.input} />
-                </div>
-                <div className={styles.formGroup}>
-                  <label htmlFor="linkedinUrl" className={styles.label}>LinkedIn (URL HTTPS)</label>
-                  <input id="linkedinUrl" type="url" name="linkedinUrl" value={data.linkedinUrl || ""} onChange={handleChange} className={styles.input} />
+                <div className={styles.socialNetworksList}>
+                  {SOCIAL_PLATFORMS.map((platform) => {
+                    const currentEntry = data.socialNetworks?.[platform.id] || DEFAULT_SOCIAL_NETWORKS[platform.id];
+                    return (
+                      <div key={platform.id} className={styles.socialPlatformItem}>
+                        <div className={styles.socialHeaderRow}>
+                          <label htmlFor={`social-url-${platform.id}`} className={styles.socialPlatformName}>
+                            {platform.name}
+                          </label>
+                          <label className={styles.socialToggleLabel} htmlFor={`social-enable-${platform.id}`}>
+                            <input
+                              id={`social-enable-${platform.id}`}
+                              type="checkbox"
+                              checked={currentEntry.enabled}
+                              onChange={(e) => handleSocialToggle(platform.id, e.target.checked)}
+                              className={styles.socialCheckbox}
+                              aria-label={`Afficher ${platform.name}`}
+                            />
+                            <span>{currentEntry.enabled ? "Affiché" : "Masqué"}</span>
+                          </label>
+                        </div>
+                        <input
+                          id={`social-url-${platform.id}`}
+                          type="url"
+                          value={currentEntry.url}
+                          placeholder={`https://${platform.allowedDomains[0]}/...`}
+                          onChange={(e) => handleSocialUrlChange(platform.id, e.target.value)}
+                          className={styles.input}
+                          aria-label={`URL ${platform.name}`}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

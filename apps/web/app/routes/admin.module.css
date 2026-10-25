@@ -757,6 +757,51 @@
   margin-bottom: 0.5rem;
 }
 
+.socialNetworksList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.socialPlatformItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.socialHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.socialPlatformName {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #111827;
+}
+
+.socialToggleLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: #4b5563;
+  cursor: pointer;
+  user-select: none;
+}
+
+.socialCheckbox {
+  cursor: pointer;
+  accent-color: var(--color-primary, #04211d);
+  width: 16px;
+  height: 16px;
+}
+
 .formulaEditorCard {
   border: 1px solid var(--color-border);
   border-radius: 8px;

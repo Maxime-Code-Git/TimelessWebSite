@@ -27,3 +27,18 @@ export interface ContactRequest {
   location: string;
   message: string;
 }
+
+export type SocialPlatformId =
+  | "instagram"
+  | "facebook"
+  | "youtube"
+  | "linkedin"
+  | "tiktok"
+  | "vimeo";
+
+export interface SocialNetworkEntry {
+  url: string;
+  enabled: boolean;
+}
+
+export type SocialNetworksState = Record<SocialPlatformId, SocialNetworkEntry>;

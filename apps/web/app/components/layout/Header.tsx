@@ -83,6 +83,15 @@ export function Header({
             </NavLink>
           ))}
 
+          <a
+            href="https://parallax-creative-studio.com/"
+            className={styles.parallaxLink}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            PARALLAX ↗
+          </a>
+
           <Link to={clientAreaTo} className={styles.clientBtn}>
             {t.clientArea}
           </Link>

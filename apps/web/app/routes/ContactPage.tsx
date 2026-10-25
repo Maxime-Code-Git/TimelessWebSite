@@ -6,6 +6,8 @@ import type { Lang } from "~/lib/i18n";
 
 import type { loader as rootLoader } from "../root";
 import { VisioBooking } from "~/components/booking/VisioBooking";
+import { getActiveSocialNetworks } from "~/lib/social-networks";
+import { SocialIcon } from "~/components/ui/SocialIcon";
 import styles from "./contact.module.css";
 
 interface ContactPageProps {
@@ -17,6 +19,7 @@ export function ContactPage({ lang }: ContactPageProps) {
   const contactContent = rootData?.siteContent?.contactPage;
   if (!contactContent) throw new Error("ContactPage requires siteContent.contactPage to be loaded");
   const BUSINESS = rootData?.siteContent?.business;
+  const activeSocials = getActiveSocialNetworks(BUSINESS?.socialNetworks);
   const [searchParams] = useSearchParams();
   const rawInitialFormula = searchParams.get("formula") || "";
 
@@ -272,18 +275,24 @@ export function ContactPage({ lang }: ContactPageProps) {
               </div>
             )}
 
-            {(BUSINESS?.instagramUrl || BUSINESS?.linkedinUrl) && (
+            {activeSocials.length > 0 && (
               <div className={styles.infoBlock}>
                 <p className={styles.infoLabel}>{contactContent.contactDetails.labelSocial[lang]}</p>
-                <p className={styles.infoValue}>
-                  {BUSINESS.instagramUrl && (
-                    <a href={BUSINESS.instagramUrl} className={styles.infoLink} target="_blank" rel="noopener noreferrer">{contactContent.contactDetails.labelInstagram[lang]}</a>
-                  )}
-                  {BUSINESS.instagramUrl && BUSINESS.linkedinUrl && " | "}
-                  {BUSINESS.linkedinUrl && (
-                    <a href={BUSINESS.linkedinUrl} className={styles.infoLink} target="_blank" rel="noopener noreferrer">{contactContent.contactDetails.labelLinkedin[lang]}</a>
-                  )}
-                </p>
+                <div className={styles.socialGrid}>
+                  {activeSocials.map((item) => (
+                    <a
+                      key={item.id}
+                      href={item.url}
+                      className={styles.contactSocialLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={item.name}
+                    >
+                      <SocialIcon id={item.id} width={16} height={16} aria-hidden="true" />
+                      <span>{item.name}</span>
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
 

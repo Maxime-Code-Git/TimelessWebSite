@@ -3,6 +3,8 @@ import type { Lang } from "~/lib/i18n";
 import { getStrings } from "~/lib/i18n";
 import styles from "./Footer.module.css";
 import type { loader as rootLoader } from "../../root";
+import { getActiveSocialNetworks } from "~/lib/social-networks";
+import { SocialIcon } from "~/components/ui/SocialIcon";
 
 interface FooterProps {
   lang: Lang;
@@ -14,6 +16,7 @@ export function Footer({ lang }: FooterProps) {
 
   const rootData = useRouteLoaderData<typeof rootLoader>("root");
   const business = rootData?.siteContent?.business;
+  const activeSocials = getActiveSocialNetworks(business?.socialNetworks);
 
   return (
     <footer className={styles.footer}>
@@ -29,64 +32,53 @@ export function Footer({ lang }: FooterProps) {
         />
       </Link>
 
-      {/* Social links - only render if URLs are configured */}
-      <div className={styles.socialRow}>
-        {business?.instagramUrl && (
-          <a
-            href={business.instagramUrl}
-            className={styles.socialLink}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="2" y="2" width="20" height="20" rx="5" />
-              <circle cx="12" cy="12" r="4" />
-              <circle cx="17.5" cy="6.5" r="1" />
-            </svg>
-            {t.instagram}
-          </a>
-        )}
-        {business?.linkedinUrl && (
-          <a
-            href={business.linkedinUrl}
-            className={styles.socialLink}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="2" y="2" width="20" height="20" rx="3" />
-              <line x1="7" y1="10" x2="7" y2="17" />
-              <circle cx="7" cy="6.8" r="0.9" />
-              <path d="M11 17v-4a2.5 2.5 0 0 1 5 0v4" />
-              <line x1="11" y1="10" x2="11" y2="17" />
-            </svg>
-            {t.linkedin}
-          </a>
-        )}
-        {business?.email && (
-          <a
-            href={`mailto:${business.email}`}
-            className={styles.socialLink}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-              <polyline points="22,6 12,13 2,6"></polyline>
-            </svg>
-            {business.email}
-          </a>
-        )}
-        {business?.phoneDisplay && business?.phoneE164 && (
-          <a
-            href={`tel:${business.phoneE164}`}
-            className={styles.socialLink}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
-            </svg>
-            {business.phoneDisplay}
-          </a>
-        )}
-      </div>
+      {/* Social links - only render if active networks exist */}
+      {activeSocials.length > 0 && (
+        <div className={styles.socialRow} aria-label={lang === "fr" ? "Réseaux sociaux" : "Social media"}>
+          {activeSocials.map((item) => (
+            <a
+              key={item.id}
+              href={item.url}
+              className={styles.socialLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={item.name}
+            >
+              <SocialIcon id={item.id} width={15} height={15} aria-hidden="true" />
+              <span>{item.name}</span>
+            </a>
+          ))}
+        </div>
+      )}
+
+      {/* Contact details - email & phone */}
+      {(business?.email || (business?.phoneDisplay && business?.phoneE164)) && (
+        <div className={styles.contactRow}>
+          {business?.email && (
+            <a
+              href={`mailto:${business.email}`}
+              className={styles.socialLink}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+              {business.email}
+            </a>
+          )}
+          {business?.phoneDisplay && business?.phoneE164 && (
+            <a
+              href={`tel:${business.phoneE164}`}
+              className={styles.socialLink}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
+              </svg>
+              {business.phoneDisplay}
+            </a>
+          )}
+        </div>
+      )}
 
       {/* Contact CTA */}
       <Link to={contactTo} className={styles.contactBtn}>

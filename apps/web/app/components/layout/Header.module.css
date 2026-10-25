@@ -57,6 +57,24 @@
   font-weight: 500;
 }
 
+.parallaxLink {
+  display: inline-block;
+  color: var(--green);
+  text-decoration: none;
+  transition: transform var(--transition-base), color var(--transition-base);
+}
+
+.parallaxLink:hover {
+  transform: scale(1.08);
+  color: var(--gold);
+}
+
+.parallaxLink:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
 .clientBtn {
   border: 0.5px solid var(--gold);
   color: var(--gold-dark);

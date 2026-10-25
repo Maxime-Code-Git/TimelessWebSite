@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -291,5 +291,9 @@ describe("Gallery Import Worker Logic", () => {
     const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId);
     const files = fs.readdirSync(mediaDir);
     expect(files.some(f => f.endsWith(".tmp"))).toBe(false);
+  });
+
+  afterAll(() => {
+    delete process.env.__TEST_DISABLE_WORKER;
   });
 });

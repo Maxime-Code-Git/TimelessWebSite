@@ -43,4 +43,55 @@ describe("Header Component", () => {
     const enLink = screen.getByRole("link", { name: "Switch to EN" });
     expect(enLink).toHaveAttribute("href", "/en/pricing");
   });
+
+  it("renders reciprocal Parallax link in navigation in French", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Header lang="fr" alternateLangHref="/en/" />
+      </MemoryRouter>
+    );
+
+    const parallaxLink = screen.getByRole("link", { name: "PARALLAX ↗" });
+    expect(parallaxLink).toBeInTheDocument();
+    expect(parallaxLink).toHaveAttribute("href", "https://parallax-creative-studio.com/");
+    expect(parallaxLink).toHaveAttribute("target", "_blank");
+    expect(parallaxLink).toHaveAttribute("rel", "noopener noreferrer");
+
+    // Verify it is placed before client area in navigation
+    const nav = container.querySelector("nav");
+    expect(nav).toBeInTheDocument();
+    if (nav) {
+      const links = Array.from(nav.querySelectorAll("a"));
+      const parallaxIdx = links.findIndex((a) => a.textContent?.includes("PARALLAX ↗"));
+      const clientAreaIdx = links.findIndex((a) => a.textContent?.includes("Espace clients"));
+      expect(parallaxIdx).toBeGreaterThan(-1);
+      expect(clientAreaIdx).toBeGreaterThan(-1);
+      expect(parallaxIdx).toBeLessThan(clientAreaIdx);
+    }
+  });
+
+  it("renders reciprocal Parallax link in navigation in English", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Header lang="en" alternateLangHref="/fr/" />
+      </MemoryRouter>
+    );
+
+    const parallaxLink = screen.getByRole("link", { name: "PARALLAX ↗" });
+    expect(parallaxLink).toBeInTheDocument();
+    expect(parallaxLink).toHaveAttribute("href", "https://parallax-creative-studio.com/");
+    expect(parallaxLink).toHaveAttribute("target", "_blank");
+    expect(parallaxLink).toHaveAttribute("rel", "noopener noreferrer");
+
+    const nav = container.querySelector("nav");
+    expect(nav).toBeInTheDocument();
+    if (nav) {
+      const links = Array.from(nav.querySelectorAll("a"));
+      const parallaxIdx = links.findIndex((a) => a.textContent?.includes("PARALLAX ↗"));
+      const clientAreaIdx = links.findIndex((a) => a.textContent?.includes("Client area"));
+      expect(parallaxIdx).toBeGreaterThan(-1);
+      expect(clientAreaIdx).toBeGreaterThan(-1);
+      expect(parallaxIdx).toBeLessThan(clientAreaIdx);
+    }
+  });
 });

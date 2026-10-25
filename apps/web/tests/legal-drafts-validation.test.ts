@@ -78,12 +78,12 @@ describe("Legal Pages Drafts and Content Integrity", () => {
 
   it("passes strict schema validation through validateSiteContent", () => {
     const validated = validateSiteContent(defaultJson);
-    expect(validated.schemaVersion).toBe(11);
+    expect(validated.schemaVersion).toBe(12);
     expect(validated.legalPages).toBeDefined();
 
     if (fs.existsSync(activeContentPath)) {
       const activeValidated = validateSiteContent(activeJson);
-      expect(activeValidated.schemaVersion).toBe(11);
+      expect(activeValidated.schemaVersion).toBe(12);
       expect(activeValidated.legalPages).toBeDefined();
     }
   });
@@ -170,7 +170,7 @@ describe("Legal Pages Drafts and Content Integrity", () => {
     const targetFile = path.join(tempDir, "no-legal-pages.json");
     try {
       const invalidData = {
-        schemaVersion: 11,
+        schemaVersion: 12,
         revision: "0123456789abcdef0123456789abcdef",
         updatedAt: "2026-01-01T00:00:00.000Z",
       };

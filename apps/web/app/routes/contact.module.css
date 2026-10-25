@@ -418,6 +418,29 @@
   color: var(--gold);
 }
 
+.socialGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.contactSocialLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ivory);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color var(--transition-base), transform var(--transition-base);
+}
+
+.contactSocialLink:hover {
+  color: var(--gold);
+  transform: translateY(-1px);
+}
+
 .responseTime {
   margin-top: 40px;
   padding-top: 24px;

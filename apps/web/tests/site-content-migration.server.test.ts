@@ -166,8 +166,8 @@ describe("Migration of intermediate V2 content", () => {
     fs.writeFileSync(filePath, JSON.stringify(V1_CONTENT), "utf8");
     const { content } = getRawSiteContent();
 
-    // Check that it's migrated to V11
-    expect(content.schemaVersion).toBe(11);
+    // Check that it's migrated to V12
+    expect(content.schemaVersion).toBe(12);
 
     // Check real fallbacks instead of generic "Description"
     const photoEssential = content.pricing.photo.find(f => f.id === "essential");
@@ -221,7 +221,7 @@ describe("Migration of intermediate V2 content", () => {
     const { content: migratedContent1 } = getRawSiteContent();
 
     // Check it's migrated
-    expect(migratedContent1.schemaVersion).toBe(11);
+    expect(migratedContent1.schemaVersion).toBe(12);
     expect(migratedContent1.pricingPage.addOns).toBeDefined();
 
     const prestigeIncluded = migratedContent1.pricing.photo.find(f => f.id === "prestige")?.includedItems;
@@ -292,7 +292,7 @@ describe("Migration of intermediate V2 content", () => {
       const originalJson = JSON.stringify(v3Data);
 
       const migrated = validateSiteContent(v3Data);
-      expect(migrated.schemaVersion).toBe(11);
+      expect(migrated.schemaVersion).toBe(12);
       expect(migrated.business.email).toBe("v3@test.com");
       expect(migrated.pricingPage).toBeDefined();
       expect(migrated.pricingPage.faqs).toHaveLength(defaultContent.pricingPage.faqs.length);
@@ -323,7 +323,7 @@ describe("Migration of intermediate V2 content", () => {
       const originalJson = JSON.stringify(v4Data);
 
       const migrated = validateSiteContent(v4Data);
-      expect(migrated.schemaVersion).toBe(11);
+      expect(migrated.schemaVersion).toBe(12);
       expect(migrated.business.email).toBe("v4@test.com");
       expect(migrated.aboutPage).toBeDefined();
       expect(migrated.aboutPage.seo.title.fr).toBe(defaultContent.aboutPage.seo.title.fr);
@@ -360,8 +360,8 @@ describe("Migration of intermediate V2 content", () => {
         const originalJson = JSON.stringify(inputData);
         const migrated = validateSiteContent(inputData);
 
-        // résultat en V10
-        expect(migrated.schemaVersion).toBe(11);
+        // résultat en V12
+        expect(migrated.schemaVersion).toBe(12);
 
         // présence de contactPage
         expect(migrated.contactPage).toBeDefined();
@@ -425,7 +425,7 @@ describe("Migration of intermediate V2 content", () => {
       delete v8.business.vatNumber;
 
       const migrated = validateSiteContent(v8);
-      expect(migrated.schemaVersion).toBe(11);
+      expect(migrated.schemaVersion).toBe(12);
       expect(migrated.legalPages).toBeDefined();
       expect(migrated.legalPages.mentions.draft.publicTitle.fr).toBe("Mentions légales");
       expect(migrated.business.tradeName).toBeNull();
@@ -439,7 +439,7 @@ describe("Migration of intermediate V2 content", () => {
       delete v9.legalUI.versionLabel;
 
       const migrated = validateSiteContent(v9);
-      expect(migrated.schemaVersion).toBe(11);
+      expect(migrated.schemaVersion).toBe(12);
       expect(migrated.legalUI.draftWarning.fr).toBe("Modifié"); // Conservé
       expect(migrated.legalUI.versionLabel.fr).toBe("Version"); // Injecté depuis le défaut
 
@@ -481,6 +481,70 @@ describe("Migration of intermediate V2 content", () => {
       const v10 = JSON.parse(JSON.stringify(defaultContent));
       delete v10.contactPage.visioBooking.rgpdNotice;
       expect(() => validateSiteContent(v10)).toThrow();
+    });
+  });
+
+  describe("Migration to V12 (Social Networks)", () => {
+    it("migrates V11 content without socialNetworks to V12 with empty and disabled defaults", () => {
+      const v11 = JSON.parse(JSON.stringify(defaultContent));
+      v11.schemaVersion = 11;
+      delete v11.business.socialNetworks;
+      v11.business.email = "hello@sempra.com";
+      v11.business.phoneDisplay = "+33 6 00 00 00 00";
+
+      const migrated = validateSiteContent(v11);
+      expect(migrated.schemaVersion).toBe(12);
+      expect(migrated.business.email).toBe("hello@sempra.com");
+      expect(migrated.business.phoneDisplay).toBe("+33 6 00 00 00 00");
+      expect(migrated.business.socialNetworks).toBeDefined();
+
+      const platforms = ["instagram", "facebook", "youtube", "linkedin", "tiktok", "vimeo"] as const;
+      for (const p of platforms) {
+        expect(migrated.business.socialNetworks[p]).toEqual({
+          url: "",
+          enabled: false,
+        });
+      }
+    });
+
+    it("is idempotent for V12", () => {
+      const v12 = JSON.parse(JSON.stringify(defaultContent));
+      v12.business.socialNetworks.instagram = {
+        url: "https://instagram.com/semprawedding",
+        enabled: true,
+      };
+
+      const migrated1 = validateSiteContent(v12);
+      const migrated2 = validateSiteContent(migrated1);
+      expect(migrated1).toEqual(migrated2);
+      expect(migrated2.business.socialNetworks.instagram).toEqual({
+        url: "https://instagram.com/semprawedding",
+        enabled: true,
+      });
+    });
+
+    it("preserves all existing content across migrations", () => {
+      const v11 = JSON.parse(JSON.stringify(defaultContent));
+      v11.schemaVersion = 11;
+      delete v11.business.socialNetworks;
+      v11.pricingPage.faqTitle.fr = "Questions personnalisées";
+      v11.aboutPage.seo.title.en = "Custom About Title";
+      v11.contactPage.seo.title.fr = "Contactez-nous";
+
+      const migrated = validateSiteContent(v11);
+      expect(migrated.schemaVersion).toBe(12);
+      expect(migrated.pricingPage.faqTitle.fr).toBe("Questions personnalisées");
+      expect(migrated.aboutPage.seo.title.en).toBe("Custom About Title");
+      expect(migrated.contactPage.seo.title.fr).toBe("Contactez-nous");
+    });
+
+    it("rejects unknown platforms or unexpected keys in socialNetworks", () => {
+      const v12 = JSON.parse(JSON.stringify(defaultContent));
+      (v12.business.socialNetworks as Record<string, unknown>).unknownPlatform = {
+        url: "https://unknown.com",
+        enabled: true,
+      };
+      expect(() => validateSiteContent(v12)).toThrow();
     });
   });
 });
