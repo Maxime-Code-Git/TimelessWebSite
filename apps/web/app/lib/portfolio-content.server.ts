@@ -800,6 +800,7 @@ export interface PublicPortfolioPhoto {
   width: number;
   height: number;
   variants: Array<Pick<Photo["variants"][number], "name" | "width" | "height">>;
+  version?: string;
 }
 
 export interface PublicCategory {
@@ -848,6 +849,7 @@ export function getPublicPortfolio(): PublicPortfolio {
         width: p.originalWidth,
         height: p.originalHeight,
         variants: p.variants.map(({ name, width, height }) => ({ name, width, height })),
+        version: p.appliedWatermarkRevision,
       };
     });
 

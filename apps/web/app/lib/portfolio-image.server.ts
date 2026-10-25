@@ -496,6 +496,227 @@ export async function processImage(
   }
 }
 
+export interface RegenerateVariantsResult {
+  variants: VariantResult[];
+  commit: () => void;
+  rollback: () => void;
+}
+
+export async function regenerateImageVariants(
+  photoId: string,
+  mediaBasePath: string,
+  photo: {
+    id: string;
+    fileId: string;
+    originalFormat: "jpeg" | "png" | "webp";
+    originalWidth?: number;
+    originalHeight?: number;
+    variants?: Array<{ name: VariantName; fileId: string }>;
+  },
+  watermarkText: string,
+  watermarkRevision: string,
+  options?: {
+    renameSyncFn?: typeof fs.renameSync;
+  }
+): Promise<RegenerateVariantsResult> {
+  // Validate UUID format
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(photoId)) {
+    throw new SafeImageError("Invalid photo ID.");
+  }
+
+  const resolvedMediaBasePath = path.resolve(mediaBasePath);
+  ensureStrictDirectory(resolvedMediaBasePath, path.resolve(resolvedMediaBasePath, ".."), false);
+
+  const globalV2Dir = path.resolve(resolvedMediaBasePath, "global-v2");
+  const photosDir = path.resolve(globalV2Dir, "photos");
+  const projectDir = path.resolve(photosDir, photoId);
+  const originalsDir = path.resolve(projectDir, "originals");
+
+  for (const dir of [globalV2Dir, photosDir, projectDir, originalsDir]) {
+    ensureStrictDirectory(dir, resolvedMediaBasePath, false);
+  }
+
+  const originalPath = path.resolve(originalsDir, `${photo.fileId}.${photo.originalFormat}`);
+  validateConfinement(originalPath, resolvedMediaBasePath);
+
+  try {
+    const origStat = fs.lstatSync(originalPath);
+    if (origStat.isSymbolicLink() || !origStat.isFile()) {
+      throw new SafeImageError("Original photo file is missing or invalid.");
+    }
+  } catch (err: unknown) {
+    if (err instanceof SafeImageError) throw err;
+    throw new SafeImageError("Original photo file is missing or invalid.");
+  }
+
+  // Validate format and dimensions against allowed parameters
+  const { format, width, height } = await validateImageFile(originalPath, originalsDir);
+  if (format !== photo.originalFormat) {
+    throw new SafeImageError("Original photo format mismatch.");
+  }
+
+  const renameSync = options?.renameSyncFn || fs.renameSync;
+
+  const tempFiles: Array<{
+    name: VariantName;
+    tmpPath: string;
+    finalPath: string;
+    backupPath: string;
+    width: number;
+    height: number;
+    sizeBytes: number;
+    fileId: string;
+    existedBefore: boolean;
+  }> = [];
+
+  try {
+    for (const breakpoint of VARIANT_BREAKPOINTS) {
+      if (breakpoint.name !== "480p" && width <= breakpoint.maxWidth && height <= breakpoint.maxWidth) {
+        continue;
+      }
+
+      const variantDir = path.resolve(projectDir, breakpoint.name);
+      if (!fs.existsSync(variantDir)) {
+        ensureStrictDirectoryCreated(variantDir, resolvedMediaBasePath);
+      } else {
+        ensureStrictDirectory(variantDir, resolvedMediaBasePath);
+      }
+
+      const variantFileId = `${photo.fileId}-${breakpoint.name}`;
+      const finalPath = path.resolve(variantDir, `${variantFileId}.webp`);
+      validateConfinement(finalPath, resolvedMediaBasePath);
+
+      const tmpPath = path.resolve(variantDir, `.tmp-regen-${crypto.randomBytes(8).toString("hex")}.webp`);
+      validateConfinement(tmpPath, resolvedMediaBasePath);
+
+      const backupPath = path.resolve(variantDir, `.bak-regen-${crypto.randomBytes(8).toString("hex")}.webp`);
+      validateConfinement(backupPath, resolvedMediaBasePath);
+
+      const { data: rawBuffer, info } = await sharp(originalPath, { limitInputPixels: MAX_PIXELS })
+        .rotate()
+        .resize(breakpoint.maxWidth, breakpoint.maxWidth, { fit: "inside", withoutEnlargement: true })
+        .toColorspace("srgb")
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      const watermarkSvg = await renderTextWatermark({
+        text: watermarkText,
+        watermarkRevision,
+        width: info.width,
+        height: info.height,
+      });
+
+      const variantBuffer = await sharp(rawBuffer, {
+        raw: {
+          width: info.width,
+          height: info.height,
+          channels: 4,
+        }
+      })
+        .composite([{ input: watermarkSvg, top: 0, left: 0 }])
+        .webp({ quality: WEBP_QUALITY })
+        .toBuffer();
+
+      atomicWriteFile(tmpPath, variantBuffer, 0o600);
+
+      tempFiles.push({
+        name: breakpoint.name,
+        tmpPath,
+        finalPath,
+        backupPath,
+        width: info.width,
+        height: info.height,
+        sizeBytes: variantBuffer.length,
+        fileId: variantFileId,
+        existedBefore: fs.existsSync(finalPath),
+      });
+    }
+  } catch (err) {
+    // Sharp or write error before any replacement: clean up all temp files
+    for (const item of tempFiles) {
+      try {
+        if (fs.existsSync(item.tmpPath)) fs.unlinkSync(item.tmpPath);
+      } catch { /* best effort */ }
+    }
+    if (err instanceof SafeImageError) throw err;
+    throw new SafeImageError("Image processing failed due to an internal error.");
+  }
+
+  // Atomic replacement: swap existing variants with new variants
+  const swappedFiles: typeof tempFiles = [];
+  try {
+    for (const item of tempFiles) {
+      if (item.existedBefore) {
+        renameSync(item.finalPath, item.backupPath);
+      }
+      renameSync(item.tmpPath, item.finalPath);
+      swappedFiles.push(item);
+    }
+  } catch {
+    // Rollback swap
+    for (const item of swappedFiles.reverse()) {
+      try {
+        if (fs.existsSync(item.finalPath)) {
+          fs.unlinkSync(item.finalPath);
+        }
+        if (item.existedBefore && fs.existsSync(item.backupPath)) {
+          renameSync(item.backupPath, item.finalPath);
+        }
+      } catch { /* best effort */ }
+    }
+    for (const item of tempFiles) {
+      try { if (fs.existsSync(item.tmpPath)) fs.unlinkSync(item.tmpPath); } catch { /* ignore */ }
+      try { if (fs.existsSync(item.backupPath)) fs.unlinkSync(item.backupPath); } catch { /* ignore */ }
+    }
+    throw new SafeImageError("Image processing failed due to an internal error.");
+  }
+
+  const commit = () => {
+    for (const item of tempFiles) {
+      try {
+        if (fs.existsSync(item.backupPath)) fs.unlinkSync(item.backupPath);
+      } catch { /* ignore */ }
+      try {
+        if (fs.existsSync(item.tmpPath)) fs.unlinkSync(item.tmpPath);
+      } catch { /* ignore */ }
+    }
+  };
+
+  const rollback = () => {
+    for (const item of tempFiles) {
+      try {
+        if (item.existedBefore && fs.existsSync(item.backupPath)) {
+          if (fs.existsSync(item.finalPath)) {
+            fs.unlinkSync(item.finalPath);
+          }
+          renameSync(item.backupPath, item.finalPath);
+        } else if (!item.existedBefore && fs.existsSync(item.finalPath)) {
+          fs.unlinkSync(item.finalPath);
+        }
+      } catch { /* ignore */ }
+      try {
+        if (fs.existsSync(item.backupPath)) fs.unlinkSync(item.backupPath);
+      } catch { /* ignore */ }
+      try {
+        if (fs.existsSync(item.tmpPath)) fs.unlinkSync(item.tmpPath);
+      } catch { /* ignore */ }
+    }
+  };
+
+  return {
+    variants: tempFiles.map(item => ({
+      name: item.name,
+      width: item.width,
+      height: item.height,
+      sizeBytes: item.sizeBytes,
+      fileId: item.fileId,
+    })),
+    commit,
+    rollback,
+  };
+}
+
 export function removeProcessedImage(
   photoId: string,
   mediaBasePath: string,

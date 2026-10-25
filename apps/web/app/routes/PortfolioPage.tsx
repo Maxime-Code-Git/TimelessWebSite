@@ -28,12 +28,14 @@ export function getPublicPhotoUrl(
   const preferred = photo.variants.find(variant => variant.name === preferredVariant);
   const fallback = photo.variants.at(-1) ?? photo.variants[0];
   const variant = preferred ?? fallback;
-  return "/portfolio/media/" + photo.id + "/" + variant.name;
+  const v = photo.version ? `?v=${photo.version}` : "";
+  return "/portfolio/media/" + photo.id + "/" + variant.name + v;
 }
 
 export function getPublicPhotoSrcSet(photo: PublicPortfolioPhoto): string {
+  const v = photo.version ? `?v=${photo.version}` : "";
   return photo.variants
-    .map(variant => "/portfolio/media/" + photo.id + "/" + variant.name + " " + variant.width + "w")
+    .map(variant => "/portfolio/media/" + photo.id + "/" + variant.name + v + " " + variant.width + "w")
     .join(", ");
 }
 

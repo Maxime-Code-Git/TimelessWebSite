@@ -1,5 +1,7 @@
-import { getPortfolioContent, trashPhoto, getPortfolioMediaPath, assertPortfolioRevision } from "./portfolio-content.server";
-import { trashPhotoMedia, restorePhotoMedia } from "./portfolio-image.server";
+import { getPortfolioContent, trashPhoto, getPortfolioMediaPath, assertPortfolioRevision, savePortfolio } from "./portfolio-content.server";
+import { trashPhotoMedia, restorePhotoMedia, regenerateImageVariants, SafeImageError } from "./portfolio-image.server";
+import { RevisionConflictError, CorruptedContentError } from "./site-content.server";
+import * as fs from "node:fs";
 
 export class TransactionRollbackError extends Error {
   constructor(message: string) {
@@ -7,8 +9,6 @@ export class TransactionRollbackError extends Error {
     this.name = "TransactionRollbackError";
   }
 }
-
-import * as fs from "node:fs";
 
 export function deletePhotoTransactionally(photoId: string, revision: string, renameSyncFn = fs.renameSync): { newRevision: string } {
   // 0. Vérifier la révision avant toute mutation
@@ -37,4 +37,169 @@ export function deletePhotoTransactionally(photoId: string, revision: string, re
     }
     throw error; // Re-throw the original JSON save error (e.g., RevisionConflictError)
   }
+}
+
+export interface RegeneratePhotoWatermarkResult {
+  photoId: string;
+  alreadyUpToDate: boolean;
+  newPortfolioRevision: string;
+  appliedWatermarkRevision: string;
+}
+
+export async function regeneratePhotoWatermark(
+  photoId: string,
+  expectedPortfolioRevision: string,
+  options?: {
+    mediaBasePath?: string;
+    renameSyncFn?: typeof fs.renameSync;
+    onBeforeSavePortfolio?: () => void;
+  }
+): Promise<RegeneratePhotoWatermarkResult> {
+  // Validate UUID format
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(photoId)) {
+    throw new SafeImageError("Invalid photo ID.");
+  }
+
+  const mediaBasePath = options?.mediaBasePath || getPortfolioMediaPath();
+
+  // 1. Assert revision conflict before doing anything
+  assertPortfolioRevision(expectedPortfolioRevision);
+
+  const portfolio = getPortfolioContent();
+  const photoIndex = portfolio.photos.findIndex(p => p.id === photoId);
+  if (photoIndex === -1) {
+    throw new SafeImageError("Photo introuvable.");
+  }
+
+  const photo = portfolio.photos[photoIndex];
+
+  // 2. Idempotency check: if already at current watermark revision, skip!
+  if (photo.appliedWatermarkRevision === portfolio.watermark.revision) {
+    return {
+      photoId,
+      alreadyUpToDate: true,
+      newPortfolioRevision: portfolio.revision,
+      appliedWatermarkRevision: photo.appliedWatermarkRevision,
+    };
+  }
+
+  // 3. Regenerate variants from original file
+  const { variants: newVariants, commit, rollback } = await regenerateImageVariants(
+    photoId,
+    mediaBasePath,
+    photo,
+    portfolio.watermark.text,
+    portfolio.watermark.revision,
+    { renameSyncFn: options?.renameSyncFn }
+  );
+
+  // 4. Update JSON transactionally
+  try {
+    if (options?.onBeforeSavePortfolio) {
+      options.onBeforeSavePortfolio();
+    }
+
+    portfolio.photos[photoIndex] = {
+      ...photo,
+      variants: newVariants,
+      appliedWatermarkRevision: portfolio.watermark.revision,
+      processedAt: new Date().toISOString(),
+    };
+
+    const newRevision = savePortfolio(portfolio, expectedPortfolioRevision);
+
+    // Commit filesystem changes
+    commit();
+
+    return {
+      photoId,
+      alreadyUpToDate: false,
+      newPortfolioRevision: newRevision,
+      appliedWatermarkRevision: portfolio.watermark.revision,
+    };
+  } catch (err) {
+    // Rollback filesystem changes
+    try {
+      rollback();
+    } catch {
+      // rollback is best effort
+    }
+
+    if (err instanceof RevisionConflictError || err instanceof CorruptedContentError) {
+      throw err;
+    }
+    if (err instanceof SafeImageError) {
+      throw err;
+    }
+    throw new SafeImageError("Image processing failed due to an internal error.");
+  }
+}
+
+export interface RegenerateNextResult {
+  success: boolean;
+  done: boolean;
+  processedPhotoId?: string;
+  totalPhotos: number;
+  upToDatePhotos: number;
+  outdatedPhotos: number;
+  portfolioRevision: string;
+}
+
+export async function regenerateNextOutdatedPhoto(
+  expectedPortfolioRevision: string,
+  options?: {
+    photoId?: string;
+    mediaBasePath?: string;
+    renameSyncFn?: typeof fs.renameSync;
+    onBeforeSavePortfolio?: () => void;
+  }
+): Promise<RegenerateNextResult> {
+  assertPortfolioRevision(expectedPortfolioRevision);
+  const portfolio = getPortfolioContent();
+  const currentWatermarkRev = portfolio.watermark.revision;
+
+  const outdated = portfolio.photos.filter(p => p.appliedWatermarkRevision !== currentWatermarkRev);
+  const totalPhotos = portfolio.photos.length;
+  const upToDatePhotos = totalPhotos - outdated.length;
+
+  if (outdated.length === 0) {
+    return {
+      success: true,
+      done: true,
+      totalPhotos,
+      upToDatePhotos,
+      outdatedPhotos: 0,
+      portfolioRevision: portfolio.revision,
+    };
+  }
+
+  const targetPhoto = options?.photoId
+    ? outdated.find(p => p.id === options.photoId)
+    : outdated[0];
+
+  if (!targetPhoto) {
+    return {
+      success: true,
+      done: outdated.length === 0,
+      totalPhotos,
+      upToDatePhotos,
+      outdatedPhotos: outdated.length,
+      portfolioRevision: portfolio.revision,
+    };
+  }
+
+  const result = await regeneratePhotoWatermark(targetPhoto.id, expectedPortfolioRevision, options);
+
+  const updatedPortfolio = getPortfolioContent();
+  const remainingOutdated = updatedPortfolio.photos.filter(p => p.appliedWatermarkRevision !== currentWatermarkRev).length;
+
+  return {
+    success: true,
+    done: remainingOutdated === 0,
+    processedPhotoId: result.photoId,
+    totalPhotos: updatedPortfolio.photos.length,
+    upToDatePhotos: updatedPortfolio.photos.length - remainingOutdated,
+    outdatedPhotos: remainingOutdated,
+    portfolioRevision: result.newPortfolioRevision,
+  };
 }
