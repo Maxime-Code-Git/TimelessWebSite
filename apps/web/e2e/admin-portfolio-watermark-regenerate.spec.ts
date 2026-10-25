@@ -139,6 +139,41 @@ test.describe("Portfolio Watermark Regeneration E2E", () => {
       const regenButton = page.locator("#regenerate-watermarks-button");
       await expect(regenButton).toBeEnabled();
 
+      // Setup response capture to verify HTTP 200 and JSON payloads of regenerate_one
+      interface CapturedRegenResponse {
+        status: number;
+        data: {
+          success?: boolean;
+          done?: boolean;
+          portfolioRevision?: string;
+          totalPhotos?: number;
+          upToDatePhotos?: number;
+          outdatedPhotos?: number;
+          error?: string;
+        };
+      }
+      const capturedResponses: CapturedRegenResponse[] = [];
+      const handleResponse = async (response: import("@playwright/test").Response) => {
+        if (
+          response.request().method() === "POST" &&
+          response.url().includes("/admin/portfolio/watermark")
+        ) {
+          const postData = response.request().postData() || "";
+          if (postData.includes("intent=regenerate_one")) {
+            try {
+              const data = await response.json();
+              capturedResponses.push({ status: response.status(), data });
+            } catch {
+              capturedResponses.push({
+                status: response.status(),
+                data: { error: "Failed to parse JSON" },
+              });
+            }
+          }
+        }
+      };
+      page.on("response", handleResponse);
+
       // 7. Launch watermark regeneration with confirmation
       page.once("dialog", async (dialog) => {
         expect(dialog.message()).toContain("1");
@@ -147,8 +182,24 @@ test.describe("Portfolio Watermark Regeneration E2E", () => {
       await regenButton.click();
 
       // 8. Wait for processing completion
-      await expect(page.locator("#regeneration-success-message")).toBeVisible({ timeout: 30_000 });
+      const successLocator = page.locator("#regeneration-success-message");
+      await expect(successLocator).toBeVisible({ timeout: 30_000 });
+      await expect(successLocator).toHaveText(
+        "Les filigranes des photos existantes ont été régénérés."
+      );
       await expect(regenButton).toBeDisabled();
+
+      // Verify captured responses: all 200, no error, last has done: true
+      expect(capturedResponses.length).toBeGreaterThan(0);
+      for (const captured of capturedResponses) {
+        expect(captured.status).toBe(200);
+        expect(captured.data.error).toBeUndefined();
+        expect(captured.data.success).toBe(true);
+      }
+      const lastCaptured = capturedResponses[capturedResponses.length - 1];
+      expect(lastCaptured.data.done).toBe(true);
+
+      page.off("response", handleResponse);
 
       // 9. Verify counters show all photos are up-to-date
       await expect(page.locator("#total-photos-count")).toHaveText("1");

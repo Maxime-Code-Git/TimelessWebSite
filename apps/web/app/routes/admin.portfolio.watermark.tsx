@@ -3,8 +3,8 @@ import {
   type LoaderFunctionArgs,
   type HeadersFunction,
 } from "react-router";
-import { useState, useEffect } from "react";
-import { Form, Link, useLoaderData, useActionData, useNavigation } from "react-router";
+import { useState, useEffect, useRef } from "react";
+import { Form, Link, useLoaderData, useActionData, useNavigation, useFetcher } from "react-router";
 import { getPortfolioContent, updateWatermarkText } from "../lib/portfolio-content.server";
 import { regenerateNextOutdatedPhoto } from "../lib/portfolio-transaction.server";
 import { SafeImageError } from "../lib/portfolio-image.server";
@@ -144,10 +144,25 @@ interface ActionData {
   error?: string;
 }
 
+interface RegenerateOneResponse {
+  success?: boolean;
+  done?: boolean;
+  processedPhotoId?: string;
+  totalPhotos?: number;
+  upToDatePhotos?: number;
+  outdatedPhotos?: number;
+  portfolioRevision?: string;
+  error?: string;
+}
+
+export type RegenState = "idle" | "confirming" | "running" | "success" | "error";
+
 export default function AdminPortfolioWatermark() {
   const loaderData = useLoaderData() as unknown as LoaderData;
   const actionData = useActionData() as unknown as ActionData | undefined;
   const navigation = useNavigation();
+  const fetcher = useFetcher<RegenerateOneResponse>();
+
   const isSubmitting = navigation.state === "submitting";
 
   const { watermarkText, csrfToken } = loaderData;
@@ -162,109 +177,151 @@ export default function AdminPortfolioWatermark() {
     outdated: loaderData.outdatedPhotos,
   });
 
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [regenProgress, setRegenProgress] = useState<{ current: number; total: number } | null>(null);
-  const [regenStatusMessage, setRegenStatusMessage] = useState<string | null>(null);
-  const [regenFinalMessage, setRegenFinalMessage] = useState<string | null>(null);
+  const [regenState, setRegenState] = useState<RegenState>("idle");
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [regenErrorMessage, setRegenErrorMessage] = useState<string | null>(null);
 
+  // Refs for deterministic state machine and StrictMode deduplication
+  const lastHandledRevisionRef = useRef<string | null>(null);
+  const currentRevisionRef = useRef<string>(activePortfolioRevision);
+  const processedCountRef = useRef<number>(0);
+  const totalToProcessRef = useRef<number>(0);
+
+  // Keep currentRevisionRef synchronized with activePortfolioRevision
+  useEffect(() => {
+    currentRevisionRef.current = activePortfolioRevision;
+  }, [activePortfolioRevision]);
+
+  // When watermark text is updated via the main form action, update revision and reset regen state
   useEffect(() => {
     if (actionData?.portfolioRevision) {
       setActivePortfolioRevision(actionData.portfolioRevision);
-    } else {
-      setActivePortfolioRevision(loaderData.portfolioRevision);
+      currentRevisionRef.current = actionData.portfolioRevision;
     }
-  }, [actionData?.portfolioRevision, loaderData.portfolioRevision]);
+    if (actionData?.success) {
+      setRegenState("idle");
+      setRegenErrorMessage(null);
+    }
+  }, [actionData]);
 
+  // When loaderData updates (revalidation), synchronize counts and revision if idle
   useEffect(() => {
-    setCounts({
-      total: loaderData.totalPhotos,
-      upToDate: loaderData.upToDatePhotos,
-      outdated: loaderData.outdatedPhotos,
-    });
-  }, [loaderData.totalPhotos, loaderData.upToDatePhotos, loaderData.outdatedPhotos, loaderData.watermarkRevision]);
+    if (regenState === "idle") {
+      setCounts({
+        total: loaderData.totalPhotos,
+        upToDate: loaderData.upToDatePhotos,
+        outdated: loaderData.outdatedPhotos,
+      });
+      if (!actionData?.portfolioRevision) {
+        setActivePortfolioRevision(loaderData.portfolioRevision);
+        currentRevisionRef.current = loaderData.portfolioRevision;
+      }
+    }
+  }, [
+    loaderData.totalPhotos,
+    loaderData.upToDatePhotos,
+    loaderData.outdatedPhotos,
+    loaderData.portfolioRevision,
+    regenState,
+    actionData?.portfolioRevision,
+  ]);
 
-  const handleStartRegeneration = async () => {
-    if (counts.outdated <= 0 || isRegenerating) return;
+  // Regeneration loop effect driven by fetcher state & data
+  useEffect(() => {
+    if (regenState !== "running") return;
+    if (fetcher.state !== "idle") return;
+    if (!fetcher.data) return;
 
+    const data = fetcher.data;
+
+    // Guard against double processing under React StrictMode or re-renders
+    if (data.portfolioRevision && data.portfolioRevision === lastHandledRevisionRef.current) {
+      return;
+    }
+
+    if (data.error || !data.success) {
+      setRegenState("error");
+      setRegenErrorMessage(data.error || "Erreur lors de la régénération.");
+      return;
+    }
+
+    if (!data.portfolioRevision) {
+      setRegenState("error");
+      setRegenErrorMessage("Réponse serveur invalide (révision manquante).");
+      return;
+    }
+
+    // Mark this response revision as handled
+    lastHandledRevisionRef.current = data.portfolioRevision;
+
+    // Update revision
+    setActivePortfolioRevision(data.portfolioRevision);
+    currentRevisionRef.current = data.portfolioRevision;
+
+    // Update progress
+    processedCountRef.current += 1;
+    const currentProcessed = processedCountRef.current;
+    const total = totalToProcessRef.current || (data.totalPhotos ?? currentProcessed);
+    setProgress({ current: currentProcessed, total });
+
+    // Update counts
+    if (
+      typeof data.totalPhotos === "number" &&
+      typeof data.upToDatePhotos === "number" &&
+      typeof data.outdatedPhotos === "number"
+    ) {
+      setCounts({
+        total: data.totalPhotos,
+        upToDate: data.upToDatePhotos,
+        outdated: data.outdatedPhotos,
+      });
+    }
+
+    // Check completion
+    if (data.done === true || data.outdatedPhotos === 0) {
+      setRegenState("success");
+      return;
+    }
+
+    // Submit next photo with new portfolio revision
+    fetcher.submit(
+      {
+        intent: "regenerate_one",
+        csrfToken,
+        portfolioRevision: data.portfolioRevision,
+      },
+      { method: "POST" }
+    );
+  }, [regenState, fetcher.state, fetcher.data, csrfToken, fetcher]);
+
+  const handleStartRegeneration = () => {
+    if (counts.outdated <= 0 || regenState === "running" || isSubmitting) return;
+
+    setRegenState("confirming");
     const confirmed = window.confirm(
       `Voulez-vous régénérer le filigrane pour les ${counts.outdated} photo(s) existante(s) ?`
     );
-    if (!confirmed) return;
-
-    setIsRegenerating(true);
-    setRegenErrorMessage(null);
-    setRegenFinalMessage(null);
-    const totalToProcess = counts.outdated;
-    setRegenProgress({ current: 0, total: totalToProcess });
-    setRegenStatusMessage(`Régénération en cours : 0 / ${totalToProcess} photos traitées...`);
-
-    let currentRev = activePortfolioRevision;
-    let processed = 0;
-    let errors = 0;
-
-    try {
-      while (true) {
-        const body = new URLSearchParams();
-        body.set("intent", "regenerate_one");
-        body.set("csrfToken", csrfToken);
-        body.set("portfolioRevision", currentRev);
-
-        const res = await fetch("/admin/portfolio/watermark", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: body.toString(),
-        });
-
-        if (!res.ok) {
-          let errMsg = "Erreur lors de la régénération.";
-          try {
-            const errData = await res.json();
-            if (errData.error) errMsg = errData.error;
-          } catch {
-            // ignore JSON parse error
-          }
-          errors++;
-          setRegenErrorMessage(`Interruption : ${errMsg}`);
-          break;
-        }
-
-        const data = await res.json();
-        if (!data.success) {
-          errors++;
-          setRegenErrorMessage(data.error || "Erreur lors du traitement.");
-          break;
-        }
-
-        currentRev = data.portfolioRevision;
-        setActivePortfolioRevision(currentRev);
-        processed++;
-        setRegenProgress({ current: processed, total: totalToProcess });
-        setRegenStatusMessage(`Régénération en cours : ${processed} / ${totalToProcess} photos traitées...`);
-        setCounts({
-          total: data.totalPhotos,
-          upToDate: data.upToDatePhotos,
-          outdated: data.outdatedPhotos,
-        });
-
-        if (data.done || data.outdatedPhotos === 0) {
-          break;
-        }
-      }
-
-      if (errors === 0) {
-        setRegenFinalMessage(`Régénération terminée : ${processed} photo(s) régénérée(s) avec succès.`);
-        setRegenStatusMessage(null);
-      } else {
-        setRegenStatusMessage(`Régénération arrêtée : ${processed} photo(s) traitée(s), ${errors} erreur(s).`);
-      }
-    } catch (err: unknown) {
-      setRegenErrorMessage(`Erreur réseau : ${err instanceof Error ? err.message : "Erreur de connexion"}`);
-    } finally {
-      setIsRegenerating(false);
+    if (!confirmed) {
+      setRegenState("idle");
+      return;
     }
+
+    const totalToProcess = counts.outdated;
+    totalToProcessRef.current = totalToProcess;
+    processedCountRef.current = 0;
+    lastHandledRevisionRef.current = null;
+    setRegenErrorMessage(null);
+    setProgress({ current: 0, total: totalToProcess });
+    setRegenState("running");
+
+    fetcher.submit(
+      {
+        intent: "regenerate_one",
+        csrfToken,
+        portfolioRevision: currentRevisionRef.current,
+      },
+      { method: "POST" }
+    );
   };
 
   return (
@@ -302,7 +359,7 @@ export default function AdminPortfolioWatermark() {
                 defaultValue={watermarkText}
                 maxLength={40}
                 className={styles.input}
-                disabled={isRegenerating}
+                disabled={regenState === "running"}
                 required
               />
               <p className={styles.helpText}>Ce texte sera superposé sur toutes les photos du portfolio.</p>
@@ -320,7 +377,11 @@ export default function AdminPortfolioWatermark() {
               </div>
             </div>
 
-            <button type="submit" className={styles.submitButton} disabled={isSubmitting || isRegenerating}>
+            <button
+              type="submit"
+              className={styles.submitButton}
+              disabled={isSubmitting || regenState === "running"}
+            >
               {isSubmitting ? "Enregistrement…" : "Enregistrer le filigrane"}
             </button>
           </Form>
@@ -354,41 +415,56 @@ export default function AdminPortfolioWatermark() {
               </div>
             </div>
 
-            {regenErrorMessage && (
-              <p className={styles.error} id="regeneration-error-message">{regenErrorMessage}</p>
-            )}
-            {regenFinalMessage && (
-              <p className={styles.successMessage} id="regeneration-success-message">{regenFinalMessage}</p>
+            {regenState === "error" && regenErrorMessage && (
+              <p className={styles.error} id="regeneration-error-message" role="alert">
+                {regenErrorMessage}
+              </p>
             )}
 
-            {isRegenerating && (
+            {regenState === "success" && (
+              <p
+                id="regeneration-success-message"
+                role="status"
+                className={styles.successMessage}
+              >
+                Les filigranes des photos existantes ont été régénérés.
+              </p>
+            )}
+
+            {regenState === "running" && progress && (
               <div className={styles.regenProgressBox}>
-                <p className={styles.progressText} id="regeneration-status">{regenStatusMessage}</p>
-                {regenProgress && regenProgress.total > 0 && (
+                <p className={styles.progressText} id="regeneration-status">
+                  {`Régénération en cours : ${progress.current} / ${progress.total} photos traitées...`}
+                </p>
+                {progress.total > 0 && (
                   <progress
                     className={styles.progressBar}
-                    value={regenProgress.current}
-                    max={regenProgress.total}
+                    value={progress.current}
+                    max={progress.total}
+                    aria-valuenow={progress.current}
+                    aria-valuemin={0}
+                    aria-valuemax={progress.total}
+                    aria-label="Progression de la régénération du filigrane"
                   />
                 )}
               </div>
             )}
 
-            {!isRegenerating && counts.outdated === 0 && (
+            {regenState !== "running" && counts.outdated === 0 && (
               <p className={styles.regenNotice} id="all-photos-uptodate-message">
                 Toutes les photos sont déjà à jour avec le filigrane actuel.
               </p>
             )}
 
-            <div style={{ marginTop: "1rem" }}>
+            <div className={styles.regenActions}>
               <button
                 type="button"
                 id="regenerate-watermarks-button"
                 className={styles.submitButton}
                 onClick={handleStartRegeneration}
-                disabled={counts.outdated === 0 || isRegenerating || isSubmitting}
+                disabled={counts.outdated === 0 || regenState === "running" || regenState === "confirming" || regenState === "success" || isSubmitting}
               >
-                {isRegenerating ? "Régénération en cours…" : "Régénérer le filigrane des photos existantes"}
+                {regenState === "running" ? "Régénération en cours…" : "Régénérer le filigrane des photos existantes"}
               </button>
             </div>
           </section>
