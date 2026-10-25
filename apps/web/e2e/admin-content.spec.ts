@@ -100,22 +100,10 @@ test.describe('Admin Content Management (Phase 3B)', () => {
     // Submit a mutation via request with the same revision to "steal" it
     const revision = await page.locator('input[name="revision"]').inputValue();
 
-    // A valid business object
-    const businessData = {
-        email: "stolen@example.com",
-        phoneDisplay: null,
-        phoneE164: null,
-        address: null,
-        enterpriseNumber: null,
-        legalForm: null,
-        legalRepresentative: null,
-        hostingProvider: null,
-        hostingAddress: null,
-        depositPercent: 30,
-        instagramUrl: null,
-        linkedinUrl: null,
-        serviceArea: { fr: "Test FR", en: "Test EN" }
-    };
+    // Read the current valid business content from the form
+    const currentBusinessRaw = await page.locator('input[name="business"]').inputValue();
+    const businessData = JSON.parse(currentBusinessRaw);
+    businessData.email = "stolen@example.com";
 
     const res = await request.post('/admin/settings', {
       headers: {
