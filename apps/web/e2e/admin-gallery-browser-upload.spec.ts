@@ -1,11 +1,9 @@
 import { test, expect } from "@playwright/test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import crypto from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import sharp from "sharp";
-
-const fixtureDirectory = fileURLToPath(new URL(".", import.meta.url));
 
 test.describe("Admin Gallery Browser Upload & Visio Slots E2E", () => {
   let createdGalleryFolder: string | null = null;
@@ -56,8 +54,8 @@ test.describe("Admin Gallery Browser Upload & Visio Slots E2E", () => {
     }
   });
 
-  test("Cycle complet : connexion, créneaux visio, création galerie, dossier logique, upload par morceaux, reprise, finalisation et import", async ({ page }) => {
-    test.setTimeout(120_000);
+  test("Cycle complet : connexion, créneaux visio, création galerie, destination Invités/Mariés, envoi multi-morceaux > 5 Mo sans réessai, finalisation, import et permissions", async ({ page, browser }) => {
+    test.setTimeout(180_000);
 
     // 1. Connexion administrateur
     await page.goto("/admin");
@@ -75,7 +73,6 @@ test.describe("Admin Gallery Browser Upload & Visio Slots E2E", () => {
       const timeSelect = page.locator("#visio-time");
       await expect(timeSelect).toBeVisible();
 
-      // Vérification que les nouveaux créneaux sont présents
       const timeOptions = await timeSelect.locator("option").allInnerTexts();
       const expectedSlots = ["10:00", "12:00", "14:00", "16:00", "18:00"];
       for (const slot of expectedSlots) {
@@ -103,17 +100,29 @@ test.describe("Admin Gallery Browser Upload & Visio Slots E2E", () => {
 
     // 4. Vérification de la présence du dossier logique de la galerie sur le disque
     const subdirs = fs.readdirSync(importBasePath);
-    const galleryFolder = subdirs.find(d => d.startsWith("sophie-thomas-e2e") || d.includes(galleryId.slice(0, 8)));
+    const galleryFolder = subdirs.find(d => d.includes(galleryId));
     expect(galleryFolder).toBeDefined();
 
     createdGalleryFolder = path.join(importBasePath, galleryFolder!);
     expect(fs.existsSync(createdGalleryFolder)).toBe(true);
-    expect(fs.existsSync(path.join(createdGalleryFolder, "photos"))).toBe(true);
-    expect(fs.existsSync(path.join(createdGalleryFolder, "videos"))).toBe(true);
+    expect(fs.existsSync(path.join(createdGalleryFolder, "invites", "photos"))).toBe(true);
+    expect(fs.existsSync(path.join(createdGalleryFolder, "invites", "videos"))).toBe(true);
+    expect(fs.existsSync(path.join(createdGalleryFolder, "maries", "photos"))).toBe(true);
+    expect(fs.existsSync(path.join(createdGalleryFolder, "maries", "videos"))).toBe(true);
 
-    // 5. Présence des deux boutons sur la page d'administration
-    const photosBtn = page.getByRole("button", { name: "Importer des photos" });
-    const videosBtn = page.getByRole("button", { name: "Importer des vidéos" });
+    // 5. Groupe de choix accessible Invités / Mariés et boutons d'import
+    const fieldset = page.getByRole("group", { name: "Destination des médias à sélectionner :" });
+    await expect(fieldset).toBeVisible();
+
+    const guestRadio = page.getByRole("radio", { name: /Invités - visible par tous les détenteurs d'un code/ });
+    const coupleRadio = page.getByRole("radio", { name: /Mariés uniquement - visible uniquement avec le code mariés/ });
+    await expect(guestRadio).toBeVisible();
+    await expect(coupleRadio).toBeVisible();
+    await expect(guestRadio).toBeChecked();
+    await expect(coupleRadio).not.toBeChecked();
+
+    const photosBtn = page.getByRole("button", { name: /Importer des photos/ });
+    const videosBtn = page.getByRole("button", { name: /Importer des vidéos/ });
     await expect(photosBtn).toBeVisible();
     await expect(videosBtn).toBeVisible();
 
@@ -128,39 +137,51 @@ test.describe("Admin Gallery Browser Upload & Visio Slots E2E", () => {
       }
     });
 
-    // 6. Préparation des médias de test
-    const photo1Buffer = await sharp({ create: { width: 80, height: 80, channels: 3, background: { r: 120, g: 60, b: 200 } } }).jpeg().toBuffer();
-    const photo2Buffer = await sharp({ create: { width: 80, height: 80, channels: 3, background: { r: 200, g: 120, b: 60 } } }).jpeg().toBuffer();
+    // 6. Génération dynamique de deux vrais JPEG valides dépassant CHUNK_SIZE (> 5 Mo)
+    // 3000 x 2400 avec bruit aléatoire produit un JPEG valide d'environ 5.5 Mo
+    const rawNoise1 = crypto.randomBytes(3000 * 2400 * 3);
+    const guestPhotoBuffer = await sharp(rawNoise1, { raw: { width: 3000, height: 2400, channels: 3 } })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    expect(guestPhotoBuffer.length).toBeGreaterThan(5 * 1024 * 1024);
 
-    // 7. Upload de plusieurs petites photos via le sélecteur accessible
+    const rawNoise2 = crypto.randomBytes(3000 * 2400 * 3);
+    const couplePhotoBuffer = await sharp(rawNoise2, { raw: { width: 3000, height: 2400, channels: 3 } })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    expect(couplePhotoBuffer.length).toBeGreaterThan(5 * 1024 * 1024);
+
     const photoInput = page.locator('input[type="file"][accept*="image/jpeg"]');
+
+    // 7. Envoi de la première photo avec la destination par défaut (Invités)
     await photoInput.setInputFiles([
-      { name: "test-photo-1.jpg", mimeType: "image/jpeg", buffer: photo1Buffer },
-      { name: "test-photo-2.jpg", mimeType: "image/jpeg", buffer: photo2Buffer },
+      { name: "test-guest-big.jpg", mimeType: "image/jpeg", buffer: guestPhotoBuffer },
     ]);
+    await expect(page.locator('[title="test-guest-big.jpg"]')).toBeVisible({ timeout: 10_000 });
 
-    // 8. Vérification de l'affichage de la progression
-    await expect(page.locator('progress[aria-label*="Progression"]').first()).toBeVisible({ timeout: 10_000 });
+    // 8. Bascule sur la destination "Mariés uniquement" et sélection de la deuxième photo
+    await coupleRadio.click();
+    await expect(coupleRadio).toBeChecked();
 
-    // 9. Simulation sélection d'une vidéo de test
-    const videoFixturePath = path.join(fixtureDirectory, "fixtures/vid1.mp4");
-    let hasVideo = false;
-    if (fs.existsSync(videoFixturePath)) {
-      hasVideo = true;
-      const videoInput = page.locator('input[type="file"][accept*="video/mp4"]');
-      await videoInput.setInputFiles(videoFixturePath);
-    }
+    await photoInput.setInputFiles([
+      { name: "test-couple-big.jpg", mimeType: "image/jpeg", buffer: couplePhotoBuffer },
+    ]);
+    await expect(page.locator('[title="test-couple-big.jpg"]')).toBeVisible({ timeout: 10_000 });
 
-    // 10. Attente de la finalisation complète côté UI et serveur
+    // 9. Attente de la finalisation complète côté UI et serveur SANS cliquer sur Réessayer
     const batchSuccessMessage = page.locator('p[role="status"]').filter({
       hasText: "Tous les fichiers ont été envoyés avec succès"
     });
-    await expect(batchSuccessMessage).toBeVisible({ timeout: 30_000 });
+    await expect(batchSuccessMessage).toBeVisible({ timeout: 90_000 });
 
-    // Aucune erreur d'envoi affichée
-    await expect(page.locator('[role="alert"]').filter({ hasText: "Erreur" })).toHaveCount(0);
+    // Vérifier que le message mentionne explicitement la destination Invités et Mariés
+    await expect(batchSuccessMessage).toContainText("1 Invités");
+    await expect(batchSuccessMessage).toContainText("1 Mariés");
 
-    // Vérification des statuts HTTP serveur (init, chunk, finalize doivent être 200)
+    // Aucun message d'erreur d'envoi affiché
+    await expect(page.locator('[role="alert"]').filter({ hasText: "Échec" })).toHaveCount(0);
+
+    // 10. Vérification que toutes les requêtes init/chunk/finalize sont en succès (200)
     expect(monitoredUploadResponses.length).toBeGreaterThan(0);
     for (const item of monitoredUploadResponses) {
       expect(item.status, `La requête ${item.action} doit réussir avec le statut 200`).toBe(200);
@@ -169,46 +190,40 @@ test.describe("Admin Gallery Browser Upload & Visio Slots E2E", () => {
     expect(monitoredUploadResponses.some(r => r.action === "chunk")).toBe(true);
     expect(monitoredUploadResponses.some(r => r.action === "finalize")).toBe(true);
 
-    // 11. a & b : Vérification de la présence des fichiers finaux et de l'absence de traces temporaires
-    const photosInFolder = fs.readdirSync(path.join(createdGalleryFolder, "photos"));
-    expect(photosInFolder.length).toBeGreaterThanOrEqual(2);
-    expect(photosInFolder).toContain("test-photo-1.jpg");
-    expect(photosInFolder).toContain("test-photo-2.jpg");
-    for (const f of photosInFolder) {
-      expect(f.endsWith(".part"), `Aucun fichier .part dans photos/ (${f})`).toBe(false);
-      expect(f.endsWith(".tmp"), `Aucun fichier .tmp dans photos/ (${f})`).toBe(false);
+    // 11. Vérification sur le disque : dossiers Invités et Mariés, aucun .part ni .tmp résiduel
+    const guestPhotosDir = path.join(createdGalleryFolder, "invites", "photos");
+    const couplePhotosDir = path.join(createdGalleryFolder, "maries", "photos");
+
+    expect(fs.existsSync(path.join(guestPhotosDir, "test-guest-big.jpg"))).toBe(true);
+    expect(fs.existsSync(path.join(couplePhotosDir, "test-couple-big.jpg"))).toBe(true);
+
+    for (const f of fs.readdirSync(guestPhotosDir)) {
+      expect(f.endsWith(".part"), `Aucun fichier .part dans invites/photos/ (${f})`).toBe(false);
+      expect(f.endsWith(".tmp"), `Aucun fichier .tmp dans invites/photos/ (${f})`).toBe(false);
+    }
+    for (const f of fs.readdirSync(couplePhotosDir)) {
+      expect(f.endsWith(".part"), `Aucun fichier .part dans maries/photos/ (${f})`).toBe(false);
+      expect(f.endsWith(".tmp"), `Aucun fichier .tmp dans maries/photos/ (${f})`).toBe(false);
     }
 
-    if (hasVideo) {
-      const videosInFolder = fs.readdirSync(path.join(createdGalleryFolder, "videos"));
-      expect(videosInFolder.length).toBeGreaterThanOrEqual(1);
-      expect(videosInFolder).toContain("vid1.mp4");
-      for (const f of videosInFolder) {
-        expect(f.endsWith(".part"), `Aucun fichier .part dans videos/ (${f})`).toBe(false);
-        expect(f.endsWith(".tmp"), `Aucun fichier .tmp dans videos/ (${f})`).toBe(false);
-      }
-    }
-
-    // Vérification de l'absence de fichiers temporaires dans .tmp_uploads
     const tempUploadDir = path.join(createdGalleryFolder, ".tmp_uploads");
     if (fs.existsSync(tempUploadDir)) {
       const remainingTemp = fs.readdirSync(tempUploadDir);
       expect(remainingTemp.length, "Aucune session d'upload temporaire résiduelle").toBe(0);
     }
 
-    // 12. c : Analyse du dossier (prévisualisation import)
-    await expect(page.getByText("médias trouvés", { exact: false })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/Invités : \d+ photos/)).toBeVisible();
+    // 12. Analyse automatique du dossier et exactitude des compteurs
+    await expect(page.getByText("médias trouvés", { exact: false })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/Invités : 1 photos/)).toBeVisible();
+    await expect(page.getByText(/Mariés : 1 photos/)).toBeVisible();
 
-    // 13. d : Déclenchement de l'import via le pipeline existant et attente de fin
+    // 13. Lancement de l'import et attente de fin
     const startImportBtn = page.getByRole("button", { name: "Confirmer et lancer l'import", exact: true });
     await expect(startImportBtn).toBeVisible({ timeout: 10_000 });
     await startImportBtn.click();
 
-    // Vérification du statut d'import initial
     await expect(page.locator('[data-testid="gallery-import-status"]')).toHaveText("Import lancé.", { timeout: 10_000 });
 
-    // Attente déterministe de la fin complète de l'import
     await expect(async () => {
       const res = await page.request.get(`/api/admin/gallery-import/${galleryId}?poll=${Date.now()}`);
       expect(res.status()).toBe(200);
@@ -221,18 +236,95 @@ test.describe("Admin Gallery Browser Upload & Visio Slots E2E", () => {
       };
       expect(data.importState).not.toBeNull();
       expect(data.importState?.status).toBe("completed");
-    }).toPass({ timeout: 30_000 });
+    }).toPass({ timeout: 45_000 });
 
-    // 14. e : Vérification de la présence des médias importés dans la base et dans l'interface
-    const dbPath = process.env.GALLERY_DB_PATH;
-    if (dbPath && fs.existsSync(dbPath)) {
-      const db = new DatabaseSync(dbPath);
-      const row = db.prepare("SELECT count(*) as count FROM gallery_media WHERE gallery_id = ?").get(galleryId) as { count: number };
-      expect(row.count).toBeGreaterThanOrEqual(2);
-      db.close();
-    }
-
+    // Recharger la page pour refléter les médias importés
     await page.reload();
-    await expect(page.getByText(/Photos Invités : [1-9]/)).toBeVisible({ timeout: 10_000 });
+
+    // 14. Publication de la galerie pour permettre la connexion client
+    await page.selectOption('select[name="status"]', "published");
+    const savePromise = page.waitForResponse(
+      res => res.url().includes(`/admin/galleries/${galleryId}`) && res.request().method() === "POST"
+    );
+    await page.click('button:has-text("Enregistrer les informations")');
+    const saveRes = await savePromise;
+    expect(saveRes.status()).toBe(200);
+    await expect(page.getByRole("status").filter({ hasText: "Enregistré." })).toBeVisible();
+
+    // Récupération des codes d'accès et des identifiants médias
+    await page.click("text=Afficher les codes");
+    const guestCode = await page.getByLabel("Code invités actuel").inputValue();
+    const coupleCode = await page.getByLabel("Code mariés actuel").inputValue();
+    expect(guestCode).toBeTruthy();
+    expect(coupleCode).toBeTruthy();
+
+    const dbPath = process.env.GALLERY_DB_PATH!;
+    const db = new DatabaseSync(dbPath);
+    const galRow = db.prepare("SELECT public_id FROM galleries WHERE id = ?").get(galleryId) as { public_id: string };
+    const mediaRows = db.prepare("SELECT id, original_name, visibility FROM gallery_media WHERE gallery_id = ?").all(galleryId) as { id: string; original_name: string; visibility: string }[];
+    db.close();
+
+    const publicId = galRow.public_id;
+    const guestMedia = mediaRows.find(m => m.visibility === "invites");
+    const coupleMedia = mediaRows.find(m => m.visibility === "maries");
+
+    expect(guestMedia).toBeDefined();
+    expect(coupleMedia).toBeDefined();
+
+    // 15. Vérification des droits réels pour le code invité :
+    // Le code invité ne voit jamais les médias Mariés
+    const guestContext = await browser.newContext();
+    const guestPage = await guestContext.newPage();
+
+    await guestPage.goto("/fr/espace-clients");
+    await guestPage.waitForSelector('body[data-hydrated="true"]');
+    const guestLoginPromise = guestPage.waitForResponse(
+      res => res.url().includes("/fr/espace-clients") && res.request().method() === "POST"
+    );
+    await guestPage.fill('input[name="code"]', guestCode);
+    await guestPage.click('button[type="submit"]');
+    const guestLoginResponse = await guestLoginPromise;
+    expect(guestLoginResponse.status()).toBeLessThan(400);
+
+    await guestPage.waitForURL(url => url.pathname.includes(`/fr/galerie/${publicId}`));
+    await expect(guestPage.getByTestId("gallery-view")).toBeVisible();
+
+    // Vérification visuelle côté invité : 1 seule photo (celle des Invités)
+    await expect(guestPage.getByTestId("gallery-photo")).toHaveCount(1);
+    const guestHtml = await guestPage.content();
+    expect(guestHtml).not.toContain(coupleMedia!.id);
+
+    // Accès direct HTTP interdit en 404 au média Mariés
+    const guestForbiddenRes = await guestContext.request.get(`/api/gallery/${publicId}/media/${coupleMedia!.id}?width=480&format=webp`);
+    expect(guestForbiddenRes.status()).toBe(404);
+
+    await guestContext.close();
+
+    // 16. Vérification des droits réels pour le code mariés :
+    // Le code mariés voit les médias Invités et Mariés (2 photos au total)
+    const coupleContext = await browser.newContext();
+    const couplePage = await coupleContext.newPage();
+
+    await couplePage.goto("/fr/espace-clients");
+    await couplePage.waitForSelector('body[data-hydrated="true"]');
+    const coupleLoginPromise = couplePage.waitForResponse(
+      res => res.url().includes("/fr/espace-clients") && res.request().method() === "POST"
+    );
+    await couplePage.fill('input[name="code"]', coupleCode);
+    await couplePage.click('button[type="submit"]');
+    const coupleLoginResponse = await coupleLoginPromise;
+    expect(coupleLoginResponse.status()).toBeLessThan(400);
+
+    await couplePage.waitForURL(url => url.pathname.includes(`/fr/galerie/${publicId}`));
+    await expect(couplePage.getByTestId("gallery-view")).toBeVisible();
+
+    // Vérification visuelle côté mariés : 2 photos visibles (Invités + Mariés)
+    await expect(couplePage.getByTestId("gallery-photo")).toHaveCount(2);
+
+    // Accès direct HTTP autorisé en 200 au média Mariés
+    const coupleAllowedRes = await coupleContext.request.get(`/api/gallery/${publicId}/media/${coupleMedia!.id}?width=480&format=webp`);
+    expect(coupleAllowedRes.status()).toBe(200);
+
+    await coupleContext.close();
   });
 });

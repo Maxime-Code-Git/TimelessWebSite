@@ -1,14 +1,18 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import styles from "../../routes/admin.module.css";
+import type { UploadDestination } from "../../lib/gallery-upload.server";
+
+export type UploadPhase = "init" | "chunk" | "status" | "finalize" | "scan";
 
 export interface UploadQueueItem {
   id: string;
   file: File;
-  target: "photos" | "videos";
+  destination: UploadDestination;
   status: "pending" | "uploading" | "completed" | "error";
   progress: number; // 0 to 100
-  error?: string;
   uploadId?: string;
+  phase?: UploadPhase;
+  error?: string;
 }
 
 interface GalleryBrowserUploadProps {
@@ -21,8 +25,102 @@ interface GalleryBrowserUploadProps {
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
 const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".avif"];
 const VIDEO_EXTENSIONS = [".mp4", ".webm"];
-
 export const MAX_BATCH_FILES = 2000;
+const MAX_AUTO_RETRIES = 3;
+
+/**
+ * Determines whether an error is transient (network failure, 408, 429, 5xx)
+ * or permanent (400, 401, 403, 404, 413, 415).
+ */
+export function isTransientError(status?: number, err?: unknown): boolean {
+  if (err instanceof TypeError || (err instanceof Error && err.name === "TypeError")) {
+    return true; // Network failure in browser fetch
+  }
+  if (!status) return true; // Network failure or fetch exception
+  if (status === 408 || status === 429 || (status >= 500 && status <= 599)) {
+    return true;
+  }
+  return false;
+}
+
+export function formatPhase(phase?: UploadPhase): string {
+  switch (phase) {
+    case "init":
+      return "Initialisation";
+    case "chunk":
+      return "Envoi des morceaux";
+    case "status":
+      return "Vérification";
+    case "finalize":
+      return "Finalisation";
+    case "scan":
+      return "Analyse";
+    default:
+      return "Transfert";
+  }
+}
+
+export function formatDestination(dest: UploadDestination): string {
+  switch (dest) {
+    case "guest_photos":
+      return "Photos Invités";
+    case "guest_videos":
+      return "Vidéos Invités";
+    case "couple_photos":
+      return "Photos Mariés";
+    case "couple_videos":
+      return "Vidéos Mariés";
+  }
+}
+
+export function formatDestinationAudience(dest: UploadDestination): string {
+  return dest.startsWith("guest_") ? "Invités" : "Mariés uniquement";
+}
+
+/**
+ * Executes a fetch request with bounded automatic retries and exponential backoff
+ * for transient errors only. Permanent 4xx errors fail immediately.
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  phase: UploadPhase,
+  maxRetries = MAX_AUTO_RETRIES
+): Promise<Response> {
+  let attempt = 0;
+  while (true) {
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        if (isTransientError(res.status) && attempt < maxRetries) {
+          attempt++;
+          const delay = Math.min(500 * Math.pow(2, attempt), 3000) + Math.random() * 200;
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        const errData = (await res.json().catch(() => ({}))) as { error?: string };
+        const msg = errData.error || `Erreur HTTP ${res.status}`;
+        const err = new Error(msg);
+        (err as unknown as { status?: number; phase?: UploadPhase }).status = res.status;
+        (err as unknown as { status?: number; phase?: UploadPhase }).phase = phase;
+        throw err;
+      }
+      return res;
+    } catch (err: unknown) {
+      const httpStatus = (err as unknown as { status?: number }).status;
+      if (isTransientError(httpStatus, err) && attempt < maxRetries) {
+        attempt++;
+        const delay = Math.min(500 * Math.pow(2, attempt), 3000) + Math.random() * 200;
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      if ((err as unknown as { phase?: UploadPhase }).phase === undefined) {
+        (err as unknown as { phase?: UploadPhase }).phase = phase;
+      }
+      throw err;
+    }
+  }
+}
 
 export function GalleryBrowserUpload({
   galleryId,
@@ -31,21 +129,27 @@ export function GalleryBrowserUpload({
   onUploadBatchComplete,
 }: GalleryBrowserUploadProps) {
   const [queue, setQueue] = useState<UploadQueueItem[]>([]);
+  const [selectedAudience, setSelectedAudience] = useState<"invites" | "maries">("invites");
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [batchCompleted, setBatchCompleted] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
 
+  const queueRef = useRef<UploadQueueItem[]>([]);
+  queueRef.current = queue;
+
+  const isProcessingRef = useRef(false);
+  const hasNotifiedBatchRef = useRef(false);
+
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const photosButtonRef = useRef<HTMLButtonElement>(null);
   const videosButtonRef = useRef<HTMLButtonElement>(null);
-  const hasNotifiedBatchRef = useRef(false);
 
   // Warn before closing/refreshing if uploads are in progress
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isProcessing) {
+      if (isProcessingRef.current) {
         e.preventDefault();
         e.returnValue = "Un upload est en cours. Êtes-vous sûr de vouloir quitter ?";
         return e.returnValue;
@@ -53,10 +157,10 @@ export function GalleryBrowserUpload({
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isProcessing]);
+  }, []);
 
-  const addFilesToQueue = (files: FileList | File[], defaultTarget: "photos" | "videos") => {
-    if (queue.length + files.length > MAX_BATCH_FILES) {
+  const addFilesToQueue = (files: FileList | File[], mediaType: "photos" | "videos") => {
+    if (queueRef.current.length + files.length > MAX_BATCH_FILES) {
       setBatchError(`Limite dépassée : un lot ne peut pas contenir plus de ${MAX_BATCH_FILES} fichiers.`);
       return;
     }
@@ -65,20 +169,28 @@ export function GalleryBrowserUpload({
     const newItems: UploadQueueItem[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      let target = defaultTarget;
+      let resolvedMediaType = mediaType;
       const lower = file.name.toLowerCase();
 
       // Automatically categorize if dropped
       if (PHOTO_EXTENSIONS.some(ext => lower.endsWith(ext))) {
-        target = "photos";
+        resolvedMediaType = "photos";
       } else if (VIDEO_EXTENSIONS.some(ext => lower.endsWith(ext))) {
-        target = "videos";
+        resolvedMediaType = "videos";
+      }
+
+      // Memorize destination at the moment of selection based on selectedAudience
+      let destination: UploadDestination;
+      if (selectedAudience === "maries") {
+        destination = resolvedMediaType === "photos" ? "couple_photos" : "couple_videos";
+      } else {
+        destination = resolvedMediaType === "photos" ? "guest_photos" : "guest_videos";
       }
 
       newItems.push({
         id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
         file,
-        target,
+        destination,
         status: "pending",
         progress: 0,
       });
@@ -92,63 +204,79 @@ export function GalleryBrowserUpload({
   };
 
   const uploadSingleFile = async (item: UploadQueueItem): Promise<void> => {
-    const { file, target } = item;
+    const { file, destination } = item;
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-    // Update item status
+    // Update item status in queueRef and state
+    item.status = "uploading";
+    item.progress = 0;
+    item.error = undefined;
+    item.phase = "init";
     setQueue(prev =>
-      prev.map(q => (q.id === item.id ? { ...q, status: "uploading", progress: 0, error: undefined } : q))
+      prev.map(q => (q.id === item.id ? { ...q, status: "uploading", progress: 0, error: undefined, phase: "init" } : q))
     );
 
     let uploadId = item.uploadId;
-    let uploadedChunks: number[] = [];
+    let uploadedChunks: number[];
 
     // Step 1: Init or check existing session
     if (!uploadId) {
-      const initRes = await fetch(`/api/admin/gallery-upload/${galleryId}?action=init`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken,
+      const initRes = await fetchWithRetry(
+        `/api/admin/gallery-upload/${galleryId}?action=init`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken,
+          },
+          body: JSON.stringify({
+            action: "init",
+            destination,
+            fileName: file.name,
+            fileSize: file.size,
+            totalChunks,
+            chunkSize: CHUNK_SIZE,
+          }),
         },
-        body: JSON.stringify({
-          action: "init",
-          target,
-          fileName: file.name,
-          fileSize: file.size,
-          totalChunks,
-          chunkSize: CHUNK_SIZE,
-        }),
-      });
+        "init"
+      );
 
-      if (!initRes.ok) {
-        const data = await initRes.json().catch(() => ({ error: "Erreur d'initialisation" })) as { error?: string };
-        throw new Error(data.error || `Erreur HTTP ${initRes.status}`);
-      }
-
-      const initData = await initRes.json() as { uploadId: string; uploadedChunks: number[] };
+      const initData = (await initRes.json()) as { uploadId: string; uploadedChunks: number[] };
       uploadId = initData.uploadId;
+      item.uploadId = uploadId;
       uploadedChunks = initData.uploadedChunks || [];
 
       setQueue(prev =>
         prev.map(q => (q.id === item.id ? { ...q, uploadId } : q))
       );
     } else {
-      // Check status to resume
-      const statusRes = await fetch(`/api/admin/gallery-upload/${galleryId}?action=status&uploadId=${uploadId}`, {
-        headers: {
-          "X-CSRF-Token": csrfToken,
+      // Check status to resume existing session
+      item.phase = "status";
+      setQueue(prev =>
+        prev.map(q => (q.id === item.id ? { ...q, phase: "status" } : q))
+      );
+
+      const statusRes = await fetchWithRetry(
+        `/api/admin/gallery-upload/${galleryId}?action=status&uploadId=${uploadId}`,
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken,
+          },
         },
-      });
-      if (statusRes.ok) {
-        const statusData = await statusRes.json() as { uploadedChunks: number[] };
-        uploadedChunks = statusData.uploadedChunks || [];
-      }
+        "status"
+      );
+      const statusData = (await statusRes.json()) as { uploadedChunks: number[] };
+      uploadedChunks = statusData.uploadedChunks || [];
     }
 
     const uploadedSet = new Set(uploadedChunks);
 
     // Step 2: Upload chunks
+    item.phase = "chunk";
+    setQueue(prev =>
+      prev.map(q => (q.id === item.id ? { ...q, phase: "chunk" } : q))
+    );
+
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
       if (uploadedSet.has(chunkIndex)) {
         continue;
@@ -158,101 +286,129 @@ export function GalleryBrowserUpload({
       const end = Math.min(start + CHUNK_SIZE, file.size);
       const chunkBlob = file.slice(start, end);
 
-      const chunkRes = await fetch(`/api/admin/gallery-upload/${galleryId}?action=chunk`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/octet-stream",
-          "X-CSRF-Token": csrfToken,
-          "X-Upload-Id": uploadId,
-          "X-Chunk-Index": String(chunkIndex),
-          "X-Total-Chunks": String(totalChunks),
+      await fetchWithRetry(
+        `/api/admin/gallery-upload/${galleryId}?action=chunk`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "X-CSRF-Token": csrfToken,
+            "X-Upload-Id": uploadId,
+            "X-Chunk-Index": String(chunkIndex),
+            "X-Total-Chunks": String(totalChunks),
+          },
+          body: chunkBlob,
         },
-        body: chunkBlob,
-      });
-
-      if (!chunkRes.ok) {
-        const errData = await chunkRes.json().catch(() => ({ error: "Erreur envoi morceau" })) as { error?: string };
-        throw new Error(errData.error || `Erreur HTTP ${chunkRes.status} sur morceau ${chunkIndex + 1}`);
-      }
+        "chunk"
+      );
 
       uploadedSet.add(chunkIndex);
       const currentProgress = Math.round((uploadedSet.size / totalChunks) * 100);
+      item.progress = currentProgress;
 
       setQueue(prev =>
         prev.map(q => (q.id === item.id ? { ...q, progress: currentProgress } : q))
       );
     }
 
-    // Step 3: Finalize
-    const finalizeRes = await fetch(`/api/admin/gallery-upload/${galleryId}?action=finalize`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
-      },
-      body: JSON.stringify({
-        action: "finalize",
-        uploadId,
-      }),
-    });
-
-    if (!finalizeRes.ok) {
-      const finData = await finalizeRes.json().catch(() => ({ error: "Erreur de finalisation" })) as { error?: string };
-      throw new Error(finData.error || `Erreur HTTP ${finalizeRes.status} à la finalisation`);
+    // Authoritative check: all chunks must be accounted for before finalize
+    if (uploadedSet.size !== totalChunks) {
+      throw new Error(`Envoi incomplet : ${uploadedSet.size}/${totalChunks} morceaux transmis.`);
     }
 
+    // Step 3: Finalize
+    item.phase = "finalize";
     setQueue(prev =>
-      prev.map(q => (q.id === item.id ? { ...q, status: "completed", progress: 100 } : q))
+      prev.map(q => (q.id === item.id ? { ...q, phase: "finalize" } : q))
+    );
+
+    await fetchWithRetry(
+      `/api/admin/gallery-upload/${galleryId}?action=finalize`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
+        },
+        body: JSON.stringify({
+          action: "finalize",
+          uploadId,
+        }),
+      },
+      "finalize"
+    );
+
+    item.status = "completed";
+    item.progress = 100;
+    item.error = undefined;
+    setQueue(prev =>
+      prev.map(q => (q.id === item.id ? { ...q, status: "completed", progress: 100, error: undefined } : q))
     );
   };
 
-  // Process the queue with max concurrency of 2
+  // Robust queue processor with strict concurrency limit of 2, free of stale React closures
   const processQueue = useCallback(async () => {
-    if (isProcessing) return;
+    if (isProcessingRef.current) return;
 
-    const pending = queue.filter(q => q.status === "pending");
-    if (pending.length === 0) return;
+    const hasPending = queueRef.current.some(q => q.status === "pending");
+    if (!hasPending) return;
 
+    isProcessingRef.current = true;
     setIsProcessing(true);
 
-    const pool = [...pending];
     const CONCURRENCY = 2;
 
-    const runNext = async (): Promise<void> => {
-      if (pool.length === 0) return;
-      const item = pool.shift()!;
+    const pump = async (): Promise<void> => {
+      while (true) {
+        // Find next pending item directly from freshest queueRef
+        const item = queueRef.current.find(q => q.status === "pending");
+        if (!item) break;
 
-      try {
-        await uploadSingleFile(item);
-      } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : "Erreur lors du transfert";
-        setQueue(prev =>
-          prev.map(q => (q.id === item.id ? { ...q, status: "error", error: errorMsg } : q))
-        );
-      } finally {
-        if (pool.length > 0) {
-          await runNext();
+        // Reserve item immediately
+        item.status = "uploading";
+
+        try {
+          await uploadSingleFile(item);
+        } catch (err: unknown) {
+          const errorMsg = err instanceof Error ? err.message : "Erreur lors du transfert";
+          const phase = (err as unknown as { phase?: UploadPhase }).phase || item.phase || "chunk";
+          item.status = "error";
+          item.error = errorMsg;
+          item.phase = phase;
+
+          setQueue(prev =>
+            prev.map(q =>
+              q.id === item.id
+                ? { ...q, status: "error", error: errorMsg, phase, uploadId: item.uploadId }
+                : q
+            )
+          );
         }
       }
     };
 
     const runners: Promise<void>[] = [];
-    const countToLaunch = Math.min(CONCURRENCY, pool.length);
+    const pendingCount = queueRef.current.filter(q => q.status === "pending").length;
+    const countToLaunch = Math.min(CONCURRENCY, pendingCount);
+
     for (let i = 0; i < countToLaunch; i++) {
-      runners.push(runNext());
+      runners.push(pump());
     }
 
     await Promise.all(runners);
+
+    isProcessingRef.current = false;
     setIsProcessing(false);
-  }, [queue, isProcessing, galleryId, csrfToken]);
+  }, [galleryId, csrfToken]);
 
   useEffect(() => {
     const hasPending = queue.some(q => q.status === "pending");
-    if (hasPending && !isProcessing) {
+    if (hasPending && !isProcessingRef.current) {
       void processQueue();
     }
-  }, [queue, isProcessing, processQueue]);
+  }, [queue, processQueue]);
 
+  // When all items finish (no pending, no uploading, at least one completed), notify batch
   useEffect(() => {
     const anyPendingOrUploading = queue.some(q => q.status === "pending" || q.status === "uploading");
     const hasCompleted = queue.some(q => q.status === "completed");
@@ -269,6 +425,14 @@ export function GalleryBrowserUpload({
     setBatchCompleted(false);
     setQueue(prev =>
       prev.map(q => (q.id === id ? { ...q, status: "pending", error: undefined } : q))
+    );
+  };
+
+  const retryAllFailed = () => {
+    hasNotifiedBatchRef.current = false;
+    setBatchCompleted(false);
+    setQueue(prev =>
+      prev.map(q => (q.status === "error" ? { ...q, status: "pending", error: undefined } : q))
     );
   };
 
@@ -298,41 +462,64 @@ export function GalleryBrowserUpload({
     setIsDragging(false);
   };
 
-  const totalItems = queue.length;
-  const completedItems = queue.filter(q => q.status === "completed").length;
+  const totalFiles = queue.length;
+  const completedFiles = queue.filter(q => q.status === "completed").length;
   const errorItems = queue.filter(q => q.status === "error").length;
   const currentUploading = queue.find(q => q.status === "uploading");
+  const overallProgress = totalFiles > 0 ? Math.round((completedFiles / totalFiles) * 100) : 0;
 
-  const totalProgress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+  const completedGuests = queue.filter(q => q.status === "completed" && q.destination.startsWith("guest_")).length;
+  const completedCouple = queue.filter(q => q.status === "completed" && q.destination.startsWith("couple_")).length;
 
   return (
-    <div className={styles.uploadSection}>
+    <div
+      className={`${styles.uploadSection} ${isDragging ? styles.uploadSectionDragging : ""}`}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      aria-label="Zone d'importation de médias dans la galerie"
+    >
+      {/* Accessible Audience Choice Group */}
+      <fieldset className={styles.audienceFieldset}>
+        <legend className={styles.audienceLegend}>
+          <strong>Destination des médias à sélectionner :</strong>
+        </legend>
+        <div className={styles.audienceRadioGroup} role="radiogroup" aria-label="Destination des médias">
+          <label className={`${styles.audienceRadioLabel} ${selectedAudience === "invites" ? styles.audienceRadioLabelActive : ""}`}>
+            <input
+              type="radio"
+              name="upload-audience-choice"
+              value="invites"
+              checked={selectedAudience === "invites"}
+              onChange={() => setSelectedAudience("invites")}
+              disabled={isProcessing}
+            />
+            <span>
+              <strong>Invités</strong> - visible par tous les détenteurs d'un code
+            </span>
+          </label>
+          <label className={`${styles.audienceRadioLabel} ${selectedAudience === "maries" ? styles.audienceRadioLabelActive : ""}`}>
+            <input
+              type="radio"
+              name="upload-audience-choice"
+              value="maries"
+              checked={selectedAudience === "maries"}
+              onChange={() => setSelectedAudience("maries")}
+              disabled={isProcessing}
+            />
+            <span>
+              <strong>Mariés uniquement</strong> - visible uniquement avec le code mariés
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
       <div className={styles.uploadButtonsRow}>
-        <button
-          ref={photosButtonRef}
-          type="button"
-          onClick={handlePhotosClick}
-          className={styles.uploadPhotosBtn}
-          aria-label="Importer des photos"
-        >
-          📷 Importer des photos
-        </button>
-
-        <button
-          ref={videosButtonRef}
-          type="button"
-          onClick={handleVideosClick}
-          className={styles.uploadVideosBtn}
-          aria-label="Importer des vidéos"
-        >
-          🎥 Importer des vidéos
-        </button>
-
         <input
           ref={photoInputRef}
           type="file"
-          multiple
           accept="image/jpeg,image/png,image/webp,image/avif"
+          multiple
           className={styles.visuallyHidden}
           aria-hidden="true"
           tabIndex={-1}
@@ -347,8 +534,8 @@ export function GalleryBrowserUpload({
         <input
           ref={videoInputRef}
           type="file"
-          multiple
           accept="video/mp4,video/webm"
+          multiple
           className={styles.visuallyHidden}
           aria-hidden="true"
           tabIndex={-1}
@@ -359,51 +546,76 @@ export function GalleryBrowserUpload({
             }
           }}
         />
+
+        <button
+          ref={photosButtonRef}
+          type="button"
+          onClick={handlePhotosClick}
+          disabled={isProcessing}
+          className={styles.uploadPhotosBtn}
+          aria-label={`Importer des photos (${selectedAudience === "maries" ? "Mariés uniquement" : "Invités"})`}
+        >
+          📷 Importer des photos ({selectedAudience === "maries" ? "Mariés" : "Invités"})
+        </button>
+
+        <button
+          ref={videosButtonRef}
+          type="button"
+          onClick={handleVideosClick}
+          disabled={isProcessing}
+          className={styles.uploadVideosBtn}
+          aria-label={`Importer des vidéos (${selectedAudience === "maries" ? "Mariés uniquement" : "Invités"})`}
+        >
+          🎥 Importer des vidéos ({selectedAudience === "maries" ? "Mariés" : "Invités"})
+        </button>
+
+        {errorItems > 0 && !isProcessing && (
+          <button
+            type="button"
+            onClick={retryAllFailed}
+            className={styles.retryAllBtn}
+            aria-label="Réessayer tous les échecs"
+          >
+            🔄 Réessayer tous les échecs ({errorItems})
+          </button>
+        )}
       </div>
 
-      <div
-        className={`${styles.dropZone} ${isDragging ? styles.dropZoneActive : ""}`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        role="region"
-        aria-label="Zone de glisser-déposer pour photos et vidéos"
-      >
-        <p className={styles.dropZoneText}>
-          Glissez-déposez vos photos ou vidéos ici, ou utilisez les boutons ci-dessus.
-        </p>
-        <p className={styles.dropZoneHint}>
-          Photos acceptées : JPEG, PNG, WebP, AVIF - Vidéos acceptées : MP4, WebM (morceaux de 5 Mo résilients)
-        </p>
-      </div>
+      <p className={styles.helperText}>
+        Glissez-déposez des photos ou des vidéos ici, ou utilisez les boutons ci-dessus.
+        Taille maximale : 100 Mo par photo, 20 Go par vidéo. Transfert découpé en morceaux avec reprise automatique.
+      </p>
 
       {batchError && (
-        <p role="alert" className={styles.errorText}>
+        <div role="alert" className={styles.errorMessage}>
           {batchError}
-        </p>
+        </div>
       )}
 
-      {totalItems > 0 && (
-        <div className={styles.uploadStatusContainer} role="region" aria-label="Progression de l'envoi">
-          <div role="status" aria-live="polite">
-            <p>
-              <strong>Progression globale :</strong> {completedItems} / {totalItems} fichier(s) terminé(s)
-              {errorItems > 0 && ` - ${errorItems} erreur(s)`}
-            </p>
+      {/* Queue & Progress View */}
+      {queue.length > 0 && (
+        <div className={styles.uploadStatusContainer} aria-live="polite">
+          <div className={styles.uploadSummaryRow}>
+            <span>
+              <strong>Lot en cours :</strong> {completedFiles} / {totalFiles} fichier(s) terminé(s)
+              {errorItems > 0 && ` • ${errorItems} échec(s)`}
+            </span>
             <progress
               className={styles.uploadProgressBar}
-              value={totalProgress}
+              value={overallProgress}
               max={100}
-              aria-label={`Progression globale de l'envoi : ${totalProgress}%`}
+              aria-label={`Progression globale du lot : ${overallProgress}%`}
             >
-              {totalProgress}%
+              {overallProgress}%
             </progress>
           </div>
 
           {currentUploading && (
             <div role="status" aria-live="polite">
               <p>
-                <strong>Envoi en cours :</strong> {currentUploading.file.name} ({currentUploading.progress}%)
+                <strong>Envoi en cours ({formatPhase(currentUploading.phase)}) :</strong> {currentUploading.file.name}{" "}
+                <span className={styles.destinationBadge}>[{formatDestinationAudience(currentUploading.destination)}]</span>{" "}
+                ({currentUploading.progress}%)
               </p>
               <progress
                 className={styles.uploadProgressBar}
@@ -418,7 +630,7 @@ export function GalleryBrowserUpload({
 
           {batchCompleted && errorItems === 0 && (
             <p role="status" className={styles.successMessage}>
-              ✓ Tous les fichiers ont été envoyés avec succès dans le dossier de la galerie ({galleryFolderName}).
+              ✓ Tous les fichiers ont été envoyés avec succès ({completedGuests} Invités, {completedCouple} Mariés) dans le dossier de la galerie ({galleryFolderName}).
               L'analyse a été déclenchée ci-dessous.
             </p>
           )}
@@ -427,7 +639,10 @@ export function GalleryBrowserUpload({
             {queue.map(item => (
               <li key={item.id} className={styles.uploadQueueItem}>
                 <span className={styles.uploadItemName} title={item.file.name}>
-                  {item.target === "photos" ? "📷" : "🎥"} {item.file.name} ({(item.file.size / 1024 / 1024).toFixed(1)} Mo)
+                  {item.destination.endsWith("_photos") ? "📷" : "🎥"} {item.file.name} ({(item.file.size / 1024 / 1024).toFixed(1)} Mo)
+                  <span className={styles.destinationBadge}>
+                    [{formatDestinationAudience(item.destination)}]
+                  </span>
                 </span>
 
                 {item.status === "pending" && (
@@ -436,7 +651,7 @@ export function GalleryBrowserUpload({
 
                 {item.status === "uploading" && (
                   <span className={`${styles.uploadItemStatus} ${styles.uploadItemUploading}`}>
-                    {item.progress}%
+                    {formatPhase(item.phase)} : {item.progress}%
                   </span>
                 )}
 
@@ -446,7 +661,7 @@ export function GalleryBrowserUpload({
 
                 {item.status === "error" && (
                   <div role="alert" className={`${styles.uploadItemStatus} ${styles.uploadItemError}`}>
-                    <span>{item.error || "Erreur"}</span>
+                    <span>Échec ({formatPhase(item.phase)}) : {item.error || "Erreur"}</span>
                     <button
                       type="button"
                       onClick={() => retryItem(item.id)}

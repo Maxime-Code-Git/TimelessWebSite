@@ -15,9 +15,64 @@ export const MAX_TOTAL_CHUNKS = 5000; // 5000 chunks max per file (allows 20 GB 
 export const MAX_BATCH_FILES = 2000; // 2000 files max per selection/batch
 export const MAX_ACTIVE_SESSIONS_PER_TARGET = 2; // 2 active sessions max per gallery and target
 export const SAFETY_BUFFER_BYTES = 50 * 1024 * 1024; // 50 MB safety margin
+export const ACTIVE_SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes inactivity timeout for active sessions
 
 export const PHOTO_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 export const VIDEO_MIME_TYPES = new Set(["video/mp4", "video/webm"]);
+
+export type UploadDestination =
+  | "guest_photos"
+  | "guest_videos"
+  | "couple_photos"
+  | "couple_videos";
+
+export interface DestinationConfig {
+  folder: string;
+  mediaType: "photo" | "video";
+  target: "photos" | "videos";
+  visibility: "invites" | "maries";
+  maxSize: number;
+  allowedMimes: Set<string>;
+}
+
+export const UPLOAD_DESTINATIONS: Record<UploadDestination, DestinationConfig> = {
+  guest_photos: {
+    folder: "invites/photos",
+    mediaType: "photo",
+    target: "photos",
+    visibility: "invites",
+    maxSize: MAX_PHOTO_SIZE,
+    allowedMimes: PHOTO_MIME_TYPES,
+  },
+  guest_videos: {
+    folder: "invites/videos",
+    mediaType: "video",
+    target: "videos",
+    visibility: "invites",
+    maxSize: MAX_VIDEO_SIZE,
+    allowedMimes: VIDEO_MIME_TYPES,
+  },
+  couple_photos: {
+    folder: "maries/photos",
+    mediaType: "photo",
+    target: "photos",
+    visibility: "maries",
+    maxSize: MAX_PHOTO_SIZE,
+    allowedMimes: PHOTO_MIME_TYPES,
+  },
+  couple_videos: {
+    folder: "maries/videos",
+    mediaType: "video",
+    target: "videos",
+    visibility: "maries",
+    maxSize: MAX_VIDEO_SIZE,
+    allowedMimes: VIDEO_MIME_TYPES,
+  },
+};
+
+export function isUploadDestination(val: unknown): val is UploadDestination {
+  return typeof val === "string" && Object.prototype.hasOwnProperty.call(UPLOAD_DESTINATIONS, val);
+}
 
 export class DiskSpaceError extends Error {
   readonly status = 507;
@@ -63,7 +118,7 @@ export function computeAllActiveDiskReservations(basePath: string, excludeUpload
   if (!fs.existsSync(basePath)) return 0;
   let totalReserved = 0;
   const now = Date.now();
-  const maxAgeMs = 24 * 60 * 60 * 1000;
+  const maxAgeMs = ACTIVE_SESSION_TIMEOUT_MS;
 
   const processTmpUploadsDir = (tmpUploadsDir: string) => {
     if (!fs.existsSync(tmpUploadsDir)) return;
@@ -79,7 +134,8 @@ export function computeAllActiveDiskReservations(basePath: string, excludeUpload
 
         try {
           const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as UploadMetadata;
-          if (now - meta.createdAt > maxAgeMs) continue;
+          const lastActive = meta.updatedAt || meta.createdAt;
+          if (now - lastActive > maxAgeMs) continue;
 
           let bytesOnDisk = 0;
           try {
@@ -128,6 +184,7 @@ export function computeAllActiveDiskReservations(basePath: string, excludeUpload
 
 /**
  * Counts currently active sessions for a specific gallery and target (photos/videos).
+ * A session is considered active if it has received activity within ACTIVE_SESSION_TIMEOUT_MS.
  */
 export function countActiveSessionsForTarget(
   galleryFolderPath: string,
@@ -138,7 +195,6 @@ export function countActiveSessionsForTarget(
   if (!fs.existsSync(tmpUploadsDir)) return 0;
   let count = 0;
   const now = Date.now();
-  const maxAgeMs = 24 * 60 * 60 * 1000;
 
   try {
     const entries = fs.readdirSync(tmpUploadsDir, { withFileTypes: true });
@@ -148,7 +204,8 @@ export function countActiveSessionsForTarget(
       if (fs.existsSync(metaPath)) {
         try {
           const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as UploadMetadata;
-          if (meta.galleryId === galleryId && meta.target === target && (now - meta.createdAt <= maxAgeMs)) {
+          const lastActive = meta.updatedAt || meta.createdAt;
+          if (meta.galleryId === galleryId && meta.target === target && (now - lastActive <= ACTIVE_SESSION_TIMEOUT_MS)) {
             count++;
           }
         } catch {
@@ -223,13 +280,16 @@ export function detectMimeType(buffer: Buffer): string | null {
 export interface UploadMetadata {
   uploadId: string;
   galleryId: string;
+  destination: UploadDestination;
   target: "photos" | "videos";
+  visibility: "invites" | "maries";
   fileName: string;
   fileSize: number;
   totalChunks: number;
   chunkSize: number;
   uploadedChunks: number[];
   createdAt: number;
+  updatedAt: number;
 }
 
 function getUploadsBaseDir(galleryFolderPath: string): string {
@@ -241,9 +301,9 @@ function getUploadsBaseDir(galleryFolderPath: string): string {
 }
 
 /**
- * Cleans up temporary upload folders older than maxAgeMs (default 24h).
+ * Cleans up temporary upload folders older than maxAgeMs (default 10 minutes inactivity).
  */
-export function cleanupAbandonedUploads(galleryFolderPath: string, maxAgeMs = 24 * 60 * 60 * 1000): void {
+export function cleanupAbandonedUploads(galleryFolderPath: string, maxAgeMs = 10 * 60 * 1000): void {
   try {
     const baseDir = path.join(galleryFolderPath, ".tmp_uploads");
     if (!fs.existsSync(baseDir)) return;
@@ -257,7 +317,8 @@ export function cleanupAbandonedUploads(galleryFolderPath: string, maxAgeMs = 24
         if (fs.existsSync(metaPath)) {
           try {
             const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as UploadMetadata;
-            if (now - meta.createdAt > maxAgeMs) shouldRemove = true;
+            const lastActive = meta.updatedAt || meta.createdAt;
+            if (now - lastActive > maxAgeMs) shouldRemove = true;
           } catch {
             try {
               const stat = fs.statSync(uploadDir);
@@ -290,17 +351,24 @@ export function cleanupAbandonedUploads(galleryFolderPath: string, maxAgeMs = 24
 export function initUploadSession(
   galleryId: string,
   params: {
-    target: "photos" | "videos";
+    destination: UploadDestination;
     fileName: string;
     fileSize: number;
     totalChunks: number;
     chunkSize?: number;
   }
-): { uploadId: string; chunkSize: number; totalChunks: number; uploadedChunks: number[] } {
+): {
+  uploadId: string;
+  chunkSize: number;
+  totalChunks: number;
+  uploadedChunks: number[];
+  destination: UploadDestination;
+} {
   return uploadLock.runSync(() => {
-    if (params.target !== "photos" && params.target !== "videos") {
-      throw new UploadValidationError("Cible d'import invalide (photos ou videos requis).");
+    if (!isUploadDestination(params.destination)) {
+      throw new UploadValidationError("Destination d'upload invalide (guest_photos, guest_videos, couple_photos ou couple_videos requis).", 400);
     }
+    const config = UPLOAD_DESTINATIONS[params.destination];
 
     const cleanName = sanitizeUploadFileName(params.fileName);
     if (!cleanName || cleanName === "fichier") {
@@ -315,12 +383,11 @@ export function initUploadSession(
       throw new UploadValidationError("Taille de fichier invalide (doit être un entier positif).");
     }
 
-    if (params.target === "photos" && params.fileSize > MAX_PHOTO_SIZE) {
-      throw new UploadValidationError(`Taille de photo trop grande (maximum ${Math.round(MAX_PHOTO_SIZE / 1024 / 1024)} Mo).`);
-    }
-
-    if (params.target === "videos" && params.fileSize > MAX_VIDEO_SIZE) {
-      throw new UploadValidationError(`Taille de vidéo trop grande (maximum ${Math.round(MAX_VIDEO_SIZE / 1024 / 1024 / 1024)} Go).`);
+    if (params.fileSize > config.maxSize) {
+      const maxLabel = config.mediaType === "photo"
+        ? `${Math.round(MAX_PHOTO_SIZE / 1024 / 1024)} Mo`
+        : `${Math.round(MAX_VIDEO_SIZE / 1024 / 1024 / 1024)} Go`;
+      throw new UploadValidationError(`Taille de fichier trop grande (maximum ${maxLabel}).`);
     }
 
     let chunkSize = DEFAULT_CHUNK_SIZE;
@@ -352,7 +419,7 @@ export function initUploadSession(
     const folder = ensureGalleryImportFolder(galleryId);
     cleanupAbandonedUploads(folder.folderPath);
 
-    const activeSessions = countActiveSessionsForTarget(folder.folderPath, galleryId, params.target);
+    const activeSessions = countActiveSessionsForTarget(folder.folderPath, galleryId, config.target);
     if (activeSessions >= MAX_ACTIVE_SESSIONS_PER_TARGET) {
       throw new UploadValidationError(
         `Nombre maximal de sessions actives atteint (${MAX_ACTIVE_SESSIONS_PER_TARGET} par type de média). Veuillez attendre la fin des transferts en cours.`,
@@ -370,20 +437,24 @@ export function initUploadSession(
 
     fs.mkdirSync(uploadDir, { recursive: true, mode: 0o700 });
 
+    const now = Date.now();
     const metadata: UploadMetadata = {
       uploadId,
       galleryId,
-      target: params.target,
+      destination: params.destination,
+      target: config.target,
+      visibility: config.visibility,
       fileName: cleanName,
       fileSize: params.fileSize,
       totalChunks: calculatedTotalChunks,
       chunkSize,
       uploadedChunks: [],
-      createdAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
     };
 
     const metaPath = path.join(uploadDir, "meta.json");
-    const tmpMetaPath = path.join(uploadDir, `meta.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
+    const tmpMetaPath = path.join(uploadDir, `meta.${process.pid}.${now}.${Math.random().toString(36).slice(2)}.tmp`);
     fs.writeFileSync(tmpMetaPath, JSON.stringify(metadata, null, 2), { mode: 0o600 });
     fs.renameSync(tmpMetaPath, metaPath);
 
@@ -392,6 +463,7 @@ export function initUploadSession(
       chunkSize,
       totalChunks: calculatedTotalChunks,
       uploadedChunks: [],
+      destination: params.destination,
     };
   });
 }
@@ -450,6 +522,11 @@ export async function saveChunkStream(
   const writeStream = fs.createWriteStream(chunkPartPath, { mode: 0o600 });
   await pipeline(nodeStream, writeStream);
 
+  // Wait for descriptor closure if still open
+  if (!writeStream.closed) {
+    await new Promise<void>((resolve) => writeStream.once("close", () => resolve()));
+  }
+
   // Vérification de la taille exacte reçue
   const chunkStat = fs.statSync(chunkPartPath);
   if (chunkStat.size !== expectedChunkSize) {
@@ -464,6 +541,7 @@ export async function saveChunkStream(
   const uploadedSet = new Set(meta.uploadedChunks);
   uploadedSet.add(chunkIndex);
   meta.uploadedChunks = Array.from(uploadedSet).sort((a, b) => a - b);
+  meta.updatedAt = Date.now();
   const tmpMetaPath = path.join(uploadDir, `meta.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
   fs.writeFileSync(tmpMetaPath, JSON.stringify(meta, null, 2), { mode: 0o600 });
   fs.renameSync(tmpMetaPath, metaPath);
@@ -481,7 +559,14 @@ export async function saveChunkStream(
 export function getUploadStatus(
   galleryId: string,
   uploadId: string
-): { uploadId: string; totalChunks: number; uploadedChunks: number[]; fileName: string; target: string } {
+): {
+  uploadId: string;
+  totalChunks: number;
+  uploadedChunks: number[];
+  fileName: string;
+  destination: UploadDestination;
+  target: "photos" | "videos";
+} {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uploadId)) {
     throw new UploadValidationError("Identifiant d'upload invalide.");
   }
@@ -521,6 +606,7 @@ export function getUploadStatus(
     totalChunks: meta.totalChunks,
     uploadedChunks: existingChunks,
     fileName: meta.fileName,
+    destination: meta.destination,
     target: meta.target,
   };
 }
@@ -531,7 +617,13 @@ export function getUploadStatus(
 export async function finalizeUpload(
   galleryId: string,
   uploadId: string
-): Promise<{ success: boolean; fileName: string; target: "photos" | "videos"; alreadyExists?: boolean }> {
+): Promise<{
+  success: boolean;
+  fileName: string;
+  destination: UploadDestination;
+  target: "photos" | "videos";
+  alreadyExists?: boolean;
+}> {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uploadId)) {
     throw new UploadValidationError("Identifiant d'upload invalide.");
   }
@@ -551,8 +643,12 @@ export async function finalizeUpload(
     throw new UploadValidationError("L'upload n'appartient pas à cette galerie.", 403);
   }
 
+  const config = UPLOAD_DESTINATIONS[meta.destination];
+  if (!config) {
+    throw new UploadValidationError("Destination d'upload inconnue dans les métadonnées.", 400);
+  }
+
   // Contrôle d'espace disque juste avant finalize pour la création du fichier assemblé
-  // (les morceaux occupent déjà fileSize sur disque, il faut fileSize supplémentaire disponible)
   const importBase = path.dirname(folder.folderPath);
   checkDiskSpace(folder.folderPath, meta.fileSize, importBase, uploadId);
 
@@ -591,33 +687,18 @@ export async function finalizeUpload(
     fs.copyFileSync(chunkPath, assembledPath);
     fs.chmodSync(assembledPath, 0o600);
   } else {
-    const writeStream = fs.createWriteStream(assembledPath, { mode: 0o600 });
-    for (let i = 0; i < meta.totalChunks; i++) {
-      const chunkPath = path.join(uploadDir, `chunk_${i}`);
-      if (!fs.existsSync(chunkPath)) {
-        writeStream.destroy();
-        throw new UploadValidationError(`Morceau ${i + 1}/${meta.totalChunks} manquant. Veuillez reprendre l'envoi.`);
+    // Robust, deterministic chunk assembly using synchronous file writing
+    const assembledFd = fs.openSync(assembledPath, "w", 0o600);
+    try {
+      for (let i = 0; i < meta.totalChunks; i++) {
+        const chunkPath = path.join(uploadDir, `chunk_${i}`);
+        const chunkBuf = fs.readFileSync(chunkPath);
+        fs.writeSync(assembledFd, chunkBuf);
       }
-      await new Promise<void>((resolve, reject) => {
-        const chunkRead = fs.createReadStream(chunkPath);
-        chunkRead.on("error", (err) => {
-          writeStream.destroy();
-          reject(err);
-        });
-        writeStream.on("error", reject);
-        chunkRead.on("end", () => {
-          writeStream.removeListener("error", reject);
-          resolve();
-        });
-        chunkRead.pipe(writeStream, { end: false });
-      });
+      fs.fsyncSync(assembledFd);
+    } finally {
+      fs.closeSync(assembledFd);
     }
-
-    await new Promise<void>((resolve, reject) => {
-      writeStream.on("error", reject);
-      writeStream.on("close", resolve);
-      writeStream.end();
-    });
   }
 
   // Check assembled size
@@ -627,11 +708,16 @@ export async function finalizeUpload(
     throw new UploadValidationError("Taille du fichier assemblé incorrecte.");
   }
 
-  // Validate magic bytes
+  // Validate magic bytes with safe fd handling in try/finally
   const fd = fs.openSync(assembledPath, "r");
-  const headerBuf = Buffer.alloc(1024);
-  const bytesRead = fs.readSync(fd, headerBuf, 0, 1024, 0);
-  fs.closeSync(fd);
+  let headerBuf: Buffer;
+  let bytesRead: number;
+  try {
+    headerBuf = Buffer.alloc(1024);
+    bytesRead = fs.readSync(fd, headerBuf, 0, 1024, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
 
   const detected = detectMimeType(headerBuf.subarray(0, bytesRead));
 
@@ -641,20 +727,17 @@ export async function finalizeUpload(
     throw new UploadValidationError("Format de fichier non reconnu.", 415);
   }
 
-  if (meta.target === "photos" && !PHOTO_MIME_TYPES.has(detected)) {
+  if (!config.allowedMimes.has(detected)) {
     try { fs.unlinkSync(assembledPath); } catch { /* ignore */ }
     fs.rmSync(uploadDir, { recursive: true, force: true });
-    throw new UploadValidationError("Le fichier envoyé n'est pas une image supportée (JPEG, PNG, WEBP, AVIF).", 415);
+    const expectedTypeLabel = config.mediaType === "photo"
+      ? "une image supportée (JPEG, PNG, WEBP, AVIF)"
+      : "une vidéo supportée (MP4, WEBM)";
+    throw new UploadValidationError(`Le fichier envoyé n'est pas ${expectedTypeLabel}.`, 415);
   }
 
-  if (meta.target === "videos" && !VIDEO_MIME_TYPES.has(detected)) {
-    try { fs.unlinkSync(assembledPath); } catch { /* ignore */ }
-    fs.rmSync(uploadDir, { recursive: true, force: true });
-    throw new UploadValidationError("Le fichier envoyé n'est pas une vidéo supportée (MP4, WEBM).", 415);
-  }
-
-  // Destination directory
-  const destDir = path.join(folder.folderPath, meta.target);
+  // Canonical destination directory based on destination config
+  const destDir = path.join(folder.folderPath, config.folder);
   if (!fs.existsSync(destDir)) {
     fs.mkdirSync(destDir, { recursive: true, mode: 0o700 });
   }
@@ -672,7 +755,13 @@ export async function finalizeUpload(
       // Exactly the same file content already exists!
       try { fs.unlinkSync(assembledPath); } catch { /* ignore */ }
       fs.rmSync(uploadDir, { recursive: true, force: true });
-      return { success: true, fileName: finalFileName, target: meta.target, alreadyExists: true };
+      return {
+        success: true,
+        fileName: finalFileName,
+        destination: meta.destination,
+        target: config.target,
+        alreadyExists: true,
+      };
     }
 
     // Different content: generate unique name
@@ -695,7 +784,8 @@ export async function finalizeUpload(
   return {
     success: true,
     fileName: finalFileName,
-    target: meta.target,
+    destination: meta.destination,
+    target: config.target,
   };
 }
 

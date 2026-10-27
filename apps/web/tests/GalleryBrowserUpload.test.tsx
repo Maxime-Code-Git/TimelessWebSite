@@ -21,11 +21,22 @@ describe("GalleryBrowserUpload Component", () => {
     cleanup();
   });
 
-  it("1: presence of both upload buttons with accessible labels", () => {
+  it("1: presence of audience choice group and upload buttons with accessible labels", () => {
     render(<GalleryBrowserUpload {...defaultProps} />);
 
-    const photoBtn = screen.getByRole("button", { name: "Importer des photos" });
-    const videoBtn = screen.getByRole("button", { name: "Importer des vidéos" });
+    const fieldset = screen.getByRole("group", { name: "Destination des médias à sélectionner :" });
+    expect(fieldset).toBeInTheDocument();
+
+    const guestRadio = screen.getByRole("radio", { name: /Invités - visible par tous les détenteurs d'un code/ });
+    const coupleRadio = screen.getByRole("radio", { name: /Mariés uniquement - visible uniquement avec le code mariés/ });
+
+    expect(guestRadio).toBeInTheDocument();
+    expect(coupleRadio).toBeInTheDocument();
+    expect(guestRadio).toBeChecked();
+    expect(coupleRadio).not.toBeChecked();
+
+    const photoBtn = screen.getByRole("button", { name: /Importer des photos/ });
+    const videoBtn = screen.getByRole("button", { name: /Importer des vidéos/ });
 
     expect(photoBtn).toBeInTheDocument();
     expect(videoBtn).toBeInTheDocument();
@@ -58,7 +69,7 @@ describe("GalleryBrowserUpload Component", () => {
   it("4: maintains focus without losing focus on button interaction", () => {
     render(<GalleryBrowserUpload {...defaultProps} />);
 
-    const photoBtn = screen.getByRole("button", { name: "Importer des photos" });
+    const photoBtn = screen.getByRole("button", { name: /Importer des photos/ });
     photoBtn.focus();
     expect(photoBtn).toHaveFocus();
 
@@ -66,7 +77,48 @@ describe("GalleryBrowserUpload Component", () => {
     expect(photoBtn).toHaveFocus();
   });
 
-  it("5: displays progress, status and triggers batch completion callback upon successful upload", async () => {
+  it("5: memorizes destination per file at selection time even if audience radio changes afterwards", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      // return slow pending response
+      return new Promise(() => {});
+    }));
+
+    const { container } = render(<GalleryBrowserUpload {...defaultProps} />);
+
+    const photoInput = container.querySelector('input[type="file"][accept*="image/jpeg"]') as HTMLInputElement;
+
+    // Default audience is Invités. Add file 1.
+    const file1 = new File(["dummy 1"], "photo_guest.jpg", { type: "image/jpeg" });
+    await act(async () => {
+      fireEvent.change(photoInput, { target: { files: [file1] } });
+    });
+
+    // Check that file 1 has [Invités] badge
+    const file1El = screen.getByTitle("photo_guest.jpg");
+    expect(file1El).toBeInTheDocument();
+    expect(file1El.textContent).toContain("[Invités]");
+
+    // Switch audience to "Mariés uniquement"
+    const coupleRadio = screen.getByRole("radio", { name: /Mariés uniquement/ });
+    await act(async () => {
+      fireEvent.click(coupleRadio);
+    });
+    expect(coupleRadio).toBeChecked();
+
+    // Now add file 2
+    const file2 = new File(["dummy 2"], "photo_couple.jpg", { type: "image/jpeg" });
+    await act(async () => {
+      fireEvent.change(photoInput, { target: { files: [file2] } });
+    });
+
+    // Verify file 1 REMAINS [Invités] and file 2 has [Mariés]
+    const file1ElAfter = screen.getByTitle("photo_guest.jpg");
+    const file2ElAfter = screen.getByTitle("photo_couple.jpg");
+    expect(file1ElAfter.textContent).toContain("[Invités]");
+    expect(file2ElAfter.textContent).toContain("[Mariés uniquement]");
+  });
+
+  it("6: displays progress, status and triggers batch completion callback upon successful upload", async () => {
     let initCalls = 0;
     let chunkCalls = 0;
     let finalizeCalls = 0;
@@ -106,14 +158,12 @@ describe("GalleryBrowserUpload Component", () => {
       fireEvent.change(photoInput, { target: { files: [testFile] } });
     });
 
-    // Verify progress element exists without inline style
     const progressBars = container.querySelectorAll("progress");
     expect(progressBars.length).toBeGreaterThan(0);
     for (const pb of progressBars) {
       expect(pb.getAttribute("style")).toBeNull();
     }
 
-    // Wait for async queue processing
     await act(async () => {
       await new Promise(r => setTimeout(r, 50));
     });
@@ -122,7 +172,6 @@ describe("GalleryBrowserUpload Component", () => {
     expect(chunkCalls).toBe(1);
     expect(finalizeCalls).toBe(1);
 
-    // Verify success status
     expect(defaultProps.onUploadBatchComplete).toHaveBeenCalledWith("alice-bob-g1234");
     expect(screen.getByText("✓ Terminé")).toBeInTheDocument();
 
@@ -131,26 +180,69 @@ describe("GalleryBrowserUpload Component", () => {
     expect(successStatus).toHaveAttribute("role", "status");
   });
 
-  it("6: handles error with role=alert and allows retry", async () => {
-    let failFirst = true;
+  it("7: handles permanent 4xx error immediately without automatic retry", async () => {
+    let initCalls = 0;
 
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       const urlStr = String(url);
       if (urlStr.includes("action=init")) {
-        if (failFirst) {
-          failFirst = false;
-          return new Response(JSON.stringify({ error: "Espace disque insuffisant" }), {
-            status: 507,
+        initCalls++;
+        return new Response(JSON.stringify({ error: "Validation échouée: format non supporté" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    }));
+
+    const { container } = render(<GalleryBrowserUpload {...defaultProps} />);
+
+    const photoInput = container.querySelector('input[type="file"][accept*="image/jpeg"]') as HTMLInputElement;
+    const testFile = new File(["dummy content"], "bad-file.jpg", { type: "image/jpeg" });
+
+    await act(async () => {
+      fireEvent.change(photoInput, { target: { files: [testFile] } });
+    });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    // Permanent 400 error must NOT be retried: init called exactly 1 time!
+    expect(initCalls).toBe(1);
+
+    // Verify alert role and error message with phase
+    const alertEl = screen.getByRole("alert");
+    expect(alertEl).toBeInTheDocument();
+    expect(alertEl).toHaveTextContent("Validation échouée: format non supporté");
+
+    // Retry button is available for manual retry
+    const retryBtn = screen.getByRole("button", { name: /Réessayer l'envoi de bad-file.jpg/ });
+    expect(retryBtn).toBeInTheDocument();
+  });
+
+  it("8: performs bounded automatic retries with backoff on transient errors", async () => {
+    let attempts = 0;
+
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const urlStr = String(url);
+      if (urlStr.includes("action=init")) {
+        attempts++;
+        if (attempts === 1) {
+          // Fail first attempt with transient 503
+          return new Response(JSON.stringify({ error: "Service Unavailable" }), {
+            status: 503,
             headers: { "Content-Type": "application/json" },
           });
         }
-        return new Response(JSON.stringify({ uploadId: "upl-retry-1", uploadedChunks: [] }), {
+        // 2nd attempt succeeds via automatic retry
+        return new Response(JSON.stringify({ uploadId: "upl-transient-1", uploadedChunks: [] }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }
       if (urlStr.includes("action=chunk") || urlStr.includes("action=finalize")) {
-        return new Response(JSON.stringify({ success: true }), {
+        return new Response(JSON.stringify({ success: true, fileName: "transient.jpg" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
@@ -161,39 +253,77 @@ describe("GalleryBrowserUpload Component", () => {
     const { container } = render(<GalleryBrowserUpload {...defaultProps} />);
 
     const photoInput = container.querySelector('input[type="file"][accept*="image/jpeg"]') as HTMLInputElement;
-    const testFile = new File(["dummy content"], "error-test.jpg", { type: "image/jpeg" });
+    const testFile = new File(["dummy content"], "transient.jpg", { type: "image/jpeg" });
 
     await act(async () => {
       fireEvent.change(photoInput, { target: { files: [testFile] } });
     });
 
+    // Wait for retries with backoff (1000ms delay for 1st retry)
     await act(async () => {
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise(r => setTimeout(r, 1300));
     });
 
-    // Verify alert role
-    const alertEl = screen.getByRole("alert");
-    expect(alertEl).toBeInTheDocument();
-    expect(alertEl).toHaveTextContent("Espace disque insuffisant");
-
-    // Retry button is available
-    const retryBtn = screen.getByRole("button", { name: /Réessayer l'envoi de error-test.jpg/ });
-    expect(retryBtn).toBeInTheDocument();
-
-    // Click retry
-    await act(async () => {
-      fireEvent.click(retryBtn);
-    });
-
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 50));
-    });
-
-    // Should now succeed
+    expect(attempts).toBe(2);
     expect(screen.getByText("✓ Terminé")).toBeInTheDocument();
   });
 
-  it("7: behaves reliably under StrictMode without duplicate batch submissions", async () => {
+  it("9: provides global retry button 'Réessayer tous les échecs' when multiple items fail", async () => {
+    let shouldFail = true;
+
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const urlStr = String(url);
+      if (urlStr.includes("action=init")) {
+        if (shouldFail) {
+          return new Response(JSON.stringify({ error: "Erreur permanente simulée" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ uploadId: "upl-ok", uploadedChunks: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    }));
+
+    const { container } = render(<GalleryBrowserUpload {...defaultProps} />);
+
+    const photoInput = container.querySelector('input[type="file"][accept*="image/jpeg"]') as HTMLInputElement;
+    const file1 = new File(["1"], "fail1.jpg", { type: "image/jpeg" });
+    const file2 = new File(["2"], "fail2.jpg", { type: "image/jpeg" });
+
+    await act(async () => {
+      fireEvent.change(photoInput, { target: { files: [file1, file2] } });
+    });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // Global retry button should be visible
+    const retryAllBtn = screen.getByRole("button", { name: "Réessayer tous les échecs" });
+    expect(retryAllBtn).toBeInTheDocument();
+
+    // Individual retry buttons should also be visible
+    expect(screen.getByRole("button", { name: /Réessayer l'envoi de fail1.jpg/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Réessayer l'envoi de fail2.jpg/ })).toBeInTheDocument();
+
+    // Now fix the error and click "Réessayer tous les échecs"
+    shouldFail = false;
+    await act(async () => {
+      fireEvent.click(retryAllBtn);
+    });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    expect(screen.getByText(/Tous les fichiers ont été envoyés avec succès/)).toBeInTheDocument();
+  });
+
+  it("10: behaves reliably under StrictMode without duplicate batch submissions", async () => {
     let initCalls = 0;
 
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
@@ -228,12 +358,11 @@ describe("GalleryBrowserUpload Component", () => {
       await new Promise(r => setTimeout(r, 50));
     });
 
-    // Exactly 1 init call despite StrictMode double effects
     expect(initCalls).toBe(1);
     expect(defaultProps.onUploadBatchComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("8: displays error alert when exceeding MAX_BATCH_FILES", async () => {
+  it("11: displays error alert when exceeding MAX_BATCH_FILES", async () => {
     const { container } = render(<GalleryBrowserUpload {...defaultProps} />);
 
     const photoInput = container.querySelector('input[type="file"][accept*="image/jpeg"]') as HTMLInputElement;
@@ -248,7 +377,7 @@ describe("GalleryBrowserUpload Component", () => {
     expect(alertEl).toHaveTextContent("Limite dépassée : un lot ne peut pas contenir plus de 2000 fichiers.");
   });
 
-  it("9: handles selection of 1,000 photos without buffering in memory and runs max 2 uploads concurrently", async () => {
+  it("12: handles selection of 1,000 photos without buffering in memory and runs max 2 uploads concurrently", async () => {
     let activeUploads = 0;
     let maxConcurrentSeen = 0;
 
@@ -283,17 +412,13 @@ describe("GalleryBrowserUpload Component", () => {
     const { container } = render(<GalleryBrowserUpload {...defaultProps} />);
 
     const photoInput = container.querySelector('input[type="file"][accept*="image/jpeg"]') as HTMLInputElement;
-    // 1 000 lightweight file references - contents are not read into memory
     const thousandPhotos = Array.from({ length: 1000 }, (_, i) => new File(["img"], `photo_${i}.jpg`, { type: "image/jpeg" }));
 
     await act(async () => {
       fireEvent.change(photoInput, { target: { files: thousandPhotos } });
     });
 
-    // Alert should not exist (1000 is well within MAX_BATCH_FILES = 2000)
     expect(screen.queryByRole("alert")).toBeNull();
-
-    // Verify concurrency never exceeded 2
     expect(maxConcurrentSeen).toBeLessThanOrEqual(2);
   });
 });

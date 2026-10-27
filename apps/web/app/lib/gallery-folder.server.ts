@@ -132,6 +132,27 @@ export function createGalleryFolderOnDisk(folderName: string): GalleryImportDire
     fs.chmodSync(videosPath, 0o700);
   }
 
+  // Canonical subfolders for invites and maries
+  const canonicalSubfolders = [
+    "invites/photos",
+    "invites/videos",
+    "maries/photos",
+    "maries/videos",
+  ];
+  for (const sub of canonicalSubfolders) {
+    const subPath = path.join(folderPath, sub);
+    if (!fs.existsSync(subPath)) {
+      fs.mkdirSync(subPath, { recursive: true, mode: 0o700 });
+    }
+    const subStat = fs.lstatSync(subPath);
+    if (subStat.isSymbolicLink()) {
+      throw new Error(`Le sous-dossier ${sub} ne peut pas être un lien symbolique.`);
+    }
+    if ((subStat.mode & 0o777) !== 0o700) {
+      fs.chmodSync(subPath, 0o700);
+    }
+  }
+
   return { folderName, folderPath, photosPath, videosPath };
 }
 

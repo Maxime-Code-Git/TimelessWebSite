@@ -9,6 +9,7 @@ import {
   getUploadStatus,
   finalizeUpload,
   cancelUpload,
+  isUploadDestination,
   UploadValidationError,
   DiskSpaceError,
 } from "~/lib/gallery-upload.server";
@@ -115,9 +116,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const action = actionParam || String(body.action || "");
 
     if (action === "init") {
-      const target = body.target;
-      if (target !== "photos" && target !== "videos") {
-        return Response.json({ error: "Cible d'import invalide (photos ou videos requis)." }, { status: 400, headers: createAdminHeaders() });
+      const destination = body.destination;
+      if (!isUploadDestination(destination)) {
+        return Response.json(
+          { error: "Destination d'upload invalide (guest_photos, guest_videos, couple_photos ou couple_videos requis)." },
+          { status: 400, headers: createAdminHeaders() }
+        );
       }
       const fileName = String(body.fileName || "").trim();
       if (!fileName) {
@@ -140,7 +144,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
 
       const res = initUploadSession(id, {
-        target,
+        destination,
         fileName,
         fileSize,
         totalChunks,
