@@ -6,6 +6,8 @@ import type { GalleryImportRow, GalleryMediaRow } from "../lib/gallery.server";
 import { decryptGalleryCode, generateGalleryCode } from "../lib/gallery-auth.server";
 import { getGalleryDb } from "../lib/gallery-db.server";
 import { getAvailableImportFolders } from "../lib/gallery-import.server";
+import { ensureGalleryImportFolder } from "../lib/gallery-folder.server";
+import { GalleryBrowserUpload } from "../components/admin/GalleryBrowserUpload";
 import styles from "./admin.module.css";
 import { commitSession } from "../lib/session.server";
 import crypto from "node:crypto";
@@ -32,6 +34,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     headers.set("Set-Cookie", await commitSession(session));
   }
 
+  const galleryFolder = ensureGalleryImportFolder(gallery.id);
   const folders = getAvailableImportFolders();
 
   // Get gallery photos for cover selection
@@ -42,7 +45,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const galleryPhotos = allMedia.filter(m => m.type === "photo");
 
-  return Response.json({ gallery, stats, imports, folders, guestCode, coupleCode, csrfToken, allMedia, galleryPhotos }, { headers });
+  return Response.json({
+    gallery,
+    stats,
+    imports,
+    folders,
+    galleryFolderName: galleryFolder.folderName,
+    guestCode,
+    coupleCode,
+    csrfToken,
+    allMedia,
+    galleryPhotos
+  }, { headers });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -358,6 +372,7 @@ interface LoaderData {
   stats: { invitesPhotos: number; invitesVideos: number; mariesPhotos: number; mariesVideos: number };
   imports: GalleryImportRow[];
   folders: string[];
+  galleryFolderName: string;
   guestCode: string;
   coupleCode: string;
   csrfToken: string;
@@ -376,7 +391,7 @@ function getAdminPhotoPreviewUrl(publicId: string, mediaId: string, width: numbe
 }
 
 export default function AdminGalleryEdit() {
-  const { gallery, stats, imports, folders, guestCode, coupleCode, csrfToken, galleryPhotos, allMedia } = useLoaderData<LoaderData>();
+  const { gallery, stats, imports, folders, galleryFolderName, guestCode, coupleCode, csrfToken, galleryPhotos, allMedia } = useLoaderData<LoaderData>();
   const actionData = useActionData<ActionData>();
   const revalidator = useRevalidator();
   const importFetcher = useFetcher<ImportActionData>();
@@ -648,22 +663,38 @@ export default function AdminGalleryEdit() {
         </ul>
 
         <h4>Importer des médias</h4>
-        <div className={styles.formGroup}>
-          <label className={styles.label} htmlFor="import_folder">Dossier d'import</label>
-          <select id="import_folder"
-            className={styles.input}
-            value={selectedFolder}
-            onChange={e => {
-              setSelectedFolder(e.target.value);
-              loadPreview(e.target.value);
-            }}
-          >
-            <option value="">Sélectionnez un dossier...</option>
-            {folders.map(f => (
-              <option key={f} value={f}>{f}</option>
-            ))}
-          </select>
-        </div>
+
+        <GalleryBrowserUpload
+          galleryId={gallery.id}
+          csrfToken={csrfToken}
+          galleryFolderName={galleryFolderName}
+          onUploadBatchComplete={(folderName) => {
+            setSelectedFolder(folderName);
+            loadPreview(folderName);
+          }}
+        />
+
+        <details className={styles.marginTop16}>
+          <summary className={styles.label}>
+            Importation depuis un dossier contrôlé (méthode avancée)
+          </summary>
+          <div className={styles.formGroup}>
+            <label className={styles.label} htmlFor="import_folder">Dossier d'import sur le serveur</label>
+            <select id="import_folder"
+              className={styles.input}
+              value={selectedFolder}
+              onChange={e => {
+                setSelectedFolder(e.target.value);
+                loadPreview(e.target.value);
+              }}
+            >
+              <option value="">Sélectionnez un dossier...</option>
+              {folders.map(f => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+          </div>
+        </details>
 
         {previewLoading && <p>Analyse du dossier en cours...</p>}
 

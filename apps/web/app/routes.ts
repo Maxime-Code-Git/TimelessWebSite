@@ -22,6 +22,7 @@ export default [
   route("api/gallery/:publicId/download/original/:mediaId", "routes/api.gallery.$publicId.download.original.$mediaId.ts"),
   route("api/gallery/:publicId/photos", "routes/api.gallery.$publicId.photos.ts"),
   route("api/admin/gallery-import/:id", "routes/api.admin.gallery-import.$id.ts"),
+  route("api/admin/gallery-upload/:id", "routes/api.admin.gallery-upload.$id.ts"),
   route("api/admin/gallery/:id/media/:mediaId/poster", "routes/api.admin.gallery.$id.media.$mediaId.poster.ts"),
 
   // ── French routes ─────────────────────────────────────────

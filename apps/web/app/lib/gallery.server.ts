@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
+import * as fs from "node:fs";
 import { getGalleryDb } from "./gallery-db.server";
 import { generateGalleryCode, hashGalleryCode, encryptGalleryCode } from "./gallery-auth.server";
 import { addCalendarMonths } from "./date";
+import { computeGalleryFolderName, createGalleryFolderOnDisk } from "./gallery-folder.server";
 
 export interface Gallery {
   id: string;
@@ -24,6 +26,7 @@ export interface Gallery {
   couple_code_version: number;
   cover_image_id: string | null;
   import_path: string | null;
+  upload_folder?: string | null;
 }
 
 export interface GalleryMediaRow {
@@ -130,6 +133,9 @@ export function createGallery(data: {
   const now = new Date();
   const expires_at = data.expires_at || addCalendarMonths(now, 24).getTime();
   const nowMs = now.getTime();
+  const folderName = computeGalleryFolderName(id, data.bride_names);
+  let createdOnDisk = false;
+  let folderPathOnDisk: string | null = null;
 
   db.exec("BEGIN EXCLUSIVE TRANSACTION;");
   try {
@@ -141,22 +147,39 @@ export function createGallery(data: {
         id, public_id, bride_names, wedding_date, location,
         intro_fr, intro_en, signature_fr, signature_en,
         created_at, expires_at, status,
-        guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)
+        guest_code_hash, couple_code_hash, guest_code_encrypted, couple_code_encrypted,
+        upload_folder
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)
     `).run(
       id, public_id, data.bride_names, data.wedding_date, data.location || null,
       data.intro_fr || null, data.intro_en || null, data.signature_fr || null, data.signature_en || null,
       nowMs, expires_at,
       guestHash, coupleHash,
-      encryptGalleryCode(guestCode), encryptGalleryCode(coupleCode)
+      encryptGalleryCode(guestCode), encryptGalleryCode(coupleCode),
+      folderName
     );
 
     db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(guestHash, id, "invites", 1, nowMs);
     db.prepare("INSERT INTO gallery_codes (code_hash, gallery_id, level, version, created_at) VALUES (?, ?, ?, ?, ?)").run(coupleHash, id, "maries", 1, nowMs);
 
+    const folderResult = createGalleryFolderOnDisk(folderName);
+    createdOnDisk = true;
+    folderPathOnDisk = folderResult.folderPath;
+
     db.exec("COMMIT;");
   } catch (err) {
-    db.exec("ROLLBACK;");
+    try {
+      db.exec("ROLLBACK;");
+    } catch {
+      // ignore rollback error
+    }
+    if (createdOnDisk && folderPathOnDisk) {
+      try {
+        fs.rmSync(folderPathOnDisk, { recursive: true, force: true });
+      } catch {
+        // ignore disk cleanup error
+      }
+    }
     throw err;
   }
 
@@ -171,7 +194,7 @@ export function updateGallery(id: string, data: Partial<Gallery>) {
   const fields: string[] = [];
   const values: Array<string | number | null> = [];
 
-  const whitelist = ["bride_names", "wedding_date", "location", "intro_fr", "intro_en", "signature_fr", "signature_en", "expires_at", "status", "cover_image_id"];
+  const whitelist = ["bride_names", "wedding_date", "location", "intro_fr", "intro_en", "signature_fr", "signature_en", "expires_at", "status", "cover_image_id", "upload_folder"];
 
   for (const key of whitelist) {
     if (key in data) {

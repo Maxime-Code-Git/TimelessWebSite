@@ -300,16 +300,16 @@ describe("Gallery Deletion Worker", () => {
 
 describe("Gallery DB Migration V8", () => {
   it("migration V8 is idempotent", () => {
-    // DB is already at V8 from beforeEach
+    // DB is already at latest version from beforeEach
     const version = db.prepare("SELECT MAX(version) as v FROM gallery_migrations").get() as { v: number };
-    expect(version.v).toBe(8);
+    expect(version.v).toBe(9);
 
     // Re-open should not fail or add duplicate
     closeGalleryDb();
     const dbPath = path.join(tmpDir, "gallery.sqlite");
     const db2 = openGalleryDb(dbPath);
     const version2 = db2.prepare("SELECT MAX(version) as v FROM gallery_migrations").get() as { v: number };
-    expect(version2.v).toBe(8);
+    expect(version2.v).toBe(9);
 
     // gallery_deletion_jobs table exists
     const tables = db2.prepare(

@@ -135,12 +135,29 @@ function validateFileType(mimeType: string, expectedCategory: MediaCategory, fil
 }
 
 function collectFiles(importDir: string, rejected: RejectedFile[]): FileToProcess[] {
-  return [
-    ...scanFolderForFiles(importDir, "invites/photos", "invites", "photos", rejected),
-    ...scanFolderForFiles(importDir, "invites/videos", "invites", "videos", rejected),
-    ...scanFolderForFiles(importDir, "maries/photos", "maries", "photos", rejected),
-    ...scanFolderForFiles(importDir, "maries/videos", "maries", "videos", rejected)
-  ];
+  const files: FileToProcess[] = [];
+  const seenPaths = new Set<string>();
+
+  const addFiles = (scanned: FileToProcess[]) => {
+    for (const f of scanned) {
+      if (!seenPaths.has(f.fullPath)) {
+        seenPaths.add(f.fullPath);
+        files.push(f);
+      }
+    }
+  };
+
+  // Dedicated gallery subfolders (Feature 1 & 2)
+  addFiles(scanFolderForFiles(importDir, "photos", "invites", "photos", rejected));
+  addFiles(scanFolderForFiles(importDir, "videos", "invites", "videos", rejected));
+
+  // Legacy controlled folder structure
+  addFiles(scanFolderForFiles(importDir, "invites/photos", "invites", "photos", rejected));
+  addFiles(scanFolderForFiles(importDir, "invites/videos", "invites", "videos", rejected));
+  addFiles(scanFolderForFiles(importDir, "maries/photos", "maries", "photos", rejected));
+  addFiles(scanFolderForFiles(importDir, "maries/videos", "maries", "videos", rejected));
+
+  return files;
 }
 
 export async function getImportPreview(folderName: string) {
