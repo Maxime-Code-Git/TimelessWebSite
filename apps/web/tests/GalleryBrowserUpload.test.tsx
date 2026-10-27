@@ -237,7 +237,7 @@ describe("GalleryBrowserUpload Component", () => {
     const { container } = render(<GalleryBrowserUpload {...defaultProps} />);
 
     const photoInput = container.querySelector('input[type="file"][accept*="image/jpeg"]') as HTMLInputElement;
-    const tooManyFiles = Array.from({ length: 201 }, (_, i) => new File(["content"], `test-${i}.jpg`, { type: "image/jpeg" }));
+    const tooManyFiles = Array.from({ length: 2001 }, (_, i) => new File(["content"], `test-${i}.jpg`, { type: "image/jpeg" }));
 
     await act(async () => {
       fireEvent.change(photoInput, { target: { files: tooManyFiles } });
@@ -245,6 +245,55 @@ describe("GalleryBrowserUpload Component", () => {
 
     const alertEl = screen.getByRole("alert");
     expect(alertEl).toBeInTheDocument();
-    expect(alertEl).toHaveTextContent("Limite dépassée : un lot ne peut pas contenir plus de 200 fichiers.");
+    expect(alertEl).toHaveTextContent("Limite dépassée : un lot ne peut pas contenir plus de 2000 fichiers.");
+  });
+
+  it("9: handles selection of 1,000 photos without buffering in memory and runs max 2 uploads concurrently", async () => {
+    let activeUploads = 0;
+    let maxConcurrentSeen = 0;
+
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const urlStr = String(url);
+      if (urlStr.includes("action=init")) {
+        activeUploads++;
+        if (activeUploads > maxConcurrentSeen) {
+          maxConcurrentSeen = activeUploads;
+        }
+        return new Response(JSON.stringify({ uploadId: `upl-${Date.now()}-${Math.random()}`, uploadedChunks: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (urlStr.includes("action=chunk")) {
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (urlStr.includes("action=finalize")) {
+        activeUploads--;
+        return new Response(JSON.stringify({ success: true, fileName: "test.jpg" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    }));
+
+    const { container } = render(<GalleryBrowserUpload {...defaultProps} />);
+
+    const photoInput = container.querySelector('input[type="file"][accept*="image/jpeg"]') as HTMLInputElement;
+    // 1 000 lightweight file references - contents are not read into memory
+    const thousandPhotos = Array.from({ length: 1000 }, (_, i) => new File(["img"], `photo_${i}.jpg`, { type: "image/jpeg" }));
+
+    await act(async () => {
+      fireEvent.change(photoInput, { target: { files: thousandPhotos } });
+    });
+
+    // Alert should not exist (1000 is well within MAX_BATCH_FILES = 2000)
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    // Verify concurrency never exceeded 2
+    expect(maxConcurrentSeen).toBeLessThanOrEqual(2);
   });
 });

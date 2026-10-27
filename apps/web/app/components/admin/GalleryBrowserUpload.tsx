@@ -22,7 +22,7 @@ const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
 const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".avif"];
 const VIDEO_EXTENSIONS = [".mp4", ".webm"];
 
-export const MAX_BATCH_FILES = 200;
+export const MAX_BATCH_FILES = 2000;
 
 export function GalleryBrowserUpload({
   galleryId,

@@ -6,13 +6,14 @@ import { Readable } from "node:stream";
 import { ensureGalleryImportFolder } from "./gallery-folder.server";
 
 export const MAX_PHOTO_SIZE = 100 * 1024 * 1024; // 100 MB max for photos
-export const MAX_VIDEO_SIZE = 2 * 1024 * 1024 * 1024; // 2 GB max for videos
+export const MAX_VIDEO_SIZE = 20 * 1024 * 1024 * 1024; // 20 GB max for videos (21474836480 bytes, safe integer)
 export const MAX_FILE_SIZE = MAX_VIDEO_SIZE;
 export const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk (Cloudflare & memory friendly)
 export const MIN_CHUNK_SIZE = 256 * 1024; // 256 KB min chunk (unless file is smaller)
 export const MAX_CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB max chunk size
-export const MAX_TOTAL_CHUNKS = 1000; // 1000 chunks max per file
-export const MAX_BATCH_FILES = 200; // 200 files max per batch
+export const MAX_TOTAL_CHUNKS = 5000; // 5000 chunks max per file (allows 20 GB at 5 MB chunks = 4096 chunks)
+export const MAX_BATCH_FILES = 2000; // 2000 files max per selection/batch
+export const MAX_ACTIVE_SESSIONS_PER_TARGET = 2; // 2 active sessions max per gallery and target
 export const SAFETY_BUFFER_BYTES = 50 * 1024 * 1024; // 50 MB safety margin
 
 export const PHOTO_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
@@ -39,14 +40,147 @@ export const diskChecker = {
   statfs: (targetPath: string) => fs.statfsSync(targetPath),
 };
 
+export const uploadLock = {
+  isLocked: false,
+  runSync<T>(fn: () => T): T {
+    if (this.isLocked) {
+      throw new UploadValidationError("Une initialisation d'upload est déjà en cours. Veuillez réessayer.", 429);
+    }
+    this.isLocked = true;
+    try {
+      return fn();
+    } finally {
+      this.isLocked = false;
+    }
+  },
+};
+
 /**
- * Checks available disk space on the filesystem of targetPath.
+ * Computes all unallocated future disk space reservations from active upload sessions.
+ * Survives server restarts by reading meta.json and chunk files directly from disk.
  */
-export function checkDiskSpace(targetPath: string, requiredBytes: number): void {
+export function computeAllActiveDiskReservations(basePath: string, excludeUploadId?: string): number {
+  if (!fs.existsSync(basePath)) return 0;
+  let totalReserved = 0;
+  const now = Date.now();
+  const maxAgeMs = 24 * 60 * 60 * 1000;
+
+  const processTmpUploadsDir = (tmpUploadsDir: string) => {
+    if (!fs.existsSync(tmpUploadsDir)) return;
+    try {
+      const uploadDirs = fs.readdirSync(tmpUploadsDir, { withFileTypes: true });
+      for (const uDir of uploadDirs) {
+        if (!uDir.isDirectory()) continue;
+        if (excludeUploadId && uDir.name === excludeUploadId) continue;
+
+        const uploadPath = path.join(tmpUploadsDir, uDir.name);
+        const metaPath = path.join(uploadPath, "meta.json");
+        if (!fs.existsSync(metaPath)) continue;
+
+        try {
+          const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as UploadMetadata;
+          if (now - meta.createdAt > maxAgeMs) continue;
+
+          let bytesOnDisk = 0;
+          try {
+            const files = fs.readdirSync(uploadPath);
+            for (const f of files) {
+              if (f.startsWith("chunk_") || f === "assembled.tmp") {
+                const st = fs.statSync(path.join(uploadPath, f));
+                bytesOnDisk += st.size;
+              }
+            }
+          } catch {
+            // ignore
+          }
+
+          const peakNeeded = meta.fileSize * 2;
+          const remainingReservation = Math.max(0, peakNeeded - bytesOnDisk);
+          totalReserved += remainingReservation;
+        } catch {
+          // ignore corrupted meta
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  try {
+    const directTmp = path.join(basePath, ".tmp_uploads");
+    if (fs.existsSync(directTmp)) {
+      processTmpUploadsDir(directTmp);
+    }
+
+    const entries = fs.readdirSync(basePath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name !== ".tmp_uploads") {
+        const childTmp = path.join(basePath, entry.name, ".tmp_uploads");
+        processTmpUploadsDir(childTmp);
+      }
+    }
+  } catch (err) {
+    console.warn("Could not compute active disk reservations:", err);
+  }
+
+  return totalReserved;
+}
+
+/**
+ * Counts currently active sessions for a specific gallery and target (photos/videos).
+ */
+export function countActiveSessionsForTarget(
+  galleryFolderPath: string,
+  galleryId: string,
+  target: "photos" | "videos"
+): number {
+  const tmpUploadsDir = path.join(galleryFolderPath, ".tmp_uploads");
+  if (!fs.existsSync(tmpUploadsDir)) return 0;
+  let count = 0;
+  const now = Date.now();
+  const maxAgeMs = 24 * 60 * 60 * 1000;
+
+  try {
+    const entries = fs.readdirSync(tmpUploadsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const metaPath = path.join(tmpUploadsDir, entry.name, "meta.json");
+      if (fs.existsSync(metaPath)) {
+        try {
+          const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as UploadMetadata;
+          if (meta.galleryId === galleryId && meta.target === target && (now - meta.createdAt <= maxAgeMs)) {
+            count++;
+          }
+        } catch {
+          // ignore corrupted meta
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return count;
+}
+
+/**
+ * Checks available disk space on the filesystem of targetPath,
+ * accounting for existing active reservations and the safety buffer.
+ */
+export function checkDiskSpace(
+  targetPath: string,
+  requiredBytes: number,
+  importBasePath?: string,
+  excludeUploadId?: string
+): void {
   try {
     const stats = diskChecker.statfs(targetPath);
-    const freeBytes = stats.bavail * stats.bsize;
-    if (freeBytes < requiredBytes + SAFETY_BUFFER_BYTES) {
+    const rawFreeBytes = stats.bavail * stats.bsize;
+    const base = importBasePath || path.dirname(targetPath);
+    const activeReservations = computeAllActiveDiskReservations(base, excludeUploadId);
+
+    const effectiveFreeBytes = rawFreeBytes - activeReservations;
+    if (effectiveFreeBytes < requiredBytes + SAFETY_BUFFER_BYTES) {
       throw new DiskSpaceError();
     }
   } catch (err) {
@@ -154,89 +288,101 @@ export function initUploadSession(
     chunkSize?: number;
   }
 ): { uploadId: string; chunkSize: number; totalChunks: number; uploadedChunks: number[] } {
-  if (params.target !== "photos" && params.target !== "videos") {
-    throw new UploadValidationError("Cible d'import invalide (photos ou videos requis).");
-  }
-
-  const cleanName = sanitizeUploadFileName(params.fileName);
-  if (!cleanName || cleanName === "fichier") {
-    throw new UploadValidationError("Nom de fichier invalide.");
-  }
-
-  if (
-    typeof params.fileSize !== "number" ||
-    !Number.isSafeInteger(params.fileSize) ||
-    params.fileSize <= 0
-  ) {
-    throw new UploadValidationError("Taille de fichier invalide (doit être un entier positif).");
-  }
-
-  if (params.target === "photos" && params.fileSize > MAX_PHOTO_SIZE) {
-    throw new UploadValidationError(`Taille de photo trop grande (maximum ${Math.round(MAX_PHOTO_SIZE / 1024 / 1024)} Mo).`);
-  }
-
-  if (params.target === "videos" && params.fileSize > MAX_VIDEO_SIZE) {
-    throw new UploadValidationError(`Taille de vidéo trop grande (maximum ${Math.round(MAX_VIDEO_SIZE / 1024 / 1024 / 1024)} Go).`);
-  }
-
-  let chunkSize = DEFAULT_CHUNK_SIZE;
-  if (params.chunkSize !== undefined) {
-    if (
-      typeof params.chunkSize !== "number" ||
-      !Number.isSafeInteger(params.chunkSize) ||
-      params.chunkSize <= 0 ||
-      params.chunkSize > MAX_CHUNK_SIZE
-    ) {
-      throw new UploadValidationError(`Taille de morceau invalide (maximum ${Math.round(MAX_CHUNK_SIZE / 1024 / 1024)} Mo).`);
+  return uploadLock.runSync(() => {
+    if (params.target !== "photos" && params.target !== "videos") {
+      throw new UploadValidationError("Cible d'import invalide (photos ou videos requis).");
     }
-    chunkSize = params.chunkSize;
-  }
 
-  const calculatedTotalChunks = Math.ceil(params.fileSize / chunkSize);
-  if (calculatedTotalChunks > MAX_TOTAL_CHUNKS) {
-    throw new UploadValidationError(`Nombre de morceaux trop élevé (maximum ${MAX_TOTAL_CHUNKS}).`);
-  }
+    const cleanName = sanitizeUploadFileName(params.fileName);
+    if (!cleanName || cleanName === "fichier") {
+      throw new UploadValidationError("Nom de fichier invalide.");
+    }
 
-  if (
-    typeof params.totalChunks !== "number" ||
-    !Number.isSafeInteger(params.totalChunks) ||
-    params.totalChunks !== calculatedTotalChunks
-  ) {
-    throw new UploadValidationError(`Nombre de morceaux incohérent (attendu ${calculatedTotalChunks}, reçu ${params.totalChunks}).`);
-  }
+    if (
+      typeof params.fileSize !== "number" ||
+      !Number.isSafeInteger(params.fileSize) ||
+      params.fileSize <= 0
+    ) {
+      throw new UploadValidationError("Taille de fichier invalide (doit être un entier positif).");
+    }
 
-  const folder = ensureGalleryImportFolder(galleryId);
-  // Vérification de l'espace disque pour le pic d'assemblage : morceaux + fichier final + réserve de sécurité
-  checkDiskSpace(folder.folderPath, params.fileSize * 2);
-  cleanupAbandonedUploads(folder.folderPath);
+    if (params.target === "photos" && params.fileSize > MAX_PHOTO_SIZE) {
+      throw new UploadValidationError(`Taille de photo trop grande (maximum ${Math.round(MAX_PHOTO_SIZE / 1024 / 1024)} Mo).`);
+    }
 
-  const uploadId = crypto.randomUUID();
-  const baseDir = getUploadsBaseDir(folder.folderPath);
-  const uploadDir = path.join(baseDir, uploadId);
+    if (params.target === "videos" && params.fileSize > MAX_VIDEO_SIZE) {
+      throw new UploadValidationError(`Taille de vidéo trop grande (maximum ${Math.round(MAX_VIDEO_SIZE / 1024 / 1024 / 1024)} Go).`);
+    }
 
-  fs.mkdirSync(uploadDir, { recursive: true, mode: 0o700 });
+    let chunkSize = DEFAULT_CHUNK_SIZE;
+    if (params.chunkSize !== undefined) {
+      if (
+        typeof params.chunkSize !== "number" ||
+        !Number.isSafeInteger(params.chunkSize) ||
+        params.chunkSize <= 0 ||
+        params.chunkSize > MAX_CHUNK_SIZE
+      ) {
+        throw new UploadValidationError(`Taille de morceau invalide (maximum ${Math.round(MAX_CHUNK_SIZE / 1024 / 1024)} Mo).`);
+      }
+      chunkSize = params.chunkSize;
+    }
 
-  const metadata: UploadMetadata = {
-    uploadId,
-    galleryId,
-    target: params.target,
-    fileName: cleanName,
-    fileSize: params.fileSize,
-    totalChunks: calculatedTotalChunks,
-    chunkSize,
-    uploadedChunks: [],
-    createdAt: Date.now(),
-  };
+    const calculatedTotalChunks = Math.ceil(params.fileSize / chunkSize);
+    if (calculatedTotalChunks > MAX_TOTAL_CHUNKS) {
+      throw new UploadValidationError(`Nombre de morceaux trop élevé (maximum ${MAX_TOTAL_CHUNKS}).`);
+    }
 
-  const metaPath = path.join(uploadDir, "meta.json");
-  fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2), { mode: 0o600 });
+    if (
+      typeof params.totalChunks !== "number" ||
+      !Number.isSafeInteger(params.totalChunks) ||
+      params.totalChunks !== calculatedTotalChunks
+    ) {
+      throw new UploadValidationError(`Nombre de morceaux incohérent (attendu ${calculatedTotalChunks}, reçu ${params.totalChunks}).`);
+    }
 
-  return {
-    uploadId,
-    chunkSize,
-    totalChunks: calculatedTotalChunks,
-    uploadedChunks: [],
-  };
+    const folder = ensureGalleryImportFolder(galleryId);
+    cleanupAbandonedUploads(folder.folderPath);
+
+    const activeSessions = countActiveSessionsForTarget(folder.folderPath, galleryId, params.target);
+    if (activeSessions >= MAX_ACTIVE_SESSIONS_PER_TARGET) {
+      throw new UploadValidationError(
+        `Nombre maximal de sessions actives atteint (${MAX_ACTIVE_SESSIONS_PER_TARGET} par type de média). Veuillez attendre la fin des transferts en cours.`,
+        429
+      );
+    }
+
+    // Vérification de l'espace disque pour le pic d'assemblage : morceaux + fichier final + réserve de sécurité
+    const importBase = path.dirname(folder.folderPath);
+    checkDiskSpace(folder.folderPath, params.fileSize * 2, importBase);
+
+    const uploadId = crypto.randomUUID();
+    const baseDir = getUploadsBaseDir(folder.folderPath);
+    const uploadDir = path.join(baseDir, uploadId);
+
+    fs.mkdirSync(uploadDir, { recursive: true, mode: 0o700 });
+
+    const metadata: UploadMetadata = {
+      uploadId,
+      galleryId,
+      target: params.target,
+      fileName: cleanName,
+      fileSize: params.fileSize,
+      totalChunks: calculatedTotalChunks,
+      chunkSize,
+      uploadedChunks: [],
+      createdAt: Date.now(),
+    };
+
+    const metaPath = path.join(uploadDir, "meta.json");
+    fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2), { mode: 0o600 });
+
+    return {
+      uploadId,
+      chunkSize,
+      totalChunks: calculatedTotalChunks,
+      uploadedChunks: [],
+    };
+  });
 }
 
 /**
@@ -280,7 +426,8 @@ export async function saveChunkStream(
     ? meta.fileSize - (meta.totalChunks - 1) * meta.chunkSize
     : meta.chunkSize;
 
-  checkDiskSpace(folder.folderPath, expectedChunkSize);
+  const importBase = path.dirname(folder.folderPath);
+  checkDiskSpace(folder.folderPath, expectedChunkSize, importBase, uploadId);
 
   const chunkPartPath = path.join(uploadDir, `chunk_${chunkIndex}.part`);
   const chunkFinalPath = path.join(uploadDir, `chunk_${chunkIndex}`);
@@ -393,7 +540,8 @@ export async function finalizeUpload(
 
   // Contrôle d'espace disque juste avant finalize pour la création du fichier assemblé
   // (les morceaux occupent déjà fileSize sur disque, il faut fileSize supplémentaire disponible)
-  checkDiskSpace(folder.folderPath, meta.fileSize);
+  const importBase = path.dirname(folder.folderPath);
+  checkDiskSpace(folder.folderPath, meta.fileSize, importBase, uploadId);
 
   // Verify all chunks are present and match their exact expected size
   let totalChunksSize = 0;

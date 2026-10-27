@@ -14,6 +14,8 @@ import {
   cancelUpload,
   cleanupAbandonedUploads,
   checkDiskSpace,
+  computeAllActiveDiskReservations,
+  uploadLock,
   diskChecker,
   DiskSpaceError,
   UploadValidationError,
@@ -354,6 +356,69 @@ describe("Gallery Upload Server Logic (Feature 2)", () => {
       const assembledPath = path.join(folderPath, ".tmp_uploads", session.uploadId, "assembled.tmp");
       expect(fs.existsSync(assembledPath)).toBe(false);
     });
+
+    it("should prevent concurrent init calls from reserving the same disk space and allow second upload after cancellation", () => {
+      // Free space is 150 MB. Safety buffer is 50 MB, so net usable is 100 MB.
+      // Each 40 MB file requires 80 MB peak space (40 * 2).
+      // File 1 needs 80 MB -> fits (80 <= 100).
+      // File 2 needs 80 MB -> would fit on empty disk, but NOT when File 1 is already reserving 80 MB (80 + 80 = 160 > 100).
+      vi.spyOn(diskChecker, "statfs").mockReturnValue({
+        bavail: 150 * 1024,
+        bsize: 1024,
+        bfree: 150 * 1024,
+        blocks: 1000 * 1024,
+      } as unknown as ReturnType<typeof diskChecker.statfs>);
+
+      const s1 = initUploadSession(galleryId, {
+        target: "photos",
+        fileName: "file1.jpg",
+        fileSize: 40 * 1024 * 1024,
+        totalChunks: 8,
+      });
+      expect(s1.uploadId).toBeDefined();
+
+      // Second upload would fit individually (needs 80 MB <= 100 MB), but cannot fit simultaneously
+      expect(() => {
+        initUploadSession(galleryId, {
+          target: "photos",
+          fileName: "file2.jpg",
+          fileSize: 40 * 1024 * 1024,
+          totalChunks: 8,
+        });
+      }).toThrow(DiskSpaceError);
+
+      // Cancelling upload 1 frees its reservation
+      cancelUpload(galleryId, s1.uploadId);
+
+      // Now second upload succeeds!
+      const s2 = initUploadSession(galleryId, {
+        target: "photos",
+        fileName: "file2.jpg",
+        fileSize: 40 * 1024 * 1024,
+        totalChunks: 8,
+      });
+      expect(s2.uploadId).toBeDefined();
+    });
+
+    it("should preserve disk reservations across restarts from existing meta.json", () => {
+      vi.spyOn(diskChecker, "statfs").mockReturnValue({
+        bavail: 150 * 1024,
+        bsize: 1024,
+        bfree: 150 * 1024,
+        blocks: 1000 * 1024,
+      } as unknown as ReturnType<typeof diskChecker.statfs>);
+
+      initUploadSession(galleryId, {
+        target: "photos",
+        fileName: "existing-session.jpg",
+        fileSize: 40 * 1024 * 1024,
+        totalChunks: 8,
+      });
+
+      // Directly compute active reservations from disk (simulating restart reading state)
+      const reserved = computeAllActiveDiskReservations(importBase);
+      expect(reserved).toBe(80 * 1024 * 1024);
+    });
   });
 
   describe("Strict Server Bounds and Security Validations", () => {
@@ -370,6 +435,75 @@ describe("Gallery Upload Server Logic (Feature 2)", () => {
 
     it("should reject videos exceeding MAX_VIDEO_SIZE", () => {
       expect(() => initUploadSession(galleryId, { target: "videos", fileName: "huge.mp4", fileSize: MAX_VIDEO_SIZE + 1, totalChunks: 1 })).toThrow(UploadValidationError);
+    });
+
+    it("should accept video size up to 20 GB (safe integer arithmetic)", () => {
+      // 20 GB = 21474836480 bytes
+      const twentyGB = 20 * 1024 * 1024 * 1024;
+      expect(Number.isSafeInteger(twentyGB)).toBe(true);
+      expect(twentyGB).toBe(21474836480);
+      expect(MAX_VIDEO_SIZE).toBe(twentyGB);
+
+      // Total chunks for 20 GB at 5 MB chunk size = 4096 chunks (well within MAX_TOTAL_CHUNKS = 5000)
+      const totalChunks = Math.ceil(twentyGB / (5 * 1024 * 1024));
+      expect(totalChunks).toBe(4096);
+
+      // Verify init succeeds if disk space is sufficient
+      vi.spyOn(diskChecker, "statfs").mockReturnValue({
+        bavail: 100 * 1024 * 1024, // 100 GB in 1KB blocks
+        bsize: 1024,
+        bfree: 100 * 1024 * 1024,
+        blocks: 200 * 1024 * 1024,
+      } as unknown as ReturnType<typeof diskChecker.statfs>);
+
+      const session = initUploadSession(galleryId, {
+        target: "videos",
+        fileName: "wedding-movie.mp4",
+        fileSize: twentyGB,
+        totalChunks,
+      });
+      expect(session.uploadId).toBeDefined();
+      expect(session.totalChunks).toBe(4096);
+    });
+
+    it("should enforce maximum 2 active sessions per gallery and target", () => {
+      const s1 = initUploadSession(galleryId, { target: "photos", fileName: "s1.jpg", fileSize: 100, totalChunks: 1 });
+      const s2 = initUploadSession(galleryId, { target: "photos", fileName: "s2.jpg", fileSize: 100, totalChunks: 1 });
+      expect(s1.uploadId).toBeDefined();
+      expect(s2.uploadId).toBeDefined();
+
+      // 3rd session on photos must be rejected with 429
+      expect(() => {
+        initUploadSession(galleryId, { target: "photos", fileName: "s3.jpg", fileSize: 100, totalChunks: 1 });
+      }).toThrow(UploadValidationError);
+
+      try {
+        initUploadSession(galleryId, { target: "photos", fileName: "s3.jpg", fileSize: 100, totalChunks: 1 });
+      } catch (err) {
+        expect((err as UploadValidationError).status).toBe(429);
+      }
+
+      // But videos target still has available slots
+      const sVideo = initUploadSession(galleryId, { target: "videos", fileName: "v1.mp4", fileSize: 100, totalChunks: 1 });
+      expect(sVideo.uploadId).toBeDefined();
+
+      // Cancelling s1 frees a photo slot
+      cancelUpload(galleryId, s1.uploadId);
+      const s3 = initUploadSession(galleryId, { target: "photos", fileName: "s3.jpg", fileSize: 100, totalChunks: 1 });
+      expect(s3.uploadId).toBeDefined();
+    });
+
+    it("should prevent concurrent lock acquisition in uploadLock.runSync", () => {
+      let innerRan = false;
+      uploadLock.runSync(() => {
+        expect(() => {
+          uploadLock.runSync(() => {
+            innerRan = true;
+          });
+        }).toThrow(UploadValidationError);
+      });
+      expect(innerRan).toBe(false);
+      expect(uploadLock.isLocked).toBe(false);
     });
 
     it("should reject chunk size exceeding MAX_CHUNK_SIZE", () => {
