@@ -14,10 +14,13 @@ import {
   setPhotoVisibility,
   reorderPhotos,
   updateGlobalVideo,
+  getPortfolioMediaPath,
   type Portfolio,
   type Category,
   type Photo
 } from "../lib/portfolio-content.server";
+import { deletePhotoTransactionally } from "../lib/portfolio-transaction.server";
+import { prepareVideoCoverDeletion } from "../lib/portfolio-image.server";
 import { requireValidAdminSession, validateAdminFormData, ActionSecurityError } from "../lib/admin-auth.server";
 import styles from "./admin.module.css";
 import * as crypto from "node:crypto";
@@ -163,7 +166,6 @@ export async function action({ request }: ActionFunctionArgs) {
         newRevision = reorderPhotos(actionPayload.photoIds, actionPayload.revision);
         break;
       case "trashPhoto": {
-        const { deletePhotoTransactionally } = await import("../lib/portfolio-transaction.server");
         newRevision = deletePhotoTransactionally(actionPayload.photoId, actionPayload.revision).newRevision;
         break;
       }
@@ -172,8 +174,6 @@ export async function action({ request }: ActionFunctionArgs) {
         newRevision = result.newRevision;
         if (result.deletedCoverId) {
           try {
-            const { getPortfolioMediaPath } = await import("../lib/portfolio-content.server");
-            const { prepareVideoCoverDeletion } = await import("../lib/portfolio-image.server");
             const mediaBasePath = getPortfolioMediaPath();
             const transaction = prepareVideoCoverDeletion(result.deletedCoverId, mediaBasePath);
             if (transaction.hasQuarantine) {

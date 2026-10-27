@@ -131,7 +131,12 @@ test.describe("Client Gallery E2E - Full Cycle", () => {
     await adminPage.selectOption('select[name="status"]', "draft");
 
     // 4. Import des 28 médias
-    await adminPage.getByLabel("Dossier d'import").selectOption(IMPORT_FOLDER);
+    const manualImportSummary = adminPage.getByText("Importation depuis un dossier contrôlé (méthode avancée)");
+    await manualImportSummary.click();
+    const importFolderSelect = adminPage.getByLabel("Dossier d'import sur le serveur");
+    await expect(importFolderSelect).toBeVisible();
+    await expect(importFolderSelect).toBeEnabled();
+    await importFolderSelect.selectOption(IMPORT_FOLDER);
     await expect(adminPage.getByText("28 médias trouvés", { exact: false })).toBeVisible();
     await expect(adminPage.getByText("Invités : 25 photos, 1 vidéos", { exact: false })).toBeVisible();
     await expect(adminPage.getByText("Mariés : 1 photos, 1 vidéos", { exact: false })).toBeVisible();

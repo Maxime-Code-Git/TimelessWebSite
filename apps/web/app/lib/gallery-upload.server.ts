@@ -259,11 +259,20 @@ export function cleanupAbandonedUploads(galleryFolderPath: string, maxAgeMs = 24
             const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as UploadMetadata;
             if (now - meta.createdAt > maxAgeMs) shouldRemove = true;
           } catch {
-            shouldRemove = true;
+            try {
+              const stat = fs.statSync(uploadDir);
+              if (now - stat.mtimeMs > maxAgeMs) shouldRemove = true;
+            } catch {
+              // ignore
+            }
           }
         } else {
-          const stat = fs.statSync(uploadDir);
-          if (now - stat.mtimeMs > maxAgeMs) shouldRemove = true;
+          try {
+            const stat = fs.statSync(uploadDir);
+            if (now - stat.mtimeMs > maxAgeMs) shouldRemove = true;
+          } catch {
+            // ignore
+          }
         }
         if (shouldRemove) {
           fs.rmSync(uploadDir, { recursive: true, force: true });
@@ -374,7 +383,9 @@ export function initUploadSession(
     };
 
     const metaPath = path.join(uploadDir, "meta.json");
-    fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2), { mode: 0o600 });
+    const tmpMetaPath = path.join(uploadDir, `meta.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
+    fs.writeFileSync(tmpMetaPath, JSON.stringify(metadata, null, 2), { mode: 0o600 });
+    fs.renameSync(tmpMetaPath, metaPath);
 
     return {
       uploadId,
@@ -453,7 +464,9 @@ export async function saveChunkStream(
   const uploadedSet = new Set(meta.uploadedChunks);
   uploadedSet.add(chunkIndex);
   meta.uploadedChunks = Array.from(uploadedSet).sort((a, b) => a - b);
-  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), { mode: 0o600 });
+  const tmpMetaPath = path.join(uploadDir, `meta.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
+  fs.writeFileSync(tmpMetaPath, JSON.stringify(meta, null, 2), { mode: 0o600 });
+  fs.renameSync(tmpMetaPath, metaPath);
 
   return {
     success: true,
@@ -566,18 +579,46 @@ export async function finalizeUpload(
 
   // Assemble into temporary assembly file
   const assembledPath = path.join(uploadDir, "assembled.tmp");
-  const writeStream = fs.createWriteStream(assembledPath, { mode: 0o600 });
+  if (fs.existsSync(assembledPath)) {
+    try { fs.unlinkSync(assembledPath); } catch { /* ignore */ }
+  }
 
-  for (let i = 0; i < meta.totalChunks; i++) {
-    const chunkPath = path.join(uploadDir, `chunk_${i}`);
-    const chunkRead = fs.createReadStream(chunkPath);
+  if (meta.totalChunks === 1) {
+    const chunkPath = path.join(uploadDir, "chunk_0");
+    if (!fs.existsSync(chunkPath)) {
+      throw new UploadValidationError("Morceau 1/1 manquant. Veuillez reprendre l'envoi.");
+    }
+    fs.copyFileSync(chunkPath, assembledPath);
+    fs.chmodSync(assembledPath, 0o600);
+  } else {
+    const writeStream = fs.createWriteStream(assembledPath, { mode: 0o600 });
+    for (let i = 0; i < meta.totalChunks; i++) {
+      const chunkPath = path.join(uploadDir, `chunk_${i}`);
+      if (!fs.existsSync(chunkPath)) {
+        writeStream.destroy();
+        throw new UploadValidationError(`Morceau ${i + 1}/${meta.totalChunks} manquant. Veuillez reprendre l'envoi.`);
+      }
+      await new Promise<void>((resolve, reject) => {
+        const chunkRead = fs.createReadStream(chunkPath);
+        chunkRead.on("error", (err) => {
+          writeStream.destroy();
+          reject(err);
+        });
+        writeStream.on("error", reject);
+        chunkRead.on("end", () => {
+          writeStream.removeListener("error", reject);
+          resolve();
+        });
+        chunkRead.pipe(writeStream, { end: false });
+      });
+    }
+
     await new Promise<void>((resolve, reject) => {
-      chunkRead.on("end", resolve);
-      chunkRead.on("error", reject);
-      chunkRead.pipe(writeStream, { end: false });
+      writeStream.on("error", reject);
+      writeStream.on("close", resolve);
+      writeStream.end();
     });
   }
-  await new Promise<void>((resolve) => writeStream.end(resolve));
 
   // Check assembled size
   const assembledStat = fs.statSync(assembledPath);
