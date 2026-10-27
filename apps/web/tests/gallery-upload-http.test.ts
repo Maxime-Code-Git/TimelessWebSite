@@ -124,6 +124,50 @@ describe("Gallery Upload HTTP API (api.admin.gallery-upload.$id.ts)", () => {
       const response = await action({ request, params: { id: ".." }, context: {} } as unknown as ActionFunctionArgs);
       expect(response.status).toBe(400);
     });
+
+    it("should reject init request with invalid or negative fileSize", async () => {
+      const request = new Request("https://example.com/api/admin/gallery-upload/" + galleryId + "?action=init", {
+        method: "POST",
+        headers: {
+          "Cookie": cookieHeader,
+          "Origin": "https://example.com",
+          "X-CSRF-Token": validCsrf,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "init",
+          target: "photos",
+          fileName: "invalid.jpg",
+          fileSize: -50,
+          totalChunks: 1,
+        }),
+      });
+
+      const response = await action({ request, params: { id: galleryId }, context: {} } as unknown as ActionFunctionArgs);
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toContain("Taille de fichier invalide");
+    });
+
+    it("should reject chunk request with non-integer chunk index header", async () => {
+      const request = new Request("https://example.com/api/admin/gallery-upload/" + galleryId + "?action=chunk", {
+        method: "POST",
+        headers: {
+          "Cookie": cookieHeader,
+          "Origin": "https://example.com",
+          "X-CSRF-Token": validCsrf,
+          "Content-Type": "application/octet-stream",
+          "X-Upload-Id": "12345678-1234-1234-1234-123456789abc",
+          "X-Chunk-Index": "abc",
+        },
+        body: Buffer.from("data"),
+      });
+
+      const response = await action({ request, params: { id: galleryId }, context: {} } as unknown as ActionFunctionArgs);
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toContain("Index de morceau");
+    });
   });
 
   describe("End-to-End HTTP Upload Lifecycle", () => {

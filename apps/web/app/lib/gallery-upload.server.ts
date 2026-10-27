@@ -5,8 +5,14 @@ import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { ensureGalleryImportFolder } from "./gallery-folder.server";
 
-export const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
+export const MAX_PHOTO_SIZE = 100 * 1024 * 1024; // 100 MB max for photos
+export const MAX_VIDEO_SIZE = 2 * 1024 * 1024 * 1024; // 2 GB max for videos
+export const MAX_FILE_SIZE = MAX_VIDEO_SIZE;
 export const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk (Cloudflare & memory friendly)
+export const MIN_CHUNK_SIZE = 256 * 1024; // 256 KB min chunk (unless file is smaller)
+export const MAX_CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB max chunk size
+export const MAX_TOTAL_CHUNKS = 1000; // 1000 chunks max per file
+export const MAX_BATCH_FILES = 200; // 200 files max per batch
 export const SAFETY_BUFFER_BYTES = 50 * 1024 * 1024; // 50 MB safety margin
 
 export const PHOTO_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
@@ -157,21 +163,51 @@ export function initUploadSession(
     throw new UploadValidationError("Nom de fichier invalide.");
   }
 
-  if (typeof params.fileSize !== "number" || params.fileSize <= 0 || params.fileSize > MAX_FILE_SIZE) {
-    throw new UploadValidationError(`Taille de fichier invalide (maximum ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo).`);
+  if (
+    typeof params.fileSize !== "number" ||
+    !Number.isSafeInteger(params.fileSize) ||
+    params.fileSize <= 0
+  ) {
+    throw new UploadValidationError("Taille de fichier invalide (doit être un entier positif).");
   }
 
-  const chunkSize = params.chunkSize && params.chunkSize > 0 && params.chunkSize <= 50 * 1024 * 1024
-    ? params.chunkSize
-    : DEFAULT_CHUNK_SIZE;
+  if (params.target === "photos" && params.fileSize > MAX_PHOTO_SIZE) {
+    throw new UploadValidationError(`Taille de photo trop grande (maximum ${Math.round(MAX_PHOTO_SIZE / 1024 / 1024)} Mo).`);
+  }
+
+  if (params.target === "videos" && params.fileSize > MAX_VIDEO_SIZE) {
+    throw new UploadValidationError(`Taille de vidéo trop grande (maximum ${Math.round(MAX_VIDEO_SIZE / 1024 / 1024 / 1024)} Go).`);
+  }
+
+  let chunkSize = DEFAULT_CHUNK_SIZE;
+  if (params.chunkSize !== undefined) {
+    if (
+      typeof params.chunkSize !== "number" ||
+      !Number.isSafeInteger(params.chunkSize) ||
+      params.chunkSize <= 0 ||
+      params.chunkSize > MAX_CHUNK_SIZE
+    ) {
+      throw new UploadValidationError(`Taille de morceau invalide (maximum ${Math.round(MAX_CHUNK_SIZE / 1024 / 1024)} Mo).`);
+    }
+    chunkSize = params.chunkSize;
+  }
 
   const calculatedTotalChunks = Math.ceil(params.fileSize / chunkSize);
-  if (params.totalChunks !== calculatedTotalChunks) {
+  if (calculatedTotalChunks > MAX_TOTAL_CHUNKS) {
+    throw new UploadValidationError(`Nombre de morceaux trop élevé (maximum ${MAX_TOTAL_CHUNKS}).`);
+  }
+
+  if (
+    typeof params.totalChunks !== "number" ||
+    !Number.isSafeInteger(params.totalChunks) ||
+    params.totalChunks !== calculatedTotalChunks
+  ) {
     throw new UploadValidationError(`Nombre de morceaux incohérent (attendu ${calculatedTotalChunks}, reçu ${params.totalChunks}).`);
   }
 
   const folder = ensureGalleryImportFolder(galleryId);
-  checkDiskSpace(folder.folderPath, params.fileSize);
+  // Vérification de l'espace disque pour le pic d'assemblage : morceaux + fichier final + réserve de sécurité
+  checkDiskSpace(folder.folderPath, params.fileSize * 2);
   cleanupAbandonedUploads(folder.folderPath);
 
   const uploadId = crypto.randomUUID();
@@ -226,11 +262,25 @@ export async function saveChunkStream(
 
   const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as UploadMetadata;
 
-  if (chunkIndex < 0 || chunkIndex >= meta.totalChunks) {
-    throw new UploadValidationError("Index de morceau hors limites.");
+  // Rattachement strict de l'uploadId à la galerie
+  if (meta.galleryId !== galleryId) {
+    throw new UploadValidationError("L'upload n'appartient pas à cette galerie.", 403);
   }
 
-  checkDiskSpace(folder.folderPath, meta.chunkSize);
+  if (
+    typeof chunkIndex !== "number" ||
+    !Number.isSafeInteger(chunkIndex) ||
+    chunkIndex < 0 ||
+    chunkIndex >= meta.totalChunks
+  ) {
+    throw new UploadValidationError("Index de morceau invalide.");
+  }
+
+  const expectedChunkSize = (chunkIndex === meta.totalChunks - 1)
+    ? meta.fileSize - (meta.totalChunks - 1) * meta.chunkSize
+    : meta.chunkSize;
+
+  checkDiskSpace(folder.folderPath, expectedChunkSize);
 
   const chunkPartPath = path.join(uploadDir, `chunk_${chunkIndex}.part`);
   const chunkFinalPath = path.join(uploadDir, `chunk_${chunkIndex}`);
@@ -241,6 +291,13 @@ export async function saveChunkStream(
 
   const writeStream = fs.createWriteStream(chunkPartPath, { mode: 0o600 });
   await pipeline(nodeStream, writeStream);
+
+  // Vérification de la taille exacte reçue
+  const chunkStat = fs.statSync(chunkPartPath);
+  if (chunkStat.size !== expectedChunkSize) {
+    try { fs.unlinkSync(chunkPartPath); } catch { /* ignore */ }
+    throw new UploadValidationError(`Taille du morceau invalide (reçu ${chunkStat.size} octets, attendu ${expectedChunkSize} octets).`);
+  }
 
   // Atomic rename to mark chunk complete
   fs.renameSync(chunkPartPath, chunkFinalPath);
@@ -279,11 +336,23 @@ export function getUploadStatus(
 
   const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as UploadMetadata;
 
-  // Authoritatively verify which chunk files exist
+  // Rattachement strict de l'uploadId à la galerie
+  if (meta.galleryId !== galleryId) {
+    throw new UploadValidationError("L'upload n'appartient pas à cette galerie.", 403);
+  }
+
+  // Authoritatively verify which chunk files exist and have exact expected size
   const existingChunks: number[] = [];
   for (let i = 0; i < meta.totalChunks; i++) {
-    if (fs.existsSync(path.join(uploadDir, `chunk_${i}`))) {
-      existingChunks.push(i);
+    const chunkPath = path.join(uploadDir, `chunk_${i}`);
+    if (fs.existsSync(chunkPath)) {
+      const stat = fs.statSync(chunkPath);
+      const expectedSize = (i === meta.totalChunks - 1)
+        ? meta.fileSize - (meta.totalChunks - 1) * meta.chunkSize
+        : meta.chunkSize;
+      if (stat.size === expectedSize) {
+        existingChunks.push(i);
+      }
     }
   }
 
@@ -297,7 +366,7 @@ export function getUploadStatus(
 }
 
 /**
- * Assembles all chunks, verifies signature, and moves the final file to destination.
+ * Assembles all chunks, verifies signature, size bounds and moves the final file to destination.
  */
 export async function finalizeUpload(
   galleryId: string,
@@ -317,12 +386,34 @@ export async function finalizeUpload(
 
   const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as UploadMetadata;
 
-  // Verify all chunks are present
+  // Rattachement strict de l'uploadId à la galerie
+  if (meta.galleryId !== galleryId) {
+    throw new UploadValidationError("L'upload n'appartient pas à cette galerie.", 403);
+  }
+
+  // Contrôle d'espace disque juste avant finalize pour la création du fichier assemblé
+  // (les morceaux occupent déjà fileSize sur disque, il faut fileSize supplémentaire disponible)
+  checkDiskSpace(folder.folderPath, meta.fileSize);
+
+  // Verify all chunks are present and match their exact expected size
+  let totalChunksSize = 0;
   for (let i = 0; i < meta.totalChunks; i++) {
     const chunkPath = path.join(uploadDir, `chunk_${i}`);
     if (!fs.existsSync(chunkPath)) {
       throw new UploadValidationError(`Morceau ${i + 1}/${meta.totalChunks} manquant. Veuillez reprendre l'envoi.`);
     }
+    const chunkStat = fs.statSync(chunkPath);
+    const expectedSize = (i === meta.totalChunks - 1)
+      ? meta.fileSize - (meta.totalChunks - 1) * meta.chunkSize
+      : meta.chunkSize;
+    if (chunkStat.size !== expectedSize) {
+      throw new UploadValidationError(`Taille du morceau ${i + 1} incohérente (reçu ${chunkStat.size}, attendu ${expectedSize}).`);
+    }
+    totalChunksSize += chunkStat.size;
+  }
+
+  if (totalChunksSize !== meta.fileSize) {
+    throw new UploadValidationError("Somme des tailles des morceaux incohérente avec la taille déclarée.");
   }
 
   // Assemble into temporary assembly file
@@ -343,7 +434,7 @@ export async function finalizeUpload(
   // Check assembled size
   const assembledStat = fs.statSync(assembledPath);
   if (assembledStat.size !== meta.fileSize) {
-    fs.unlinkSync(assembledPath);
+    try { fs.unlinkSync(assembledPath); } catch { /* ignore */ }
     throw new UploadValidationError("Taille du fichier assemblé incorrecte.");
   }
 
@@ -356,19 +447,19 @@ export async function finalizeUpload(
   const detected = detectMimeType(headerBuf.subarray(0, bytesRead));
 
   if (!detected) {
-    fs.unlinkSync(assembledPath);
+    try { fs.unlinkSync(assembledPath); } catch { /* ignore */ }
     fs.rmSync(uploadDir, { recursive: true, force: true });
     throw new UploadValidationError("Format de fichier non reconnu.", 415);
   }
 
   if (meta.target === "photos" && !PHOTO_MIME_TYPES.has(detected)) {
-    fs.unlinkSync(assembledPath);
+    try { fs.unlinkSync(assembledPath); } catch { /* ignore */ }
     fs.rmSync(uploadDir, { recursive: true, force: true });
     throw new UploadValidationError("Le fichier envoyé n'est pas une image supportée (JPEG, PNG, WEBP, AVIF).", 415);
   }
 
   if (meta.target === "videos" && !VIDEO_MIME_TYPES.has(detected)) {
-    fs.unlinkSync(assembledPath);
+    try { fs.unlinkSync(assembledPath); } catch { /* ignore */ }
     fs.rmSync(uploadDir, { recursive: true, force: true });
     throw new UploadValidationError("Le fichier envoyé n'est pas une vidéo supportée (MP4, WEBM).", 415);
   }
@@ -390,7 +481,7 @@ export async function finalizeUpload(
 
     if (hashAssembled === hashExisting) {
       // Exactly the same file content already exists!
-      fs.unlinkSync(assembledPath);
+      try { fs.unlinkSync(assembledPath); } catch { /* ignore */ }
       fs.rmSync(uploadDir, { recursive: true, force: true });
       return { success: true, fileName: finalFileName, target: meta.target, alreadyExists: true };
     }
@@ -429,6 +520,13 @@ export function cancelUpload(galleryId: string, uploadId: string): void {
   try {
     const folder = ensureGalleryImportFolder(galleryId);
     const uploadDir = path.join(getUploadsBaseDir(folder.folderPath), uploadId);
+    const metaPath = path.join(uploadDir, "meta.json");
+    if (fs.existsSync(metaPath)) {
+      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as UploadMetadata;
+      if (meta.galleryId !== galleryId) {
+        return;
+      }
+    }
     if (fs.existsSync(uploadDir)) {
       fs.rmSync(uploadDir, { recursive: true, force: true });
     }

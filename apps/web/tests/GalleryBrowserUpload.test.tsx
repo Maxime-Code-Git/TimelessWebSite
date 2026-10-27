@@ -232,4 +232,19 @@ describe("GalleryBrowserUpload Component", () => {
     expect(initCalls).toBe(1);
     expect(defaultProps.onUploadBatchComplete).toHaveBeenCalledTimes(1);
   });
+
+  it("8: displays error alert when exceeding MAX_BATCH_FILES", async () => {
+    const { container } = render(<GalleryBrowserUpload {...defaultProps} />);
+
+    const photoInput = container.querySelector('input[type="file"][accept*="image/jpeg"]') as HTMLInputElement;
+    const tooManyFiles = Array.from({ length: 201 }, (_, i) => new File(["content"], `test-${i}.jpg`, { type: "image/jpeg" }));
+
+    await act(async () => {
+      fireEvent.change(photoInput, { target: { files: tooManyFiles } });
+    });
+
+    const alertEl = screen.getByRole("alert");
+    expect(alertEl).toBeInTheDocument();
+    expect(alertEl).toHaveTextContent("Limite dépassée : un lot ne peut pas contenir plus de 200 fichiers.");
+  });
 });

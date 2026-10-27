@@ -88,11 +88,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (actionParam === "chunk") {
       const uploadId = request.headers.get("X-Upload-Id");
       const chunkIndexStr = request.headers.get("X-Chunk-Index");
-      if (!uploadId || chunkIndexStr === null) {
-        return Response.json({ error: "En-têtes de morceau manquants." }, { status: 400, headers: createAdminHeaders() });
+      if (!uploadId || chunkIndexStr === null || !/^\d+$/.test(chunkIndexStr.trim())) {
+        return Response.json({ error: "Index de morceau manquant ou invalide." }, { status: 400, headers: createAdminHeaders() });
       }
       const chunkIndex = parseInt(chunkIndexStr, 10);
-      if (isNaN(chunkIndex)) {
+      if (!Number.isSafeInteger(chunkIndex) || chunkIndex < 0) {
         return Response.json({ error: "Index de morceau invalide." }, { status: 400, headers: createAdminHeaders() });
       }
 
@@ -115,11 +115,29 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const action = actionParam || String(body.action || "");
 
     if (action === "init") {
-      const target = body.target as "photos" | "videos";
-      const fileName = String(body.fileName || "");
-      const fileSize = Number(body.fileSize);
-      const totalChunks = Number(body.totalChunks);
-      const chunkSize = body.chunkSize ? Number(body.chunkSize) : undefined;
+      const target = body.target;
+      if (target !== "photos" && target !== "videos") {
+        return Response.json({ error: "Cible d'import invalide (photos ou videos requis)." }, { status: 400, headers: createAdminHeaders() });
+      }
+      const fileName = String(body.fileName || "").trim();
+      if (!fileName) {
+        return Response.json({ error: "Nom de fichier requis." }, { status: 400, headers: createAdminHeaders() });
+      }
+      const fileSize = typeof body.fileSize === "number" ? body.fileSize : Number(body.fileSize);
+      if (!Number.isSafeInteger(fileSize) || fileSize <= 0) {
+        return Response.json({ error: "Taille de fichier invalide (doit être un entier positif)." }, { status: 400, headers: createAdminHeaders() });
+      }
+      const totalChunks = typeof body.totalChunks === "number" ? body.totalChunks : Number(body.totalChunks);
+      if (!Number.isSafeInteger(totalChunks) || totalChunks <= 0) {
+        return Response.json({ error: "Nombre de morceaux invalide." }, { status: 400, headers: createAdminHeaders() });
+      }
+      let chunkSize: number | undefined;
+      if (body.chunkSize !== undefined) {
+        chunkSize = typeof body.chunkSize === "number" ? body.chunkSize : Number(body.chunkSize);
+        if (!Number.isSafeInteger(chunkSize) || chunkSize <= 0) {
+          return Response.json({ error: "Taille de morceau invalide." }, { status: 400, headers: createAdminHeaders() });
+        }
+      }
 
       const res = initUploadSession(id, {
         target,

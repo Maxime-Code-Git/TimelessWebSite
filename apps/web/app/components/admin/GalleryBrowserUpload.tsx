@@ -22,6 +22,8 @@ const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
 const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".avif"];
 const VIDEO_EXTENSIONS = [".mp4", ".webm"];
 
+export const MAX_BATCH_FILES = 200;
+
 export function GalleryBrowserUpload({
   galleryId,
   csrfToken,
@@ -32,6 +34,7 @@ export function GalleryBrowserUpload({
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [batchCompleted, setBatchCompleted] = useState(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +56,12 @@ export function GalleryBrowserUpload({
   }, [isProcessing]);
 
   const addFilesToQueue = (files: FileList | File[], defaultTarget: "photos" | "videos") => {
+    if (queue.length + files.length > MAX_BATCH_FILES) {
+      setBatchError(`Limite dépassée : un lot ne peut pas contenir plus de ${MAX_BATCH_FILES} fichiers.`);
+      return;
+    }
+    setBatchError(null);
+
     const newItems: UploadQueueItem[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -367,6 +376,12 @@ export function GalleryBrowserUpload({
           Photos acceptées : JPEG, PNG, WebP, AVIF - Vidéos acceptées : MP4, WebM (morceaux de 5 Mo résilients)
         </p>
       </div>
+
+      {batchError && (
+        <p role="alert" className={styles.errorText}>
+          {batchError}
+        </p>
+      )}
 
       {totalItems > 0 && (
         <div className={styles.uploadStatusContainer} role="region" aria-label="Progression de l'envoi">

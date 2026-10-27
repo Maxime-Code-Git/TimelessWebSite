@@ -102,7 +102,11 @@ function scanFolderForFiles(
       if (entry.isDirectory()) {
         scan(fullPath);
       } else if (entry.isFile()) {
-        if (!entry.name.startsWith(".")) {
+        if (
+          !entry.name.startsWith(".") &&
+          !entry.name.endsWith(".part") &&
+          !entry.name.endsWith(".tmp")
+        ) {
           files.push({ fullPath, name: entry.name, visibility, expectedCategory });
         }
       }

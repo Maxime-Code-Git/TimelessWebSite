@@ -16,6 +16,10 @@ import {
   checkDiskSpace,
   diskChecker,
   DiskSpaceError,
+  UploadValidationError,
+  MAX_PHOTO_SIZE,
+  MAX_VIDEO_SIZE,
+  MAX_CHUNK_SIZE,
   detectMimeType,
 } from "../app/lib/gallery-upload.server";
 import { getImportPreview, startGalleryImport, processImport, acquireNextJob } from "../app/lib/gallery-import.server";
@@ -319,6 +323,123 @@ describe("Gallery Upload Server Logic (Feature 2)", () => {
       } as unknown as ReturnType<typeof diskChecker.statfs>);
 
       expect(() => checkDiskSpace(tmpDir, 500 * 1024 * 1024)).toThrow(DiskSpaceError);
+    });
+
+    it("should succeed receiving chunks but fail during finalizeUpload if disk space is insufficient for assembled file", async () => {
+      const jpegBuf = await sharp({ create: { width: 30, height: 30, channels: 3, background: { r: 10, g: 20, b: 30 } } }).jpeg().toBuffer();
+      const chunkSize = Math.ceil(jpegBuf.length / 2);
+      const session = initUploadSession(galleryId, {
+        target: "photos",
+        fileName: "peak-test.jpg",
+        fileSize: jpegBuf.length,
+        totalChunks: 2,
+        chunkSize,
+      });
+
+      // Upload the 2 chunks successfully
+      await saveChunkStream(galleryId, session.uploadId, 0, Readable.from(jpegBuf.subarray(0, chunkSize)));
+      await saveChunkStream(galleryId, session.uploadId, 1, Readable.from(jpegBuf.subarray(chunkSize)));
+
+      // Now simulate disk becoming full right before finalize (insufficient for assembled file)
+      vi.spyOn(diskChecker, "statfs").mockReturnValue({
+        bavail: 10,
+        bsize: 1024,
+        bfree: 10,
+        blocks: 10000,
+      } as unknown as ReturnType<typeof diskChecker.statfs>);
+
+      // finalizeUpload must throw DiskSpaceError and not leave assembled.tmp
+      await expect(finalizeUpload(galleryId, session.uploadId)).rejects.toThrow(DiskSpaceError);
+      const folderPath = path.join(importBase, galleryFolder);
+      const assembledPath = path.join(folderPath, ".tmp_uploads", session.uploadId, "assembled.tmp");
+      expect(fs.existsSync(assembledPath)).toBe(false);
+    });
+  });
+
+  describe("Strict Server Bounds and Security Validations", () => {
+    it("should reject negative, non-safe-integer or zero file sizes", () => {
+      expect(() => initUploadSession(galleryId, { target: "photos", fileName: "test.jpg", fileSize: -10, totalChunks: 1 })).toThrow(UploadValidationError);
+      expect(() => initUploadSession(galleryId, { target: "photos", fileName: "test.jpg", fileSize: 0, totalChunks: 1 })).toThrow(UploadValidationError);
+      expect(() => initUploadSession(galleryId, { target: "photos", fileName: "test.jpg", fileSize: 1.5, totalChunks: 1 })).toThrow(UploadValidationError);
+      expect(() => initUploadSession(galleryId, { target: "photos", fileName: "test.jpg", fileSize: NaN, totalChunks: 1 })).toThrow(UploadValidationError);
+    });
+
+    it("should reject photos exceeding MAX_PHOTO_SIZE", () => {
+      expect(() => initUploadSession(galleryId, { target: "photos", fileName: "big.jpg", fileSize: MAX_PHOTO_SIZE + 1, totalChunks: 1 })).toThrow(UploadValidationError);
+    });
+
+    it("should reject videos exceeding MAX_VIDEO_SIZE", () => {
+      expect(() => initUploadSession(galleryId, { target: "videos", fileName: "huge.mp4", fileSize: MAX_VIDEO_SIZE + 1, totalChunks: 1 })).toThrow(UploadValidationError);
+    });
+
+    it("should reject chunk size exceeding MAX_CHUNK_SIZE", () => {
+      expect(() => initUploadSession(galleryId, { target: "photos", fileName: "test.jpg", fileSize: 1000, totalChunks: 1, chunkSize: MAX_CHUNK_SIZE + 1 })).toThrow(UploadValidationError);
+    });
+
+    it("should reject invalid chunk indices", async () => {
+      const jpegBuf = await sharp({ create: { width: 20, height: 20, channels: 3, background: { r: 50, g: 50, b: 50 } } }).jpeg().toBuffer();
+      const session = initUploadSession(galleryId, {
+        target: "photos",
+        fileName: "bounds.jpg",
+        fileSize: jpegBuf.length,
+        totalChunks: 1,
+        chunkSize: jpegBuf.length,
+      });
+
+      await expect(saveChunkStream(galleryId, session.uploadId, -1, Readable.from(jpegBuf))).rejects.toThrow(UploadValidationError);
+      await expect(saveChunkStream(galleryId, session.uploadId, 1, Readable.from(jpegBuf))).rejects.toThrow(UploadValidationError);
+    });
+
+    it("should reject chunks with size mismatch", async () => {
+      const jpegBuf = await sharp({ create: { width: 20, height: 20, channels: 3, background: { r: 50, g: 50, b: 50 } } }).jpeg().toBuffer();
+      const session = initUploadSession(galleryId, {
+        target: "photos",
+        fileName: "mismatch.jpg",
+        fileSize: jpegBuf.length,
+        totalChunks: 1,
+        chunkSize: jpegBuf.length,
+      });
+
+      // Send only half the declared chunk size
+      const truncated = jpegBuf.subarray(0, Math.floor(jpegBuf.length / 2));
+      await expect(saveChunkStream(galleryId, session.uploadId, 0, Readable.from(truncated))).rejects.toThrow(UploadValidationError);
+
+      // Verify truncated .part file was deleted
+      const uploadDir = path.join(importBase, galleryFolder, ".tmp_uploads", session.uploadId);
+      expect(fs.existsSync(path.join(uploadDir, "chunk_0.part"))).toBe(false);
+      expect(fs.existsSync(path.join(uploadDir, "chunk_0"))).toBe(false);
+    });
+
+    it("should strictly bind uploadId to the gallery and reject access from another gallery", async () => {
+      const gal2 = createGallery({
+        bride_names: "Claire & David",
+        wedding_date: "2026-10-10",
+      });
+
+      const jpegBuf = await sharp({ create: { width: 20, height: 20, channels: 3, background: { r: 50, g: 50, b: 50 } } }).jpeg().toBuffer();
+      const session = initUploadSession(galleryId, {
+        target: "photos",
+        fileName: "binding.jpg",
+        fileSize: jpegBuf.length,
+        totalChunks: 1,
+        chunkSize: jpegBuf.length,
+      });
+
+      // Attacking gallery 2 trying to upload chunk to gallery 1's uploadId
+      await expect(saveChunkStream(gal2.id, session.uploadId, 0, Readable.from(jpegBuf))).rejects.toThrow(UploadValidationError);
+      await expect(finalizeUpload(gal2.id, session.uploadId)).rejects.toThrow(UploadValidationError);
+      expect(() => getUploadStatus(gal2.id, session.uploadId)).toThrow(UploadValidationError);
+    });
+
+    it("should ensure import analysis never scans partial or temporary files", async () => {
+      // Place a dummy .part and .tmp file inside photos/
+      const photosDir = path.join(importBase, galleryFolder, "photos");
+      fs.writeFileSync(path.join(photosDir, "test.jpg.part"), Buffer.from("partial chunk"));
+      fs.writeFileSync(path.join(photosDir, "temp.tmp"), Buffer.from("temp assembly"));
+
+      const preview = await getImportPreview(galleryFolder);
+      expect(preview.invitesPhotosCount).toBe(0);
+      expect(preview.total).toBe(0);
     });
   });
 
