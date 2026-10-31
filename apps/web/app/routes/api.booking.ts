@@ -146,6 +146,13 @@ export async function action({ request }: ActionFunctionArgs) {
     if (err instanceof Error && err.message === "ALREADY_BOOKED") {
       return json({ error: "SLOT_TAKEN" }, { status: 409, headers: { "Cache-Control": "no-store" } });
     }
+    if (err instanceof Error && (
+      err.message === "Slot is not available" ||
+      err.message === "Date is blocked" ||
+      err.message === "Slot is outside allowed booking window"
+    )) {
+      return json({ error: "SLOT_NOT_AVAILABLE" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+    }
     return json({ error: "Internal Server Error" }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
 }

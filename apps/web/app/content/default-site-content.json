@@ -990,8 +990,8 @@
         "en": "Select the day and time that suit you for a 30-minute call."
       },
       "note": {
-        "fr": "Appels disponibles les mardis et jeudis.",
-        "en": "Calls available on Tuesdays and Thursdays."
+        "fr": "Appels disponibles les mardis, jeudis et samedis.",
+        "en": "Calls available on Tuesdays, Thursdays, and Saturdays."
       }
     },
     "visioBooking": {

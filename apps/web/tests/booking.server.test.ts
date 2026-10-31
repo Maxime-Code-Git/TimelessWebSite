@@ -9,7 +9,9 @@ import {
   getLocalDate, getUtcDate, isValidVisioUrl,
   createPendingBooking, updateBookingStatus,
   addBlockedDate, removeBlockedDate, getBlockedDates,
-  toggleWeeklySlot, getWeeklySlots
+  toggleWeeklySlot, getWeeklySlots, getAvailableSlots,
+  createWeeklySlot, updateWeeklySlot,
+  SATURDAY_WEEKDAY, SATURDAY_ALLOWED_TIMES, isAllowedSlotForWeekday
 } from "../app/lib/booking.server";
 import { ENV } from "../app/lib/env.server";
 
@@ -104,16 +106,18 @@ describe("Booking Server Logic & DB", () => {
       const db = openBookingDb(dbPath);
       expect(db).toBeInstanceOf(DatabaseSync);
 
-      // Verify PRAGMA user_version is 2
+      // Verify PRAGMA user_version is 3
       const version = db.prepare("PRAGMA user_version").get() as { user_version: number };
-      expect(version.user_version).toBe(2);
+      expect(version.user_version).toBe(3);
 
       // Verify slots were seeded properly without duplicates
       const slots = db.prepare("SELECT weekday, local_time FROM weekly_slots ORDER BY weekday ASC, local_time ASC").all() as { weekday: number, local_time: string }[];
       const tuesdaySlots = slots.filter(s => s.weekday === 2).map(s => s.local_time);
       const thursdaySlots = slots.filter(s => s.weekday === 4).map(s => s.local_time);
+      const saturdaySlots = slots.filter(s => s.weekday === 6).map(s => s.local_time);
       expect(tuesdaySlots).toEqual(["10:00", "12:00", "14:00", "16:00", "18:00"]);
       expect(thursdaySlots).toEqual(["10:00", "12:00", "14:00", "16:00", "18:00"]);
+      expect(saturdaySlots).toEqual(["10:00", "14:00"]);
 
       // Also check permissions
       const dirStat = fs.statSync(path.dirname(dbPath));
@@ -125,7 +129,7 @@ describe("Booking Server Logic & DB", () => {
       db.close();
     });
 
-    it("should preserve existing slots and add 10:00, 12:00, 14:00, 16:00 without duplicate on migration", () => {
+    it("should preserve existing slots and add Tuesday/Thursday and Saturday slots without duplicate on migration from v1", () => {
       // Create DB with version 1 and old slots
       const rawDb = new DatabaseSync(dbPath);
       rawDb.exec(`
@@ -149,19 +153,55 @@ describe("Booking Server Logic & DB", () => {
 
       const db = openBookingDb(dbPath);
       const version = db.prepare("PRAGMA user_version").get() as { user_version: number };
-      expect(version.user_version).toBe(2);
+      expect(version.user_version).toBe(3);
 
       const slots = getWeeklySlots(db);
       const tueTimes = slots.filter(s => s.weekday === 2).map(s => s.local_time);
       const thuTimes = slots.filter(s => s.weekday === 4).map(s => s.local_time);
+      const satTimes = slots.filter(s => s.weekday === 6).map(s => s.local_time);
 
       expect(tueTimes).toEqual(["10:00", "12:00", "14:00", "16:00", "18:00"]);
       expect(thuTimes).toEqual(["10:00", "12:00", "14:00", "16:00", "18:00"]);
+      expect(satTimes).toEqual(["10:00", "14:00"]);
 
       // Verify old slot IDs were preserved
       const old1 = slots.find(s => s.id === "old-1");
       expect(old1).toBeDefined();
       expect(old1?.local_time).toBe("10:00");
+
+      db.close();
+    });
+
+    it("should preserve existing v2 slots and add Saturday slots on migration from v2", () => {
+      const rawDb = new DatabaseSync(dbPath);
+      rawDb.exec(`
+        CREATE TABLE IF NOT EXISTS weekly_slots (
+          id TEXT PRIMARY KEY,
+          weekday INTEGER NOT NULL,
+          local_time TEXT NOT NULL,
+          active INTEGER DEFAULT 1,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_slots_day_time ON weekly_slots(weekday, local_time);
+        PRAGMA user_version = 2;
+      `);
+      const now = Date.now();
+      rawDb.prepare("INSERT INTO weekly_slots (id, weekday, local_time, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run("v2-1", 2, "10:00", now, now);
+      rawDb.prepare("INSERT INTO weekly_slots (id, weekday, local_time, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run("v2-2", 4, "14:00", now, now);
+      rawDb.close();
+
+      const db = openBookingDb(dbPath);
+      const version = db.prepare("PRAGMA user_version").get() as { user_version: number };
+      expect(version.user_version).toBe(3);
+
+      const slots = getWeeklySlots(db);
+      const satTimes = slots.filter(s => s.weekday === 6).map(s => s.local_time);
+      expect(satTimes).toEqual(["10:00", "14:00"]);
+
+      // Verify existing slots preserved
+      expect(slots.find(s => s.id === "v2-1")?.local_time).toBe("10:00");
+      expect(slots.find(s => s.id === "v2-2")?.local_time).toBe("14:00");
 
       db.close();
     });
@@ -175,6 +215,30 @@ function getFutureTuesday(): string {
   const isoWeekday = date.getUTCDay() === 0 ? 7 : date.getUTCDay();
   const daysUntilTuesday = (2 - isoWeekday + 7) % 7;
   date.setUTCDate(date.getUTCDate() + daysUntilTuesday);
+
+  return date.toISOString().slice(0, 10);
+}
+
+function getFutureSaturday(): string {
+  const date = new Date();
+  date.setUTCHours(12, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + 7);
+
+  const isoWeekday = date.getUTCDay() === 0 ? 7 : date.getUTCDay();
+  const daysUntilSaturday = (6 - isoWeekday + 7) % 7;
+  date.setUTCDate(date.getUTCDate() + daysUntilSaturday);
+
+  return date.toISOString().slice(0, 10);
+}
+
+function getFutureSunday(): string {
+  const date = new Date();
+  date.setUTCHours(12, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + 7);
+
+  const isoWeekday = date.getUTCDay() === 0 ? 7 : date.getUTCDay();
+  const daysUntilSunday = (7 - isoWeekday + 7) % 7;
+  date.setUTCDate(date.getUTCDate() + daysUntilSunday);
 
   return date.toISOString().slice(0, 10);
 }
@@ -331,7 +395,7 @@ function getFutureTuesday(): string {
   });
 
   describe("Visio Slots Availability & Server Validation (Feature 3)", () => {
-    it("should include all 5 slots (10:00, 12:00, 14:00, 16:00, 18:00) in chronological order", () => {
+    it("should include all 5 slots (10:00, 12:00, 14:00, 16:00, 18:00) in chronological order for Tuesday/Thursday", () => {
       const db = openBookingDb(dbPath);
       const weekly = getWeeklySlots(db);
       const tueSlots = weekly.filter(s => s.weekday === 2).map(s => s.local_time);
@@ -342,7 +406,7 @@ function getFutureTuesday(): string {
       db.close();
     });
 
-    it("should accept bookings for all new and existing slots: 10:00, 12:00, 14:00, 16:00, 18:00", () => {
+    it("should accept bookings for all new and existing slots: 10:00, 12:00, 14:00, 16:00, 18:00 on Tuesday", () => {
       const db = openBookingDb(dbPath);
       const futureDate = getFutureTuesday();
 
@@ -366,6 +430,203 @@ function getFutureTuesday(): string {
       expect(() => createPendingBooking({ date: futureDate, time: "15:00", names: "User 15", email: "u15@test.com", language: "fr" }, db)).toThrow("Slot is not available");
 
       db.close();
+    });
+  });
+
+  describe("Saturday Visio Slots (10:00 and 14:00 only)", () => {
+    it("should export Saturday configuration constants and helper", () => {
+      expect(SATURDAY_WEEKDAY).toBe(6);
+      expect(SATURDAY_ALLOWED_TIMES).toEqual(["10:00", "14:00"]);
+      expect(isAllowedSlotForWeekday(6, "10:00")).toBe(true);
+      expect(isAllowedSlotForWeekday(6, "14:00")).toBe(true);
+      expect(isAllowedSlotForWeekday(6, "12:00")).toBe(false);
+      expect(isAllowedSlotForWeekday(6, "18:00")).toBe(false);
+      expect(isAllowedSlotForWeekday(2, "12:00")).toBe(true);
+      expect(isAllowedSlotForWeekday(4, "18:00")).toBe(true);
+    });
+
+    it("should configure Saturday weekly slots with exactly 10:00 and 14:00", () => {
+      const db = openBookingDb(dbPath);
+      const weekly = getWeeklySlots(db);
+      const satSlots = weekly.filter(s => s.weekday === SATURDAY_WEEKDAY).map(s => s.local_time);
+
+      expect(satSlots).toEqual(["10:00", "14:00"]);
+      db.close();
+    });
+
+    it("should propose ONLY 10:00 and 14:00 for Saturday in getAvailableSlots", () => {
+      const db = openBookingDb(dbPath);
+      const futureSat = getFutureSaturday();
+      const slots = getAvailableSlots(db);
+
+      const satSlots = slots.filter(s => s.date === futureSat).map(s => s.time);
+      expect(satSlots).toEqual(["10:00", "14:00"]);
+      db.close();
+    });
+
+    it("should not propose any slots on Sunday in getAvailableSlots", () => {
+      const db = openBookingDb(dbPath);
+      const futureSun = getFutureSunday();
+      const slots = getAvailableSlots(db);
+
+      const sunSlots = slots.filter(s => s.date === futureSun).map(s => s.time);
+      expect(sunSlots).toEqual([]);
+      db.close();
+    });
+
+    it("should accept bookings on Saturday for 10:00 and 14:00", () => {
+      const db = openBookingDb(dbPath);
+      const futureSat = getFutureSaturday();
+
+      const b10 = createPendingBooking({ date: futureSat, time: "10:00", names: "User Sat 10", email: "sat10@test.com", language: "fr" }, db);
+      expect(b10.slotKey).toBe(`${futureSat}T10:00`);
+
+      const b14 = createPendingBooking({ date: futureSat, time: "14:00", names: "User Sat 14", email: "sat14@test.com", language: "fr" }, db);
+      expect(b14.slotKey).toBe(`${futureSat}T14:00`);
+
+      db.close();
+    });
+
+    it("should reject any other times on Saturday (server refusal)", () => {
+      const db = openBookingDb(dbPath);
+      const futureSat = getFutureSaturday();
+
+      const invalidTimes = ["09:00", "11:00", "12:00", "13:00", "15:00", "16:00", "17:00", "18:00", "20:00"];
+      for (const time of invalidTimes) {
+        expect(() =>
+          createPendingBooking({ date: futureSat, time, names: `User Sat ${time}`, email: "test@test.com", language: "fr" }, db)
+        ).toThrow("Slot is not available");
+      }
+
+      db.close();
+    });
+
+    it("should reject Sunday booking requests with 'Slot is not available'", () => {
+      const db = openBookingDb(dbPath);
+      const futureSun = getFutureSunday();
+
+      expect(() =>
+        createPendingBooking({ date: futureSun, time: "10:00", names: "User Sun", email: "sun@test.com", language: "fr" }, db)
+      ).toThrow("Slot is not available");
+
+      expect(() =>
+        createPendingBooking({ date: futureSun, time: "14:00", names: "User Sun", email: "sun@test.com", language: "fr" }, db)
+      ).toThrow("Slot is not available");
+
+      db.close();
+    });
+
+    it("should respect blocked dates for Saturday slots", () => {
+      const db = openBookingDb(dbPath);
+      const futureSat = getFutureSaturday();
+
+      addBlockedDate(futureSat, "Vacances", db);
+
+      const available = getAvailableSlots(db);
+      expect(available.filter(s => s.date === futureSat)).toEqual([]);
+
+      expect(() =>
+        createPendingBooking({ date: futureSat, time: "10:00", names: "User", email: "u@t.c", language: "fr" }, db)
+      ).toThrow("Date is blocked");
+
+      db.close();
+    });
+
+    it("should respect existing conflicts on Saturday and remove booked slot", () => {
+      const db = openBookingDb(dbPath);
+      const futureSat = getFutureSaturday();
+
+      // Book 10:00
+      createPendingBooking({ date: futureSat, time: "10:00", names: "User Sat 1", email: "u1@t.c", language: "fr" }, db);
+
+      // 10:00 is taken, 14:00 still available
+      const available = getAvailableSlots(db);
+      const satTimes = available.filter(s => s.date === futureSat).map(s => s.time);
+      expect(satTimes).toEqual(["14:00"]);
+
+      // Second booking on 10:00 fails with ALREADY_BOOKED
+      expect(() =>
+        createPendingBooking({ date: futureSat, time: "10:00", names: "User Sat 2", email: "u2@t.c", language: "fr" }, db)
+      ).toThrow("ALREADY_BOOKED");
+
+      db.close();
+    });
+
+    it("should respect toggling Saturday weekly slots inactive", () => {
+      const db = openBookingDb(dbPath);
+      const weekly = getWeeklySlots(db);
+      const sat10 = weekly.find(s => s.weekday === 6 && s.local_time === "10:00")!;
+      expect(sat10).toBeDefined();
+
+      // Deactivate Saturday 10:00
+      toggleWeeklySlot(sat10.id, db);
+
+      const futureSat = getFutureSaturday();
+      const available = getAvailableSlots(db);
+      const satTimes = available.filter(s => s.date === futureSat).map(s => s.time);
+      expect(satTimes).toEqual(["14:00"]);
+
+      // Booking deactivated 10:00 throws Slot is not available
+      expect(() =>
+        createPendingBooking({ date: futureSat, time: "10:00", names: "User", email: "u@t.c", language: "fr" }, db)
+      ).toThrow("Slot is not available");
+
+      db.close();
+    });
+
+    it("should enforce Saturday allowed times in createWeeklySlot and updateWeeklySlot", () => {
+      const db = openBookingDb(dbPath);
+
+      // Attempting to create an invalid Saturday slot (e.g. 12:00 or 16:00) must throw
+      expect(() => createWeeklySlot(6, "12:00", db)).toThrow("Horaires non autorisés pour le samedi");
+      expect(() => createWeeklySlot(6, "16:00", db)).toThrow("Horaires non autorisés pour le samedi");
+
+      // Attempting to update a slot to an invalid Saturday time must throw
+      const weekly = getWeeklySlots(db);
+      const satSlot = weekly.find(s => s.weekday === 6)!;
+      expect(() => updateWeeklySlot(satSlot.id, 6, "18:00", db)).toThrow("Horaires non autorisés pour le samedi");
+
+      db.close();
+    });
+
+    it("should compute Belgian time (Europe/Brussels) correctly for Saturday slots across summer (CEST) and winter (CET)", () => {
+      // Summer (CEST / UTC+2): 2026-06-20 is a Saturday
+      const summerSat10 = getUtcDate("2026-06-20", "10:00", "Europe/Brussels");
+      expect(summerSat10.getUTCHours()).toBe(8); // 10:00 CEST = 08:00 UTC
+      expect(summerSat10.getUTCMinutes()).toBe(0);
+
+      const summerSat14 = getUtcDate("2026-06-20", "14:00", "Europe/Brussels");
+      expect(summerSat14.getUTCHours()).toBe(12); // 14:00 CEST = 12:00 UTC
+      expect(summerSat14.getUTCMinutes()).toBe(0);
+
+      const summerLocal10 = getLocalDate(summerSat10, "Europe/Brussels");
+      expect(summerLocal10.dateStr).toBe("2026-06-20");
+      expect(summerLocal10.timeStr).toBe("10:00");
+      expect(summerLocal10.weekday).toBe(6);
+
+      const summerLocal14 = getLocalDate(summerSat14, "Europe/Brussels");
+      expect(summerLocal14.dateStr).toBe("2026-06-20");
+      expect(summerLocal14.timeStr).toBe("14:00");
+      expect(summerLocal14.weekday).toBe(6);
+
+      // Winter (CET / UTC+1): 2026-12-19 is a Saturday
+      const winterSat10 = getUtcDate("2026-12-19", "10:00", "Europe/Brussels");
+      expect(winterSat10.getUTCHours()).toBe(9); // 10:00 CET = 09:00 UTC
+      expect(winterSat10.getUTCMinutes()).toBe(0);
+
+      const winterSat14 = getUtcDate("2026-12-19", "14:00", "Europe/Brussels");
+      expect(winterSat14.getUTCHours()).toBe(13); // 14:00 CET = 13:00 UTC
+      expect(winterSat14.getUTCMinutes()).toBe(0);
+
+      const winterLocal10 = getLocalDate(winterSat10, "Europe/Brussels");
+      expect(winterLocal10.dateStr).toBe("2026-12-19");
+      expect(winterLocal10.timeStr).toBe("10:00");
+      expect(winterLocal10.weekday).toBe(6);
+
+      const winterLocal14 = getLocalDate(winterSat14, "Europe/Brussels");
+      expect(winterLocal14.dateStr).toBe("2026-12-19");
+      expect(winterLocal14.timeStr).toBe("14:00");
+      expect(winterLocal14.weekday).toBe(6);
     });
   });
 

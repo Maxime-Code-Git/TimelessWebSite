@@ -172,4 +172,83 @@ test.describe('Visio Booking Flow', () => {
     await context2.close();
     await contextAdmin.close();
   });
+
+  test('should offer only 10:00 and 14:00 on Saturday and clear invalid time on date change', async ({ page }) => {
+    await page.goto('/fr/contact');
+    await expect(page.locator('#visio-booking-section')).toBeVisible();
+
+    const dateSelect = page.locator('#visio-date');
+    await expect(dateSelect).toBeVisible();
+
+    // Verify booking note mentions Saturday
+    const bookingNote = page.locator('p:has-text("samedis")').first();
+    await expect(bookingNote).toContainText('samedis');
+
+    // Find Saturday option
+    const dateOptions = await dateSelect.locator('option:not([disabled])').all();
+    let saturdayValue: string | null = null;
+
+    for (const opt of dateOptions) {
+      const val = await opt.getAttribute('value');
+      if (val) {
+        const [y, m, d] = val.split('-').map(Number);
+        const dayOfWeek = new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).getUTCDay();
+        if (dayOfWeek === 6 && !saturdayValue) {
+          saturdayValue = val;
+        }
+      }
+    }
+
+    expect(saturdayValue).not.toBeNull();
+
+    // Find a weekday date that has both 10:00 and 18:00 available
+    let weekdayValue: string | null = null;
+    for (const opt of dateOptions) {
+      const val = await opt.getAttribute('value');
+      if (val && val !== saturdayValue) {
+        await dateSelect.selectOption({ value: val });
+        const availableTimes = await page.locator('#visio-time option:not([disabled])').allInnerTexts();
+        if (availableTimes.includes('10:00') && availableTimes.includes('18:00')) {
+          weekdayValue = val;
+          break;
+        }
+      }
+    }
+
+    expect(weekdayValue).not.toBeNull();
+
+    // 1. Select weekday with 18:00
+    await dateSelect.selectOption({ value: weekdayValue! });
+    const timeSelect = page.locator('#visio-time');
+    await expect(timeSelect).toBeVisible();
+
+    await timeSelect.selectOption({ value: '18:00' });
+    expect(await timeSelect.inputValue()).toBe('18:00');
+
+    // Form should be visible
+    await expect(page.locator('#visio-names')).toBeVisible();
+
+    // 2. Switch date to Saturday
+    await dateSelect.selectOption({ value: saturdayValue! });
+
+    // Time should be cleared because 18:00 is not allowed on Saturday
+    expect(await timeSelect.inputValue()).toBe('');
+
+    // Available times for Saturday must be exactly 10:00 and 14:00
+    const saturdayTimes = await timeSelect.locator('option:not([disabled])').allInnerTexts();
+    expect(saturdayTimes).toEqual(['10:00', '14:00']);
+
+    // 3. Select 10:00 on Saturday
+    await timeSelect.selectOption({ value: '10:00' });
+    expect(await timeSelect.inputValue()).toBe('10:00');
+
+    // Form should now be visible
+    await expect(page.locator('#visio-names')).toBeVisible();
+
+    // 4. Switch back to weekday where 10:00 is available
+    await dateSelect.selectOption({ value: weekdayValue! });
+
+    // 10:00 should be preserved because it is available on weekday
+    expect(await timeSelect.inputValue()).toBe('10:00');
+  });
 });

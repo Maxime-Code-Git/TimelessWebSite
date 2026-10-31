@@ -142,6 +142,22 @@ export function openBookingDb(dbPath: string): DatabaseSync {
       db.exec("PRAGMA user_version = 2;");
     }
 
+    // Migration to user_version 3: Add Saturday 10:00 and 14:00
+    if (currentVersion < 3) {
+      const saturdaySlots = [
+        { day: 6, time: "10:00" },
+        { day: 6, time: "14:00" },
+      ];
+      const now = Date.now();
+      const insertSlot = db.prepare(
+        "INSERT OR IGNORE INTO weekly_slots (id, weekday, local_time, active, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)"
+      );
+      for (const slot of saturdaySlots) {
+        insertSlot.run(crypto.randomUUID(), slot.day, slot.time, now, now);
+      }
+      db.exec("PRAGMA user_version = 3;");
+    }
+
     // Pre-fill default slots idempotently if weekly_slots is empty
     const countStmt = db.prepare("SELECT COUNT(*) as c FROM weekly_slots");
     const count = (countStmt.get() as { c: number }).c;
@@ -160,6 +176,8 @@ export function openBookingDb(dbPath: string): DatabaseSync {
         { day: 4, time: "14:00" },
         { day: 4, time: "16:00" },
         { day: 4, time: "18:00" },
+        { day: 6, time: "10:00" },
+        { day: 6, time: "14:00" },
       ];
       for (const slot of defaultSlots) {
         insertSlot.run(crypto.randomUUID(), slot.day, slot.time, now, now);

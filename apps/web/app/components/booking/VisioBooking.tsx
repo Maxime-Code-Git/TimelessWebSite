@@ -57,11 +57,24 @@ export function VisioBooking({ language, content }: { language: 'fr' | 'en', con
   const availableDates = Array.from(new Set(slots.map(s => s.date))).sort();
 
   const handleDateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedDate(e.target.value);
-    setSelectedTime("");
+    const newDate = e.target.value;
+    setSelectedDate(newDate);
+    const timesForNewDate = slots.filter(s => s.date === newDate).map(s => s.time);
+    if (!timesForNewDate.includes(selectedTime)) {
+      setSelectedTime("");
+    }
   };
 
   const availableTimes = slots.filter(s => s.date === selectedDate).sort((a,b) => a.time.localeCompare(b.time));
+
+  useEffect(() => {
+    if (selectedDate && selectedTime) {
+      const timesForCurrentDate = slots.filter(s => s.date === selectedDate).map(s => s.time);
+      if (!timesForCurrentDate.includes(selectedTime)) {
+        setSelectedTime("");
+      }
+    }
+  }, [slots, selectedDate, selectedTime]);
 
   useEffect(() => {
     if (success && successRef.current) {
@@ -146,9 +159,19 @@ export function VisioBooking({ language, content }: { language: 'fr' | 'en', con
           <label htmlFor="visio-date" className={styles.label}>{t.selectDate}</label>
           <select id="visio-date" name="date" className={styles.select} value={selectedDate} onChange={handleDateChange}>
             <option value="" disabled>-</option>
-            {availableDates.map(d => (
-              <option key={d} value={d}>{new Date(d).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</option>
-            ))}
+            {availableDates.map(d => {
+              const [y, m, day] = d.split('-').map(Number);
+              const dateObj = new Date(Date.UTC(y, m - 1, day, 12, 0, 0));
+              const label = dateObj.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
+                timeZone: 'Europe/Brussels',
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long'
+              });
+              return (
+                <option key={d} value={d}>{label}</option>
+              );
+            })}
           </select>
         </div>
 

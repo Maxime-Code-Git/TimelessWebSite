@@ -17,6 +17,16 @@ export interface WeeklySlot {
   active: boolean;
 }
 
+export const SATURDAY_WEEKDAY = 6;
+export const SATURDAY_ALLOWED_TIMES = ["10:00", "14:00"] as const;
+
+export function isAllowedSlotForWeekday(weekday: number, localTime: string): boolean {
+  if (weekday === SATURDAY_WEEKDAY) {
+    return (SATURDAY_ALLOWED_TIMES as readonly string[]).includes(localTime);
+  }
+  return true;
+}
+
 export interface BlockedDate {
   id: string;
   local_date: string;
@@ -175,7 +185,7 @@ export function getAvailableSlots(db: DatabaseSync = getBookingDb(), nowMs: numb
       const midDayUtc = new Date(Date.UTC(currentCivilDate.getFullYear(), currentCivilDate.getMonth(), currentCivilDate.getDate(), 12, 0, 0));
       const local = getLocalDate(midDayUtc, settings.timezone);
 
-      const daySlots = weeklyRows.filter(r => r.weekday === local.weekday);
+      const daySlots = weeklyRows.filter(r => r.weekday === local.weekday && isAllowedSlotForWeekday(local.weekday, r.local_time));
 
       for (const slot of daySlots) {
         const slotKey = `${dateStr}T${slot.local_time}`;
@@ -227,6 +237,10 @@ export function createPendingBooking(data: {
     if (isBlocked) throw new Error("Date is blocked");
 
     const local = getLocalDate(startsAtUtc, settings.timezone);
+    if (!isAllowedSlotForWeekday(local.weekday, data.time)) {
+      throw new Error("Slot is not available");
+    }
+
     const hasSlot = db.prepare("SELECT 1 FROM weekly_slots WHERE weekday = ? AND local_time = ? AND active = 1").get(local.weekday, data.time);
     if (!hasSlot) throw new Error("Slot is not available");
 
@@ -367,6 +381,9 @@ export function checkSlotOverlap(weekday: number, localTime: string, excludeId: 
 export function createWeeklySlot(weekday: number, localTime: string, db: DatabaseSync = getBookingDb()) {
   if (weekday < 1 || weekday > 7) throw new Error("Invalid weekday");
   if (!/^\d{2}:\d{2}$/.test(localTime)) throw new Error("Invalid time format");
+  if (!isAllowedSlotForWeekday(weekday, localTime)) {
+    throw new Error("Horaires non autorisés pour le samedi: seuls 10:00 et 14:00 sont permis.");
+  }
 
   if (checkSlotOverlap(weekday, localTime, null, db)) {
     throw new Error("OVERLAP: Le créneau se superpose avec un créneau existant (durée + buffer).");
@@ -389,6 +406,9 @@ export function createWeeklySlot(weekday: number, localTime: string, db: Databas
 export function updateWeeklySlot(id: string, weekday: number, localTime: string, db: DatabaseSync = getBookingDb()) {
   if (weekday < 1 || weekday > 7) throw new Error("Invalid weekday");
   if (!/^\d{2}:\d{2}$/.test(localTime)) throw new Error("Invalid time format");
+  if (!isAllowedSlotForWeekday(weekday, localTime)) {
+    throw new Error("Horaires non autorisés pour le samedi: seuls 10:00 et 14:00 sont permis.");
+  }
 
   if (checkSlotOverlap(weekday, localTime, id, db)) {
     throw new Error("OVERLAP: Le créneau se superpose avec un créneau existant (durée + buffer).");

@@ -39,6 +39,10 @@ vi.mock("../app/lib/booking.server", async (importOriginal) => {
 describe("Booking HTTP Route (/api/booking)", () => {
   const getStatus = (res: unknown) => res instanceof Response ? res.status : (res as { init?: { status?: number } })?.init?.status ?? 200;
   const getHeader = (res: unknown, name: string) => res instanceof Response ? res.headers.get(name) : ((res as { init?: { headers?: Record<string, string> } })?.init?.headers as Record<string, string>)?.[name] ?? null;
+  const getBody = async (res: unknown) => {
+    if (res instanceof Response) return res.json();
+    return (res as { data?: unknown })?.data;
+  };
 
   beforeEach(() => {
     vi.mocked(checkRateLimit).mockClear();
@@ -132,5 +136,35 @@ describe("Booking HTTP Route (/api/booking)", () => {
     expect(status).toBe(201);
     const cacheControl = getHeader(res, "Cache-Control");
     expect(cacheControl).toBe("no-store");
+  });
+
+  it("should reject booking with 400 when slot is not available (e.g. unauthorized Saturday hour)", async () => {
+    const { createPendingBooking } = await import("../app/lib/booking.server");
+    vi.mocked(createPendingBooking).mockImplementationOnce(() => {
+      throw new Error("Slot is not available");
+    });
+
+    const req = createRequest({ contentType: "application/json", body: { ...validPayload, time: "12:00" } });
+    const res = await action({ request: req } as Parameters<typeof action>[0]) as Response;
+    const status = getStatus(res);
+    expect(status).toBe(400);
+
+    const body = await getBody(res);
+    expect(body).toEqual({ error: "SLOT_NOT_AVAILABLE" });
+  });
+
+  it("should return 409 when slot is already booked", async () => {
+    const { createPendingBooking } = await import("../app/lib/booking.server");
+    vi.mocked(createPendingBooking).mockImplementationOnce(() => {
+      throw new Error("ALREADY_BOOKED");
+    });
+
+    const req = createRequest({ contentType: "application/json", body: validPayload });
+    const res = await action({ request: req } as Parameters<typeof action>[0]) as Response;
+    const status = getStatus(res);
+    expect(status).toBe(409);
+
+    const body = await getBody(res);
+    expect(body).toEqual({ error: "SLOT_TAKEN" });
   });
 });

@@ -1197,11 +1197,21 @@ function validateContactPageContent(data: unknown): ContactPageContent {
   // BookingIntro
   assertExactKeys(obj.bookingIntro, ["overtitle", "title", "description", "note"], "contactPage.bookingIntro");
   const bIntro = obj.bookingIntro as Record<string, unknown>;
+  let validNote = validateLocalizedString(bIntro.note, "contactPage.bookingIntro.note", 2000);
+  if (
+    validNote.fr === "Appels disponibles les mardis et jeudis." &&
+    validNote.en === "Calls available on Tuesdays and Thursdays."
+  ) {
+    validNote = {
+      fr: "Appels disponibles les mardis, jeudis et samedis.",
+      en: "Calls available on Tuesdays, Thursdays, and Saturdays."
+    };
+  }
   const validBookingIntro = {
     overtitle: validateLocalizedString(bIntro.overtitle, "contactPage.bookingIntro.overtitle", 120),
     title: validateLocalizedString(bIntro.title, "contactPage.bookingIntro.title", 200),
     description: validateLocalizedString(bIntro.description, "contactPage.bookingIntro.description", 2000),
-    note: validateLocalizedString(bIntro.note, "contactPage.bookingIntro.note", 2000)
+    note: validNote
   };
 
   // VisioBooking
