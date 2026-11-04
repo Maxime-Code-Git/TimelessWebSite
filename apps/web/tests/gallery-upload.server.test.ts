@@ -348,6 +348,39 @@ describe("Gallery Upload Server Logic (Feature 2 & Post-Production Audience & Re
       expect(files).toEqual(["replay.jpg"]);
     });
 
+    it("should prevent duplicate video files using streaming hash comparison", async () => {
+      const mp4Buf = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypmp42"), Buffer.alloc(32)]);
+
+      // First upload
+      const s1 = initUploadSession(galleryId, {
+        destination: "guest_videos",
+        fileName: "stream-test.mp4",
+        fileSize: mp4Buf.length,
+        totalChunks: 1,
+        chunkSize: mp4Buf.length,
+      });
+      await saveChunkStream(galleryId, s1.uploadId, 0, Readable.from(mp4Buf));
+      const res1 = await finalizeUpload(galleryId, s1.uploadId);
+      expect(res1.fileName).toBe("stream-test.mp4");
+
+      // Second upload with the same content and name (replayed)
+      const s2 = initUploadSession(galleryId, {
+        destination: "guest_videos",
+        fileName: "stream-test.mp4",
+        fileSize: mp4Buf.length,
+        totalChunks: 1,
+        chunkSize: mp4Buf.length,
+      });
+      await saveChunkStream(galleryId, s2.uploadId, 0, Readable.from(mp4Buf));
+      const res2 = await finalizeUpload(galleryId, s2.uploadId);
+      expect(res2.fileName).toBe("stream-test.mp4");
+      expect(res2.alreadyExists).toBe(true);
+
+      // Verify only ONE file exists in the directory
+      const files = fs.readdirSync(path.join(importBase, galleryFolder, "invites", "videos"));
+      expect(files).toEqual(["stream-test.mp4"]);
+    });
+
     it("should rename to unique suffix if a file with same name but different content is uploaded", async () => {
       const jpegBuf1 = await sharp({ create: { width: 20, height: 20, channels: 3, background: { r: 10, g: 10, b: 10 } } }).jpeg().toBuffer();
       const jpegBuf2 = await sharp({ create: { width: 30, height: 30, channels: 3, background: { r: 99, g: 99, b: 99 } } }).jpeg().toBuffer();

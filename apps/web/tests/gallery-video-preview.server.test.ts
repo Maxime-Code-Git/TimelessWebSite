@@ -14,6 +14,8 @@ import {
   getFfmpegPath,
   acquireGlobalLock,
   releaseGlobalLock,
+  getMachineLockPath,
+  __setMachineLockPathForTest,
 } from "../app/lib/gallery-video-preview.server";
 import { loader as mediaLoader } from "../app/routes/api.gallery.$publicId.media.$mediaId";
 import { loader as posterLoader } from "../app/routes/api.gallery.$publicId.media.$mediaId.poster";
@@ -54,18 +56,18 @@ describe("Gallery Video Preview & Access Control", () => {
     publicId = created.public_id;
 
     ffmpegBin = getFfmpegPath() || "/opt/homebrew/bin/ffmpeg";
+
+    // Isolate lock path to this test fixture
+    const fixtureLockPath = path.join(tmpDir, "gallery-video-preview.lock");
+    __setMachineLockPathForTest(fixtureLockPath);
   });
 
   afterEach(() => {
+    __setMachineLockPathForTest(null);
     closeGalleryDb();
     vi.restoreAllMocks();
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });
-    } catch {
-      // ignore
-    }
-    try {
-      fs.unlinkSync("/tmp/gallery-video-preview.lock");
     } catch {
       // ignore
     }
@@ -192,6 +194,52 @@ describe("Gallery Video Preview & Access Control", () => {
     const reacquired = acquireGlobalLock(galleryId, "media-2");
     expect(reacquired).toBe(true);
     releaseGlobalLock(galleryId, "media-2");
+  });
+
+  it("preserves external locks and isolates fixture locks while maintaining mutual exclusion", () => {
+    // 1. Create an external lock file simulating a concurrent process or production lock
+    const externalTmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "gallery-external-lock-test-")));
+    const externalLockPath = path.join(externalTmpDir, "external.lock");
+    const externalPayload = JSON.stringify({
+      pid: process.pid,
+      galleryId: "ext-gallery",
+      mediaId: "ext-media",
+      heartbeat: Date.now(),
+      startTime: Date.now(),
+    });
+    fs.writeFileSync(externalLockPath, externalPayload, { mode: 0o600 });
+
+    try {
+      // 2. Set the active lock path to our test fixture lock
+      const fixtureLockPath = path.join(tmpDir, "fixture-preview.lock");
+      __setMachineLockPathForTest(fixtureLockPath);
+      expect(getMachineLockPath()).toBe(fixtureLockPath);
+
+      // Verify mutual exclusion on the fixture lock path
+      const lockedFirst = acquireGlobalLock(galleryId, "media-1");
+      expect(lockedFirst).toBe(true);
+      expect(fs.existsSync(fixtureLockPath)).toBe(true);
+
+      // Concurrent acquisition on another gallery/media on the fixture lock is blocked
+      const lockedSecond = acquireGlobalLock("another-gallery", "media-2");
+      expect(lockedSecond).toBe(false);
+
+      // Release the fixture lock
+      releaseGlobalLock(galleryId, "media-1");
+      expect(fs.existsSync(fixtureLockPath)).toBe(false);
+
+      // Can re-acquire fixture lock
+      const lockedThird = acquireGlobalLock("another-gallery", "media-2");
+      expect(lockedThird).toBe(true);
+      releaseGlobalLock("another-gallery", "media-2");
+
+      // 3. Verify that the external lock was completely untouched
+      expect(fs.existsSync(externalLockPath)).toBe(true);
+      expect(fs.readFileSync(externalLockPath, "utf8")).toBe(externalPayload);
+    } finally {
+      __setMachineLockPathForTest(path.join(tmpDir, "gallery-video-preview.lock"));
+      fs.rmSync(externalTmpDir, { recursive: true, force: true });
+    }
   });
 
   it("supports Range requests: 200, 206, 416, HEAD, and representation stability", async () => {

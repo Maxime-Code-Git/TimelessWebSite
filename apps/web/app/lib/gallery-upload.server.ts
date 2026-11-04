@@ -773,6 +773,16 @@ export async function finalizeUpload(
   }
 }
 
+function computeFileSha256(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(filePath);
+    stream.on("data", chunk => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+    stream.on("error", reject);
+  });
+}
+
 async function executeFinalizeUpload(
   galleryId: string,
   uploadId: string
@@ -939,11 +949,19 @@ async function executeFinalizeUpload(
 
   // Check for existing file with same name
   if (fs.existsSync(destFilePath)) {
-    // Hash comparison to avoid duplicate file creation
-    const hashAssembled = crypto.createHash("sha256").update(fs.readFileSync(assembledPath)).digest("hex");
-    const hashExisting = crypto.createHash("sha256").update(fs.readFileSync(destFilePath)).digest("hex");
+    // Stream-based hash comparison to avoid buffering large files (e.g. 20 GB videos) in memory
+    let sameContent = false;
+    const statAssembled = fs.statSync(assembledPath);
+    const statDest = fs.statSync(destFilePath);
+    if (statAssembled.size === statDest.size) {
+      const [hashAssembled, hashExisting] = await Promise.all([
+        computeFileSha256(assembledPath),
+        computeFileSha256(destFilePath),
+      ]);
+      sameContent = (hashAssembled === hashExisting);
+    }
 
-    if (hashAssembled === hashExisting) {
+    if (sameContent) {
       // Exactly the same file content already exists!
       try { fs.unlinkSync(assembledPath); } catch { /* ignore */ }
       fs.rmSync(uploadDir, { recursive: true, force: true });

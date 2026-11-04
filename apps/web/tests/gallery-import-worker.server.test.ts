@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import sharp from "sharp";
 import { getGalleryDb } from "~/lib/gallery-db.server";
 import { ENV } from "~/lib/env.server";
-import { startGalleryImport, processImport, acquireNextJob, __setLeaseDurationForTest } from "~/lib/gallery-import.server";
+import { startGalleryImport, processImport, acquireNextJob, __setLeaseDurationForTest, getImportPreview, MAX_PHOTO_SIZE, MAX_VIDEO_SIZE } from "~/lib/gallery-import.server";
 import { Readable } from "node:stream";
 
 // Mock fs to allow intercepting specific functions while keeping the rest intact
@@ -291,6 +291,90 @@ describe("Gallery Import Worker Logic", () => {
     const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId);
     const files = fs.readdirSync(mediaDir);
     expect(files.some(f => f.endsWith(".tmp"))).toBe(false);
+  });
+
+  it("accepte une vidéo > 500 Mo en analyse et import, et rejette les fichiers dépassant les limites (> 20 Go vidéo, > 100 Mo photo)", async () => {
+    expect(MAX_PHOTO_SIZE).toBe(100 * 1024 * 1024);
+    expect(MAX_VIDEO_SIZE).toBe(20 * 1024 * 1024 * 1024);
+
+    const testDirName = "worker-test-size-limits";
+    const dir = path.join(ENV.GALLERY_IMPORT_PATH, testDirName);
+    fs.mkdirSync(path.join(dir, "invites/videos"), { recursive: true });
+    fs.mkdirSync(path.join(dir, "invites/photos"), { recursive: true });
+
+    // 1. Vidéo de 600 Mo (> 500 Mo ancienne limite, <= 20 Go nouvelle limite)
+    const video600MbPath = path.join(dir, "invites/videos/video-600mb.mp4");
+    const fd600 = fs.openSync(video600MbPath, "w");
+    const mp4Header = Buffer.alloc(16);
+    mp4Header.writeUInt32BE(16, 0);
+    mp4Header.write("ftyp", 4, "ascii");
+    mp4Header.write("mp42", 8, "ascii");
+    fs.writeSync(fd600, mp4Header, 0, mp4Header.length);
+    fs.ftruncateSync(fd600, 600 * 1024 * 1024);
+    fs.closeSync(fd600);
+
+    // 2. Vidéo de 21 Go (> 20 Go limite max vidéo)
+    const video21GbPath = path.join(dir, "invites/videos/video-21gb.mp4");
+    const fd21 = fs.openSync(video21GbPath, "w");
+    fs.writeSync(fd21, mp4Header, 0, mp4Header.length);
+    fs.ftruncateSync(fd21, 21 * 1024 * 1024 * 1024);
+    fs.closeSync(fd21);
+
+    // 3. Photo de 120 Mo (> 100 Mo limite max photo)
+    const photo120MbPath = path.join(dir, "invites/photos/photo-120mb.jpg");
+    const fdPhoto = fs.openSync(photo120MbPath, "w");
+    const jpegHeader = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01]);
+    fs.writeSync(fdPhoto, jpegHeader, 0, jpegHeader.length);
+    fs.ftruncateSync(fdPhoto, 120 * 1024 * 1024);
+    fs.closeSync(fdPhoto);
+
+    try {
+      // Analyse préalable (getImportPreview)
+      const preview = await getImportPreview(testDirName);
+      expect(preview.invitesVideosCount).toBe(1); // video-600mb.mp4 acceptée
+      expect(preview.invitesPhotosCount).toBe(0); // photo-120mb.jpg rejetée
+
+      const rejectedNames = preview.rejected.map(r => r.file);
+      expect(rejectedNames).toContain("video-21gb.mp4");
+      expect(rejectedNames).toContain("photo-120mb.jpg");
+
+      const rej21 = preview.rejected.find(r => r.file === "video-21gb.mp4");
+      expect(rej21?.reason).toContain("Fichier trop volumineux");
+      const rejPhoto = preview.rejected.find(r => r.file === "photo-120mb.jpg");
+      expect(rejPhoto?.reason).toContain("Fichier trop volumineux");
+
+      // Import par le worker
+      const importId = startGalleryImport(galleryId, testDirName);
+      const job = acquireNextJob();
+      expect(job).toBeDefined();
+
+      await processImport(importId, galleryId, testDirName, job!.lease_token);
+
+      const row = db.prepare("SELECT status, progress, result_json FROM gallery_imports WHERE id = ?").get(importId) as Record<string, unknown>;
+      expect(row.status).toBe("completed");
+
+      const res = JSON.parse(row.result_json as string);
+      expect(res.imported).toBe(1);
+      expect(res.rejected.map((r: { file: string }) => r.file)).toContain("video-21gb.mp4");
+      expect(res.rejected.map((r: { file: string }) => r.file)).toContain("photo-120mb.jpg");
+
+      // Vérifier le média importé
+      const media = db.prepare("SELECT * FROM gallery_media WHERE gallery_id = ? AND original_name = 'video-600mb.mp4'").get(galleryId) as Record<string, unknown>;
+      expect(media).toBeDefined();
+      expect(media.type).toBe("video");
+      expect(media.size).toBe(600 * 1024 * 1024);
+      expect(media.visibility).toBe("invites");
+
+      const mediaFilePath = path.join(ENV.GALLERY_MEDIA_PATH, galleryId, media.id as string);
+      expect(fs.existsSync(mediaFilePath)).toBe(true);
+      expect(fs.statSync(mediaFilePath).size).toBe(600 * 1024 * 1024);
+    } finally {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
   });
 
   afterAll(() => {

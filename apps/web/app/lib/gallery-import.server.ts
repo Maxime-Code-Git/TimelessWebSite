@@ -8,8 +8,10 @@ import sharp from "sharp";
 import { generateAllPreviews, removePreviews } from "./gallery-preview.server";
 
 const MAX_MEDIA_COUNT = 1000;
-const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB per file
-const MAX_TOTAL_SIZE = 50 * 1024 * 1024 * 1024; // 50 GB total
+export const MAX_PHOTO_SIZE = 100 * 1024 * 1024; // 100 MB max per photo
+export const MAX_VIDEO_SIZE = 20 * 1024 * 1024 * 1024; // 20 GB max per video (21474836480 bytes, safe integer)
+export const MAX_FILE_SIZE = MAX_VIDEO_SIZE;
+export const MAX_TOTAL_SIZE = 100 * 1024 * 1024 * 1024; // 100 GB total
 
 const PHOTO_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 const VIDEO_MIME_TYPES = new Set(["video/mp4", "video/webm"]);
@@ -181,7 +183,9 @@ export async function getImportPreview(folderName: string) {
   for (const file of files) {
     try {
       const stat = fs.statSync(file.fullPath);
-      if (stat.size > MAX_FILE_SIZE) {
+      const isVideoExpected = file.expectedCategory === "videos";
+      const maxExpectedSize = isVideoExpected ? MAX_VIDEO_SIZE : MAX_PHOTO_SIZE;
+      if (stat.size > maxExpectedSize) {
         rejected.push({ file: file.name, reason: `Fichier trop volumineux (${Math.round(stat.size / 1024 / 1024)} Mo)` });
         continue;
       }
@@ -201,6 +205,11 @@ export async function getImportPreview(folderName: string) {
       }
 
       const isPhoto = PHOTO_MIME_TYPES.has(mimeType);
+      const effectiveMaxSize = isPhoto ? MAX_PHOTO_SIZE : MAX_VIDEO_SIZE;
+      if (stat.size > effectiveMaxSize) {
+        rejected.push({ file: file.name, reason: `Fichier trop volumineux (${Math.round(stat.size / 1024 / 1024)} Mo)` });
+        continue;
+      }
       if (file.visibility === "invites") {
         if (isPhoto) validInvitesPhotos++;
         else validInvitesVideos++;
@@ -491,7 +500,9 @@ export async function processImport(importId: string, galleryId: string, folderN
           continue;
         }
 
-        if (stat.size > MAX_FILE_SIZE) {
+        const isVideoExpected = file.expectedCategory === "videos";
+        const maxExpectedSize = isVideoExpected ? MAX_VIDEO_SIZE : MAX_PHOTO_SIZE;
+        if (stat.size > maxExpectedSize) {
           rejected.push({ file: file.name, reason: "Fichier trop volumineux" });
           continue;
         }
@@ -510,6 +521,11 @@ export async function processImport(importId: string, galleryId: string, folderN
         }
 
         type = PHOTO_MIME_TYPES.has(mimeType) ? "photo" : "video";
+        const effectiveMaxSize = type === "photo" ? MAX_PHOTO_SIZE : MAX_VIDEO_SIZE;
+        if (stat.size > effectiveMaxSize) {
+          rejected.push({ file: file.name, reason: "Fichier trop volumineux" });
+          continue;
+        }
         mediaId = crypto.randomUUID();
         destPath = path.join(mediaDir, mediaId);
         tmpPath = destPath + ".tmp";

@@ -8,7 +8,20 @@ export const PREVIEW_FILENAME = "video-v1.mp4";
 export const MIN_DISK_FREE = 512 * 1024 * 1024; // 512 MB
 export const MAX_PREVIEW_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
 export const MAX_ENCODING_TIME = 2 * 60 * 60 * 1000; // 2 hours
-const MACHINE_LOCK_PATH = "/tmp/gallery-video-preview.lock";
+
+let customMachineLockPath: string | null = null;
+
+export function getMachineLockPath(): string {
+  if (customMachineLockPath) return customMachineLockPath;
+  if (process.env.GALLERY_VIDEO_PREVIEW_LOCK_PATH) {
+    return process.env.GALLERY_VIDEO_PREVIEW_LOCK_PATH;
+  }
+  return "/tmp/gallery-video-preview.lock";
+}
+
+export function __setMachineLockPathForTest(customPath: string | null): void {
+  customMachineLockPath = customPath;
+}
 
 export type GalleryVideoPreviewStatus =
   | { state: "missing" | "processing" | "ready" }
@@ -73,8 +86,9 @@ export function isGalleryVideoPreviewProcessing(galleryId: string, mediaId: stri
 
   // Check global machine lock
   try {
-    if (fs.existsSync(MACHINE_LOCK_PATH)) {
-      const content = fs.readFileSync(MACHINE_LOCK_PATH, "utf8");
+    const lockPath = getMachineLockPath();
+    if (fs.existsSync(lockPath)) {
+      const content = fs.readFileSync(lockPath, "utf8");
       const lockData = JSON.parse(content) as { pid: number; galleryId: string; mediaId: string; heartbeat: number };
       if (lockData.galleryId === galleryId && lockData.mediaId === mediaId) {
         try {
@@ -96,9 +110,10 @@ export function isGalleryVideoPreviewProcessing(galleryId: string, mediaId: stri
 
 export function acquireGlobalLock(galleryId: string, mediaId: string): boolean {
   try {
-    if (fs.existsSync(MACHINE_LOCK_PATH)) {
+    const lockPath = getMachineLockPath();
+    if (fs.existsSync(lockPath)) {
       try {
-        const content = fs.readFileSync(MACHINE_LOCK_PATH, "utf8");
+        const content = fs.readFileSync(lockPath, "utf8");
         const lockData = JSON.parse(content) as { pid: number; heartbeat: number };
         let isAlive = false;
         try {
@@ -114,10 +129,15 @@ export function acquireGlobalLock(galleryId: string, mediaId: string): boolean {
         }
 
         // Clean up stale lock
-        try { fs.unlinkSync(MACHINE_LOCK_PATH); } catch { /* ignore */ }
+        try { fs.unlinkSync(lockPath); } catch { /* ignore */ }
       } catch {
-        try { fs.unlinkSync(MACHINE_LOCK_PATH); } catch { /* ignore */ }
+        try { fs.unlinkSync(lockPath); } catch { /* ignore */ }
       }
+    }
+
+    const lockDir = path.dirname(lockPath);
+    if (!fs.existsSync(lockDir)) {
+      fs.mkdirSync(lockDir, { recursive: true, mode: 0o700 });
     }
 
     const payload = JSON.stringify({
@@ -127,7 +147,7 @@ export function acquireGlobalLock(galleryId: string, mediaId: string): boolean {
       heartbeat: Date.now(),
       startTime: Date.now(),
     });
-    fs.writeFileSync(MACHINE_LOCK_PATH, payload, { flag: "wx", mode: 0o600 });
+    fs.writeFileSync(lockPath, payload, { flag: "wx", mode: 0o600 });
     return true;
   } catch {
     return false;
@@ -136,12 +156,13 @@ export function acquireGlobalLock(galleryId: string, mediaId: string): boolean {
 
 function updateGlobalLockHeartbeat(): void {
   try {
-    if (fs.existsSync(MACHINE_LOCK_PATH)) {
-      const content = fs.readFileSync(MACHINE_LOCK_PATH, "utf8");
+    const lockPath = getMachineLockPath();
+    if (fs.existsSync(lockPath)) {
+      const content = fs.readFileSync(lockPath, "utf8");
       const data = JSON.parse(content);
       if (data.pid === process.pid) {
         data.heartbeat = Date.now();
-        fs.writeFileSync(MACHINE_LOCK_PATH, JSON.stringify(data), { mode: 0o600 });
+        fs.writeFileSync(lockPath, JSON.stringify(data), { mode: 0o600 });
       }
     }
   } catch {
@@ -151,11 +172,12 @@ function updateGlobalLockHeartbeat(): void {
 
 export function releaseGlobalLock(galleryId: string, mediaId: string): void {
   try {
-    if (fs.existsSync(MACHINE_LOCK_PATH)) {
-      const content = fs.readFileSync(MACHINE_LOCK_PATH, "utf8");
+    const lockPath = getMachineLockPath();
+    if (fs.existsSync(lockPath)) {
+      const content = fs.readFileSync(lockPath, "utf8");
       const data = JSON.parse(content);
       if (data.pid === process.pid && data.galleryId === galleryId && data.mediaId === mediaId) {
-        fs.unlinkSync(MACHINE_LOCK_PATH);
+        fs.unlinkSync(lockPath);
       }
     }
   } catch {
