@@ -1,5 +1,5 @@
 // @vitest-environment node
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -18,7 +18,7 @@ import {
   processImport,
   acquireNextJob,
 } from "../app/lib/gallery-import.server";
-import { action as adminGalleryAction } from "../app/routes/admin.galleries.$id";
+import { action as adminGalleryAction, loader as adminGalleryLoader } from "../app/routes/admin.galleries.$id";
 import {
   initUploadSession,
   saveChunkStream,
@@ -56,6 +56,7 @@ describe("Gallery Video Management, Multi-Import & Deletion Isolation", () => {
     vi.spyOn(ENV, "GALLERY_MEDIA_PATH", "get").mockReturnValue(mediaBase);
     vi.spyOn(ENV, "GALLERY_IMPORT_PATH", "get").mockReturnValue(importBase);
     vi.spyOn(ENV, "ADMIN_SESSION_SECRET", "get").mockReturnValue("test-secret-at-least-32-chars-long-1234567890");
+    vi.spyOn(ENV, "ADMIN_PASSWORD_HASH", "get").mockReturnValue("$argon2id$v=19$m=19456,t=2,p=1$xDSx00u+uSs9AcMqypmthw$ubmjWhg1XWL+Yp496qb5LLlTx0FK4lwqy9pvKa5ills");
 
     openGalleryDb(dbPath);
 
@@ -334,5 +335,93 @@ describe("Gallery Video Management, Multi-Import & Deletion Isolation", () => {
     expect(() => {
       deleteGalleryVideoSource(galleryId, "root_videos", "version-check.mp4", "wrong-token");
     }).toThrow(GalleryImportFileError);
+  });
+
+  it("handles legacy/pre-fix galleries gracefully on edit loader: decrypts codes, handles empty sources, absent posters, and missing previews", async () => {
+    // 1. Manually insert a legacy gallery record with upload_folder = null, import_path = null
+    const db = openGalleryDb(dbPath);
+    const legacyId = crypto.randomUUID();
+    const legacyPublicId = crypto.randomUUID();
+    const { encryptGalleryCode, hashGalleryCode } = await import("../app/lib/gallery-auth.server");
+
+    const guestPlain = "SEMPRA-TEST-GST1";
+    const couplePlain = "SEMPRA-TEST-CPL1";
+
+    db.prepare(`
+      INSERT INTO galleries (
+        id, public_id, bride_names, wedding_date, location,
+        intro_fr, intro_en, signature_fr, signature_en,
+        created_at, expires_at, status,
+        guest_code_hash, couple_code_hash,
+        guest_code_encrypted, couple_code_encrypted,
+        guest_code_version, couple_code_version,
+        cover_image_id, import_path, upload_folder
+      ) VALUES (
+        ?, ?, 'Legacy Wedding', '2026-05-15', 'Chateau',
+        'Intro FR', 'Intro EN', 'Sig FR', 'Sig EN',
+        ?, ?, 'published',
+        ?, ?,
+        ?, ?,
+        1, 1,
+        NULL, NULL, NULL
+      )
+    `).run(
+      legacyId, legacyPublicId,
+      Date.now(), Date.now() + 86400000,
+      hashGalleryCode(guestPlain), hashGalleryCode(couplePlain),
+      encryptGalleryCode(guestPlain), encryptGalleryCode(couplePlain)
+    );
+
+    // Also add a legacy video without poster_revision
+    const legacyMediaId = crypto.randomUUID();
+    db.prepare(`
+      INSERT INTO gallery_media (
+        id, gallery_id, type, visibility, sort_order,
+        original_name, mime_type, size, hash, width, height, created_at, poster_revision
+      ) VALUES (
+        ?, ?, 'video', 'invites', 0,
+        'legacy-clip.mp4', 'video/mp4', 1048576, 'dummyhash123', NULL, NULL, ?, NULL
+      )
+    `).run(legacyMediaId, legacyId, Date.now());
+
+    // 2. Build valid admin request
+    const adminSession = await getSession();
+    adminSession.set("adminId", "admin-tester");
+    adminSession.set("credentialVersion", computeCredentialVersion());
+    adminSession.set("csrfToken", "test-csrf-token");
+    const adminCookie = await commitSession(adminSession);
+
+    const req = new Request(`http://localhost/admin/galleries/${legacyId}`, {
+      headers: {
+        Cookie: adminCookie,
+      },
+    });
+
+    // 3. Execute loader
+    const res = await adminGalleryLoader({ request: req, params: { id: legacyId } } as unknown as LoaderFunctionArgs);
+    expect(res.status).toBe(200);
+
+    const data = await res.json() as {
+      gallery: { bride_names: string; upload_folder: string | null };
+      guestCode: string;
+      coupleCode: string;
+      videoSources: unknown[];
+      videoPreviews: Record<string, { state: string }>;
+      allMedia: Array<{ id: string; poster_revision: string | null }>;
+    };
+
+    // Decrypted codes match exactly
+    expect(data.guestCode).toBe(guestPlain);
+    expect(data.coupleCode).toBe(couplePlain);
+
+    // Empty video sources handled without error
+    expect(Array.isArray(data.videoSources)).toBe(true);
+    expect(data.videoSources.length).toBe(0);
+
+    // Absent preview handled as "missing" without error
+    expect(data.videoPreviews[legacyMediaId]).toEqual({ state: "missing" });
+
+    // Poster revision is null for legacy media
+    expect(data.allMedia.find(m => m.id === legacyMediaId)?.poster_revision).toBeNull();
   });
 });
