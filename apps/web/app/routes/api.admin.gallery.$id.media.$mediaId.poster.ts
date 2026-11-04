@@ -13,10 +13,17 @@ import { validateOrigin } from "../lib/security.server";
 import { getGalleryDb } from "../lib/gallery-db.server";
 import { ENV } from "../lib/env.server";
 import { fsSync } from "../lib/fs.server";
+import {
+  MAX_POSTER_PIXELS,
+  MAX_POSTER_FILE_SIZE,
+  MAX_POSTER_PAYLOAD_SIZE,
+  ALLOWED_POSTER_MIME_TYPES,
+  validatePosterMetadata,
+} from "../lib/gallery-poster";
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
-const MAX_PAYLOAD_SIZE = MAX_FILE_SIZE + 1024 * 1024; // 26 MB
-const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
+const MAX_FILE_SIZE = MAX_POSTER_FILE_SIZE;
+const MAX_PAYLOAD_SIZE = MAX_POSTER_PAYLOAD_SIZE;
+const allowedMimeTypes = ALLOWED_POSTER_MIME_TYPES;
 
 class UploadRequestError extends Error {
   constructor(message: string, readonly status: number) {
@@ -293,26 +300,29 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     const uploadedFilePath = await parseSingleUpload(request, contentType, tempDirectory, session.get("csrfToken") as string);
 
-    // Validate real content with sharp
-    const metadata = await sharp(uploadedFilePath, { limitInputPixels: 40_000_000 }).metadata();
-    if (!metadata.format || !["jpeg", "png", "webp", "avif"].includes(metadata.format)) {
-      return jsonError("Invalid image content", 415);
+    // Validate real content with sharp using centralized limits
+    let metadata;
+    try {
+      metadata = await sharp(uploadedFilePath, { limitInputPixels: MAX_POSTER_PIXELS }).metadata();
+    } catch {
+      return jsonError("Format d'image non supporté ou fichier corrompu.", 415);
     }
-    if ((metadata.width || 0) * (metadata.height || 0) > 40_000_000) {
-      return jsonError("Image too large (dimensions)", 413);
+    const validation = validatePosterMetadata(metadata);
+    if (!validation.valid) {
+      return jsonError(validation.message, validation.status);
     }
 
     const newRevision = crypto.randomUUID();
     const tempAvifPath = path.join(tempDirectory, newRevision + ".avif");
     const tempWebpPath = path.join(tempDirectory, newRevision + ".webp");
 
-    await sharp(uploadedFilePath, { limitInputPixels: 40_000_000 })
+    await sharp(uploadedFilePath, { limitInputPixels: MAX_POSTER_PIXELS })
       .rotate() // Apply EXIF rotation
       .resize({ width: 1920, withoutEnlargement: true })
       .avif({ effort: 6 })
       .toFile(tempAvifPath);
 
-    await sharp(uploadedFilePath, { limitInputPixels: 40_000_000 })
+    await sharp(uploadedFilePath, { limitInputPixels: MAX_POSTER_PIXELS })
       .rotate()
       .resize({ width: 1920, withoutEnlargement: true })
       .webp({ effort: 6 })

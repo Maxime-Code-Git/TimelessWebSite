@@ -983,8 +983,8 @@ describe("Admin Gallery Integration Lifecycle", () => {
     expect(adminReadRes.status).toBe(200);
     expect(adminReadRes.headers.get("Content-Type")).toBe("image/webp");
 
-    // 8. Fichier > 25MB
-    const bigFileBody = buildMultipart(Buffer.alloc(26 * 1024 * 1024), "big.jpg", "image/jpeg", activeCsrfToken);
+    // 8. Fichier dépassant la taille maximale (52MB > 50MB, attendu 413)
+    const bigFileBody = buildMultipart(Buffer.alloc(52 * 1024 * 1024), "big.jpg", "image/jpeg", activeCsrfToken);
     const bigFileRes = await fetch(actionUrl, {
       method: "POST",
       body: bigFileBody.body,

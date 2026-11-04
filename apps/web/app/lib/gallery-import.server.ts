@@ -380,7 +380,10 @@ export async function processImport(importId: string, galleryId: string, folderN
     }
 
     let progress = 0;
-    const results = { imported: 0, ignored: [...ignoredFiles] };
+    const duplicates: RejectedFile[] = [];
+    const rejected: RejectedFile[] = [...ignoredFiles];
+    const errors: RejectedFile[] = [];
+    let imported = 0;
     let currentTotalSize = 0;
 
     for (const file of files) {
@@ -398,17 +401,17 @@ export async function processImport(importId: string, galleryId: string, folderN
 
         const stat = fs.fstatSync(fd);
         if (!stat.isFile()) {
-          results.ignored.push({ file: file.name, reason: "N'est pas un fichier régulier" });
+          rejected.push({ file: file.name, reason: "N'est pas un fichier régulier" });
           continue;
         }
 
         if (stat.size > MAX_FILE_SIZE) {
-          results.ignored.push({ file: file.name, reason: "Fichier trop volumineux" });
+          rejected.push({ file: file.name, reason: "Fichier trop volumineux" });
           continue;
         }
 
         if (currentTotalSize + stat.size > MAX_TOTAL_SIZE) {
-          results.ignored.push({ file: file.name, reason: "Limite totale de stockage atteinte" });
+          rejected.push({ file: file.name, reason: "Limite totale de stockage atteinte" });
           continue;
         }
 
@@ -416,7 +419,7 @@ export async function processImport(importId: string, galleryId: string, folderN
         const bytesRead = fs.readSync(fd, header, 0, 1024, 0);
         const mimeType = detectMimeType(header.subarray(0, bytesRead));
 
-        if (!mimeType || !validateFileType(mimeType, file.expectedCategory, file.name, results.ignored)) {
+        if (!mimeType || !validateFileType(mimeType, file.expectedCategory, file.name, rejected)) {
           continue;
         }
 
@@ -444,9 +447,10 @@ export async function processImport(importId: string, galleryId: string, folderN
         fs.closeSync(fd);
         fd = null;
 
-        const existing = db.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND hash = ?").get(galleryId, finalHash);
+        const existing = db.prepare("SELECT id, visibility FROM gallery_media WHERE gallery_id = ? AND hash = ?").get(galleryId, finalHash) as { id: string; visibility: string } | undefined;
         if (existing) {
-          results.ignored.push({ file: file.name, reason: "Doublon (même contenu exact)" });
+          // Deduplicated by content hash: preserve existing access level strictly (never broaden maries to invites)
+          duplicates.push({ file: file.name, reason: "Doublon (même contenu exact)" });
           continue;
         }
 
@@ -478,7 +482,7 @@ export async function processImport(importId: string, galleryId: string, folderN
         tmpPath = null;
 
         currentTotalSize += stat.size;
-        results.imported++;
+        imported++;
       } catch (err) {
         if (inserted && tmpPath) {
            // Compensation: if rename fails but DB was inserted, remove DB record to keep consistency
@@ -489,7 +493,7 @@ export async function processImport(importId: string, galleryId: string, folderN
         if (type === "photo" && mediaId) {
           removePreviews(galleryId, mediaId);
         }
-        results.ignored.push({ file: file.name, reason: "Erreur: " + (err instanceof Error ? err.message : String(err)) });
+        errors.push({ file: file.name, reason: "Erreur: " + (err instanceof Error ? err.message : String(err)) });
       } finally {
         if (fd !== null) {
           try { fs.closeSync(fd); } catch { /* ignore */ }
@@ -506,7 +510,16 @@ export async function processImport(importId: string, galleryId: string, folderN
 
     if (leaseTimer) clearInterval(leaseTimer);
 
-    // Finalize
+    // Finalize with full breakdown
+    const results = {
+      transferred: files.length + ignoredFiles.length,
+      imported,
+      duplicates,
+      rejected,
+      errors,
+      ignored: [...duplicates, ...rejected, ...errors],
+    };
+
     if (!canceled) {
       db.prepare("UPDATE gallery_imports SET status = 'completed', result_json = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
       .run(JSON.stringify(results), Date.now(), importId, leaseToken);

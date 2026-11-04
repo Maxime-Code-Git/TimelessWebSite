@@ -1099,6 +1099,10 @@
   margin-top: 16px;
 }
 
+.marginTop8 {
+  margin-top: 8px;
+}
+
 .teamMemberGap {
   margin-bottom: 40px;
 }
@@ -1870,4 +1874,109 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ── Source video management (Mac mini) ───────────────────── */
+.sourceVideoList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.sourceVideoCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.sourceVideoHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sourceVideoBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.sourceVideoActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sourceVideoConfirmBox {
+  padding: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Video Preview Status ──────────────────────────────────── */
+.videoPreviewControls {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.previewBadge {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.previewBadgeReady {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.previewBadgeProcessing {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.previewBadgeFailed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.previewBadgeMissing {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+/* ── Import Breakdown ─────────────────────────────────────── */
+.importBreakdown {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  background: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.importBreakdownList {
+  margin: 6px 0 0 16px;
+  padding: 0;
+  font-size: 0.8rem;
+  color: #475569;
 }

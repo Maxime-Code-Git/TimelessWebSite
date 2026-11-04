@@ -31,13 +31,17 @@
 .heroOverlay {
   position: absolute;
   inset: 0;
-  background: rgba(10, 24, 18, 0.5);
+  background:
+    radial-gradient(ellipse at center, rgba(10, 24, 18, 0.55) 0%, rgba(10, 24, 18, 0.22) 48%, transparent 76%),
+    linear-gradient(180deg, rgba(10, 24, 18, 0.1) 0%, rgba(10, 24, 18, 0.25) 100%);
   z-index: 1;
 }
 
 .heroContent {
   position: relative;
   z-index: 2;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .heroSubtitle {
@@ -45,7 +49,7 @@
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--gold-light);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.75);
   margin: 0 0 20px;
 }
 
@@ -54,14 +58,14 @@
   font-weight: 500;
   font-size: clamp(30px, 5.5vw, 50px);
   color: var(--ivory);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
   margin: 0 0 14px;
 }
 
 .heroDate {
   font-size: 14px;
   color: var(--ivory);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.75);
   max-width: 440px;
   margin: 0 auto;
 }

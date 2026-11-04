@@ -74,6 +74,95 @@ export function isUploadDestination(val: unknown): val is UploadDestination {
   return typeof val === "string" && Object.prototype.hasOwnProperty.call(UPLOAD_DESTINATIONS, val);
 }
 
+export interface FinalizeReceipt {
+  uploadId: string;
+  fileName: string;
+  destination: UploadDestination;
+  target: "photos" | "videos";
+  alreadyExists?: boolean;
+  createdAt: number;
+}
+
+const ongoingFinalizations = new Map<
+  string,
+  Promise<{
+    success: boolean;
+    fileName: string;
+    destination: UploadDestination;
+    target: "photos" | "videos";
+    alreadyExists?: boolean;
+  }>
+>();
+
+export function hasOngoingGalleryUploadFinalization(galleryId: string): boolean {
+  return Array.from(ongoingFinalizations.keys()).some((key) => key.startsWith(`${galleryId}:`));
+}
+
+export function getReceiptsBaseDir(folderPath: string): string {
+  return path.join(folderPath, ".receipts");
+}
+
+export function writeReceipt(folderPath: string, uploadId: string, receipt: FinalizeReceipt): void {
+  const receiptsDir = getReceiptsBaseDir(folderPath);
+  if (!fs.existsSync(receiptsDir)) {
+    fs.mkdirSync(receiptsDir, { recursive: true, mode: 0o700 });
+  }
+  const receiptPath = path.join(receiptsDir, `${uploadId}.json`);
+  const tmpPath = path.join(
+    receiptsDir,
+    `${uploadId}.${process.pid}.${Date.now()}.${crypto.randomBytes(4).toString("hex")}.tmp`
+  );
+  fs.writeFileSync(tmpPath, JSON.stringify(receipt, null, 2), { mode: 0o600 });
+  fs.renameSync(tmpPath, receiptPath);
+}
+
+export function cleanupReceiptsForFile(folderPath: string, fileName: string): void {
+  const cleanInDir = (dir: string) => {
+    if (!fs.existsSync(dir)) return;
+    try {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+        const receiptPath = path.join(dir, entry.name);
+        try {
+          const receipt = JSON.parse(fs.readFileSync(receiptPath, "utf-8")) as FinalizeReceipt;
+          if (receipt.fileName === fileName) {
+            fs.unlinkSync(receiptPath);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  cleanInDir(getReceiptsBaseDir(folderPath));
+  cleanInDir(path.join(getUploadsBaseDir(folderPath), ".receipts"));
+
+  const uploadsBase = getUploadsBaseDir(folderPath);
+  if (!fs.existsSync(uploadsBase)) return;
+  try {
+    for (const entry of fs.readdirSync(uploadsBase, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name === ".receipts") continue;
+      const uploadDir = path.join(uploadsBase, entry.name);
+      const receiptPath = path.join(uploadDir, "finalized.json");
+      if (fs.existsSync(receiptPath)) {
+        try {
+          const receipt = JSON.parse(fs.readFileSync(receiptPath, "utf-8")) as FinalizeReceipt;
+          if (receipt.fileName === fileName) {
+            fs.rmSync(uploadDir, { recursive: true, force: true });
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export class DiskSpaceError extends Error {
   readonly status = 507;
   constructor(message = "Espace disque insuffisant sur le serveur.") {
@@ -129,6 +218,7 @@ export function computeAllActiveDiskReservations(basePath: string, excludeUpload
         if (excludeUploadId && uDir.name === excludeUploadId) continue;
 
         const uploadPath = path.join(tmpUploadsDir, uDir.name);
+        if (fs.existsSync(path.join(uploadPath, "finalized.json"))) continue;
         const metaPath = path.join(uploadPath, "meta.json");
         if (!fs.existsSync(metaPath)) continue;
 
@@ -200,6 +290,7 @@ export function countActiveSessionsForTarget(
     const entries = fs.readdirSync(tmpUploadsDir, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
+      if (fs.existsSync(path.join(tmpUploadsDir, entry.name, "finalized.json"))) continue;
       const metaPath = path.join(tmpUploadsDir, entry.name, "meta.json");
       if (fs.existsSync(metaPath)) {
         try {
@@ -566,6 +657,7 @@ export function getUploadStatus(
   fileName: string;
   destination: UploadDestination;
   target: "photos" | "videos";
+  finalized?: boolean;
 } {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uploadId)) {
     throw new UploadValidationError("Identifiant d'upload invalide.");
@@ -573,7 +665,45 @@ export function getUploadStatus(
 
   const folder = ensureGalleryImportFolder(galleryId);
   const uploadDir = path.join(getUploadsBaseDir(folder.folderPath), uploadId);
+  const receiptsDir = getReceiptsBaseDir(folder.folderPath);
+  const receiptPath = path.join(receiptsDir, `${uploadId}.json`);
+  const legacyReceiptPath1 = path.join(getUploadsBaseDir(folder.folderPath), ".receipts", `${uploadId}.json`);
+  const legacyReceiptPath2 = path.join(uploadDir, "finalized.json");
   const metaPath = path.join(uploadDir, "meta.json");
+
+  const effectiveReceipt = fs.existsSync(receiptPath)
+    ? receiptPath
+    : fs.existsSync(legacyReceiptPath1)
+    ? legacyReceiptPath1
+    : fs.existsSync(legacyReceiptPath2)
+    ? legacyReceiptPath2
+    : null;
+
+  if (effectiveReceipt) {
+    try {
+      const receipt = JSON.parse(fs.readFileSync(effectiveReceipt, "utf-8")) as FinalizeReceipt;
+      const config = UPLOAD_DESTINATIONS[receipt.destination];
+      if (config) {
+        const recordedDest = path.join(folder.folderPath, config.folder, receipt.fileName);
+        if (fs.existsSync(recordedDest)) {
+          return {
+            uploadId,
+            totalChunks: 1,
+            uploadedChunks: [0],
+            fileName: receipt.fileName,
+            destination: receipt.destination,
+            target: receipt.target,
+            finalized: true,
+          };
+        } else {
+          try { fs.unlinkSync(effectiveReceipt); } catch { /* ignore */ }
+          try { fs.rmSync(uploadDir, { recursive: true, force: true }); } catch { /* ignore */ }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   if (!fs.existsSync(metaPath)) {
     throw new UploadValidationError("Session d'upload introuvable ou expirée.", 404);
@@ -628,9 +758,71 @@ export async function finalizeUpload(
     throw new UploadValidationError("Identifiant d'upload invalide.");
   }
 
+  const lockKey = `${galleryId}:${uploadId}`;
+  const existing = ongoingFinalizations.get(lockKey);
+  if (existing) {
+    return await existing;
+  }
+
+  const promise = executeFinalizeUpload(galleryId, uploadId);
+  ongoingFinalizations.set(lockKey, promise);
+  try {
+    return await promise;
+  } finally {
+    ongoingFinalizations.delete(lockKey);
+  }
+}
+
+async function executeFinalizeUpload(
+  galleryId: string,
+  uploadId: string
+): Promise<{
+  success: boolean;
+  fileName: string;
+  destination: UploadDestination;
+  target: "photos" | "videos";
+  alreadyExists?: boolean;
+}> {
   const folder = ensureGalleryImportFolder(galleryId);
   const uploadDir = path.join(getUploadsBaseDir(folder.folderPath), uploadId);
+  const receiptsDir = getReceiptsBaseDir(folder.folderPath);
+  const receiptPath = path.join(receiptsDir, `${uploadId}.json`);
+  const legacyReceiptPath1 = path.join(getUploadsBaseDir(folder.folderPath), ".receipts", `${uploadId}.json`);
+  const legacyReceiptPath2 = path.join(uploadDir, "finalized.json");
   const metaPath = path.join(uploadDir, "meta.json");
+
+  // Check existing receipt
+  const effectiveReceipt = fs.existsSync(receiptPath)
+    ? receiptPath
+    : fs.existsSync(legacyReceiptPath1)
+    ? legacyReceiptPath1
+    : fs.existsSync(legacyReceiptPath2)
+    ? legacyReceiptPath2
+    : null;
+
+  if (effectiveReceipt) {
+    try {
+      const receipt = JSON.parse(fs.readFileSync(effectiveReceipt, "utf-8")) as FinalizeReceipt;
+      const config = UPLOAD_DESTINATIONS[receipt.destination];
+      if (config) {
+        const recordedDest = path.join(folder.folderPath, config.folder, receipt.fileName);
+        if (fs.existsSync(recordedDest)) {
+          return {
+            success: true,
+            fileName: receipt.fileName,
+            destination: receipt.destination,
+            target: receipt.target,
+            alreadyExists: receipt.alreadyExists,
+          };
+        } else {
+          try { fs.unlinkSync(effectiveReceipt); } catch { /* ignore */ }
+          try { fs.rmSync(uploadDir, { recursive: true, force: true }); } catch { /* ignore */ }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   if (!fs.existsSync(metaPath)) {
     throw new UploadValidationError("Session d'upload introuvable ou expirée.", 404);
@@ -755,6 +947,19 @@ export async function finalizeUpload(
       // Exactly the same file content already exists!
       try { fs.unlinkSync(assembledPath); } catch { /* ignore */ }
       fs.rmSync(uploadDir, { recursive: true, force: true });
+      const receipt: FinalizeReceipt = {
+        uploadId,
+        fileName: finalFileName,
+        destination: meta.destination,
+        target: config.target,
+        alreadyExists: true,
+        createdAt: Date.now(),
+      };
+      try {
+        writeReceipt(folder.folderPath, uploadId, receipt);
+      } catch {
+        // ignore
+      }
       return {
         success: true,
         fileName: finalFileName,
@@ -780,6 +985,20 @@ export async function finalizeUpload(
 
   // Cleanup upload directory
   fs.rmSync(uploadDir, { recursive: true, force: true });
+
+  const receipt: FinalizeReceipt = {
+    uploadId,
+    fileName: finalFileName,
+    destination: meta.destination,
+    target: config.target,
+    createdAt: Date.now(),
+  };
+
+  try {
+    writeReceipt(folder.folderPath, uploadId, receipt);
+  } catch {
+    // ignore
+  }
 
   return {
     success: true,

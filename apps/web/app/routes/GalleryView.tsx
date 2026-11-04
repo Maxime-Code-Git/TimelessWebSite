@@ -13,6 +13,7 @@ export interface GalleryMedia {
   width: number | null;
   height: number | null;
   poster_revision: string | null;
+  has_video_preview?: boolean;
 }
 
 export function packRows(photos: GalleryMedia[]) {
@@ -221,7 +222,10 @@ export function GalleryView({ lang, gallery, media }: GalleryViewProps) {
                     className={styles.videoElement}
                     poster={v.poster_revision ? `${mediaUrl(v.id)}/poster?v=${v.poster_revision}` : undefined}
                   >
-                    <source src={mediaUrl(v.id)} type={v.mime_type} />
+                    <source
+                      src={v.has_video_preview ? `${mediaUrl(v.id)}?variant=preview` : mediaUrl(v.id)}
+                      type={v.has_video_preview ? "video/mp4" : v.mime_type}
+                    />
                   </video>
                   <a
                     href={`/api/gallery/${gallery.public_id}/download/original/${v.id}`}

@@ -4,6 +4,7 @@ import { getGalleryDb } from "./gallery-db.server";
 import { generateGalleryCode, hashGalleryCode, encryptGalleryCode } from "./gallery-auth.server";
 import { addCalendarMonths } from "./date";
 import { computeGalleryFolderName, createGalleryFolderOnDisk } from "./gallery-folder.server";
+import { hasGalleryVideoPreview } from "./gallery-video-preview.server";
 
 export interface Gallery {
   id: string;
@@ -42,6 +43,7 @@ export interface GalleryMediaRow {
   width: number | null;
   height: number | null;
   poster_revision: string | null;
+  has_video_preview?: boolean;
   created_at: number;
 }
 
@@ -82,7 +84,11 @@ export function getGalleryMedia(galleryId: string, accessLevel: "invites" | "mar
   }
 
   const videoQuery = "SELECT id, type, width, height, mime_type, poster_revision FROM gallery_media WHERE gallery_id = ? AND type = 'video'" + visCondition + " ORDER BY created_at ASC";
-  const videos = db.prepare(videoQuery).all(galleryId) as unknown as GalleryMediaRow[];
+  const rawVideos = db.prepare(videoQuery).all(galleryId) as unknown as GalleryMediaRow[];
+  const videos = rawVideos.map(v => ({
+    ...v,
+    has_video_preview: hasGalleryVideoPreview(galleryId, v.id),
+  }));
 
   const photoQuery = "SELECT id, type, width, height, mime_type, poster_revision FROM gallery_media WHERE gallery_id = ? AND type = 'photo'" + visCondition + " ORDER BY created_at ASC LIMIT 24";
   const photos = db.prepare(photoQuery).all(galleryId) as unknown as GalleryMediaRow[];

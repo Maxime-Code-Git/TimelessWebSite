@@ -7,6 +7,18 @@ import { decryptGalleryCode, generateGalleryCode } from "../lib/gallery-auth.ser
 import { getGalleryDb } from "../lib/gallery-db.server";
 import { getAvailableImportFolders } from "../lib/gallery-import.server";
 import { ensureGalleryImportFolder } from "../lib/gallery-folder.server";
+import {
+  listGalleryVideoSources,
+  deleteGalleryVideoSource,
+  GalleryImportFileError,
+  type GalleryVideoSource,
+} from "../lib/gallery-import-files.server";
+import {
+  getGalleryVideoPreviewStatus,
+  startGalleryVideoPreview,
+  isGalleryVideoPreviewProcessing,
+  type GalleryVideoPreviewStatus,
+} from "../lib/gallery-video-preview.server";
 import { GalleryBrowserUpload } from "../components/admin/GalleryBrowserUpload";
 import styles from "./admin.module.css";
 import { commitSession } from "../lib/session.server";
@@ -45,6 +57,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const galleryPhotos = allMedia.filter(m => m.type === "photo");
 
+  const videoSources = listGalleryVideoSources(galleryFolder.folderName);
+  const videoPreviews: Record<string, GalleryVideoPreviewStatus> = {};
+  for (const m of allMedia) {
+    if (m.type === "video") {
+      videoPreviews[m.id] = getGalleryVideoPreviewStatus(gallery.id, m.id);
+    }
+  }
+
   return Response.json({
     gallery,
     stats,
@@ -55,7 +75,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     coupleCode,
     csrfToken,
     allMedia,
-    galleryPhotos
+    galleryPhotos,
+    videoSources,
+    videoPreviews,
   }, { headers });
 }
 
@@ -221,6 +243,49 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return Response.json({ error: "Impossible de générer un code unique.", intent }, { status: 500 });
   }
 
+  if (intent === "generate_video_preview") {
+    const mediaId = String(formData.get("mediaId") || "").trim();
+    if (!mediaId) {
+      return Response.json({ error: "Identifiant de média manquant.", intent }, { status: 400 });
+    }
+    const result = startGalleryVideoPreview(gallery.id, mediaId);
+    if (result === "not_found") {
+      return Response.json({ error: "Vidéo introuvable dans cette galerie.", intent }, { status: 404 });
+    }
+    if (result === "busy") {
+      return Response.json({
+        error: "Un autre aperçu vidéo est déjà en cours de génération sur le serveur. Réessayez une fois le traitement terminé.",
+        intent,
+      }, { status: 409 });
+    }
+    const success = result === "ready"
+      ? "L'aperçu vidéo est déjà disponible."
+      : "Génération de l'aperçu vidéo lancée en arrière-plan. Le fichier original reste intact.";
+    return Response.json({ success, intent }, { status: result === "ready" ? 200 : 202 });
+  }
+
+  if (intent === "delete_video_source") {
+    const sourceName = String(formData.get("sourceName") || "").trim();
+    const category = String(formData.get("category") || "").trim();
+    const sourceVersion = String(formData.get("sourceVersion") || "").trim();
+
+    try {
+      deleteGalleryVideoSource(gallery.id, category, sourceName, sourceVersion);
+      return Response.json({
+        success: `Le fichier source « ${sourceName} » a été supprimé du Mac mini. Sa copie déjà importée dans la galerie reste disponible.`,
+        intent,
+      });
+    } catch (err: unknown) {
+      if (err instanceof GalleryImportFileError) {
+        return Response.json({ error: err.message, intent }, { status: err.status });
+      }
+      return Response.json({
+        error: err instanceof Error ? err.message : "Erreur lors de la suppression de la source.",
+        intent,
+      }, { status: 500 });
+    }
+  }
+
   if (intent === "delete_media") {
     const mediaIds = [...new Set(formData.getAll("mediaIds").map(String))];
     if (!mediaIds || mediaIds.length === 0) {
@@ -233,6 +298,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const pendingImports = getGalleryImports(gallery.id).filter(i => i.status === "pending" || i.status === "processing");
     if (pendingImports.length > 0) {
       return Response.json({ error: "Une galerie ne peut pas être modifiée si un import est en cours.", intent }, { status: 400 });
+    }
+
+    for (const id of mediaIds) {
+      if (isGalleryVideoPreviewProcessing(gallery.id, id)) {
+        return Response.json({
+          error: "Un aperçu vidéo est en cours de génération pour ce média. Suppression impossible pour le moment.",
+          intent,
+        }, { status: 409 });
+      }
     }
 
     const db = getGalleryDb();
@@ -349,7 +423,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 interface ActionData {
   error?: string;
-  success?: boolean;
+  success?: boolean | string;
   intent?: string;
   deletedCount?: number;
 }
@@ -378,6 +452,8 @@ interface LoaderData {
   csrfToken: string;
   allMedia: { id: string; type: string; visibility: string; original_name: string; width: number | null; height: number | null; poster_revision: string | null }[];
   galleryPhotos: { id: string; original_name: string; width: number | null; height: number | null }[];
+  videoSources: GalleryVideoSource[];
+  videoPreviews: Record<string, GalleryVideoPreviewStatus>;
 }
 
 type ImportActionData = {
@@ -390,12 +466,44 @@ function getAdminPhotoPreviewUrl(publicId: string, mediaId: string, width: numbe
   return `/api/gallery/${publicId}/media/${mediaId}?width=${width}&format=webp`;
 }
 
+function formatFileSize(bytes: number): string {
+  if (!bytes || isNaN(bytes)) return "0 o";
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} Go`;
+}
+
 export default function AdminGalleryEdit() {
-  const { gallery, stats, imports, folders, galleryFolderName, guestCode, coupleCode, csrfToken, galleryPhotos, allMedia } = useLoaderData<LoaderData>();
+  const {
+    gallery,
+    stats,
+    imports,
+    folders,
+    galleryFolderName,
+    guestCode,
+    coupleCode,
+    csrfToken,
+    galleryPhotos,
+    allMedia,
+    videoSources = [],
+    videoPreviews = {},
+  } = useLoaderData<LoaderData>();
   const actionData = useActionData<ActionData>();
   const revalidator = useRevalidator();
   const importFetcher = useFetcher<ImportActionData>();
   const deleteFetcher = useFetcher<ActionData>();
+  const sourceFetcher = useFetcher<ActionData>();
+  const previewFetcher = useFetcher<ActionData>();
+
+  const [confirmDeleteSingleMedia, setConfirmDeleteSingleMedia] = useState<{ id: string; original_name: string } | null>(null);
+  const [confirmDeleteSource, setConfirmDeleteSource] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (sourceFetcher.data?.success) {
+      setConfirmDeleteSource(null);
+    }
+  }, [sourceFetcher.data]);
 
   const [showCodes, setShowCodes] = useState(false);
   const [previewData, setPreviewData] = useState<{
@@ -451,10 +559,12 @@ export default function AdminGalleryEdit() {
     if (deleteFetcher.data?.success && deleteFetcher.data?.intent === "delete_media") {
       setSelectedMedia(new Set());
       setShowDeleteModal(false);
+      setConfirmDeleteSingleMedia(null);
     }
   }, [deleteFetcher.data]);
 
   const hasActiveImport = imports.some(i => i.status === "pending" || i.status === "processing");
+  const hasActivePreview = Object.values(videoPreviews || {}).some(p => p?.state === "processing");
   const importBusy = importFetcher.state !== "idle" || hasActiveImport;
   const deleteBusy = deleteFetcher.state !== "idle";
 
@@ -467,6 +577,16 @@ export default function AdminGalleryEdit() {
       return () => clearInterval(interval);
     }
   }, [hasActiveImport, revalidator]);
+
+  // Auto-reload when video preview compression is active
+  useEffect(() => {
+    if (hasActivePreview) {
+      const interval = setInterval(() => {
+        revalidator.revalidate();
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [hasActivePreview, revalidator]);
 
   // When import finishes, reload stats
   useEffect(() => {
@@ -696,6 +816,93 @@ export default function AdminGalleryEdit() {
           </div>
         </details>
 
+        <details className={styles.marginTop16} open={videoSources.length > 0}>
+          <summary className={styles.label}>
+            Fichiers vidéo sur le Mac mini ({videoSources.length})
+          </summary>
+          <p className={styles.helperText}>
+            Sources originales présentes dans le dossier d'importation de cette galerie sur le Mac mini. La suppression d'une source libère l'espace disque du serveur sans affecter sa copie déjà importée et publiée dans la galerie.
+          </p>
+
+          {sourceFetcher.data?.error && (
+            <p role="alert" className={`${styles.errorText} ${styles.marginTop8}`}>
+              {sourceFetcher.data.error}
+            </p>
+          )}
+          {sourceFetcher.data?.success && (
+            <p role="status" className={`${styles.successMessage} ${styles.marginTop8}`}>
+              {String(sourceFetcher.data.success)}
+            </p>
+          )}
+
+          {videoSources.length === 0 ? (
+            <p className={`${styles.helperText} ${styles.marginTop8}`}>
+              Aucun fichier vidéo présent sur le Mac mini dans le dossier d'import de cette galerie.
+            </p>
+          ) : (
+            <div className={styles.sourceVideoList}>
+              {videoSources.map((src) => {
+                const isConfirming = confirmDeleteSource === `${src.category}:${src.name}`;
+                return (
+                  <div key={`${src.category}:${src.name}`} className={styles.sourceVideoCard} data-testid="source-video-item">
+                    <div className={styles.sourceVideoHeader}>
+                      <div>
+                        <strong>{src.name}</strong>
+                        <span className={styles.sourceVideoBadge} style={{ marginLeft: 8 }}>{src.categoryLabel}</span>
+                      </div>
+                      <span className={styles.helperText}>{formatFileSize(src.size)}</span>
+                    </div>
+
+                    {isConfirming ? (
+                      <div className={styles.sourceVideoConfirmBox}>
+                        <p><strong>Confirmer la suppression du Mac mini :</strong> {src.name} ({src.categoryLabel})</p>
+                        <p className={styles.helperText}>
+                          Le fichier source sera supprimé du disque. La vidéo publiée dans la galerie (si déjà importée) reste disponible.
+                        </p>
+                        <div className={styles.sourceVideoActions}>
+                          <sourceFetcher.Form method="post">
+                            <input type="hidden" name="csrfToken" value={csrfToken} />
+                            <input type="hidden" name="intent" value="delete_video_source" />
+                            <input type="hidden" name="sourceName" value={src.name} />
+                            <input type="hidden" name="category" value={src.category} />
+                            <input type="hidden" name="sourceVersion" value={src.version} />
+                            <button
+                              type="submit"
+                              className={styles.buttonDanger}
+                              disabled={sourceFetcher.state !== "idle"}
+                            >
+                              {sourceFetcher.state !== "idle" ? "Suppression..." : "Supprimer définitivement du disque"}
+                            </button>
+                          </sourceFetcher.Form>
+                          <button
+                            type="button"
+                            className={styles.button}
+                            onClick={() => setConfirmDeleteSource(null)}
+                            disabled={sourceFetcher.state !== "idle"}
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={styles.sourceVideoActions}>
+                        <button
+                          type="button"
+                          className={styles.buttonDanger}
+                          onClick={() => setConfirmDeleteSource(`${src.category}:${src.name}`)}
+                          disabled={sourceFetcher.state !== "idle"}
+                        >
+                          Supprimer du Mac mini
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </details>
+
         {previewLoading && <p>Analyse du dossier en cours...</p>}
 
         {previewData && !previewLoading && (
@@ -775,24 +982,75 @@ export default function AdminGalleryEdit() {
               else if (i.status === "failed") statusLabel = "Échoué";
               else if (i.status === "pending") statusLabel = "En attente";
 
-              let resultSummary: string | null = null;
+              let resultSummary: {
+                transferred?: number;
+                imported?: number;
+                duplicates?: { file: string; reason: string }[];
+                rejected?: { file: string; reason: string }[];
+                errors?: { file: string; reason: string }[];
+                ignored?: { file: string; reason: string }[];
+                error?: string;
+              } | null = null;
               if (i.result_json) {
                 try {
-                  const result = JSON.parse(i.result_json);
-                  if (result.error) {
-                    resultSummary = `Erreur : ${String(result.error)}`;
-                  } else {
-                    resultSummary = `${String(result.imported)} importé(s), ${String((result.ignored as { file: string }[])?.length || 0)} ignoré(s)`;
-                  }
+                  resultSummary = JSON.parse(i.result_json);
                 } catch {
                   resultSummary = null;
                 }
               }
 
               return (
-                <li key={i.id}>
-                  <strong>{new Date(i.created_at).toLocaleString()}</strong> - {statusLabel}
-                  {resultSummary && <span> - {resultSummary}</span>}
+                <li key={i.id} style={{ marginBottom: 12 }}>
+                  <div>
+                    <strong>{new Date(i.created_at).toLocaleString()}</strong> - {statusLabel}
+                  </div>
+                  {resultSummary && (
+                    <div className={styles.importBreakdown}>
+                      {resultSummary.error ? (
+                        <p className={styles.errorText}>Erreur : {String(resultSummary.error)}</p>
+                      ) : (
+                        <div>
+                          <p>
+                            <strong>Bilan : </strong>
+                            {typeof resultSummary.imported === "number" && `${resultSummary.imported} média(s) ajouté(s)`}
+                            {resultSummary.duplicates && resultSummary.duplicates.length > 0 && `, ${resultSummary.duplicates.length} déjà présent(s)`}
+                            {resultSummary.rejected && resultSummary.rejected.length > 0 && `, ${resultSummary.rejected.length} refusé(s)`}
+                            {resultSummary.errors && resultSummary.errors.length > 0 && `, ${resultSummary.errors.length} erreur(s)`}
+                          </p>
+                          {resultSummary.duplicates && resultSummary.duplicates.length > 0 && (
+                            <details className={styles.marginTop8}>
+                              <summary>Fichiers déjà présents ({resultSummary.duplicates.length})</summary>
+                              <ul className={styles.importBreakdownList}>
+                                {resultSummary.duplicates.map((d, idx) => (
+                                  <li key={idx}><strong>{d.file}</strong> : {d.reason}</li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+                          {resultSummary.rejected && resultSummary.rejected.length > 0 && (
+                            <details className={styles.marginTop8}>
+                              <summary>Fichiers refusés ({resultSummary.rejected.length})</summary>
+                              <ul className={styles.importBreakdownList}>
+                                {resultSummary.rejected.map((r, idx) => (
+                                  <li key={idx}><strong>{r.file}</strong> : {r.reason}</li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+                          {resultSummary.errors && resultSummary.errors.length > 0 && (
+                            <details className={styles.marginTop8}>
+                              <summary>Erreurs ({resultSummary.errors.length})</summary>
+                              <ul className={styles.importBreakdownList}>
+                                {resultSummary.errors.map((e, idx) => (
+                                  <li key={idx}><strong>{e.file}</strong> : {e.reason}</li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -842,6 +1100,17 @@ export default function AdminGalleryEdit() {
           </p>
         )}
 
+        {previewFetcher.data?.error && previewFetcher.data?.intent === "generate_video_preview" && (
+          <p className={`${styles.errorText} ${styles.marginTop16}`} role="alert">
+            {previewFetcher.data.error}
+          </p>
+        )}
+        {previewFetcher.data?.success && previewFetcher.data?.intent === "generate_video_preview" && (
+          <p className={`${styles.successMessage} ${styles.marginTop16}`} role="status">
+            {String(previewFetcher.data.success)}
+          </p>
+        )}
+
         <div className={styles.mediaGrid}>
           {filteredMedia.map(m => (
             <div key={m.id} className={`${styles.mediaItem} ${selectedMedia.has(m.id) ? styles.selected : ''}`} data-testid="gallery-media-item" data-media-id={m.id} data-media-type={m.type} data-media-visibility={m.visibility}>
@@ -855,9 +1124,52 @@ export default function AdminGalleryEdit() {
                   {m.poster_revision ? (
                     <img className={styles.mediaItemImage} src={`/api/gallery/${gallery.public_id}/media/${m.id}/poster?v=${m.poster_revision}&width=480`} alt="Cover" loading="lazy" data-testid="gallery-media-image" />
                   ) : (
-                    <div className={styles.coverThumbPlaceholder}>Vidéo</div>
+                    <div className={styles.coverThumbPlaceholder}>Vidéo : {m.original_name}</div>
                   )}
                   <div className={styles.videoPosterControls}>
+                    <div className={styles.videoPreviewControls}>
+                      {videoPreviews[m.id]?.state === "ready" && (
+                        <span className={`${styles.previewBadge} ${styles.previewBadgeReady}`}>
+                          Aperçu Web prêt
+                        </span>
+                      )}
+                      {videoPreviews[m.id]?.state === "processing" && (
+                        <span className={`${styles.previewBadge} ${styles.previewBadgeProcessing}`}>
+                          Compression en cours...
+                        </span>
+                      )}
+                      {videoPreviews[m.id]?.state === "failed" && (
+                        <span
+                          className={`${styles.previewBadge} ${styles.previewBadgeFailed}`}
+                          title={(videoPreviews[m.id] as { message?: string })?.message}
+                        >
+                          Échec aperçu
+                        </span>
+                      )}
+                      {(!videoPreviews[m.id] || videoPreviews[m.id]?.state === "missing") && (
+                        <span className={`${styles.previewBadge} ${styles.previewBadgeMissing}`}>
+                          Aperçu absent
+                        </span>
+                      )}
+
+                      <previewFetcher.Form method="post">
+                        <input type="hidden" name="csrfToken" value={csrfToken} />
+                        <input type="hidden" name="intent" value="generate_video_preview" />
+                        <input type="hidden" name="mediaId" value={m.id} />
+                        <button
+                          type="submit"
+                          className={styles.posterActionBtn}
+                          disabled={previewFetcher.state !== "idle" || videoPreviews[m.id]?.state === "processing"}
+                        >
+                          {videoPreviews[m.id]?.state === "failed"
+                            ? "Réessayer la compression"
+                            : videoPreviews[m.id]?.state === "ready"
+                            ? "Régénérer l'aperçu"
+                            : "Générer aperçu web"}
+                        </button>
+                      </previewFetcher.Form>
+                    </div>
+
                     <VideoPosterManager
                       galleryId={gallery.id}
                       mediaId={m.id}
@@ -867,6 +1179,15 @@ export default function AdminGalleryEdit() {
                         setHideDeleteMessages(true);
                       }}
                     />
+
+                    <button
+                      type="button"
+                      className={styles.posterActionBtnDanger}
+                      onClick={() => setConfirmDeleteSingleMedia({ id: m.id, original_name: m.original_name })}
+                      disabled={deleteBusy}
+                    >
+                      Supprimer de la galerie
+                    </button>
                   </div>
                 </div>
               )}
@@ -877,6 +1198,50 @@ export default function AdminGalleryEdit() {
           )}
         </div>
       </div>
+
+      {confirmDeleteSingleMedia && (
+        <div className={styles.galleryDeleteModalOverlay}>
+          <div
+            className={styles.galleryDeleteModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gallery-single-delete-title"
+            tabIndex={-1}
+            ref={(el) => { if (el && !deleteBusy) el.focus(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && !deleteBusy) {
+                setConfirmDeleteSingleMedia(null);
+              }
+            }}
+          >
+            <h3 id="gallery-single-delete-title" className={styles.modalTitle}>Confirmer la suppression de la galerie</h3>
+            <p>
+              Voulez-vous vraiment retirer la vidéo <strong>« {confirmDeleteSingleMedia.original_name} »</strong> de la galerie ?
+            </p>
+            <p className={styles.helperText}>
+              Cette action supprime la vidéo de la galerie ainsi que ses aperçus et affiches. Le fichier source original sur le Mac mini reste conservé pour un éventuel réimport.
+            </p>
+            <div className={styles.galleryDeleteModalActions}>
+              <button
+                type="button"
+                className={styles.button}
+                onClick={() => setConfirmDeleteSingleMedia(null)}
+                disabled={deleteBusy}
+              >
+                Annuler
+              </button>
+              <deleteFetcher.Form method="post">
+                <input type="hidden" name="csrfToken" value={csrfToken} />
+                <input type="hidden" name="intent" value="delete_media" />
+                <input type="hidden" name="mediaIds" value={confirmDeleteSingleMedia.id} />
+                <button type="submit" className={styles.buttonDanger} disabled={deleteBusy}>
+                  {deleteBusy ? "Suppression..." : "Supprimer définitivement"}
+                </button>
+              </deleteFetcher.Form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDeleteModal && (
         <div className={styles.galleryDeleteModalOverlay}>
