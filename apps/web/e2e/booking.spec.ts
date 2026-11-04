@@ -184,7 +184,7 @@ test.describe('Visio Booking Flow', () => {
     const bookingNote = page.locator('p:has-text("samedis")').first();
     await expect(bookingNote).toContainText('samedis');
 
-    // Find Saturday option
+    // Find Saturday option with both 10:00 and 14:00 available
     const dateOptions = await dateSelect.locator('option:not([disabled])').all();
     let saturdayValue: string | null = null;
 
@@ -194,7 +194,12 @@ test.describe('Visio Booking Flow', () => {
         const [y, m, d] = val.split('-').map(Number);
         const dayOfWeek = new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).getUTCDay();
         if (dayOfWeek === 6 && !saturdayValue) {
-          saturdayValue = val;
+          await dateSelect.selectOption({ value: val });
+          const times = await page.locator('#visio-time option:not([disabled])').allInnerTexts();
+          if (times.includes('10:00') && times.includes('14:00')) {
+            saturdayValue = val;
+            break;
+          }
         }
       }
     }

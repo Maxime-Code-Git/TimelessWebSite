@@ -207,10 +207,23 @@ export function retryFailedJob(jobId: string): void {
 
 let workerStarted = false;
 
+export function isDeletionWorkerDisabled(): boolean {
+  const specific = process.env.DISABLE_DELETION_WORKER;
+  if (specific !== undefined && specific !== "") {
+    const norm = specific.trim().toLowerCase();
+    if (norm === "true" || norm === "1" || norm === "yes") return true;
+    if (norm === "false" || norm === "0" || norm === "no") return false;
+  }
+  const val = process.env.__TEST_DISABLE_WORKER;
+  if (!val) return false;
+  const norm = val.trim().toLowerCase();
+  return norm === "true" || norm === "1" || norm === "yes";
+}
+
 export function resumeGalleryDeletions(): void {
   if (workerStarted) return;
   workerStarted = true;
-  if (!process.env.__TEST_DISABLE_WORKER) {
+  if (!isDeletionWorkerDisabled()) {
     setImmediate(() => {
       processGalleryDeletions();
     });

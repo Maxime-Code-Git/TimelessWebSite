@@ -1,7 +1,17 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { requireValidAdminSession, createAdminHeaders } from "~/lib/admin-auth.server";
+import { requireValidAdminSession, createAdminHeaders, validateAdminFormData, ActionSecurityError } from "~/lib/admin-auth.server";
 import { getGalleryDb } from "~/lib/gallery-db.server";
-import { getImportPreview, startGalleryImport } from "~/lib/gallery-import.server";
+import {
+  getImportPreview,
+  startGalleryImport,
+  getActiveImportInfo,
+  isImportWorkerDisabled,
+  scheduleWorker,
+} from "~/lib/gallery-import.server";
+import {
+  getGalleryVideoPreviewStatus,
+  type GalleryVideoPreviewStatus,
+} from "~/lib/gallery-video-preview.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   await requireValidAdminSession(request);
@@ -21,12 +31,46 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const db = getGalleryDb();
-  const imports = db.prepare("SELECT * FROM gallery_imports WHERE gallery_id = ? ORDER BY created_at DESC LIMIT 1").get(id);
+  interface ImportRow {
+    id: string;
+    gallery_id: string;
+    status: string;
+    progress: number;
+    total: number;
+    result_json: string | null;
+    worker_id: string | null;
+    lease_expires_at: number | null;
+    attempt_count: number;
+    created_at: number;
+    updated_at: number;
+  }
+  const imports = db.prepare("SELECT * FROM gallery_imports WHERE gallery_id = ? ORDER BY created_at DESC LIMIT 1").get(id) as ImportRow | undefined;
 
-  return Response.json({ importState: imports || null }, { headers: createAdminHeaders() });
+  const workerDisabled = isImportWorkerDisabled();
+
+  // Self-healing: if an import is pending or processing with an expired lease, wake up the worker
+  if (imports && !workerDisabled) {
+    const isPending = imports.status === "pending";
+    const isExpiredLease = imports.status === "processing" && typeof imports.lease_expires_at === "number" && imports.lease_expires_at < Date.now();
+    if (isPending || isExpiredLease) {
+      scheduleWorker();
+    }
+  }
+
+  // Video previews statuses for videos belonging to this gallery
+  const videoRows = db.prepare("SELECT id FROM gallery_media WHERE gallery_id = ? AND type = 'video'").all(id) as { id: string }[];
+  const videoPreviews: Record<string, GalleryVideoPreviewStatus> = {};
+  for (const v of videoRows) {
+    videoPreviews[v.id] = getGalleryVideoPreviewStatus(id, v.id);
+  }
+
+  return Response.json({
+    importState: imports || null,
+    activeInfo: getActiveImportInfo(id),
+    workerDisabled,
+    videoPreviews,
+  }, { headers: createAdminHeaders() });
 }
-
-import { validateAdminFormData, ActionSecurityError } from "~/lib/admin-auth.server";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   let formData: FormData;

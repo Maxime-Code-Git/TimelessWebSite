@@ -163,6 +163,7 @@ test.describe('Admin Home Management', () => {
 
     const newImgPreview = page.getByTestId("home-image-preview-hero-0");
     await expect(newImgPreview).toBeVisible();
+    await expect(newImgPreview).not.toHaveAttribute("src", publicUrl!);
     const newPublicUrl = await newImgPreview.getAttribute('src');
     expect(newPublicUrl).not.toBe(publicUrl);
 

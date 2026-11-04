@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -20,7 +20,7 @@ vi.mock("node:fs", async (importOriginal) => {
 
 
 describe("Gallery Import Worker Logic", () => {
-  beforeAll(() => {
+  beforeEach(() => {
     process.env.__TEST_DISABLE_WORKER = "true";
   });
   let db: DatabaseSync;
@@ -53,8 +53,8 @@ describe("Gallery Import Worker Logic", () => {
   });
 
   afterEach(() => {
-    db.prepare("DELETE FROM gallery_imports").run();
-    db.prepare("DELETE FROM gallery_media").run();
+    db.prepare("DELETE FROM gallery_imports WHERE gallery_id = ?").run(galleryId);
+    db.prepare("DELETE FROM gallery_media WHERE gallery_id = ?").run(galleryId);
     const mediaDir = path.join(ENV.GALLERY_MEDIA_PATH, galleryId);
     if (fs.existsSync(mediaDir)) {
       fs.rmSync(mediaDir, { recursive: true, force: true });

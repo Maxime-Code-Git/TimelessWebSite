@@ -3,6 +3,7 @@ import * as path from "node:path";
 import crypto from "node:crypto";
 import { ENV } from "./env.server";
 import { getGalleryDb } from "./gallery-db.server";
+import { computeGalleryFolderName } from "./gallery-folder.server";
 import sharp from "sharp";
 import { generateAllPreviews, removePreviews } from "./gallery-preview.server";
 
@@ -12,8 +13,6 @@ const MAX_TOTAL_SIZE = 50 * 1024 * 1024 * 1024; // 50 GB total
 
 const PHOTO_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 const VIDEO_MIME_TYPES = new Set(["video/mp4", "video/webm"]);
-
-let workerStarted = false;
 
 function validateImportPath(folderName: string): string {
   const baseReal = fs.realpathSync(ENV.GALLERY_IMPORT_PATH);
@@ -247,9 +246,43 @@ export function startGalleryImport(galleryId: string, folderName: string): strin
   }
 
   // Trigger worker
-  if (!process.env.__TEST_DISABLE_WORKER) scheduleWorker();
+  if (!isImportWorkerDisabled()) scheduleWorker();
 
   return importId;
+}
+
+/**
+ * Checks if the import worker is disabled via environment variables.
+ * Safely parses "true", "1", "yes" vs "false", "0", "no".
+ */
+export function isImportWorkerDisabled(): boolean {
+  const specific = process.env.DISABLE_IMPORT_WORKER;
+  if (specific !== undefined && specific !== "") {
+    const norm = specific.trim().toLowerCase();
+    if (norm === "true" || norm === "1" || norm === "yes") return true;
+    if (norm === "false" || norm === "0" || norm === "no") return false;
+  }
+  const val = process.env.__TEST_DISABLE_WORKER;
+  if (!val) return false;
+  const norm = val.trim().toLowerCase();
+  return norm === "true" || norm === "1" || norm === "yes";
+}
+
+export interface ActiveImportInfo {
+  importId: string;
+  galleryId: string;
+  phase: "scanning" | "reconciling" | "processing" | "completed" | "failed";
+  phaseDetail: string;
+  currentFile?: string;
+  fileIndex?: number;
+  totalFiles?: number;
+  updatedAt: number;
+}
+
+const activeImports = new Map<string, ActiveImportInfo>();
+
+export function getActiveImportInfo(galleryId: string): ActiveImportInfo | null {
+  return activeImports.get(galleryId) || null;
 }
 
 /**
@@ -279,17 +312,25 @@ export function acquireNextJob(): { id: string; gallery_id: string; import_path:
 
   if (!result) return null;
 
-  const gallery = db.prepare("SELECT import_path FROM galleries WHERE id = ?").get(result.gallery_id) as { import_path: string };
-  return { id: result.id, gallery_id: result.gallery_id, import_path: gallery.import_path, lease_token: leaseToken };
+  const gallery = db.prepare("SELECT import_path, upload_folder, bride_names FROM galleries WHERE id = ?").get(result.gallery_id) as { import_path?: string | null; upload_folder?: string | null; bride_names?: string } | undefined;
+  const folderName = gallery?.import_path || gallery?.upload_folder || (gallery ? computeGalleryFolderName(result.gallery_id, gallery.bride_names || "") : "");
+  if (folderName && gallery && !gallery.import_path) {
+    try {
+      db.prepare("UPDATE galleries SET import_path = ? WHERE id = ?").run(folderName, result.gallery_id);
+    } catch { /* ignore */ }
+  }
+  return { id: result.id, gallery_id: result.gallery_id, import_path: folderName, lease_token: leaseToken };
 }
 
 export function resumeImports(): void {
-  if (workerStarted) return;
-  workerStarted = true;
-  if (!process.env.__TEST_DISABLE_WORKER) scheduleWorker();
+  if (isImportWorkerDisabled()) return;
+  scheduleWorker();
 }
 
-function scheduleWorker(): void {
+let isWorkerRunning = false;
+
+export function scheduleWorker(): void {
+  if (isImportWorkerDisabled()) return;
   setImmediate(() => {
     void runWorkerLoop().catch(err => {
       console.error("Import worker error:", err);
@@ -298,28 +339,51 @@ function scheduleWorker(): void {
 }
 
 async function runWorkerLoop(): Promise<void> {
-  let job = acquireNextJob();
-  while (job) {
-    if (job.import_path) {
-      await processImport(job.id, job.gallery_id, job.import_path, job.lease_token);
+  if (isWorkerRunning) return;
+  isWorkerRunning = true;
+  try {
+    let job = acquireNextJob();
+    while (job) {
+      if (job.import_path) {
+        await processImport(job.id, job.gallery_id, job.import_path, job.lease_token);
+      }
+      job = acquireNextJob();
     }
-    job = acquireNextJob();
+  } finally {
+    isWorkerRunning = false;
+    if (!isImportWorkerDisabled()) {
+      const db = getGalleryDb();
+      const hasMore = db.prepare(
+        "SELECT 1 FROM gallery_imports WHERE status = 'pending' OR (status = 'processing' AND lease_expires_at < ?) LIMIT 1"
+      ).get(Date.now());
+      if (hasMore) {
+        scheduleWorker();
+      }
+    }
   }
 }
 
 export async function processImport(importId: string, galleryId: string, folderName: string, leaseToken: string): Promise<void> {
   const db = getGalleryDb();
   let leaseTimer: NodeJS.Timeout | null = null;
-    let canceled = false;
-    const checkLease = () => {
-      if (canceled) return false;
-      const res = db.prepare("UPDATE gallery_imports SET lease_expires_at = ? WHERE id = ? AND worker_id = ? AND status = 'processing' AND lease_expires_at >= ?")
-        .run(Date.now() + LEASE_DURATION_MS, importId, leaseToken, Date.now()); // allow some skew, but reject completely expired leases by others. Actually, if someone stole it, worker_id changed. If it expired but not stolen, we can still renew it if it hasn't been stolen. Wait! The instruction says: "Un bail déjà expiré ne doit pas pouvoir être renouvelé par son ancien propriétaire." So lease_expires_at > Date.now().
-      if (res.changes === 0) {
-        canceled = true;
-      }
-      return !canceled;
-    };
+  let canceled = false;
+  const checkLease = () => {
+    if (canceled) return false;
+    const res = db.prepare("UPDATE gallery_imports SET lease_expires_at = ? WHERE id = ? AND worker_id = ? AND status = 'processing' AND lease_expires_at >= ?")
+      .run(Date.now() + LEASE_DURATION_MS, importId, leaseToken, Date.now());
+    if (res.changes === 0) {
+      canceled = true;
+    }
+    return !canceled;
+  };
+
+  activeImports.set(galleryId, {
+    importId,
+    galleryId,
+    phase: "scanning",
+    phaseDetail: "Analyse et inventaire des fichiers sur le Mac mini...",
+    updatedAt: Date.now(),
+  });
 
   try {
     const importDir = validateImportPath(folderName);
@@ -332,6 +396,15 @@ export async function processImport(importId: string, galleryId: string, folderN
 
     db.prepare("UPDATE gallery_imports SET total = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
       .run(files.length, Date.now(), importId, leaseToken);
+
+    activeImports.set(galleryId, {
+      importId,
+      galleryId,
+      phase: "reconciling",
+      phaseDetail: `Vérification du stockage (${files.length} fichier(s) à traiter)...`,
+      totalFiles: files.length,
+      updatedAt: Date.now(),
+    });
 
     leaseTimer = setInterval(() => {
       if (!checkLease()) clearInterval(leaseTimer!);
@@ -386,8 +459,21 @@ export async function processImport(importId: string, galleryId: string, folderN
     let imported = 0;
     let currentTotalSize = 0;
 
-    for (const file of files) {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       if (!checkLease()) break;
+
+      activeImports.set(galleryId, {
+        importId,
+        galleryId,
+        phase: "processing",
+        currentFile: file.name,
+        phaseDetail: `Traitement de « ${file.name} » (${i + 1}/${files.length}) : analyse et empreinte SHA-256...`,
+        fileIndex: i + 1,
+        totalFiles: files.length,
+        updatedAt: Date.now(),
+      });
+
       let fd: number | null = null;
       let tmpPath: string | null = null;
       let destPath: string | null = null;
@@ -447,16 +533,28 @@ export async function processImport(importId: string, galleryId: string, folderN
         fs.closeSync(fd);
         fd = null;
 
-        const existing = db.prepare("SELECT id, visibility FROM gallery_media WHERE gallery_id = ? AND hash = ?").get(galleryId, finalHash) as { id: string; visibility: string } | undefined;
+        const existing = db.prepare("SELECT id, visibility, original_name FROM gallery_media WHERE gallery_id = ? AND hash = ?").get(galleryId, finalHash) as { id: string; visibility: string; original_name?: string } | undefined;
         if (existing) {
           // Deduplicated by content hash: preserve existing access level strictly (never broaden maries to invites)
-          duplicates.push({ file: file.name, reason: "Doublon (même contenu exact)" });
+          const matchInfo = existing.original_name ? ` : identique à « ${existing.original_name} »` : "";
+          duplicates.push({ file: file.name, reason: `Doublon (même contenu exact)${matchInfo}` });
           continue;
         }
 
         let width: number | null = null;
         let height: number | null = null;
         if (type === "photo") {
+          activeImports.set(galleryId, {
+            importId,
+            galleryId,
+            phase: "processing",
+            currentFile: file.name,
+            phaseDetail: `Génération des aperçus WebP pour « ${file.name} » (${i + 1}/${files.length})...`,
+            fileIndex: i + 1,
+            totalFiles: files.length,
+            updatedAt: Date.now(),
+          });
+
           const metadata = await sharp(tmpPath).metadata();
           if (!checkLease()) throw new Error("Lease lost");
           width = metadata.width || null;
@@ -531,5 +629,8 @@ export async function processImport(importId: string, galleryId: string, folderN
       db.prepare("UPDATE gallery_imports SET status = 'failed', result_json = ?, updated_at = ? WHERE id = ? AND worker_id = ?")
       .run(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), Date.now(), importId, leaseToken);
     }
+  } finally {
+    if (leaseTimer) clearInterval(leaseTimer);
+    activeImports.delete(galleryId);
   }
 }

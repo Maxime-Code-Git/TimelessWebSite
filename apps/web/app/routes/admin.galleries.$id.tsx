@@ -5,7 +5,7 @@ import { getGalleryById, updateGallery, rotateGalleryCode, CodeCollisionError, g
 import type { GalleryImportRow, GalleryMediaRow } from "../lib/gallery.server";
 import { decryptGalleryCode, generateGalleryCode } from "../lib/gallery-auth.server";
 import { getGalleryDb } from "../lib/gallery-db.server";
-import { getAvailableImportFolders } from "../lib/gallery-import.server";
+import { getAvailableImportFolders, type ActiveImportInfo } from "../lib/gallery-import.server";
 import { ensureGalleryImportFolder } from "../lib/gallery-folder.server";
 import {
   listGalleryVideoSources,
@@ -27,6 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ENV } from "../lib/env.server";
 import { useEffect, useState, useRef } from "react";
+import { formatEuropeanDate } from "../lib/date";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const session = await requireValidAdminSession(request);
   const gallery = getGalleryById(params.id!);
@@ -496,6 +497,83 @@ export default function AdminGalleryEdit() {
   const sourceFetcher = useFetcher<ActionData>();
   const previewFetcher = useFetcher<ActionData>();
 
+  // Live import & preview tracking state
+  const [liveImportState, setLiveImportState] = useState<GalleryImportRow | null>(
+    imports.length > 0 ? imports[0] : null
+  );
+  const [liveActiveInfo, setLiveActiveInfo] = useState<ActiveImportInfo | null>(null);
+  const [workerDisabled, setWorkerDisabled] = useState<boolean>(false);
+  const [liveVideoPreviews, setLiveVideoPreviews] = useState<Record<string, GalleryVideoPreviewStatus>>(videoPreviews || {});
+
+  // Update live state when fresh loader data arrives
+  useEffect(() => {
+    if (imports.length > 0) {
+      setLiveImportState(imports[0]);
+    }
+  }, [imports]);
+
+  useEffect(() => {
+    if (videoPreviews) {
+      setLiveVideoPreviews(videoPreviews);
+    }
+  }, [videoPreviews]);
+
+  // Check if background work is in progress
+  const isImportActive = liveImportState?.status === "pending" || liveImportState?.status === "processing";
+  const isPreviewActive = Object.values(liveVideoPreviews).some(p => p?.state === "processing");
+  const isBackgroundBusy = isImportActive || isPreviewActive;
+
+  // Real-time polling without resetting active form inputs
+  useEffect(() => {
+    if (!isBackgroundBusy) return;
+
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/admin/gallery-import/${gallery.id}`);
+        if (!res.ok || stopped) return;
+        const data = await res.json();
+        if (stopped) return;
+
+        if (data.workerDisabled !== undefined) {
+          setWorkerDisabled(Boolean(data.workerDisabled));
+        }
+
+        if (data.importState) {
+          const prevStatus = liveImportState?.status;
+          const newStatus = data.importState.status;
+          setLiveImportState(data.importState);
+          setLiveActiveInfo(data.activeInfo || null);
+
+          // If job finished, trigger ONE revalidation to refresh media grid & stats
+          if ((prevStatus === "pending" || prevStatus === "processing") &&
+              (newStatus === "completed" || newStatus === "failed")) {
+            revalidator.revalidate();
+          }
+        }
+
+        if (data.videoPreviews) {
+          const wasProcessing = Object.values(liveVideoPreviews).some(p => p?.state === "processing");
+          const previewsRecord = data.videoPreviews as Record<string, GalleryVideoPreviewStatus>;
+          const stillProcessing = Object.values(previewsRecord).some(p => p?.state === "processing");
+          setLiveVideoPreviews(previewsRecord);
+
+          if (wasProcessing && !stillProcessing) {
+            revalidator.revalidate();
+          }
+        }
+      } catch {
+        // network error, retry next interval
+      }
+    };
+
+    const interval = setInterval(poll, 1500);
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+    };
+  }, [isBackgroundBusy, gallery.id, liveImportState?.status, liveVideoPreviews, revalidator]);
+
   const [confirmDeleteSingleMedia, setConfirmDeleteSingleMedia] = useState<{ id: string; original_name: string } | null>(null);
   const [confirmDeleteSource, setConfirmDeleteSource] = useState<string | null>(null);
 
@@ -534,7 +612,6 @@ export default function AdminGalleryEdit() {
   const [hideDeleteMessages, setHideDeleteMessages] = useState(false);
 
   useEffect(() => {
-    // Reset hide state when a new delete starts
     if (deleteFetcher.state !== "idle") {
       setHideDeleteMessages(false);
     }
@@ -563,37 +640,8 @@ export default function AdminGalleryEdit() {
     }
   }, [deleteFetcher.data]);
 
-  const hasActiveImport = imports.some(i => i.status === "pending" || i.status === "processing");
-  const hasActivePreview = Object.values(videoPreviews || {}).some(p => p?.state === "processing");
-  const importBusy = importFetcher.state !== "idle" || hasActiveImport;
+  const importBusy = importFetcher.state !== "idle" || isImportActive;
   const deleteBusy = deleteFetcher.state !== "idle";
-
-  // Auto-reload when import is active
-  useEffect(() => {
-    if (hasActiveImport) {
-      const interval = setInterval(() => {
-        revalidator.revalidate();
-      }, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [hasActiveImport, revalidator]);
-
-  // Auto-reload when video preview compression is active
-  useEffect(() => {
-    if (hasActivePreview) {
-      const interval = setInterval(() => {
-        revalidator.revalidate();
-      }, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [hasActivePreview, revalidator]);
-
-  // When import finishes, reload stats
-  useEffect(() => {
-    if (importFetcher.data && importFetcher.state === "idle") {
-      revalidator.revalidate();
-    }
-  }, [importFetcher.data, importFetcher.state, revalidator]);
 
   const loadPreview = async (folder: string) => {
     if (!folder) { setPreviewData(null); return; }
@@ -628,285 +676,177 @@ export default function AdminGalleryEdit() {
 
   return (
     <div className={styles.adminPage}>
-      <div className={styles.headerRow}>
-        <h2>Gérer la galerie : {gallery.bride_names}</h2>
-        <Link to="/admin/galleries" className={styles.button}>Retour aux galeries</Link>
-      </div>
+      {/* ── Sticky Parallax Header ── */}
+      <header className={styles.galleryHeaderParallax}>
+        <div className={styles.galleryHeaderLeft}>
+          <div className={styles.galleryHeaderTitleRow}>
+            <Link to="/admin/galleries" className={styles.backLink}>
+              ← Galeries
+            </Link>
+            <h1 className={styles.galleryHeaderTitle}>{gallery.bride_names}</h1>
+            <span
+              className={`${styles.statusPill} ${
+                gallery.status === "published"
+                  ? styles.statusPillPublished
+                  : gallery.status === "draft"
+                  ? styles.statusPillDraft
+                  : styles.statusPillArchived
+              }`}
+            >
+              {gallery.status === "published" ? "Publiée" : gallery.status === "draft" ? "Brouillon" : "Archivée"}
+            </span>
+          </div>
+          <div className={styles.galleryHeaderMeta}>
+            <span>Mariage du {formatEuropeanDate(gallery.wedding_date, "fr")}</span>
+            {gallery.location && <span>· {gallery.location}</span>}
+            <span>· ID Public : <code>{gallery.public_id}</code></span>
+          </div>
+        </div>
 
-      <div className={styles.grid}>
-        <div className={styles.card}>
-          <h3>Informations générales</h3>
-          <Form method="post" className={styles.form}>
-            <input type="hidden" name="csrfToken" value={csrfToken} />
-            <input type="hidden" name="intent" value="update_info" />
+        <div className={styles.galleryHeaderActions}>
+          <a
+            href={`/galerie/${gallery.public_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.button}
+            title="Ouvrir la galerie telle que vue par les clients"
+          >
+            Voir côté client ↗
+          </a>
 
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Noms des mariés</label>
-              <input type="text" name="bride_names" className={styles.input} required defaultValue={gallery.bride_names} />
+          {gallery.status === "published" ? (
+            <Form method="post">
+              <input type="hidden" name="csrfToken" value={csrfToken} />
+              <input type="hidden" name="intent" value="update_info" />
+              <input type="hidden" name="bride_names" value={gallery.bride_names} />
+              <input type="hidden" name="wedding_date" value={gallery.wedding_date} />
+              <input type="hidden" name="expires_at" value={new Date(gallery.expires_at).toISOString().split("T")[0]} />
+              <input type="hidden" name="status" value="draft" />
+              <button type="submit" className={styles.button}>
+                Passer en brouillon
+              </button>
+            </Form>
+          ) : (
+            <Form method="post">
+              <input type="hidden" name="csrfToken" value={csrfToken} />
+              <input type="hidden" name="intent" value="update_info" />
+              <input type="hidden" name="bride_names" value={gallery.bride_names} />
+              <input type="hidden" name="wedding_date" value={gallery.wedding_date} />
+              <input type="hidden" name="expires_at" value={new Date(gallery.expires_at).toISOString().split("T")[0]} />
+              <input type="hidden" name="status" value="published" />
+              <button type="submit" className={styles.submitButton}>
+                Publier la galerie
+              </button>
+            </Form>
+          )}
+        </div>
+      </header>
+
+      {/* ── Audience Metrics Grid ── */}
+      <section className={styles.metricsGrid} aria-label="Compteurs médias">
+        <div className={styles.metricCardItem}>
+          <span className={styles.metricCardLabel}>Total Médias</span>
+          <span className={styles.metricCardValue}>{allMedia.length}</span>
+          <span className={styles.metricCardSubtitle}>Photos et vidéos cumulées</span>
+        </div>
+        <div className={styles.metricCardItem}>
+          <span className={styles.metricCardLabel}>Espace Invités</span>
+          <span className={styles.metricCardValue}>{stats.invitesPhotos + stats.invitesVideos}</span>
+          <span className={styles.metricCardSubtitle}>{stats.invitesPhotos} photo(s) · {stats.invitesVideos} vidéo(s)</span>
+        </div>
+        <div className={styles.metricCardItem}>
+          <span className={styles.metricCardLabel}>Espace Mariés (Privé)</span>
+          <span className={styles.metricCardValue}>{stats.mariesPhotos + stats.mariesVideos}</span>
+          <span className={styles.metricCardSubtitle}>{stats.mariesPhotos} photo(s) · {stats.mariesVideos} vidéo(s)</span>
+        </div>
+        <div className={styles.metricCardItem}>
+          <span className={styles.metricCardLabel}>Date d'expiration</span>
+          <span className={styles.metricCardValue} style={{ fontSize: "1.25rem" }}>
+            {formatEuropeanDate(new Date(gallery.expires_at).toISOString().split("T")[0], "fr")}
+          </span>
+          <span className={styles.metricCardSubtitle}>
+            {gallery.expires_at > Date.now() ? "Galerie active" : "Expirée"}
+          </span>
+        </div>
+      </section>
+
+      {/* ── Section: Téléversement et Importation de Médias ── */}
+      <section className={styles.adminCardParallax}>
+        <div className={styles.adminCardParallaxHeader}>
+          <div>
+            <h2 className={styles.adminCardParallaxTitle}>Téléversement & Importation de médias</h2>
+            <p className={styles.adminCardParallaxSubtitle}>
+              Transférez des photos ou des vidéos depuis votre navigateur vers le Mac mini, ou lancez l'importation d'un dossier.
+            </p>
+          </div>
+        </div>
+
+        {/* Worker disabled warning */}
+        {workerDisabled && (
+          <div className={styles.workerDisabledWarning} role="alert">
+            <div>
+              <strong>Worker d'importation désactivé :</strong> La variable d'environnement <code>__TEST_DISABLE_WORKER=true</code> est active. Les tâches d'importation resteront en attente tant que le worker n'est pas activé.
             </div>
+          </div>
+        )}
 
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Date du mariage</label>
-              <input type="date" name="wedding_date" className={styles.input} required defaultValue={gallery.wedding_date} />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Lieu (optionnel)</label>
-              <input type="text" name="location" className={styles.input} defaultValue={gallery.location || ""} />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Date d'expiration</label>
-              <input type="date" name="expires_at" className={styles.input} defaultValue={new Date(gallery.expires_at).toISOString().split("T")[0]} />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Statut</label>
-              <select name="status" className={styles.input} defaultValue={gallery.status}>
-                <option value="draft">Brouillon</option>
-                <option value="published">Publié</option>
-                <option value="archived">Archivé</option>
-              </select>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Intro FR</label>
-              <textarea name="intro_fr" className={styles.input} defaultValue={gallery.intro_fr || ""} rows={3} />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Intro EN</label>
-              <textarea name="intro_en" className={styles.input} defaultValue={gallery.intro_en || ""} rows={3} />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Signature FR</label>
-              <input type="text" name="signature_fr" className={styles.input} defaultValue={gallery.signature_fr || ""} />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Signature EN</label>
-              <input type="text" name="signature_en" className={styles.input} defaultValue={gallery.signature_en || ""} />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Image de couverture</label>
-              {galleryPhotos.length > 0 ? (
-                <div className={styles.coverGrid}>
-                  <label className={styles.coverOption}>
-                    <input type="radio" name="cover_image_id" value="" defaultChecked={!gallery.cover_image_id} />
-                    <span className={styles.coverThumbPlaceholder}>Aucune</span>
-                  </label>
-                  {galleryPhotos.map(p => (
-                    <label key={p.id} className={styles.coverOption}>
-                      <input type="radio" name="cover_image_id" value={p.id} defaultChecked={gallery.cover_image_id === p.id} />
-                      <img className={styles.coverImage} src={getAdminPhotoPreviewUrl(gallery.public_id, p.id, 480)} alt={p.original_name} loading="lazy" />
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <p className={styles.helperText}>Aucune photo importée. Importez des médias d'abord.</p>
+        {/* Real-time Operation Tracker (Browser -> Server -> Gallery) */}
+        {isImportActive && liveImportState && (
+          <div className={styles.operationTracker} role="status" aria-live="polite">
+            <div className={styles.operationTrackerHeader}>
+              <span className={styles.operationTrackerPhase}>
+                {liveImportState.status === "pending"
+                  ? "⏳ En attente de prise en charge par le worker d'importation..."
+                  : `⚙️ ${liveActiveInfo?.phaseDetail || "Importation et traitement en cours..."}`}
+              </span>
+              {liveImportState.total > 0 && (
+                <span className={styles.helperText}>
+                  {liveImportState.progress} / {liveImportState.total} fichier(s) traité(s)
+                </span>
               )}
             </div>
 
-            {intentMsg("update_info")}
+            {liveImportState.status === "processing" && liveImportState.total > 0 ? (
+              <div className={styles.operationProgressBar}>
+                <div
+                  className={styles.operationProgressFill}
+                  style={{
+                    width: `${Math.min(100, Math.round(((liveImportState.progress || 0) / (liveImportState.total || 1)) * 100))}%`,
+                  }}
+                />
+              </div>
+            ) : (
+              <div className={styles.operationProgressIndeterminate} />
+            )}
 
-            <button type="submit" className={styles.submitButton}>
-              Enregistrer les informations
-            </button>
-          </Form>
-        </div>
-
-        <div className={styles.card}>
-          <h3>Codes d'accès</h3>
-          <button type="button" onClick={() => setShowCodes(!showCodes)} className={styles.button}>
-            {showCodes ? "Masquer les codes" : "Afficher les codes"}
-          </button>
-
-          {/* Guest code section */}
-          <h4>Code Invités</h4>
-          <div className={styles.flexGroup}>
-            <input type={showCodes ? "text" : "password"} readOnly aria-label="Code invités actuel" value={guestCode} className={`${styles.input} ${styles.flex1}`} />
-            <button type="button" onClick={() => copyToClipboard(guestCode)} className={styles.button}>Copier</button>
+            {liveActiveInfo?.currentFile && (
+              <p className={styles.helperText} style={{ marginTop: "0.5rem", marginBottom: 0 }}>
+                Fichier en cours : <strong>{liveActiveInfo.currentFile}</strong>
+              </p>
+            )}
           </div>
-          <Form method="post" className={`${styles.form} ${styles.marginBottom16}`}>
-            <input type="hidden" name="csrfToken" value={csrfToken} />
-            <input type="hidden" name="intent" value="rotate_guest_code" />
-            <div className={styles.formGroup}>
-              <input type="text" name="guestCode" className={styles.input} placeholder="Nouveau code invités (min 8 car.)" />
-            </div>
-            {intentMsg("rotate_guest_code")}
-            <button type="submit" className={styles.button}>Modifier le code invités</button>
-          </Form>
-          <Form method="post" className={styles.marginBottom24}>
-            <input type="hidden" name="csrfToken" value={csrfToken} />
-            <input type="hidden" name="intent" value="regenerate_guest_code" />
-            {intentMsg("regenerate_guest_code")}
-            <button type="submit" className={styles.button}>Régénérer auto le code invités</button>
-          </Form>
+        )}
 
-          {/* Couple code section */}
-          <h4>Code Mariés</h4>
-          <div className={styles.flexGroup}>
-            <input type={showCodes ? "text" : "password"} readOnly aria-label="Code mariés actuel" value={coupleCode} className={`${styles.input} ${styles.flex1}`} />
-            <button type="button" onClick={() => copyToClipboard(coupleCode)} className={styles.button}>Copier</button>
-          </div>
-          <Form method="post" className={`${styles.form} ${styles.marginBottom16}`}>
-            <input type="hidden" name="csrfToken" value={csrfToken} />
-            <input type="hidden" name="intent" value="rotate_couple_code" />
-            <div className={styles.formGroup}>
-              <input type="text" name="coupleCode" className={styles.input} placeholder="Nouveau code mariés (min 8 car.)" />
-            </div>
-            {intentMsg("rotate_couple_code")}
-            <button type="submit" className={styles.button}>Modifier le code mariés</button>
-          </Form>
-          <Form method="post">
-            <input type="hidden" name="csrfToken" value={csrfToken} />
-            <input type="hidden" name="intent" value="regenerate_couple_code" />
-            {intentMsg("regenerate_couple_code")}
-            <button type="submit" className={styles.button}>Régénérer auto le code mariés</button>
-          </Form>
-
-          <p className={`${styles.helperText} ${styles.marginTop16}`}>
-            Modifier un code invalide immédiatement les sessions actives de ce niveau.
-          </p>
-        </div>
-      </div>
-
-      <div className={styles.card}>
-        <h3>Médias de la galerie</h3>
-        <ul>
-          <li>Photos Invités : {stats.invitesPhotos}</li>
-          <li>Vidéos Invités : {stats.invitesVideos}</li>
-          <li>Photos Mariés : {stats.mariesPhotos}</li>
-          <li>Vidéos Mariés : {stats.mariesVideos}</li>
-        </ul>
-
-        <h4>Importer des médias</h4>
-
+        {/* Browser Chunked Upload Component */}
         <GalleryBrowserUpload
           galleryId={gallery.id}
           csrfToken={csrfToken}
           galleryFolderName={galleryFolderName}
           onUploadBatchComplete={(folderName) => {
             setSelectedFolder(folderName);
-            loadPreview(folderName);
+            void loadPreview(folderName);
           }}
         />
 
-        <details className={styles.marginTop16}>
-          <summary className={styles.label}>
-            Importation depuis un dossier contrôlé (méthode avancée)
-          </summary>
-          <div className={styles.formGroup}>
-            <label className={styles.label} htmlFor="import_folder">Dossier d'import sur le serveur</label>
-            <select id="import_folder"
-              className={styles.input}
-              value={selectedFolder}
-              onChange={e => {
-                setSelectedFolder(e.target.value);
-                loadPreview(e.target.value);
-              }}
-            >
-              <option value="">Sélectionnez un dossier...</option>
-              {folders.map(f => (
-                <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
-          </div>
-        </details>
-
-        <details className={styles.marginTop16} open={videoSources.length > 0}>
-          <summary className={styles.label}>
-            Fichiers vidéo sur le Mac mini ({videoSources.length})
-          </summary>
-          <p className={styles.helperText}>
-            Sources originales présentes dans le dossier d'importation de cette galerie sur le Mac mini. La suppression d'une source libère l'espace disque du serveur sans affecter sa copie déjà importée et publiée dans la galerie.
+        {/* Folder analysis preview box */}
+        {previewLoading && (
+          <p className={styles.helperText} style={{ marginTop: "1rem" }}>
+            Analyse du dossier en cours...
           </p>
-
-          {sourceFetcher.data?.error && (
-            <p role="alert" className={`${styles.errorText} ${styles.marginTop8}`}>
-              {sourceFetcher.data.error}
-            </p>
-          )}
-          {sourceFetcher.data?.success && (
-            <p role="status" className={`${styles.successMessage} ${styles.marginTop8}`}>
-              {String(sourceFetcher.data.success)}
-            </p>
-          )}
-
-          {videoSources.length === 0 ? (
-            <p className={`${styles.helperText} ${styles.marginTop8}`}>
-              Aucun fichier vidéo présent sur le Mac mini dans le dossier d'import de cette galerie.
-            </p>
-          ) : (
-            <div className={styles.sourceVideoList}>
-              {videoSources.map((src) => {
-                const isConfirming = confirmDeleteSource === `${src.category}:${src.name}`;
-                return (
-                  <div key={`${src.category}:${src.name}`} className={styles.sourceVideoCard} data-testid="source-video-item">
-                    <div className={styles.sourceVideoHeader}>
-                      <div>
-                        <strong>{src.name}</strong>
-                        <span className={styles.sourceVideoBadge} style={{ marginLeft: 8 }}>{src.categoryLabel}</span>
-                      </div>
-                      <span className={styles.helperText}>{formatFileSize(src.size)}</span>
-                    </div>
-
-                    {isConfirming ? (
-                      <div className={styles.sourceVideoConfirmBox}>
-                        <p><strong>Confirmer la suppression du Mac mini :</strong> {src.name} ({src.categoryLabel})</p>
-                        <p className={styles.helperText}>
-                          Le fichier source sera supprimé du disque. La vidéo publiée dans la galerie (si déjà importée) reste disponible.
-                        </p>
-                        <div className={styles.sourceVideoActions}>
-                          <sourceFetcher.Form method="post">
-                            <input type="hidden" name="csrfToken" value={csrfToken} />
-                            <input type="hidden" name="intent" value="delete_video_source" />
-                            <input type="hidden" name="sourceName" value={src.name} />
-                            <input type="hidden" name="category" value={src.category} />
-                            <input type="hidden" name="sourceVersion" value={src.version} />
-                            <button
-                              type="submit"
-                              className={styles.buttonDanger}
-                              disabled={sourceFetcher.state !== "idle"}
-                            >
-                              {sourceFetcher.state !== "idle" ? "Suppression..." : "Supprimer définitivement du disque"}
-                            </button>
-                          </sourceFetcher.Form>
-                          <button
-                            type="button"
-                            className={styles.button}
-                            onClick={() => setConfirmDeleteSource(null)}
-                            disabled={sourceFetcher.state !== "idle"}
-                          >
-                            Annuler
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className={styles.sourceVideoActions}>
-                        <button
-                          type="button"
-                          className={styles.buttonDanger}
-                          onClick={() => setConfirmDeleteSource(`${src.category}:${src.name}`)}
-                          disabled={sourceFetcher.state !== "idle"}
-                        >
-                          Supprimer du Mac mini
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </details>
-
-        {previewLoading && <p>Analyse du dossier en cours...</p>}
+        )}
 
         {previewData && !previewLoading && (
-          <div className={`${styles.previewBox} ${previewData.error ? styles.previewBoxError : ''}`}>
+          <div className={`${styles.previewBox} ${previewData.error ? styles.previewBoxError : ""}`} style={{ marginTop: "1rem" }}>
             {previewData.error ? (
               <p className={styles.errorText}>{previewData.error}</p>
             ) : (
@@ -917,7 +857,7 @@ export default function AdminGalleryEdit() {
                   <li>Mariés : {previewData.mariesPhotosCount} photos, {previewData.mariesVideosCount} vidéos</li>
                 </ul>
                 {(previewData.rejected as { file: string; reason: string }[])?.length > 0 && (
-                  <details>
+                  <details style={{ marginTop: "0.5rem" }}>
                     <summary>Fichiers refusés ({(previewData.rejected as { file: string; reason: string }[]).length})</summary>
                     <ul>
                       {(previewData.rejected as { file: string; reason: string }[]).map((r, i) => (
@@ -951,140 +891,207 @@ export default function AdminGalleryEdit() {
           </p>
         )}
 
-        {previewData && !previewData.error && !previewLoading && (
+        {/* Launch Import Button from selected folder */}
+        <div style={{ marginTop: "1.25rem", display: "flex", gap: "1rem", alignItems: "center" }}>
           <importFetcher.Form
             method="post"
             action={`/api/admin/gallery-import/${gallery.id}`}
             encType="application/x-www-form-urlencoded"
           >
             <input type="hidden" name="csrfToken" value={csrfToken} />
-            <input type="hidden" name="folderName" value={selectedFolder} />
+            <input type="hidden" name="folderName" value={selectedFolder || galleryFolderName} />
 
             <button
               type="submit"
               className={styles.submitButton}
-              disabled={importBusy || !selectedFolder}
+              disabled={importBusy}
             >
               {importBusy ? "Import en cours..." : "Confirmer et lancer l'import"}
             </button>
           </importFetcher.Form>
-        )}
-
-        <h4>Historique d'importation</h4>
-        {imports.length === 0 ? (
-          <p>Aucun import effectué.</p>
-        ) : (
-          <ul>
-            {imports.map(i => {
-              let statusLabel: string = i.status;
-              if (i.status === "processing") statusLabel = `En cours (${i.progress} / ${i.total})`;
-              else if (i.status === "completed") statusLabel = "Terminé";
-              else if (i.status === "failed") statusLabel = "Échoué";
-              else if (i.status === "pending") statusLabel = "En attente";
-
-              let resultSummary: {
-                transferred?: number;
-                imported?: number;
-                duplicates?: { file: string; reason: string }[];
-                rejected?: { file: string; reason: string }[];
-                errors?: { file: string; reason: string }[];
-                ignored?: { file: string; reason: string }[];
-                error?: string;
-              } | null = null;
-              if (i.result_json) {
-                try {
-                  resultSummary = JSON.parse(i.result_json);
-                } catch {
-                  resultSummary = null;
-                }
-              }
-
-              return (
-                <li key={i.id} style={{ marginBottom: 12 }}>
-                  <div>
-                    <strong>{new Date(i.created_at).toLocaleString()}</strong> - {statusLabel}
-                  </div>
-                  {resultSummary && (
-                    <div className={styles.importBreakdown}>
-                      {resultSummary.error ? (
-                        <p className={styles.errorText}>Erreur : {String(resultSummary.error)}</p>
-                      ) : (
-                        <div>
-                          <p>
-                            <strong>Bilan : </strong>
-                            {typeof resultSummary.imported === "number" && `${resultSummary.imported} média(s) ajouté(s)`}
-                            {resultSummary.duplicates && resultSummary.duplicates.length > 0 && `, ${resultSummary.duplicates.length} déjà présent(s)`}
-                            {resultSummary.rejected && resultSummary.rejected.length > 0 && `, ${resultSummary.rejected.length} refusé(s)`}
-                            {resultSummary.errors && resultSummary.errors.length > 0 && `, ${resultSummary.errors.length} erreur(s)`}
-                          </p>
-                          {resultSummary.duplicates && resultSummary.duplicates.length > 0 && (
-                            <details className={styles.marginTop8}>
-                              <summary>Fichiers déjà présents ({resultSummary.duplicates.length})</summary>
-                              <ul className={styles.importBreakdownList}>
-                                {resultSummary.duplicates.map((d, idx) => (
-                                  <li key={idx}><strong>{d.file}</strong> : {d.reason}</li>
-                                ))}
-                              </ul>
-                            </details>
-                          )}
-                          {resultSummary.rejected && resultSummary.rejected.length > 0 && (
-                            <details className={styles.marginTop8}>
-                              <summary>Fichiers refusés ({resultSummary.rejected.length})</summary>
-                              <ul className={styles.importBreakdownList}>
-                                {resultSummary.rejected.map((r, idx) => (
-                                  <li key={idx}><strong>{r.file}</strong> : {r.reason}</li>
-                                ))}
-                              </ul>
-                            </details>
-                          )}
-                          {resultSummary.errors && resultSummary.errors.length > 0 && (
-                            <details className={styles.marginTop8}>
-                              <summary>Erreurs ({resultSummary.errors.length})</summary>
-                              <ul className={styles.importBreakdownList}>
-                                {resultSummary.errors.map((e, idx) => (
-                                  <li key={idx}><strong>{e.file}</strong> : {e.reason}</li>
-                                ))}
-                              </ul>
-                            </details>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      <div className={styles.card}>
-        <h3>Gestion des médias</h3>
-        <p className={styles.helperText}>
-          Les médias importés sont des copies indépendantes. Supprimer un fichier du dossier d'import ne le retire pas de la galerie. Utilisez cette section pour supprimer les médias déjà importés.
-        </p>
-
-        <div className={`${styles.formGroup} ${styles.marginTop16}`}>
-          <label className={styles.label}>Filtrer par catégorie</label>
-          <select className={styles.input} value={mediaFilter} onChange={e => {
-            setMediaFilter(e.target.value as "all" | "invites-photo" | "invites-video" | "maries-photo" | "maries-video");
-            setSelectedMedia(new Set());
-          }}>
-            <option value="all">Tous les médias ({allMedia?.length || 0})</option>
-            <option value="invites-photo">Photos Invités ({stats.invitesPhotos})</option>
-            <option value="invites-video">Vidéos Invités ({stats.invitesVideos})</option>
-            <option value="maries-photo">Photos Mariés ({stats.mariesPhotos})</option>
-            <option value="maries-video">Vidéos Mariés ({stats.mariesVideos})</option>
-          </select>
         </div>
 
-        <div className={styles.flexGroup}>
+        {/* Advanced Folder Selection */}
+        <details className={styles.marginTop16}>
+          <summary className={styles.label}>
+            Importation depuis un dossier contrôlé (méthode avancée)
+          </summary>
+          <div className={styles.formGroup} style={{ marginTop: "0.75rem" }}>
+            <label className={styles.label} htmlFor="import_folder">Dossier d'import sur le serveur</label>
+            <select
+              id="import_folder"
+              className={styles.input}
+              value={selectedFolder}
+              onChange={e => {
+                setSelectedFolder(e.target.value);
+                void loadPreview(e.target.value);
+              }}
+            >
+              <option value="">Dossier par défaut ({galleryFolderName})</option>
+              {folders.map(f => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+          </div>
+        </details>
+      </section>
+
+      {/* ── Section: Fichiers Sources Vidéo sur le Mac mini (Dossier d'import) ── */}
+      <section className={styles.adminCardParallax}>
+        <div className={styles.adminCardParallaxHeader}>
+          <div>
+            <h2 className={styles.adminCardParallaxTitle}>
+              Fichiers sources vidéo sur le Mac mini ({videoSources.length})
+            </h2>
+            <p className={styles.adminCardParallaxSubtitle}>
+              Dossier <code>{galleryFolderName}</code>. Ces fichiers sont les vidéos brutes stockées sur le disque local du Mac mini. La suppression d'un fichier source ici libère l'espace disque sans affecter sa copie déjà importée et publiée dans la galerie.
+            </p>
+          </div>
+        </div>
+
+        {sourceFetcher.data?.error && (
+          <p role="alert" className={`${styles.errorText} ${styles.marginTop8}`}>
+            {sourceFetcher.data.error}
+          </p>
+        )}
+        {sourceFetcher.data?.success && (
+          <p role="status" className={`${styles.successMessage} ${styles.marginTop8}`}>
+            {String(sourceFetcher.data.success)}
+          </p>
+        )}
+
+        {videoSources.length === 0 ? (
+          <p className={styles.helperText}>
+            Aucun fichier vidéo source présent dans le dossier d'import du Mac mini pour cette galerie.
+          </p>
+        ) : (
+          <div className={styles.sourceVideoList}>
+            {videoSources.map((src) => {
+              const isConfirming = confirmDeleteSource === `${src.category}:${src.name}`;
+              return (
+                <div key={`${src.category}:${src.name}`} className={styles.sourceVideoCard} data-testid="source-video-item">
+                  <div className={styles.sourceVideoHeader}>
+                    <div>
+                      <strong>🎬 {src.name}</strong>
+                      <span className={src.category.includes("maries") ? styles.audienceBadgeMaries : styles.audienceBadgeInvites} style={{ marginLeft: 8 }}>
+                        {src.categoryLabel}
+                      </span>
+                    </div>
+                    <span className={styles.helperText}>{formatFileSize(src.size)}</span>
+                  </div>
+
+                  {isConfirming ? (
+                    <div className={styles.sourceVideoConfirmBox}>
+                      <p><strong>Confirmer la suppression du Mac mini :</strong> {src.name} ({src.categoryLabel})</p>
+                      <p className={styles.helperText}>
+                        Le fichier source sera supprimé du disque. La vidéo publiée dans la galerie (si déjà importée) reste disponible.
+                      </p>
+                      <div className={styles.sourceVideoActions}>
+                        <sourceFetcher.Form method="post">
+                          <input type="hidden" name="csrfToken" value={csrfToken} />
+                          <input type="hidden" name="intent" value="delete_video_source" />
+                          <input type="hidden" name="sourceName" value={src.name} />
+                          <input type="hidden" name="category" value={src.category} />
+                          <input type="hidden" name="sourceVersion" value={src.version} />
+                          <button
+                            type="submit"
+                            className={styles.buttonDanger}
+                            disabled={sourceFetcher.state !== "idle"}
+                          >
+                            {sourceFetcher.state !== "idle" ? "Suppression..." : "Supprimer définitivement du Mac mini"}
+                          </button>
+                        </sourceFetcher.Form>
+                        <button
+                          type="button"
+                          className={styles.button}
+                          onClick={() => setConfirmDeleteSource(null)}
+                          disabled={sourceFetcher.state !== "idle"}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={styles.sourceVideoActions}>
+                      <button
+                        type="button"
+                        className={styles.buttonDanger}
+                        onClick={() => setConfirmDeleteSource(`${src.category}:${src.name}`)}
+                        disabled={sourceFetcher.state !== "idle"}
+                      >
+                        Supprimer du Mac mini
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ── Section: Médias Importés dans la Galerie ── */}
+      <section className={styles.adminCardParallax}>
+        <div className={styles.adminCardParallaxHeader}>
+          <div>
+            <h2 className={styles.adminCardParallaxTitle}>
+              Médias de la galerie ({allMedia.length})
+            </h2>
+            <p className={styles.adminCardParallaxSubtitle}>
+              Ces médias sont importés et accessibles aux invités ou aux mariés selon leur visibilité. Supprimer un média ici le retire de la galerie.
+            </p>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className={styles.filterTabsRow} role="tablist" aria-label="Filtrer les médias">
+          <button
+            type="button"
+            className={`${styles.filterTabButton} ${mediaFilter === "all" ? styles.filterTabButtonActive : ""}`}
+            onClick={() => { setMediaFilter("all"); setSelectedMedia(new Set()); }}
+          >
+            Tous ({allMedia.length})
+          </button>
+          <button
+            type="button"
+            className={`${styles.filterTabButton} ${mediaFilter === "invites-photo" ? styles.filterTabButtonActive : ""}`}
+            onClick={() => { setMediaFilter("invites-photo"); setSelectedMedia(new Set()); }}
+          >
+            Photos Invités ({stats.invitesPhotos})
+          </button>
+          <button
+            type="button"
+            className={`${styles.filterTabButton} ${mediaFilter === "invites-video" ? styles.filterTabButtonActive : ""}`}
+            onClick={() => { setMediaFilter("invites-video"); setSelectedMedia(new Set()); }}
+          >
+            Vidéos Invités ({stats.invitesVideos})
+          </button>
+          <button
+            type="button"
+            className={`${styles.filterTabButton} ${mediaFilter === "maries-photo" ? styles.filterTabButtonActive : ""}`}
+            onClick={() => { setMediaFilter("maries-photo"); setSelectedMedia(new Set()); }}
+          >
+            Photos Mariés ({stats.mariesPhotos})
+          </button>
+          <button
+            type="button"
+            className={`${styles.filterTabButton} ${mediaFilter === "maries-video" ? styles.filterTabButtonActive : ""}`}
+            onClick={() => { setMediaFilter("maries-video"); setSelectedMedia(new Set()); }}
+          >
+            Vidéos Mariés ({stats.mariesVideos})
+          </button>
+        </div>
+
+        {/* Bulk Selection Actions */}
+        <div className={styles.flexGroup} style={{ marginBottom: "1.25rem" }}>
           <button type="button" onClick={toggleSelectAllFiltered} className={styles.button}>
-            {filteredMedia.length > 0 && filteredMedia.every(media => selectedMedia.has(media.id)) ? "Désélectionner tout" : "Sélectionner tout"}
+            {filteredMedia.length > 0 && filteredMedia.every(media => selectedMedia.has(media.id))
+              ? "Désélectionner tout"
+              : "Sélectionner tout"}
           </button>
           {selectedMedia.size > 0 && (
             <button type="button" onClick={() => setShowDeleteModal(true)} className={styles.buttonDanger}>
-              Supprimer la sélection ({selectedMedia.size})
+              Supprimer la sélection de la galerie ({selectedMedia.size})
             </button>
           )}
         </div>
@@ -1096,7 +1103,7 @@ export default function AdminGalleryEdit() {
         )}
         {!hideDeleteMessages && deleteFetcher.data?.success && deleteFetcher.data?.intent === "delete_media" && (
           <p className={`${styles.successMessage} ${styles.marginTop16}`} role="status">
-            {deleteFetcher.data.deletedCount} média(s) supprimé(s).
+            {deleteFetcher.data.deletedCount} média(s) retiré(s) de la galerie.
           </p>
         )}
 
@@ -1111,44 +1118,88 @@ export default function AdminGalleryEdit() {
           </p>
         )}
 
-        <div className={styles.mediaGrid}>
-          {filteredMedia.map(m => (
-            <div key={m.id} className={`${styles.mediaItem} ${selectedMedia.has(m.id) ? styles.selected : ''}`} data-testid="gallery-media-item" data-media-id={m.id} data-media-type={m.type} data-media-visibility={m.visibility}>
-              <label>
-                <input type="checkbox" className={styles.mediaCheckbox} checked={selectedMedia.has(m.id)} onChange={() => toggleMediaSelection(m.id)} aria-label={`Sélectionner ${m.original_name}`} />
-              </label>
-              {m.type === "photo" ? (
-                <img className={styles.mediaItemImage} src={getAdminPhotoPreviewUrl(gallery.public_id, m.id, 480)} alt={m.original_name} loading="lazy" data-testid="gallery-media-image" />
-              ) : (
-                <div className={styles.videoPosterContainer}>
-                  {m.poster_revision ? (
-                    <img className={styles.mediaItemImage} src={`/api/gallery/${gallery.public_id}/media/${m.id}/poster?v=${m.poster_revision}&width=480`} alt="Cover" loading="lazy" data-testid="gallery-media-image" />
+        {/* Media Grid */}
+        <div className={styles.modernMediaGrid}>
+          {filteredMedia.map(m => {
+            const isSelected = selectedMedia.has(m.id);
+            const preview = liveVideoPreviews[m.id];
+            return (
+              <div
+                key={m.id}
+                className={`${styles.modernMediaCard} ${isSelected ? styles.modernMediaCardSelected : ""}`}
+                data-testid="gallery-media-item"
+                data-media-id={m.id}
+                data-media-type={m.type}
+                data-media-visibility={m.visibility}
+              >
+                <input
+                  type="checkbox"
+                  className={styles.modernMediaSelectCheckbox}
+                  checked={isSelected}
+                  onChange={() => toggleMediaSelection(m.id)}
+                  aria-label={`Sélectionner ${m.original_name}`}
+                />
+
+                <div className={styles.modernMediaThumbContainer}>
+                  {m.type === "photo" ? (
+                    <img
+                      className={styles.modernMediaThumbImg}
+                      src={getAdminPhotoPreviewUrl(gallery.public_id, m.id, 480)}
+                      alt={m.original_name}
+                      loading="lazy"
+                      data-testid="gallery-media-image"
+                    />
+                  ) : m.poster_revision ? (
+                    <img
+                      className={styles.modernMediaThumbImg}
+                      src={`/api/gallery/${gallery.public_id}/media/${m.id}/poster?v=${m.poster_revision}&width=480`}
+                      alt={`Couverture de ${m.original_name}`}
+                      loading="lazy"
+                      data-testid="gallery-media-image"
+                    />
                   ) : (
-                    <div className={styles.coverThumbPlaceholder}>Vidéo : {m.original_name}</div>
+                    <div style={{ textAlign: "center", padding: "1rem" }}>
+                      <span style={{ fontSize: "2rem" }}>🎬</span>
+                      <p className={styles.helperText} style={{ margin: "0.25rem 0 0 0" }}>Vidéo</p>
+                    </div>
                   )}
-                  <div className={styles.videoPosterControls}>
+                </div>
+
+                <div className={styles.modernMediaCardBody}>
+                  <div className={styles.modernMediaCardTitle} title={m.original_name}>
+                    {m.original_name}
+                  </div>
+
+                  <div className={styles.modernMediaCardMetaRow}>
+                    <span className={m.visibility === "maries" ? styles.audienceBadgeMaries : styles.audienceBadgeInvites}>
+                      {m.visibility === "maries" ? "Mariés (privé)" : "Invités"}
+                    </span>
+                    <span>{m.type === "photo" ? "Photo" : "Vidéo"}</span>
+                  </div>
+
+                  {m.type === "video" && (
                     <div className={styles.videoPreviewControls}>
-                      {videoPreviews[m.id]?.state === "ready" && (
+                      {preview?.state === "ready" && (
                         <span className={`${styles.previewBadge} ${styles.previewBadgeReady}`}>
-                          Aperçu Web prêt
+                          ✓ Aperçu Web prêt
                         </span>
                       )}
-                      {videoPreviews[m.id]?.state === "processing" && (
+                      {preview?.state === "processing" && (
                         <span className={`${styles.previewBadge} ${styles.previewBadgeProcessing}`}>
-                          Compression en cours...
+                          ⚙️ Compression en cours...
                         </span>
                       )}
-                      {videoPreviews[m.id]?.state === "failed" && (
+                      {preview?.state === "failed" && (
                         <span
                           className={`${styles.previewBadge} ${styles.previewBadgeFailed}`}
-                          title={(videoPreviews[m.id] as { message?: string })?.message}
+                          title={(preview as { message?: string })?.message}
                         >
-                          Échec aperçu
+                          ⚠️ Échec aperçu
                         </span>
                       )}
-                      {(!videoPreviews[m.id] || videoPreviews[m.id]?.state === "missing") && (
+                      {(!preview || preview?.state === "missing") && (
                         <span className={`${styles.previewBadge} ${styles.previewBadgeMissing}`}>
-                          Aperçu absent
+                          Original utilisé
                         </span>
                       )}
 
@@ -1159,30 +1210,33 @@ export default function AdminGalleryEdit() {
                         <button
                           type="submit"
                           className={styles.posterActionBtn}
-                          disabled={previewFetcher.state !== "idle" || videoPreviews[m.id]?.state === "processing"}
+                          disabled={previewFetcher.state !== "idle" || preview?.state === "processing"}
                         >
-                          {videoPreviews[m.id]?.state === "failed"
-                            ? "Réessayer la compression"
-                            : videoPreviews[m.id]?.state === "ready"
+                          {preview?.state === "failed"
+                            ? "Réessayer compression"
+                            : preview?.state === "ready"
                             ? "Régénérer l'aperçu"
                             : "Générer aperçu web"}
                         </button>
                       </previewFetcher.Form>
+
+                      <VideoPosterManager
+                        galleryId={gallery.id}
+                        mediaId={m.id}
+                        hasPoster={!!m.poster_revision}
+                        csrfToken={csrfToken}
+                        clearDeleteMessages={() => {
+                          setHideDeleteMessages(true);
+                        }}
+                      />
                     </div>
+                  )}
 
-                    <VideoPosterManager
-                      galleryId={gallery.id}
-                      mediaId={m.id}
-                      hasPoster={!!m.poster_revision}
-                      csrfToken={csrfToken}
-                      clearDeleteMessages={() => {
-                        setHideDeleteMessages(true);
-                      }}
-                    />
-
+                  <div className={styles.modernMediaCardActions}>
                     <button
                       type="button"
-                      className={styles.posterActionBtnDanger}
+                      className={styles.buttonDanger}
+                      style={{ width: "100%", padding: "0.4rem 0.6rem", fontSize: "0.8125rem" }}
                       onClick={() => setConfirmDeleteSingleMedia({ id: m.id, original_name: m.original_name })}
                       disabled={deleteBusy}
                     >
@@ -1190,15 +1244,315 @@ export default function AdminGalleryEdit() {
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
-          ))}
-          {filteredMedia.length === 0 && (
-            <p className={styles.helperText}>Aucun média trouvé.</p>
-          )}
+              </div>
+            );
+          })}
         </div>
-      </div>
 
+        {filteredMedia.length === 0 && (
+          <p className={styles.helperText} style={{ marginTop: "1rem" }}>
+            Aucun média dans cette catégorie.
+          </p>
+        )}
+      </section>
+
+      {/* ── Section: Codes d'Accès & Sécurité ── */}
+      <section className={styles.adminCardParallax}>
+        <div className={styles.adminCardParallaxHeader}>
+          <div>
+            <h2 className={styles.adminCardParallaxTitle}>Codes d'accès et sécurité</h2>
+            <p className={styles.adminCardParallaxSubtitle}>
+              Gérez les codes d'accès confidentiels pour les invités et l'espace privé des mariés.
+            </p>
+          </div>
+          <button type="button" onClick={() => setShowCodes(!showCodes)} className={styles.button}>
+            {showCodes ? "Masquer les codes" : "Afficher les codes en clair"}
+          </button>
+        </div>
+
+        <div className={styles.grid}>
+          {/* Guest Code */}
+          <div className={styles.card} style={{ marginBottom: 0 }}>
+            <h3>Code Invités (Accès public)</h3>
+            <p className={styles.helperText}>
+              Permet aux invités d'accéder aux photos et vidéos marquées « Invités ».
+            </p>
+            <div className={styles.flexGroup} style={{ marginTop: "0.75rem" }}>
+              <input
+                type={showCodes ? "text" : "password"}
+                readOnly
+                aria-label="Code invités actuel"
+                value={guestCode}
+                className={`${styles.input} ${styles.flex1}`}
+              />
+              <button type="button" onClick={() => copyToClipboard(guestCode)} className={styles.button}>
+                Copier
+              </button>
+            </div>
+            <Form method="post" className={`${styles.form} ${styles.marginTop16}`}>
+              <input type="hidden" name="csrfToken" value={csrfToken} />
+              <input type="hidden" name="intent" value="rotate_guest_code" />
+              <div className={styles.formGroup}>
+                <input type="text" name="guestCode" className={styles.input} placeholder="Nouveau code personnalisé (min 8 car.)" />
+              </div>
+              {intentMsg("rotate_guest_code")}
+              <button type="submit" className={styles.button}>Enregistrer le code</button>
+            </Form>
+            <Form method="post" className={styles.marginTop8}>
+              <input type="hidden" name="csrfToken" value={csrfToken} />
+              <input type="hidden" name="intent" value="regenerate_guest_code" />
+              {intentMsg("regenerate_guest_code")}
+              <button type="submit" className={styles.button}>Régénérer auto le code invités</button>
+            </Form>
+          </div>
+
+          {/* Couple Code */}
+          <div className={styles.card} style={{ marginBottom: 0 }}>
+            <h3>Code Mariés (Espace Privé)</h3>
+            <p className={styles.helperText}>
+              Donne accès à l'intégralité de la galerie (médias invités + médias privés des mariés).
+            </p>
+            <div className={styles.flexGroup} style={{ marginTop: "0.75rem" }}>
+              <input
+                type={showCodes ? "text" : "password"}
+                readOnly
+                aria-label="Code mariés actuel"
+                value={coupleCode}
+                className={`${styles.input} ${styles.flex1}`}
+              />
+              <button type="button" onClick={() => copyToClipboard(coupleCode)} className={styles.button}>
+                Copier
+              </button>
+            </div>
+            <Form method="post" className={`${styles.form} ${styles.marginTop16}`}>
+              <input type="hidden" name="csrfToken" value={csrfToken} />
+              <input type="hidden" name="intent" value="rotate_couple_code" />
+              <div className={styles.formGroup}>
+                <input type="text" name="coupleCode" className={styles.input} placeholder="Nouveau code personnalisé (min 8 car.)" />
+              </div>
+              {intentMsg("rotate_couple_code")}
+              <button type="submit" className={styles.button}>Enregistrer le code</button>
+            </Form>
+            <Form method="post" className={styles.marginTop8}>
+              <input type="hidden" name="csrfToken" value={csrfToken} />
+              <input type="hidden" name="intent" value="regenerate_couple_code" />
+              {intentMsg("regenerate_couple_code")}
+              <button type="submit" className={styles.button}>Régénérer auto le code mariés</button>
+            </Form>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Section: Paramètres & Textes de la Galerie ── */}
+      <section className={styles.adminCardParallax}>
+        <div className={styles.adminCardParallaxHeader}>
+          <div>
+            <h2 className={styles.adminCardParallaxTitle}>Paramètres et textes de la galerie</h2>
+            <p className={styles.adminCardParallaxSubtitle}>
+              Personnalisez les noms, dates, messages d'introduction et l'image de couverture.
+            </p>
+          </div>
+        </div>
+
+        <Form method="post" className={styles.form}>
+          <input type="hidden" name="csrfToken" value={csrfToken} />
+          <input type="hidden" name="intent" value="update_info" />
+
+          <div className={styles.grid}>
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Noms des mariés</label>
+              <input type="text" name="bride_names" className={styles.input} required defaultValue={gallery.bride_names} />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Date du mariage</label>
+              <input type="date" name="wedding_date" className={styles.input} required defaultValue={gallery.wedding_date} />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Lieu (optionnel)</label>
+              <input type="text" name="location" className={styles.input} defaultValue={gallery.location || ""} />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Date d'expiration</label>
+              <input type="date" name="expires_at" className={styles.input} defaultValue={new Date(gallery.expires_at).toISOString().split("T")[0]} />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Statut de publication</label>
+              <select name="status" className={styles.input} defaultValue={gallery.status}>
+                <option value="draft">Brouillon (non accessible publiquement)</option>
+                <option value="published">Publiée (accessible avec code)</option>
+                <option value="archived">Archivée (fermée)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className={styles.grid} style={{ marginTop: "1rem" }}>
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Introduction (Français)</label>
+              <textarea name="intro_fr" className={styles.input} defaultValue={gallery.intro_fr || ""} rows={3} />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Introduction (Anglais)</label>
+              <textarea name="intro_en" className={styles.input} defaultValue={gallery.intro_en || ""} rows={3} />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Signature (Français)</label>
+              <input type="text" name="signature_fr" className={styles.input} defaultValue={gallery.signature_fr || ""} />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Signature (Anglais)</label>
+              <input type="text" name="signature_en" className={styles.input} defaultValue={gallery.signature_en || ""} />
+            </div>
+          </div>
+
+          {/* Cover photo selection */}
+          <div className={styles.formGroup} style={{ marginTop: "1rem" }}>
+            <label className={styles.label}>Photographie de couverture</label>
+            {galleryPhotos.length > 0 ? (
+              <div className={styles.coverGrid}>
+                <label className={styles.coverOption}>
+                  <input type="radio" name="cover_image_id" value="" defaultChecked={!gallery.cover_image_id} />
+                  <span className={styles.coverThumbPlaceholder}>Par défaut</span>
+                </label>
+                {galleryPhotos.map(p => (
+                  <label key={p.id} className={styles.coverOption}>
+                    <input type="radio" name="cover_image_id" value={p.id} defaultChecked={gallery.cover_image_id === p.id} />
+                    <img className={styles.coverImage} src={getAdminPhotoPreviewUrl(gallery.public_id, p.id, 480)} alt={p.original_name} loading="lazy" />
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className={styles.helperText}>Aucune photo importée. Importez des médias d'abord pour choisir une couverture.</p>
+            )}
+          </div>
+
+          {intentMsg("update_info")}
+
+          <button type="submit" className={styles.submitButton} style={{ marginTop: "1.25rem" }}>
+            Enregistrer les informations
+          </button>
+        </Form>
+      </section>
+
+      {/* ── Section: Historique d'Importation (Compact & Repliable) ── */}
+      <section className={styles.adminCardParallax}>
+        <details>
+          <summary className={styles.adminCardParallaxTitle} style={{ cursor: "pointer" }}>
+            Historique d'importation ({imports.length})
+          </summary>
+
+          <div style={{ marginTop: "1rem" }}>
+            {imports.length === 0 ? (
+              <p className={styles.helperText}>Aucun import effectué.</p>
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {imports.map(i => {
+                  let statusLabel: string = i.status;
+                  if (i.status === "processing") statusLabel = `En cours (${i.progress} / ${i.total})`;
+                  else if (i.status === "completed") statusLabel = "Terminé";
+                  else if (i.status === "failed") statusLabel = "Échoué";
+                  else if (i.status === "pending") statusLabel = "En attente";
+
+                  let resultSummary: {
+                    transferred?: number;
+                    imported?: number;
+                    duplicates?: { file: string; reason: string }[];
+                    rejected?: { file: string; reason: string }[];
+                    errors?: { file: string; reason: string }[];
+                    error?: string;
+                  } | null = null;
+
+                  if (i.result_json) {
+                    try {
+                      resultSummary = JSON.parse(i.result_json);
+                    } catch {
+                      resultSummary = null;
+                    }
+                  }
+
+                  return (
+                    <li key={i.id} style={{ marginBottom: "1rem", borderBottom: "1px solid #f1f5f9", paddingBottom: "1rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+                        <strong>{new Date(i.created_at).toLocaleString("fr-FR")}</strong>
+                        <span
+                          className={`${styles.statusPill} ${
+                            i.status === "completed"
+                              ? styles.statusPillPublished
+                              : i.status === "processing" || i.status === "pending"
+                              ? styles.statusPillDraft
+                              : styles.statusPillArchived
+                          }`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+
+                      {resultSummary && (
+                        <div className={styles.importBreakdown}>
+                          {resultSummary.error ? (
+                            <p className={styles.errorText}>Erreur : {String(resultSummary.error)}</p>
+                          ) : (
+                            <div>
+                              <p style={{ margin: "0 0 0.5rem 0" }}>
+                                <strong>Bilan : </strong>
+                                {typeof resultSummary.imported === "number" && `${resultSummary.imported} média(s) ajouté(s)`}
+                                {resultSummary.duplicates && resultSummary.duplicates.length > 0 && `, ${resultSummary.duplicates.length} déjà présent(s)`}
+                                {resultSummary.rejected && resultSummary.rejected.length > 0 && `, ${resultSummary.rejected.length} refusé(s)`}
+                                {resultSummary.errors && resultSummary.errors.length > 0 && `, ${resultSummary.errors.length} erreur(s)`}
+                              </p>
+
+                              {resultSummary.duplicates && resultSummary.duplicates.length > 0 && (
+                                <details style={{ marginTop: "0.5rem" }}>
+                                  <summary>Fichiers déjà présents ({resultSummary.duplicates.length})</summary>
+                                  <ul className={styles.importBreakdownList}>
+                                    {resultSummary.duplicates.map((d, idx) => (
+                                      <li key={idx}><strong>{d.file}</strong> : {d.reason}</li>
+                                    ))}
+                                  </ul>
+                                </details>
+                              )}
+
+                              {resultSummary.rejected && resultSummary.rejected.length > 0 && (
+                                <details style={{ marginTop: "0.5rem" }}>
+                                  <summary>Fichiers refusés ({resultSummary.rejected.length})</summary>
+                                  <ul className={styles.importBreakdownList}>
+                                    {resultSummary.rejected.map((r, idx) => (
+                                      <li key={idx}><strong>{r.file}</strong> : {r.reason}</li>
+                                    ))}
+                                  </ul>
+                                </details>
+                              )}
+
+                              {resultSummary.errors && resultSummary.errors.length > 0 && (
+                                <details style={{ marginTop: "0.5rem" }}>
+                                  <summary>Erreurs ({resultSummary.errors.length})</summary>
+                                  <ul className={styles.importBreakdownList}>
+                                    {resultSummary.errors.map((e, idx) => (
+                                      <li key={idx}><strong>{e.file}</strong> : {e.reason}</li>
+                                    ))}
+                                  </ul>
+                                </details>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </details>
+      </section>
+
+      {/* ── Single Media Delete Modal (Supprimer de la galerie) ── */}
       {confirmDeleteSingleMedia && (
         <div className={styles.galleryDeleteModalOverlay}>
           <div
@@ -1214,12 +1568,12 @@ export default function AdminGalleryEdit() {
               }
             }}
           >
-            <h3 id="gallery-single-delete-title" className={styles.modalTitle}>Confirmer la suppression de la galerie</h3>
+            <h3 id="gallery-single-delete-title" className={styles.modalTitle}>Retirer le média de la galerie</h3>
             <p>
-              Voulez-vous vraiment retirer la vidéo <strong>« {confirmDeleteSingleMedia.original_name} »</strong> de la galerie ?
+              Voulez-vous vraiment retirer <strong>« {confirmDeleteSingleMedia.original_name} »</strong> de la galerie ?
             </p>
             <p className={styles.helperText}>
-              Cette action supprime la vidéo de la galerie ainsi que ses aperçus et affiches. Le fichier source original sur le Mac mini reste conservé pour un éventuel réimport.
+              Cette action supprime le média de la galerie ainsi que ses aperçus et affiches. Le fichier source original sur le Mac mini reste conservé pour un éventuel réimport.
             </p>
             <div className={styles.galleryDeleteModalActions}>
               <button
@@ -1243,6 +1597,7 @@ export default function AdminGalleryEdit() {
         </div>
       )}
 
+      {/* ── Bulk Delete Modal (Supprimer de la galerie) ── */}
       {showDeleteModal && (
         <div className={styles.galleryDeleteModalOverlay}>
           <div
@@ -1258,8 +1613,11 @@ export default function AdminGalleryEdit() {
               }
             }}
           >
-            <h3 id="gallery-delete-title" className={styles.modalTitle}>Confirmer la suppression</h3>
-            <p>Voulez-vous vraiment supprimer {selectedMedia.size} média(s) ? Cette action est irréversible.</p>
+            <h3 id="gallery-delete-title" className={styles.modalTitle}>Confirmer la suppression de la sélection</h3>
+            <p>Voulez-vous vraiment retirer {selectedMedia.size} média(s) de la galerie ?</p>
+            <p className={styles.helperText}>
+              Cette action supprime les médias de la galerie. Les fichiers sources éventuels sur le Mac mini restent intacts.
+            </p>
             <div className={styles.galleryDeleteModalActions}>
               <button type="button" className={styles.button} onClick={() => setShowDeleteModal(false)} disabled={deleteBusy}>
                 Annuler
