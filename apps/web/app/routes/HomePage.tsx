@@ -29,6 +29,11 @@ export function HomePage({ lang }: HomePageProps) {
   };
   const currentPricing = (siteContent?.pricing[selectedCat] || []).filter(f => f.enabled);
   if (!homeContent) return null; // Wait for loader
+  const savedPricingButtonText = homeContent.pricingPreview.buttonText[lang];
+  const legacyPricingButtonText = lang === "fr" ? "Voir toutes les formules" : "See all packages";
+  const pricingButtonText = savedPricingButtonText === legacyPricingButtonText
+    ? (lang === "fr" ? "Voir le détail des formules" : "View package details")
+    : savedPricingButtonText;
   return (
     <>
       {/* 1. Header */}
@@ -157,17 +162,12 @@ export function HomePage({ lang }: HomePageProps) {
               </div>
             ))}
           </div>
-          <p className={styles.formulesPromo}>
-            {homeContent.pricingPreview.promoText[lang]}
-            <b className={styles.formulesPromoHighlight}>{homeContent.pricingPreview.promoTextBold[lang]}</b>
-          </p>
-          <p className={styles.formulesCaveat}>{homeContent.pricingPreview.caveat[lang]}</p>
           <div className={styles.formulesContactWrap}>
             <Link
               to={lang === "fr" ? "/fr/formules" : "/en/pricing"}
               className="btn btn--outline"
             >
-              {homeContent.pricingPreview.buttonText[lang]}
+              {pricingButtonText}
             </Link>
           </div>
           <p className={styles.formulesCustom}>
