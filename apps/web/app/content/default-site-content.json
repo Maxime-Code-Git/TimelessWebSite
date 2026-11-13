@@ -651,8 +651,8 @@
         "en": "for any Duo booking (Photo + Film)."
       },
       "buttonText": {
-        "fr": "Voir toutes les formules",
-        "en": "See all packages"
+        "fr": "Voir le détail des formules",
+        "en": "View package details"
       },
       "customFormulaText": {
         "fr": "Vous avez un projet atypique ?",
